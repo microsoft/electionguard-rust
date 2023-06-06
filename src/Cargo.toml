@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "electionguard",
+  "eg",
+  "util",
+]
