@@ -8,53 +8,59 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
+/// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElectionManifest {
-    // All the contests in the election.
+    /// All the contests in the election.
     pub contests: Vec<Contest>,
 }
 
 impl ElectionManifest {
+    /// Reads an `ElectionManifest` from any `&str` JSON representation.
+    pub fn from_json_str(json: &str) -> Result<ElectionManifest> {
+        serde_json::from_str(json).map_err(|e| anyhow!("Error parsing JSON: {}", e))
+    }
+
+    /// Reads an `ElectionManifest` from a byte sequence.
+    /// Does NOT verify that it is *the* canonical byte sequence.
+    pub fn from_bytes(bytes: &[u8]) -> Result<ElectionManifest> {
+        serde_json::from_slice(bytes).map_err(|e| anyhow!("Error parsing canonical bytes: {}", e))
+    }
+
+    /// Returns a pretty JSON `String` representation of the `ElectionManifest`.
     pub fn to_json_pretty(&self) -> String {
         // `unwrap()` is justified here because why would json serialization would fail?
         #[allow(clippy::unwrap_used)]
         serde_json::to_string_pretty(self).unwrap()
     }
 
+    /// Returns the canonical byte sequence representation of the `ElectionManifest`.
+    /// This uses a more compact JSON format.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
         // `unwrap()` is justified here because why would json serialization would fail?
         #[allow(clippy::unwrap_used)]
         serde_json::to_vec(self).unwrap()
     }
-
-    pub fn from_json_str(json: &str) -> Result<ElectionManifest> {
-        serde_json::from_str(json).map_err(|e| anyhow!("Error parsing JSON: {}", e))
-    }
-
-    pub fn from_canonical_bytes(bytes: &[u8]) -> Result<ElectionManifest> {
-        serde_json::from_slice(bytes).map_err(|e| anyhow!("Error parsing canonical bytes: {}", e))
-    }
 }
 
+/// A contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Contest {
-    // Label
+    /// The label.
     pub label: String,
 
-    // The number of selections allowed.
-    pub number_of_selections_allowed: usize,
-
-    // The number of options that a voter may select.
+    /// The maximum count of options that a voter may select.
     pub selection_limit: usize,
 
-    // The candidates/options.
-    // The order of options matches the virtual ballot.
+    /// The candidates/options.
+    /// The order of options matches the virtual ballot.
     pub options: Vec<ContestOption>,
 }
 
+/// An option in a contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContestOption {
-    // Label
+    /// Label
     pub label: String,
 }
 
@@ -94,7 +100,7 @@ vvvvvvvvvvvvvvv election manifest (canonical bytes) vvvvvvvvvvvvvvv
         assert_ne!(canonical_bytes[canonical_bytes.len() - 1], 0x00);
 
         let election_manifest_from_canonical_bytes =
-            ElectionManifest::from_canonical_bytes(&canonical_bytes).unwrap();
+            ElectionManifest::from_bytes(&canonical_bytes).unwrap();
 
         assert_eq!(election_manifest, election_manifest_from_canonical_bytes);
     }

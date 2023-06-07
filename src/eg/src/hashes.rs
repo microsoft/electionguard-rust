@@ -134,10 +134,10 @@ mod test {
             "eb16f520cd4776961e1e73947f34649413b822661b992dde7f546480e20501b6"
         ));
         let expected_h_m = HValue::from(hex!(
-            "795b4c940ff5f6093cd1c42ef406235643f574d54cbdb48a8485b22b768cfc20"
+            "7b7cda7b05bddef7381b890a76379de4a0e193f68b9204cd2e2db8d743326ad7"
         ));
         let expected_h_b = HValue::from(hex!(
-            "22a6fbab34a0c7d6370e370c8201495463475a8d813b38537325c860f69922ca"
+            "763b1e6ab4f82494445173861581304fa68413744764359e9984d0a4a32b22d0"
         ));
 
         assert_eq!(hashes.h_p, expected_h_p);

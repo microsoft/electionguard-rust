@@ -22,7 +22,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                 Contest {
                     label: "For President and Vice President of The United Realms of Imaginaria"
                         .to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: vec![
                         ContestOption {
@@ -37,7 +36,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
                 Contest {
                     label: "Minister of Arcane Sciences".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: vec![
                         ContestOption {
@@ -56,7 +54,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
                 Contest {
                     label: "Minister of Elemental Resources".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: vec![
                         ContestOption {
@@ -72,7 +69,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
                 Contest {
                     label: "Minister of Dance".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: vec![
                         ContestOption {
@@ -88,7 +84,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
                 Contest {
                     label: "Gränd Cøuncil of Arcáne and Technomägical Affairs".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 3,
                     options: vec![
                         ContestOption {
@@ -128,7 +123,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
                 Contest {
                     label: "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: vec![
                         ContestOption {
@@ -141,26 +135,22 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
                 Contest {
                     label: "Privacy Protection in Techno-Magical Communications Act".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: referendum_options.clone(),
                 },
                 Contest {
                     label: "Public Transport Modernization and Enchantment Proposal".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: referendum_options.clone(),
                 },
                 Contest {
                     label: "Renewable Ætherwind Infrastructure Initiative".to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: referendum_options,
                 },
                 Contest {
                     label: "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained"
                         .to_string(),
-                    number_of_selections_allowed: 1,
                     selection_limit: 1,
                     options: vec![
                         ContestOption {
