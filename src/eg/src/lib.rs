@@ -1,14 +1,17 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+// Copyright (C) Microsoft Corporation. All rights reserved.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod election_manifest;
+pub mod election_parameters;
+pub mod example_election_manifest;
+pub mod example_election_parameters;
+pub mod fixed_parameters;
+pub mod hash;
+pub mod hashes;
+pub mod key;
+pub mod standard_parameters;
+pub mod varying_parameters;
