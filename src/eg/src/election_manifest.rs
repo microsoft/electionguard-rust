@@ -63,7 +63,6 @@ pub struct ContestOption {
 pub mod test {
     use super::*;
     use crate::example_election_manifest::example_election_manifest;
-    use serde::{Deserialize, Serialize};
 
     #[test]
     fn test_election_manifest() {

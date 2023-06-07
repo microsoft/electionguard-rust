@@ -17,7 +17,7 @@ use crate::fixed_parameters::FixedParameters;
 pub struct PublicKey(pub BigUint);
 
 #[derive(Clone)]
-struct PrivateKey {
+pub struct PrivateKey {
     /// Integer secret, s < q
     s: BigUint,
 
@@ -54,6 +54,7 @@ mod test {
         let mut csprng = Csprng::new(12345);
 
         let private_key = PrivateKey::new(&mut csprng, &fixed_parameters);
+
         let public_key: PublicKey = private_key.public_key().clone();
 
         assert!(&private_key.s < fixed_parameters.q.borrow());

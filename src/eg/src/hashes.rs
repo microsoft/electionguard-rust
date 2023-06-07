@@ -22,6 +22,7 @@ struct Hashes {
 
     /// Election base hash.
     h_b: HValue,
+    //? TODO?
     // /// Extended base hash.
     // h_e: HValue,
 }
@@ -97,6 +98,7 @@ impl Hashes {
             eg_h(&h_p, &v)
         };
 
+        //? TODO?
         // // Computation of the extended base hash H_E.
         //
         // let h_e = {
