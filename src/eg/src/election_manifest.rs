@@ -28,10 +28,13 @@ impl ElectionManifest {
     }
 
     /// Returns a pretty JSON `String` representation of the `ElectionManifest`.
+    /// The final line will end with a newline.
     pub fn to_json_pretty(&self) -> String {
         // `unwrap()` is justified here because why would json serialization would fail?
         #[allow(clippy::unwrap_used)]
-        serde_json::to_string_pretty(self).unwrap()
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
     }
 
     /// Returns the canonical byte sequence representation of the `ElectionManifest`.
@@ -75,28 +78,12 @@ pub mod test {
         let election_manifest = example_election_manifest();
 
         let json_pretty = election_manifest.to_json_pretty();
-        assert_ne!(json_pretty.len(), 0);
-
-        #[cfg(trace_extreme)]
-        println!(
-            r"
-vvvvvvvvvvvvvvv election manifest (pretty JSON) vvvvvvvvvvvvvvv
-{json_pretty}
-^^^^^^^^^^^^^^^ election manifest (pretty JSON) ^^^^^^^^^^^^^^^"
-        );
+        assert!(json_pretty.len() > 6);
+        assert_eq!(json_pretty.chars().last().unwrap(), '\n');
 
         let canonical_bytes = election_manifest.to_canonical_bytes();
-
-        #[cfg(trace_extreme)]
-        println!(
-            r"
-vvvvvvvvvvvvvvv election manifest (canonical bytes) vvvvvvvvvvvvvvv
-{}
-^^^^^^^^^^^^^^^ election manifest (canonical bytes) ^^^^^^^^^^^^^^^",
-            util::hex_dump::HexDump::new().dump(&canonical_bytes)
-        );
-
-        assert!(canonical_bytes.len() > 0);
+        assert!(canonical_bytes.len() > 5);
+        assert_ne!(canonical_bytes[canonical_bytes.len() - 1], '\n' as u8);
         assert_ne!(canonical_bytes[canonical_bytes.len() - 1], 0x00);
 
         let election_manifest_from_canonical_bytes =
