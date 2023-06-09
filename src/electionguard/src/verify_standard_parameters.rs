@@ -8,20 +8,27 @@
 use anyhow::{bail, Result};
 use clap::Args;
 
+use util::csprng::Csprng;
+
+use crate::{Clargs, Subcommand};
+
 #[derive(Args, Debug)]
 pub(crate) struct VerifyStandardParameters {
     #[arg(long, default_value_t = 1)]
     passes: usize,
 }
 
-impl VerifyStandardParameters {
-    pub fn do_it(&self) -> Result<()> {
-        use eg::standard_parameters::STANDARD_PARAMETERS;
+impl Subcommand for VerifyStandardParameters {
+    fn need_csprng(&self) -> bool {
+        true
+    }
 
-        eprint!("Initializing csprng...");
-        eprint!("\n!!! WARNING TEMP TEST CODE !!! ...");
-        let mut csprng = util::csprng::Csprng::new(1234); //? TODO seed this for real
-        eprintln!("Done.");
+    fn do_it(&self, _clargs: &Clargs) -> Result<()> {
+        bail!("need csprng version instead");
+    }
+
+    fn do_it_with_csprng(&self, _clargs: &Clargs, mut csprng: Csprng) -> Result<()> {
+        use eg::standard_parameters::STANDARD_PARAMETERS;
 
         eprint!("Initializing standard parameters...");
         let fixed_parameters = &*STANDARD_PARAMETERS;
