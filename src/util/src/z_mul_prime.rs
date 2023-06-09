@@ -5,8 +5,9 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
+use std::ops::{Mul, Sub, SubAssign};
 use std::rc::Rc;
+use std::{borrow::Borrow, ops::Add};
 
 use num_bigint::BigUint;
 use num_traits::{One, Pow, Zero};
@@ -38,7 +39,7 @@ impl ZMulPrime {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ZMulPrimeElem {
     pub zmulp: Rc<ZMulPrime>,
     pub elem: BigUint,
@@ -60,6 +61,13 @@ impl ZMulPrimeElem {
     }
 }
 
+impl Borrow<BigUint> for ZMulPrimeElem {
+    #[inline]
+    fn borrow(&self) -> &BigUint {
+        &self.elem
+    }
+}
+
 impl<'a, 'b> Pow<&'b BigUint> for &'a ZMulPrimeElem {
     type Output = ZMulPrimeElem;
 
@@ -67,6 +75,96 @@ impl<'a, 'b> Pow<&'b BigUint> for &'a ZMulPrimeElem {
         ZMulPrimeElem {
             zmulp: self.zmulp.clone(),
             elem: self.elem.modpow(exponent, self.zmulp.p.borrow()),
+        }
+    }
+}
+
+impl<'a> Add<&ZMulPrimeElem> for &'a ZMulPrimeElem {
+    type Output = ZMulPrimeElem;
+
+    fn add(self: &'a ZMulPrimeElem, other: &ZMulPrimeElem) -> Self::Output {
+        ZMulPrimeElem {
+            zmulp: self.zmulp.clone(),
+            elem: (&self.elem + &other.elem) % self.zmulp.p.as_ref(),
+        }
+    }
+}
+
+// impl Mul<ZMulPrimeElem> for ZMulPrimeElem {
+//     type Output = ZMulPrimeElem;
+
+//     fn mul(self, other: ZMulPrimeElem) -> Self::Output {
+//         ZMulPrimeElem {
+//             zmulp: self.zmulp.clone(),
+//             elem: (&self.elem * &other.elem) % self.zmulp.p.as_ref(),
+//         }
+//     }
+// }
+
+impl<'a> Mul<&ZMulPrimeElem> for &'a ZMulPrimeElem {
+    type Output = ZMulPrimeElem;
+
+    fn mul(self: &'a ZMulPrimeElem, other: &ZMulPrimeElem) -> Self::Output {
+        ZMulPrimeElem {
+            zmulp: self.zmulp.clone(),
+            elem: (&self.elem * &other.elem) % self.zmulp.p.as_ref(),
+        }
+    }
+}
+
+impl<'a, 'b> Mul<&'b BigUint> for &'a ZMulPrimeElem {
+    type Output = ZMulPrimeElem;
+
+    fn mul(self: &'a ZMulPrimeElem, other: &BigUint) -> Self::Output {
+        ZMulPrimeElem {
+            zmulp: self.zmulp.clone(),
+            elem: (&self.elem * other) % self.zmulp.p.as_ref(),
+        }
+    }
+}
+
+impl Sub<&ZMulPrimeElem> for ZMulPrimeElem {
+    type Output = ZMulPrimeElem;
+
+    fn sub(self: ZMulPrimeElem, other: &ZMulPrimeElem) -> Self::Output {
+        if &self.elem > &other.elem {
+            ZMulPrimeElem {
+                zmulp: self.zmulp.clone(),
+                elem: (&self.elem - &other.elem) % self.zmulp.p.as_ref(),
+            }
+        } else {
+            ZMulPrimeElem {
+                zmulp: self.zmulp.clone(),
+                elem: self.zmulp.p.as_ref() - ((&other.elem - &self.elem) % self.zmulp.p.as_ref()),
+            }
+        }
+    }
+}
+
+impl<'a> Sub<&ZMulPrimeElem> for &'a ZMulPrimeElem {
+    type Output = ZMulPrimeElem;
+
+    fn sub(self: &'a ZMulPrimeElem, other: &ZMulPrimeElem) -> Self::Output {
+        if &self.elem > &other.elem {
+            ZMulPrimeElem {
+                zmulp: self.zmulp.clone(),
+                elem: (&self.elem - &other.elem) % self.zmulp.p.as_ref(),
+            }
+        } else {
+            ZMulPrimeElem {
+                zmulp: self.zmulp.clone(),
+                elem: self.zmulp.p.as_ref() - ((&other.elem - &self.elem) % self.zmulp.p.as_ref()),
+            }
+        }
+    }
+}
+
+impl SubAssign<ZMulPrimeElem> for ZMulPrimeElem {
+    fn sub_assign(&mut self, other: ZMulPrimeElem) {
+        if &self.elem > &other.elem {
+            self.elem = (&self.elem - &other.elem) % self.zmulp.p.as_ref()
+        } else {
+            self.elem = self.zmulp.p.as_ref() - ((&other.elem - &self.elem) % self.zmulp.p.as_ref())
         }
     }
 }
@@ -124,6 +222,36 @@ mod test_zmulprime {
             let elem = zmulp.clone().try_new_elem(elem).unwrap();
             let actual = elem.pow(&exponent);
 
+            assert_eq!(&actual.elem, &expected.into());
+        }
+    }
+    #[test]
+    fn test_zmulprime_sub() {
+        let mut csprng = Csprng::new(0);
+
+        for (a, b, p, expected) in [
+            (100u16, 50u16, 997u16, 50u16),
+            (500, 300, 997, 200),
+            (700, 400, 997, 300),
+            (50, 100, 997, 947),
+            (300, 500, 997, 797),
+            (400, 700, 997, 697),
+            (1000, 100, 997, 900),
+            (100, 1000, 997, 97),
+            (999, 1, 997, 1),
+        ] {
+            let p: BigUint = p.try_into().unwrap();
+
+            let a = BigUint::from(a) % &p;
+            let b: BigUint = BigUint::from(b) % &p;
+
+            let p = BigUintPrime::new(p, &mut csprng).unwrap();
+
+            let zmulp = Rc::new(ZMulPrime::new(p));
+            let a = zmulp.clone().try_new_elem(a).unwrap();
+            let b = zmulp.clone().try_new_elem(b).unwrap();
+
+            let actual = a - &b;
             assert_eq!(&actual.elem, &expected.into());
         }
     }

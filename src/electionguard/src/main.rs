@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 mod common_utils;
+mod generate_preencrypted_ballots;
 mod manifest;
 mod verify_standard_parameters;
 
@@ -19,7 +20,10 @@ use eg::{
 };
 use util::csprng::Csprng;
 
-use crate::{manifest::Manifest, verify_standard_parameters::VerifyStandardParameters};
+use crate::{
+    generate_preencrypted_ballots::GeneratePreEncryptedBallots, manifest::Manifest,
+    verify_standard_parameters::VerifyStandardParameters,
+};
 
 #[derive(Parser, Debug)]
 pub(crate) struct Clargs {
@@ -63,6 +67,9 @@ enum Subcommands {
 
     /// Verify standard parameters. Primarily for testing.
     VerifyStandardParameters(VerifyStandardParameters),
+
+    /// Generate preencrypted ballots.
+    GeneratePreEncryptedBallots(GeneratePreEncryptedBallots),
 }
 
 pub(crate) trait Subcommand {
@@ -91,6 +98,9 @@ fn main() -> Result<()> {
         Subcommands::Manifest(ref manifest) => manifest,
         Subcommands::VerifyStandardParameters(ref verify_standard_parameters) => {
             verify_standard_parameters
+        }
+        Subcommands::GeneratePreEncryptedBallots(ref generate_preencrypted_ballots) => {
+            generate_preencrypted_ballots
         }
     };
 

@@ -13,15 +13,15 @@ use crate::{
     hash::{eg_h, HValue},
 };
 
-struct Hashes {
+pub struct Hashes {
     /// Parameter base hash.
-    h_p: HValue,
+    pub h_p: HValue,
 
     /// Election manifest hash.
-    h_m: HValue,
+    pub h_m: HValue,
 
     /// Election base hash.
-    h_b: HValue,
+    pub h_b: HValue,
     //? TODO?
     // /// Extended base hash.
     // h_e: HValue,
@@ -46,7 +46,10 @@ impl std::fmt::Display for Hashes {
 }
 
 impl Hashes {
-    fn new(election_parameters: &ElectionParameters, election_manifest: &ElectionManifest) -> Self {
+    pub fn new(
+        election_parameters: &ElectionParameters,
+        election_manifest: &ElectionManifest,
+    ) -> Self {
         // Computation of the parameter base hash H_P.
         let h_p = {
             // "B1 = 00 ∥ b(p, 512) ∥ b(q, 32) ∥ b(g, 512) ∥ b(n, 2) ∥ b(k, 2)"

@@ -7,6 +7,33 @@
 
 use crate::election_manifest::{Contest, ContestOption, ElectionManifest};
 
+/// Contains only a single 2-of-5 contest
+pub fn example_election_manifest_small() -> ElectionManifest {
+    ElectionManifest {
+        contests: vec![Contest {
+            label: "Minister of Elemental Resources".to_string(),
+            selection_limit: 1,
+            options: vec![
+                ContestOption {
+                    label: "Tïtus Stormforge\n(Ætherwïng)".to_string(),
+                },
+                ContestOption {
+                    label: "Fæ Willowgrove\n(Crystâlheärt)".to_string(),
+                },
+                ContestOption {
+                    label: "Tèrra Stonebinder\n(Independent)".to_string(),
+                },
+                // ContestOption {
+                //     label: "Èlena Wîndwhisper\n(Technocrat)".to_string(),
+                // },
+                // ContestOption {
+                //     label: "Élyria Moonshadow\n(Crystâlheärt)".to_string(),
+                // },
+            ],
+        }],
+    }
+}
+
 pub fn example_election_manifest() -> ElectionManifest {
     let referendum_options = vec![
         ContestOption {
