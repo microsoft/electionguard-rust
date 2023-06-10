@@ -2,3 +2,6 @@
 **/local.settings.json
 **/.vscode
 **/Cargo.lock
+
+data
+run_demo.sh

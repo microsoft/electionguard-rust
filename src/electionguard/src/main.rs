@@ -6,11 +6,12 @@
 #![deny(clippy::manual_assert)]
 
 mod common_utils;
-mod generate_preencrypted_ballots;
+mod guardian;
 mod manifest;
+mod pre_encrypted_ballots;
 mod verify_standard_parameters;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::SystemTime};
 
 use anyhow::{bail, Context, Result};
 use clap::Parser;
@@ -21,7 +22,7 @@ use eg::{
 use util::csprng::Csprng;
 
 use crate::{
-    generate_preencrypted_ballots::GeneratePreEncryptedBallots, manifest::Manifest,
+    guardian::Guardian, manifest::Manifest, pre_encrypted_ballots::PreEncryptedBallots,
     verify_standard_parameters::VerifyStandardParameters,
 };
 
@@ -68,8 +69,11 @@ enum Subcommands {
     /// Verify standard parameters. Primarily for testing.
     VerifyStandardParameters(VerifyStandardParameters),
 
-    /// Generate preencrypted ballots.
-    GeneratePreEncryptedBallots(GeneratePreEncryptedBallots),
+    /// Operations on preencrypted ballots.
+    PreEncryptedBallots(PreEncryptedBallots),
+
+    /// Create and manage guardians.
+    Guardian(Guardian),
 }
 
 pub(crate) trait Subcommand {
@@ -96,21 +100,25 @@ fn main() -> Result<()> {
 
     let subcommand: &dyn Subcommand = match clargs.subcmd {
         Subcommands::Manifest(ref manifest) => manifest,
+        Subcommands::PreEncryptedBallots(ref pre_ncrypted_ballots) => pre_ncrypted_ballots,
+        Subcommands::Guardian(ref guardian) => guardian,
         Subcommands::VerifyStandardParameters(ref verify_standard_parameters) => {
             verify_standard_parameters
-        }
-        Subcommands::GeneratePreEncryptedBallots(ref generate_preencrypted_ballots) => {
-            generate_preencrypted_ballots
         }
     };
 
     if subcommand.need_csprng() {
         eprint!("Initializing csprng...");
         eprint!("\n!!! WARNING TEMP TEST CODE !!! ...");
-        let csprng = Csprng::new(1234); //? TODO seed this for real
-        eprintln!("Done.");
 
-        subcommand.do_it_with_csprng(&clargs, csprng)
+        match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(n) => {
+                let csprng = Csprng::new(n.as_micros() as u64);
+                eprintln!("Done.");
+                subcommand.do_it_with_csprng(&clargs, csprng)
+            }
+            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+        }
     } else {
         subcommand.do_it(&clargs)
     }

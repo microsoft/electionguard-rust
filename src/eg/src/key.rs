@@ -6,20 +6,22 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
-use std::ops;
+use std::path::PathBuf;
+use std::{fs, ops};
 
 use num_bigint::BigUint;
 
-use num_traits::One;
+use num_traits::{Num, One};
+use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::ballot::CiphertextContestSelection;
 use crate::fixed_parameters::FixedParameters;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct PublicKey(pub BigUint);
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct PrivateKey {
     /// Integer secret, s < q
     s: BigUint,
@@ -28,8 +30,69 @@ pub struct PrivateKey {
     public_key: PublicKey,
 }
 
+/// Serialize for PublicKey
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.0.to_str_radix(16).serialize(serializer)
+    }
+}
+
+/// Deserialize for PublicKey
+impl<'de> Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match String::deserialize(deserializer) {
+            Ok(s) => Ok(PublicKey(BigUint::from_str_radix(&s, 16).unwrap())),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// Serialize for PrivateKey
+impl Serialize for PrivateKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        (self.s.to_str_radix(16), &self.public_key).serialize(serializer)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Ciphertext(pub BigUint, pub BigUint);
+pub struct Ciphertext {
+    pub alpha: BigUint,
+    pub beta: BigUint,
+}
+
+/// Serialize for Ciphertext
+impl Serialize for Ciphertext {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        (self.alpha.to_str_radix(16), self.beta.to_str_radix(16)).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Ciphertext {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match <(String, String)>::deserialize(deserializer) {
+            Ok((alpha, beta)) => Ok(Ciphertext {
+                alpha: BigUint::from_str_radix(&alpha, 16).unwrap(),
+                beta: BigUint::from_str_radix(&beta, 16).unwrap(),
+            }),
+            Err(e) => Err(e),
+        }
+    }
+}
 
 pub fn homomorphic_addition(
     ctxts: Vec<&Vec<CiphertextContestSelection>>,
@@ -45,18 +108,21 @@ pub fn homomorphic_addition(
     let mut result = <Vec<CiphertextContestSelection>>::new();
     (0..ctxts[0].len()).for_each(|i| {
         result.push(CiphertextContestSelection {
-            label: ctxts[0][i].label.clone(),
-            ciphertext: Ciphertext(BigUint::from(0 as usize), BigUint::from(0 as usize)),
+            ciphertext: Ciphertext {
+                alpha: BigUint::from(0 as usize),
+                beta: BigUint::from(0 as usize),
+            },
             nonce: BigUint::from(0 as usize),
         });
     });
 
     (0..ctxts.len()).for_each(|i| {
         (0..result.len()).for_each(|j| {
-            result[j].ciphertext.0 =
-                (&result[j].ciphertext.0 * &ctxts[i][j].ciphertext.0) % fixed_parameters.p.as_ref();
-            result[j].ciphertext.1 =
-                (&result[j].ciphertext.1 * &ctxts[i][j].ciphertext.1) % fixed_parameters.p.as_ref();
+            result[j].ciphertext.alpha = (&result[j].ciphertext.alpha
+                * &ctxts[i][j].ciphertext.alpha)
+                % fixed_parameters.p.as_ref();
+            result[j].ciphertext.beta = (&result[j].ciphertext.beta * &ctxts[i][j].ciphertext.beta)
+                % fixed_parameters.p.as_ref();
             result[j].nonce = (&result[j].nonce + &ctxts[i][j].nonce) % fixed_parameters.q.as_ref();
         });
     });
@@ -86,8 +152,8 @@ impl PrivateKey {
         ct: Ciphertext,
         vote: usize,
     ) -> bool {
-        let mut pt = ct.0.modpow(&self.s, fixed_parameters.p.borrow());
-        pt = ct.1
+        let mut pt = ct.alpha.modpow(&self.s, fixed_parameters.p.borrow());
+        pt = ct.beta
             * pt.modpow(
                 (fixed_parameters.p.as_ref() - BigUint::from(2 as usize)).borrow(),
                 fixed_parameters.p.borrow(),
@@ -107,11 +173,11 @@ impl PublicKey {
         nonce: &BigUint,
         vote: usize,
     ) -> Ciphertext {
-        let c1 = fixed_parameters
+        let alpha = fixed_parameters
             .g
             .modpow(&nonce, fixed_parameters.p.borrow());
-        let c2 = self.0.modpow(&(nonce + vote), fixed_parameters.p.borrow());
-        Ciphertext(c1, c2)
+        let beta = self.0.modpow(&(nonce + vote), fixed_parameters.p.borrow());
+        Ciphertext { alpha, beta }
     }
 
     pub fn decrypt_check_with(
@@ -122,7 +188,7 @@ impl PublicKey {
         nonce: &BigUint,
     ) -> bool {
         let mut pt = self.0.modpow(nonce, fixed_parameters.p.borrow());
-        pt = ct.1
+        pt = ct.beta
             * pt.modpow(
                 (fixed_parameters.p.as_ref() - BigUint::from(2 as usize)).borrow(),
                 fixed_parameters.p.borrow(),
@@ -131,6 +197,19 @@ impl PublicKey {
         pt == self
             .0
             .modpow(BigUint::from(vote).borrow(), fixed_parameters.p.borrow())
+    }
+
+    pub fn new_from_file(path: &PathBuf) -> Self {
+        match fs::read_to_string(path) {
+            Ok(file) => {
+                let res = serde_json::from_str(&file);
+                match (res) {
+                    Ok(key) => return key,
+                    Err(e) => panic!("Error reading public key from file: {}", e),
+                }
+            }
+            Err(e) => panic!("Error reading public key from file: {}", e),
+        }
     }
 }
 

@@ -7,6 +7,9 @@
 
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
+use num_bigint::BigUint;
+use num_traits::Num;
+use serde::{Deserialize, Serialize};
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 
@@ -24,6 +27,35 @@ impl From<HValueByteArray> for HValue {
     #[inline]
     fn from(value: HValueByteArray) -> Self {
         HValue(value)
+    }
+}
+
+/// Serialize a HValue as hex
+impl Serialize for HValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.0.to_vec().serialize(serializer)
+    }
+}
+
+/// Deserialize a HValue from hex
+impl<'de> Deserialize<'de> for HValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match String::deserialize(deserializer) {
+            Ok(s) => match BigUint::from_str_radix(&s, 16) {
+                Ok(s) => match s.to_bytes_be().try_into() {
+                    Ok(bytes) => Ok(HValue(bytes)),
+                    Err(_) => Err(serde::de::Error::custom("Invalid HValue")),
+                },
+                Err(e) => Err(serde::de::Error::custom(e)),
+            },
+            Err(e) => Err(e),
+        }
     }
 }
 
