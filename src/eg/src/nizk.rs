@@ -306,6 +306,11 @@ impl ProofRange {
             })
             .collect::<Vec<_>>();
 
+        println!("a: {:?}", a[0]);
+        println!("b: {:?}", b[0]);
+        println!("h_e: {:?}", config.h_e);
+        println!("k: {:?}", config.election_public_key);
+
         match ZMulPrimeElem::try_new(
             zmulq.clone(),
             Self::challenge(
@@ -329,8 +334,8 @@ impl ProofRange {
 
                 match ZMulPrimeElem::try_new(zmulq.clone(), rhs) {
                     Some(rhs) => {
-                        // println!("lhs {:?}", c.elem);
-                        // println!("rhs {:?}", rhs.elem);
+                        println!("lhs {:?}", c.elem);
+                        println!("rhs {:?}", rhs.elem);
                         c.elem == rhs.elem
                     }
                     None => {

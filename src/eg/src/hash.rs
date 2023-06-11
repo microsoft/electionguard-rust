@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use std::str::FromStr;
+
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use num_bigint::BigUint;
@@ -30,34 +32,45 @@ impl From<HValueByteArray> for HValue {
     }
 }
 
+pub fn hex_to_bytes(s: &str) -> Vec<u8> {
+    BigUint::from_str_radix(s, 16).unwrap().to_bytes_be()
+}
+
 /// Serialize a HValue as hex
 impl Serialize for HValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
-        self.0.to_vec().serialize(serializer)
+        format!("{:0>16}", BigUint::from_bytes_be(&self.0).to_str_radix(16)).serialize(serializer)
     }
 }
 
 /// Deserialize a HValue from hex
-impl<'de> Deserialize<'de> for HValue {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match String::deserialize(deserializer) {
-            Ok(s) => match BigUint::from_str_radix(&s, 16) {
-                Ok(s) => match s.to_bytes_be().try_into() {
-                    Ok(bytes) => Ok(HValue(bytes)),
-                    Err(_) => Err(serde::de::Error::custom("Invalid HValue")),
-                },
-                Err(e) => Err(serde::de::Error::custom(e)),
-            },
-            Err(e) => Err(e),
-        }
-    }
-}
+// impl<'de> Deserialize<'de> for HValue {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         match String::deserialize(deserializer) {
+//             Ok(s) => match BigUint::from_str_radix(&s, 16) {
+//                 Ok(s) => {
+//                     let mut bytes = s.to_bytes_be();
+//                     // if bytes.len() < HVALUE_BYTE_LEN {
+//                     //     bytes = [vec![0u8; HVALUE_BYTE_LEN - bytes.len()], bytes].concat();
+//                     //     // bytes.resize(HVALUE_BYTE_LEN, 0)
+//                     // }
+//                     match bytes.try_into() {
+//                         Ok(bytes) => Ok(HValue(bytes)),
+//                         Err(e) => Err(serde::de::Error::custom(format!("{:?} {}", e, e.len()))),
+//                     }
+//                 }
+//                 Err(e) => Err(serde::de::Error::custom(e)),
+//             },
+//             Err(e) => Err(e),
+//         }
+//     }
+// }
 
 impl From<&HValueByteArray> for HValue {
     #[inline]

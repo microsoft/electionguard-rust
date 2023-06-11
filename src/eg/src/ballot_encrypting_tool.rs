@@ -11,7 +11,7 @@ use crate::ballot::{
 };
 
 use crate::fixed_parameters::FixedParameters;
-use crate::hash::{eg_h, HValue};
+use crate::hash::{eg_h, hex_to_bytes, HValue};
 use crate::key::{homomorphic_addition, Ciphertext};
 use crate::nizk::ProofRange;
 
@@ -19,8 +19,8 @@ pub struct BallotEncryptingTool {}
 
 impl BallotEncryptingTool {
     /// Returns the last byte of the hash value
-    pub fn generate_short_code(full_hash: HValue) -> String {
-        format!("{:x}", full_hash.0[full_hash.0.len() - 1])
+    pub fn generate_short_code(full_hash: &String) -> String {
+        full_hash.chars().skip(full_hash.len() - 2).collect()
     }
 
     pub fn check_shortcode(
@@ -43,7 +43,7 @@ impl BallotEncryptingTool {
     pub fn generate_selection_hash(
         config: &PreEncryptedBallotConfig,
         selections: &Vec<CiphertextContestSelection>,
-    ) -> HValue {
+    ) -> String {
         let mut v = vec![0x40];
 
         v.extend_from_slice(config.election_public_key.0.to_bytes_be().as_slice());
@@ -53,7 +53,7 @@ impl BallotEncryptingTool {
             v.extend_from_slice(s.ciphertext.beta.to_bytes_be().as_slice());
         });
 
-        eg_h(&config.h_e, &v)
+        eg_h(&config.h_e, &v).to_string()
     }
 
     /// Generates a selection hash (Equation 95)
@@ -64,7 +64,7 @@ impl BallotEncryptingTool {
         config: &PreEncryptedBallotConfig,
         contest_label: &String,
         selections: &Vec<PreEncryptedContestSelection>,
-    ) -> HValue {
+    ) -> String {
         let mut v = vec![0x41];
 
         v.extend_from_slice(contest_label.as_bytes());
@@ -73,15 +73,15 @@ impl BallotEncryptingTool {
         // TODO: Check if this sorting works
         let mut sorted_selection_hashes = selections
             .iter()
-            .map(|s| s.crypto_hash)
-            .collect::<Vec<HValue>>();
+            .map(|s| s.get_crypto_hash())
+            .collect::<Vec<&String>>();
         sorted_selection_hashes.sort();
 
         sorted_selection_hashes.iter().for_each(|s| {
-            v.extend_from_slice(s.0.as_slice());
+            v.extend(hex_to_bytes(s));
         });
 
-        eg_h(&config.h_e, &v)
+        eg_h(&config.h_e, &v).to_string()
     }
 
     /// Generates a nonce for deterministic ballot encryption (Equation 96)
@@ -92,15 +92,15 @@ impl BallotEncryptingTool {
         config: &PreEncryptedBallotConfig,
         contests: &Vec<PreEncryptedContest>,
         b_aux: &[u8],
-    ) -> HValue {
+    ) -> String {
         let mut v = vec![0x42];
 
         contests.iter().for_each(|c| {
-            v.extend_from_slice(c.crypto_hash.0.as_slice());
+            v.extend(hex_to_bytes(&c.crypto_hash));
         });
 
         v.extend_from_slice(b_aux);
-        eg_h(&config.h_e, &v)
+        eg_h(&config.h_e, &v).to_string()
     }
 
     /// Generates a nonce for deterministic ballot encryption (Equation 97)

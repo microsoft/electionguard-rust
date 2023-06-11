@@ -1,7 +1,12 @@
+use num_bigint::BigUint;
+use num_traits::Num;
+use util::csprng::Csprng;
+
 use crate::ballot::{
     CiphertextContestSelection, PreEncryptedBallot, PreEncryptedBallotConfig, PreEncryptedContest,
     PreEncryptedContestSelection,
 };
+use crate::ballot_encrypting_tool::BallotEncryptingTool;
 use crate::fixed_parameters::FixedParameters;
 use crate::nizk::ProofRange;
 
@@ -12,9 +17,19 @@ impl BallotRecordingTool {
         config: &PreEncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         ballot: &PreEncryptedBallot,
-        primary_nonce: &[u8],
+        primary_nonce_str: &str,
     ) -> bool {
-        match PreEncryptedBallot::try_new_with(config, fixed_parameters, primary_nonce) {
+        let mut primary_nonce = Vec::new();
+        println!("primary_nonce_str: {}", primary_nonce_str);
+        match BigUint::from_str_radix(primary_nonce_str, 16) {
+            Ok(nonce) => primary_nonce.extend_from_slice(nonce.to_bytes_be().as_slice()),
+            Err(e) => {
+                println!("Error parsing primary nonce: {}", e);
+                return false;
+            }
+        };
+
+        match PreEncryptedBallot::try_new_with(config, fixed_parameters, primary_nonce.as_slice()) {
             Some(regenerated_ballot) => {
                 if *ballot.get_crypto_hash() == *regenerated_ballot.get_crypto_hash() {
                     return BallotRecordingTool::verify_ballot_contests(
@@ -22,11 +37,119 @@ impl BallotRecordingTool {
                         ballot.get_contests(),
                         regenerated_ballot.get_contests(),
                     );
+                } else {
+                    println!(
+                        "Ballot crypto hash mismatch {} {}.",
+                        ballot.get_crypto_hash(),
+                        regenerated_ballot.get_crypto_hash()
+                    );
+                    return false;
                 }
             }
-            None => return false,
+            None => {
+                println!("Error regenerating ballot.");
+                return false;
+            }
         }
         false
+    }
+
+    pub fn regenerate_nonces(
+        ballot: &mut PreEncryptedBallot,
+        config: &PreEncryptedBallotConfig,
+        fixed_parameters: &FixedParameters,
+        primary_nonce: &[u8],
+    ) {
+        let selection_labels = config
+            .manifest
+            .contests
+            .iter()
+            .map(|c| {
+                PreEncryptedContest::sanitize_contest(c)
+                    .options
+                    .iter()
+                    .map(|s| s.label.clone())
+                    .collect::<Vec<String>>()
+            })
+            .collect::<Vec<Vec<String>>>();
+        for i in 0..ballot.get_contests().len() {
+            for j in 0..ballot.get_contests()[i].selections.len() {
+                for k in 0..ballot.get_contests()[i].selections[j]
+                    .get_selections()
+                    .len()
+                {
+                    ballot.contests[i].selections[j].selections[k] = CiphertextContestSelection {
+                        ciphertext: ballot.get_contests()[i].get_selections()[j].get_selections()
+                            [k]
+                            .ciphertext
+                            .clone(),
+                        nonce: BallotEncryptingTool::generate_nonce(
+                            config,
+                            primary_nonce,
+                            ballot.get_contests()[i].label.as_bytes(),
+                            selection_labels[i][j].as_bytes(),
+                            selection_labels[i][k].as_bytes(),
+                            fixed_parameters,
+                        ),
+                    };
+                }
+
+                // contest.selections[j].regenerate_nonces(
+                //     config,
+                //     fixed_parameters,
+                //     primary_nonce,
+                //     &contest.label,
+                //     &selection_labels[i],
+                //     j,
+                // );
+            }
+        }
+    }
+
+    pub fn verify_ballot_proofs(
+        config: &PreEncryptedBallotConfig,
+        fixed_parameters: &FixedParameters,
+        csprng: &mut Csprng,
+        ballot: &PreEncryptedBallot,
+        voter_selections: &Vec<Vec<usize>>,
+    ) {
+        let (proof_ballot_correctness, proof_selection_limit) =
+            ballot.nizkp(csprng, fixed_parameters, &config, &voter_selections);
+
+        // Verify proof of ballot correctness
+        for (i, ballot_proof) in proof_ballot_correctness.iter().enumerate() {
+            for (j, contest_proof) in ballot_proof.iter().enumerate() {
+                for (k, selection_proof) in contest_proof.iter().enumerate() {
+                    println!(
+                        "Verify proof of ballot correctness i: {}, j: {}, k: {}",
+                        i, j, k
+                    );
+                    // TODO: Nonces are all zero
+                    assert!(selection_proof.verify(
+                        fixed_parameters,
+                        &config,
+                        &ballot.get_contests()[i].get_selections()[j].get_selections()[k]
+                            .ciphertext,
+                        1 as usize,
+                    ));
+                }
+            }
+
+            let combined_selection = PreEncryptedContest::sum_selection_vector(
+                fixed_parameters,
+                &ballot.get_contests()[i]
+                    .combine_voter_selections(fixed_parameters, voter_selections[i].as_slice()),
+            );
+
+            println!("Verify proof of satisfying the selection limit {}", i);
+            // Verify proof of satisfying the selection limit
+            assert!(proof_selection_limit[i].verify(
+                fixed_parameters,
+                &config,
+                &combined_selection.ciphertext,
+                config.manifest.contests[i].selection_limit,
+            ));
+        }
     }
 
     fn verify_ballot_contests(
@@ -37,6 +160,7 @@ impl BallotRecordingTool {
         assert!(contests.len() == regenerated_contests.len());
         for (i, a) in contests.iter().enumerate() {
             if a.crypto_hash != regenerated_contests[i].crypto_hash {
+                println!("Contest crypto hash mismatch.");
                 return false;
             }
             BallotRecordingTool::verify_contest_selections(
