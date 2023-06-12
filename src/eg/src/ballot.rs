@@ -1,20 +1,15 @@
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::bail;
-use num_bigint::{BigInt, BigUint};
-use num_traits::Num;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::{
-    csprng::Csprng,
-    z_mul_prime::{ZMulPrime, ZMulPrimeElem},
-};
+use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
     ballot_encrypting_tool::BallotEncryptingTool,
@@ -25,6 +20,24 @@ use crate::{
     nizk::ProofRange,
 };
 
+#[derive(Debug, Serialize)]
+pub struct VoterContest {
+    /// Label
+    pub label: String,
+
+    /// Selection
+    pub selection: Vec<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VoterBallot {
+    /// Label
+    pub label: String,
+
+    /// Contests in this ballot
+    pub contests: Vec<VoterContest>,
+}
+
 /// A contest option in a pre-encrypted ballot.
 #[derive(Debug, Serialize)]
 pub struct EncryptedContestSelection {
@@ -33,12 +46,6 @@ pub struct EncryptedContestSelection {
 
     /// Selection hash
     pub crypto_hash: String,
-
-    /// Proof of ballot correctness
-    pub proof_ballot_correctness: ProofRange,
-
-    // Proof of satisfying the selection limit
-    pub proof_selection_limit: ProofRange,
 }
 
 /// A contest in a pre-encrypted ballot.
@@ -52,19 +59,25 @@ pub struct EncryptedContest {
 
     /// Contest hash
     pub crypto_hash: String,
+
+    /// Proof of ballot correctness
+    pub proof_ballot_correctness: Vec<ProofRange>,
+
+    // Proof of satisfying the selection limit
+    pub proof_selection_limit: ProofRange,
 }
 
 /// An encrypted ballot.
 #[derive(Debug)]
 pub struct EncryptedBallot {
     /// Label
-    label: String,
+    pub label: String,
 
     /// Contests in this ballot
-    contests: Vec<EncryptedContest>,
+    pub contests: Vec<EncryptedContest>,
 
     /// Confirmation code
-    crypto_hash: String,
+    pub crypto_hash: String,
 }
 
 /// An encrypted option in a contest.
@@ -133,7 +146,7 @@ pub struct PreEncryptedBallotList {
 }
 
 /// Configuration for generating pre-encrypted ballots.
-pub struct PreEncryptedBallotConfig {
+pub struct EncryptedBallotConfig {
     /// Election manifest
     pub manifest: ElectionManifest,
     // ballot_style: BallotStyle,
@@ -141,7 +154,7 @@ pub struct PreEncryptedBallotConfig {
     pub election_public_key: PublicKey,
 
     /// Whether to encrypt the nonce with the election public key
-    pub encrypt_nonce: bool,
+    // pub encrypt_nonce: bool,
 
     /// Election extended base hash
     pub h_e: HValue,
@@ -172,9 +185,186 @@ impl<'de> Deserialize<'de> for CiphertextContestSelection {
     }
 }
 
+impl VoterBallot {
+    pub fn new_pick_random(
+        config: &EncryptedBallotConfig,
+        csprng: &mut Csprng,
+        label: String,
+    ) -> Self {
+        let mut contests = Vec::new();
+        for contest in &config.manifest.contests {
+            contests.push(VoterContest::new_pick_random(
+                csprng,
+                contest.label.clone(),
+                contest.selection_limit,
+                contest.options.len(),
+            ));
+        }
+        Self { label, contests }
+    }
+}
+
+impl VoterContest {
+    pub fn new_pick_random(
+        csprng: &mut Csprng,
+        label: String,
+        selection_limit: usize,
+        num_options: usize,
+    ) -> Self {
+        let mut selection = HashSet::new();
+        // TODO: Allow 0 selections
+        let selection_limit = 1 + (csprng.next_u64() as usize % selection_limit);
+
+        while selection.len() < selection_limit {
+            selection.insert(csprng.next_u64() as usize % num_options);
+        }
+
+        Self {
+            label,
+            selection: selection.into_iter().collect(),
+        }
+    }
+}
+
+impl EncryptedBallot {
+    pub fn new_from_preencrypted(
+        config: &EncryptedBallotConfig,
+        fixed_parameters: &FixedParameters,
+        csprng: &mut Csprng,
+        pre_encrypted: &PreEncryptedBallot,
+        voter_ballot: &VoterBallot,
+    ) -> Self {
+        let contests = (0..pre_encrypted.contests.len())
+            .map(|i| {
+                EncryptedContest::new_from_preencrypted(
+                    config,
+                    fixed_parameters,
+                    csprng,
+                    &pre_encrypted.contests[i],
+                    &voter_ballot.contests[i].selection,
+                    config.manifest.contests[i].selection_limit,
+                )
+            })
+            .collect::<Vec<EncryptedContest>>();
+
+        EncryptedBallot {
+            label: pre_encrypted.get_label().clone(),
+            contests,
+            crypto_hash: pre_encrypted.get_crypto_hash().clone(),
+        }
+    }
+}
+
+impl EncryptedContest {
+    pub fn new_from_preencrypted(
+        config: &EncryptedBallotConfig,
+        fixed_parameters: &FixedParameters,
+        csprng: &mut Csprng,
+        pre_encrypted: &PreEncryptedContest,
+        voter_selections: &Vec<usize>,
+        selection_limit: usize,
+    ) -> Self {
+        let zmulq = Rc::new(ZMulPrime::new(fixed_parameters.q.clone()));
+
+        let selection = EncryptedContestSelection {
+            vote: pre_encrypted.combine_voter_selections(fixed_parameters, voter_selections),
+            crypto_hash: pre_encrypted.get_crypto_hash().clone(),
+        };
+
+        let mut selected_vec = (0..selection.vote.len())
+            .map(|_| false)
+            .collect::<Vec<bool>>();
+        for v in voter_selections {
+            selected_vec[*v] = true;
+        }
+        let proof_ballot_correctness = selection
+            .vote
+            .iter()
+            .enumerate()
+            .map(|(i, x)| {
+                x.proof_ballot_correctness(
+                    csprng,
+                    fixed_parameters,
+                    config,
+                    selected_vec[i],
+                    zmulq.clone(),
+                )
+            })
+            .collect();
+        let proof_selection_limit = Self::proof_selection_limit(
+            csprng,
+            fixed_parameters,
+            config,
+            zmulq.clone(),
+            &selection.vote,
+            voter_selections.len(),
+            selection_limit,
+        );
+
+        // TODO: Change crypto hash
+        EncryptedContest {
+            label: pre_encrypted.label.clone(),
+            selection,
+            crypto_hash: pre_encrypted.get_crypto_hash().clone(),
+            proof_ballot_correctness,
+            proof_selection_limit,
+        }
+    }
+
+    pub fn get_proof_ballot_correctness(&self) -> &Vec<ProofRange> {
+        &self.proof_ballot_correctness
+    }
+
+    pub fn get_proof_selection_limit(&self) -> &ProofRange {
+        &self.proof_selection_limit
+    }
+
+    fn proof_selection_limit(
+        csprng: &mut Csprng,
+        fixed_parameters: &FixedParameters,
+        config: &EncryptedBallotConfig,
+        zmulq: Rc<ZMulPrime>,
+        selection: &Vec<CiphertextContestSelection>,
+        num_selections: usize,
+        selection_limit: usize,
+    ) -> ProofRange {
+        let combined_selection = Self::sum_selection_vector(fixed_parameters, selection);
+        ProofRange::new(
+            csprng,
+            fixed_parameters,
+            config,
+            zmulq,
+            &combined_selection.nonce,
+            &combined_selection.ciphertext,
+            num_selections,
+            selection_limit,
+        )
+    }
+
+    pub fn sum_selection_vector(
+        fixed_parameters: &FixedParameters,
+        selection: &Vec<CiphertextContestSelection>,
+    ) -> CiphertextContestSelection {
+        let mut sum_ct = selection[0].ciphertext.clone();
+        let mut sum_nonce = selection[0].nonce.clone();
+        for i in 1..selection.len() {
+            sum_ct.alpha =
+                (&sum_ct.alpha * &selection[i].ciphertext.alpha) % fixed_parameters.p.as_ref();
+            sum_ct.beta =
+                (&sum_ct.beta * &selection[i].ciphertext.beta) % fixed_parameters.p.as_ref();
+            sum_nonce = (&sum_nonce + &selection[i].nonce) % fixed_parameters.q.as_ref();
+        }
+
+        CiphertextContestSelection {
+            ciphertext: sum_ct,
+            nonce: sum_nonce,
+        }
+    }
+}
+
 impl PreEncryptedBallotList {
     pub fn new(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         csprng: &mut Csprng,
         path: &Path,
@@ -198,7 +388,7 @@ impl PreEncryptedBallotList {
             let (ballot, primary_nonce) =
                 PreEncryptedBallot::new(&config, fixed_parameters, csprng);
 
-            println!("Primary nonce str = {}", primary_nonce);
+            println!("Primary nonce:\t{}", primary_nonce);
             primary_nonces.push(primary_nonce);
             ballots.push(ballot);
             confirmation_codes.push(ballots[b_idx].get_crypto_hash().clone());
@@ -212,7 +402,8 @@ impl PreEncryptedBallotList {
         fs::write(
             path.join("primary-nonces.json"),
             serde_json::to_string(&vec![confirmation_codes, primary_nonces.clone()]).unwrap(),
-        );
+        )
+        .unwrap();
 
         PreEncryptedBallotList {
             label,
@@ -306,7 +497,7 @@ impl PreEncryptedBallot {
     }
 
     pub fn try_new_with(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         primary_nonce: &[u8],
     ) -> Option<Self> {
@@ -314,7 +505,7 @@ impl PreEncryptedBallot {
 
         // Generate contests
 
-        println!("Primary nonce = {:?}", primary_nonce);
+        // println!("Primary nonce = {:?}", primary_nonce);
 
         let label = "Sample Election".to_string();
         let b_aux = "Sample Aux Info".as_bytes();
@@ -354,7 +545,7 @@ impl PreEncryptedBallot {
     }
 
     pub fn new(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         csprng: &mut Csprng,
     ) -> (PreEncryptedBallot, String) {
@@ -371,39 +562,39 @@ impl PreEncryptedBallot {
         }
     }
 
-    pub fn nizkp(
-        &self,
-        csprng: &mut Csprng,
-        fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
-        voter_selections: &Vec<Vec<usize>>,
-    ) -> (Vec<Vec<Vec<ProofRange>>>, Vec<ProofRange>) {
-        assert!(voter_selections.len() == self.contests.len());
+    // pub fn nizkp(
+    //     &self,
+    //     csprng: &mut Csprng,
+    //     fixed_parameters: &FixedParameters,
+    //     config: &EncryptedBallotConfig,
+    //     voter_selections: &Vec<Vec<usize>>,
+    // ) -> (Vec<Vec<Vec<ProofRange>>>, Vec<ProofRange>) {
+    //     assert!(voter_selections.len() == self.contests.len());
 
-        // let zmulp = Rc::new(ZMulPrime::new(fixed_parameters.p.clone()));
-        let zmulq = Rc::new(ZMulPrime::new(fixed_parameters.q.clone()));
+    //     // let zmulp = Rc::new(ZMulPrime::new(fixed_parameters.p.clone()));
+    //     let zmulq = Rc::new(ZMulPrime::new(fixed_parameters.q.clone()));
 
-        let mut proof_ballot_correctness = <Vec<Vec<Vec<ProofRange>>>>::new();
-        let mut proof_selection_limit = <Vec<ProofRange>>::new();
-        for (i, contest) in self.contests.iter().enumerate() {
-            proof_ballot_correctness.push(contest.proof_ballot_correctness(
-                csprng,
-                fixed_parameters,
-                config,
-                zmulq.clone(),
-            ));
-            proof_selection_limit.push(contest.proof_selection_limit(
-                csprng,
-                fixed_parameters,
-                config,
-                zmulq.clone(),
-                config.manifest.contests[i].selection_limit,
-                voter_selections[i].as_slice(),
-            ));
-        }
+    //     let mut proof_ballot_correctness = <Vec<Vec<Vec<ProofRange>>>>::new();
+    //     let mut proof_selection_limit = <Vec<ProofRange>>::new();
+    //     for (i, contest) in self.contests.iter().enumerate() {
+    //         proof_ballot_correctness.push(contest.proof_ballot_correctness(
+    //             csprng,
+    //             fixed_parameters,
+    //             config,
+    //             zmulq.clone(),
+    //         ));
+    //         proof_selection_limit.push(contest.proof_selection_limit(
+    //             csprng,
+    //             fixed_parameters,
+    //             config,
+    //             zmulq.clone(),
+    //             config.manifest.contests[i].selection_limit,
+    //             voter_selections[i].as_slice(),
+    //         ));
+    //     }
 
-        (proof_ballot_correctness, proof_selection_limit)
-    }
+    //     (proof_ballot_correctness, proof_selection_limit)
+    // }
 
     pub fn try_new_from_file(path: &PathBuf) -> Option<Self> {
         match fs::read_to_string(path) {
@@ -437,7 +628,7 @@ impl PreEncryptedContest {
 
     pub fn regenerate_nonces(
         &mut self,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         primary_nonce: &[u8],
         selection_labels: &Vec<String>,
@@ -454,29 +645,12 @@ impl PreEncryptedContest {
         }
     }
 
-    pub fn sanitize_contest(contest: &Contest) -> Contest {
-        let mut modified_contest = contest.clone();
-        eprintln!("Contest:\t{:?}", modified_contest.label);
-
-        // TODO: Stop assuming null labels are not included
-        // Add labels for null selections
-        (0..modified_contest.selection_limit).for_each(|j| {
-            modified_contest.options.push(ContestOption {
-                label: format!("null{}", j + 1),
-            })
-        });
-
-        modified_contest
-    }
-
     pub fn try_new(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         primary_nonce: &[u8],
         contest: &Contest,
         fixed_parameters: &FixedParameters,
     ) -> Option<PreEncryptedContest> {
-        let contest = PreEncryptedContest::sanitize_contest(contest);
-
         let mut success = true;
         let mut selections = <Vec<PreEncryptedContestSelection>>::new();
         let selection_labels = contest
@@ -514,7 +688,7 @@ impl PreEncryptedContest {
                 eprintln!("Contest Hash:\t{:?}", crypto_hash);
 
                 Some(PreEncryptedContest {
-                    label: contest.label,
+                    label: contest.label.clone(),
                     selections,
                     crypto_hash,
                 })
@@ -527,11 +701,9 @@ impl PreEncryptedContest {
         &self,
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         zmulq: Rc<ZMulPrime>,
     ) -> Vec<Vec<ProofRange>> {
-        // assert!(voter_selections.len() <= self.selections.len());
-
         let mut proofs = <Vec<Vec<ProofRange>>>::new();
         for (i, selection) in self.selections.iter().enumerate() {
             proofs.push(selection.proof_ballot_correctness(
@@ -543,32 +715,6 @@ impl PreEncryptedContest {
             ));
         }
         proofs
-    }
-
-    pub fn proof_selection_limit(
-        &self,
-        csprng: &mut Csprng,
-        fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
-        zmulq: Rc<ZMulPrime>,
-        selection_limit: usize,
-        voter_selections: &[usize],
-    ) -> ProofRange {
-        let combined_selection = Self::sum_selection_vector(
-            fixed_parameters,
-            &self.combine_voter_selections(fixed_parameters, voter_selections),
-        );
-
-        ProofRange::new(
-            csprng,
-            fixed_parameters,
-            config,
-            zmulq,
-            &combined_selection.nonce,
-            &combined_selection.ciphertext,
-            voter_selections.len(),
-            selection_limit,
-        )
     }
 
     pub fn combine_voter_selections(
@@ -585,8 +731,8 @@ impl PreEncryptedContest {
 
         let mut combined_selection = selections[0].clone();
 
-        for i in (1..voter_selections.len()) {
-            for j in (0..combined_selection.len()) {
+        for i in 1..voter_selections.len() {
+            for j in 0..combined_selection.len() {
                 combined_selection[j].ciphertext.alpha = (&combined_selection[j].ciphertext.alpha
                     * &selections[i][j].ciphertext.alpha)
                     % fixed_parameters.p.as_ref();
@@ -599,26 +745,6 @@ impl PreEncryptedContest {
             }
         }
         combined_selection
-    }
-
-    pub fn sum_selection_vector(
-        fixed_parameters: &FixedParameters,
-        selection: &Vec<CiphertextContestSelection>,
-    ) -> CiphertextContestSelection {
-        let mut sum_ct = selection[0].ciphertext.clone();
-        let mut sum_nonce = selection[0].nonce.clone();
-        for i in 1..selection.len() {
-            sum_ct.alpha =
-                (&sum_ct.alpha * &selection[i].ciphertext.alpha) % fixed_parameters.p.as_ref();
-            sum_ct.beta =
-                (&sum_ct.beta * &selection[i].ciphertext.beta) % fixed_parameters.p.as_ref();
-            sum_nonce = (&sum_nonce + &selection[i].nonce) % fixed_parameters.q.as_ref();
-        }
-
-        CiphertextContestSelection {
-            ciphertext: sum_ct,
-            nonce: sum_nonce,
-        }
     }
 }
 
@@ -637,7 +763,7 @@ impl PreEncryptedContestSelection {
 
     pub fn regenerate_nonces(
         &mut self,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         primary_nonce: &[u8],
         contest_label: &String,
@@ -657,7 +783,7 @@ impl PreEncryptedContestSelection {
     }
 
     pub fn new(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         primary_nonce: &[u8],
         selection: &ContestOption,
         contest_label: &String,
@@ -709,7 +835,7 @@ impl PreEncryptedContestSelection {
         &self,
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         sequence_order: usize,
         zmulq: Rc<ZMulPrime>,
     ) -> Vec<ProofRange> {
@@ -740,7 +866,7 @@ impl CiphertextContestSelection {
         &self,
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         selected: bool,
         zmulq: Rc<ZMulPrime>,
     ) -> ProofRange {

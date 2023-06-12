@@ -10,11 +10,8 @@ use util::{
 };
 
 use crate::{
-    election_parameters::ElectionParameters,
-    fixed_parameters::FixedParameters,
-    hash::HValue,
-    key::{PrivateKey, PublicKey},
-    nizk::ProofGuardian,
+    election_parameters::ElectionParameters, fixed_parameters::FixedParameters, hash::HValue,
+    key::PublicKey, nizk::ProofGuardian,
 };
 pub struct Guardian {
     poly: Polynomial,

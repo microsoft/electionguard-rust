@@ -5,30 +5,23 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::{
-    borrow::Borrow,
-    fmt::format,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use crate::{guardian, Clargs, Subcommand};
+use crate::{Clargs, Subcommand};
 use anyhow::{bail, Result};
 use clap::Args;
 use eg::{
     ballot::{
-        PreEncryptedBallot, PreEncryptedBallotConfig, PreEncryptedBallotList, PreEncryptedContest,
+        EncryptedBallot, EncryptedBallotConfig, EncryptedContest, PreEncryptedBallotList,
+        VoterBallot,
     },
-    ballot_encrypting_tool::BallotEncryptingTool,
     ballot_recording_tool::BallotRecordingTool,
-    election_parameters::ElectionParameters,
     example_election_manifest::{example_election_manifest, example_election_manifest_small},
     example_election_parameters::example_election_parameters,
     guardian::aggregate_public_keys,
     hash::hex_to_bytes,
     hashes::Hashes,
-    key::{self, PublicKey},
-    varying_parameters::VaryingParameters,
+    key::PublicKey,
 };
 use util::csprng::Csprng;
 
@@ -109,57 +102,21 @@ impl Subcommand for PreEncryptedBallots {
 
             let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-            let voter_selections = election_manifest
-                .contests
-                .iter()
-                .map(|contest| {
-                    let mut vote = <Vec<usize>>::new();
-                    let num_selections = 1 as u64;
-                    (0..num_selections).for_each(|_| {
-                        vote.push(csprng.next_u64() as usize % (contest.options.len() + 1));
-                    });
-                    vote
-                })
-                .collect::<Vec<Vec<usize>>>();
-
-            let config: PreEncryptedBallotConfig = PreEncryptedBallotConfig {
+            let config: EncryptedBallotConfig = EncryptedBallotConfig {
                 manifest: election_manifest,
                 election_public_key: election_public_key,
-                encrypt_nonce: self.encrypt_nonce,
                 h_e: hashes.h_p,
             };
 
             let path = Path::new(&self.data).join("ballots");
 
             if self.generate {
-                let mut ballots = PreEncryptedBallotList::new(
+                PreEncryptedBallotList::new(
                     &config,
                     fixed_parameters,
                     &mut csprng,
                     &path,
                     self.num_ballots,
-                );
-
-                assert!(BallotRecordingTool::verify_ballot(
-                    &config,
-                    fixed_parameters,
-                    &ballots.ballots[0],
-                    &ballots.primary_nonces[0]
-                ));
-
-                BallotRecordingTool::regenerate_nonces(
-                    &mut ballots.ballots[0],
-                    &config,
-                    fixed_parameters,
-                    hex_to_bytes(&ballots.primary_nonces[0]).as_slice(),
-                );
-
-                BallotRecordingTool::verify_ballot_proofs(
-                    &config,
-                    fixed_parameters,
-                    &mut csprng,
-                    &ballots.ballots[0],
-                    &voter_selections,
                 );
             }
 
@@ -172,27 +129,41 @@ impl Subcommand for PreEncryptedBallots {
                 }
 
                 for b_idx in 0..ballots.ballots.len() {
-                    let ballot = &mut ballots.ballots[b_idx];
+                    let pre_encrypted_ballot = &mut ballots.ballots[b_idx];
                     assert!(BallotRecordingTool::verify_ballot(
                         &config,
                         fixed_parameters,
-                        &ballot,
+                        &pre_encrypted_ballot,
                         &ballots.primary_nonces[b_idx]
                     ));
 
                     BallotRecordingTool::regenerate_nonces(
-                        ballot,
+                        pre_encrypted_ballot,
                         &config,
                         fixed_parameters,
                         hex_to_bytes(&ballots.primary_nonces[b_idx]).as_slice(),
                     );
 
-                    BallotRecordingTool::verify_ballot_proofs(
+                    let voter_ballot = VoterBallot::new_pick_random(
+                        &config,
+                        &mut csprng,
+                        String::from("Random Voter"),
+                    );
+
+                    let encrypted_ballot = EncryptedBallot::new_from_preencrypted(
                         &config,
                         fixed_parameters,
                         &mut csprng,
-                        ballot,
-                        &voter_selections,
+                        pre_encrypted_ballot,
+                        &voter_ballot,
+                    );
+
+                    println!("Voter selections = {:?}", voter_ballot);
+
+                    BallotRecordingTool::verify_ballot_proofs(
+                        &config,
+                        fixed_parameters,
+                        &encrypted_ballot,
                     );
                 }
             }

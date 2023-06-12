@@ -3,8 +3,8 @@ use num_traits::Num;
 use util::csprng::Csprng;
 
 use crate::ballot::{
-    CiphertextContestSelection, PreEncryptedBallot, PreEncryptedBallotConfig, PreEncryptedContest,
-    PreEncryptedContestSelection,
+    CiphertextContestSelection, EncryptedBallot, EncryptedBallotConfig, EncryptedContest,
+    PreEncryptedBallot, PreEncryptedContest, PreEncryptedContestSelection,
 };
 use crate::ballot_encrypting_tool::BallotEncryptingTool;
 use crate::fixed_parameters::FixedParameters;
@@ -14,7 +14,7 @@ pub struct BallotRecordingTool {}
 
 impl BallotRecordingTool {
     pub fn verify_ballot(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         ballot: &PreEncryptedBallot,
         primary_nonce_str: &str,
@@ -51,12 +51,11 @@ impl BallotRecordingTool {
                 return false;
             }
         }
-        false
     }
 
     pub fn regenerate_nonces(
         ballot: &mut PreEncryptedBallot,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         primary_nonce: &[u8],
     ) {
@@ -65,8 +64,7 @@ impl BallotRecordingTool {
             .contests
             .iter()
             .map(|c| {
-                PreEncryptedContest::sanitize_contest(c)
-                    .options
+                c.options
                     .iter()
                     .map(|s| s.label.clone())
                     .collect::<Vec<String>>()
@@ -93,60 +91,38 @@ impl BallotRecordingTool {
                         ),
                     };
                 }
-
-                // contest.selections[j].regenerate_nonces(
-                //     config,
-                //     fixed_parameters,
-                //     primary_nonce,
-                //     &contest.label,
-                //     &selection_labels[i],
-                //     j,
-                // );
             }
         }
     }
 
     pub fn verify_ballot_proofs(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
-        csprng: &mut Csprng,
-        ballot: &PreEncryptedBallot,
-        voter_selections: &Vec<Vec<usize>>,
+        ballot: &EncryptedBallot,
     ) {
-        let (proof_ballot_correctness, proof_selection_limit) =
-            ballot.nizkp(csprng, fixed_parameters, &config, &voter_selections);
-
-        // Verify proof of ballot correctness
-        for (i, ballot_proof) in proof_ballot_correctness.iter().enumerate() {
-            for (j, contest_proof) in ballot_proof.iter().enumerate() {
-                for (k, selection_proof) in contest_proof.iter().enumerate() {
-                    println!(
-                        "Verify proof of ballot correctness i: {}, j: {}, k: {}",
-                        i, j, k
-                    );
-                    // TODO: Nonces are all zero
-                    assert!(selection_proof.verify(
-                        fixed_parameters,
-                        &config,
-                        &ballot.get_contests()[i].get_selections()[j].get_selections()[k]
-                            .ciphertext,
-                        1 as usize,
-                    ));
-                }
+        for (i, contest) in ballot.contests.iter().enumerate() {
+            // Verify proof of ballot correctness
+            for (j, proof) in contest.get_proof_ballot_correctness().iter().enumerate() {
+                println!("Verify proof of ballot correctness i: {}, j: {}", i, j);
+                assert!(proof.verify(
+                    fixed_parameters,
+                    &config,
+                    &contest.selection.vote[j].ciphertext,
+                    1 as usize,
+                ));
             }
 
-            let combined_selection = PreEncryptedContest::sum_selection_vector(
-                fixed_parameters,
-                &ballot.get_contests()[i]
-                    .combine_voter_selections(fixed_parameters, voter_selections[i].as_slice()),
+            println!(
+                "Verify proof of satisfying the selection limit {}",
+                config.manifest.contests[i].selection_limit
             );
 
-            println!("Verify proof of satisfying the selection limit {}", i);
             // Verify proof of satisfying the selection limit
-            assert!(proof_selection_limit[i].verify(
+            assert!(contest.get_proof_selection_limit().verify(
                 fixed_parameters,
                 &config,
-                &combined_selection.ciphertext,
+                &EncryptedContest::sum_selection_vector(fixed_parameters, &contest.selection.vote)
+                    .ciphertext,
                 config.manifest.contests[i].selection_limit,
             ));
         }
@@ -252,7 +228,7 @@ impl BallotRecordingTool {
     // }
 
     pub fn verify_proof_of_ballot_correctness(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         fixed_parameters: &FixedParameters,
         selections: &Vec<Vec<CiphertextContestSelection>>,
         proofs: &Vec<Vec<ProofRange>>,

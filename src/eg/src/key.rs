@@ -6,8 +6,8 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
+use std::fs;
 use std::path::PathBuf;
-use std::{fs, ops};
 
 use num_bigint::BigUint;
 
@@ -201,13 +201,10 @@ impl PublicKey {
 
     pub fn new_from_file(path: &PathBuf) -> Self {
         match fs::read_to_string(path) {
-            Ok(file) => {
-                let res = serde_json::from_str(&file);
-                match (res) {
-                    Ok(key) => return key,
-                    Err(e) => panic!("Error reading public key from file: {}", e),
-                }
-            }
+            Ok(file) => match serde_json::from_str(&file) {
+                Ok(key) => return key,
+                Err(e) => panic!("Error reading public key from file: {}", e),
+            },
             Err(e) => panic!("Error reading public key from file: {}", e),
         }
     }

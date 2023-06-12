@@ -1,5 +1,3 @@
-use num_bigint::BigUint;
-
 use crate::{election_parameters::ElectionParameters, hashes::Hashes, nizk::ProofGuardian};
 
 struct Verifier {

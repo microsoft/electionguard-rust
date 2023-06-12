@@ -9,7 +9,7 @@ use eg::{
     guardian::{export, import, verify_share_from},
     hashes::Hashes,
 };
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::csprng::Csprng;
 
 #[derive(Args, Debug)]
 pub(crate) struct Guardian {
@@ -49,8 +49,6 @@ impl Subcommand for Guardian {
 
     fn do_it_with_csprng(&self, _clargs: &Clargs, mut csprng: Csprng) -> Result<()> {
         use eg::guardian::Guardian;
-        use eg::standard_parameters::STANDARD_PARAMETERS;
-        let fixed_parameters = &*STANDARD_PARAMETERS;
 
         if self.example_manifest && self.manifest.is_some() {
             bail!("Specify either --example-manifest or --manifest, but not both.");

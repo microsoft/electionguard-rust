@@ -1,19 +1,14 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-use std::borrow::Borrow;
-
 use num_bigint::BigUint;
-use util::csprng::Csprng;
 
 use crate::ballot::{
-    CiphertextContestSelection, PreEncryptedBallot, PreEncryptedBallotConfig, PreEncryptedContest,
+    CiphertextContestSelection, EncryptedBallotConfig, PreEncryptedContest,
     PreEncryptedContestSelection,
 };
 
 use crate::fixed_parameters::FixedParameters;
-use crate::hash::{eg_h, hex_to_bytes, HValue};
-use crate::key::{homomorphic_addition, Ciphertext};
-use crate::nizk::ProofRange;
+use crate::hash::{eg_h, hex_to_bytes};
 
 pub struct BallotEncryptingTool {}
 
@@ -41,7 +36,7 @@ impl BallotEncryptingTool {
     ///
     /// TODO: Remove label from the hash (equation 93)
     pub fn generate_selection_hash(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         selections: &Vec<CiphertextContestSelection>,
     ) -> String {
         let mut v = vec![0x40];
@@ -61,7 +56,7 @@ impl BallotEncryptingTool {
     /// ψ_i = H(H_E;40,λ_i,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
     ///
     pub fn generate_contest_hash(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         contest_label: &String,
         selections: &Vec<PreEncryptedContestSelection>,
     ) -> String {
@@ -89,7 +84,7 @@ impl BallotEncryptingTool {
     /// H(B) = H(H_E;42,χ_1,χ_2,...,χ_m ,B_aux)
     ///
     pub fn generate_confirmation_code(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         contests: &Vec<PreEncryptedContest>,
         b_aux: &[u8],
     ) -> String {
@@ -108,7 +103,7 @@ impl BallotEncryptingTool {
     /// ξ_(i,j,k) = H(H_E;43,ξ,Λ_i,λ_j,λ_k) mod q
     ///
     pub fn generate_nonce(
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         primary_nonce: &[u8],
         label_i: &[u8],
         label_j: &[u8],

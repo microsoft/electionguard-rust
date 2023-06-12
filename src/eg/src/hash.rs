@@ -5,13 +5,11 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::str::FromStr;
-
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use num_bigint::BigUint;
 use num_traits::Num;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 

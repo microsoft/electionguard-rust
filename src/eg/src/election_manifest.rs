@@ -6,10 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{anyhow, Result};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-
-use crate::key::Ciphertext;
 
 /// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

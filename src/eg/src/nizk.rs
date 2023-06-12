@@ -3,7 +3,7 @@
 use std::{borrow::Borrow, rc::Rc};
 
 use num_bigint::BigUint;
-use num_traits::{zero, Num, One, Zero};
+use num_traits::{Num, One};
 use serde::{Deserialize, Serialize};
 use util::{
     csprng::Csprng,
@@ -11,8 +11,7 @@ use util::{
 };
 
 use crate::{
-    ballot::PreEncryptedBallotConfig,
-    election_parameters::ElectionParameters,
+    ballot::EncryptedBallotConfig,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
     key::{Ciphertext, PublicKey},
@@ -75,7 +74,7 @@ impl ProofRange {
     pub fn new_zero_or_one(
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         nonce: &BigUint,
         ct: &Ciphertext,
         selected: bool,
@@ -126,7 +125,6 @@ impl ProofRange {
                 ),
             ) {
                 Some(c) => {
-                    println!("c: {:?}", c);
                     // Equations 40-42
                     c1 = c.borrow() - &c0;
                     v0 = u0.borrow() - &(&c0 * nonce);
@@ -169,7 +167,6 @@ impl ProofRange {
                 ),
             ) {
                 Some(c) => {
-                    println!("c: {:?}", c);
                     // Equations 31-33
                     c0 = c.borrow() - &c1;
                     v0 = u0.borrow() - &(&c0 * nonce);
@@ -188,7 +185,7 @@ impl ProofRange {
     pub fn new(
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         zmulq: Rc<ZMulPrime>,
         nonce: &BigUint,
         ct: &Ciphertext,
@@ -241,7 +238,6 @@ impl ProofRange {
             ),
         ) {
             Some(challenge) => {
-                println!("c: {:?}", challenge);
                 c[small_l] = challenge;
                 for j in 0..big_l + 1 {
                     if j != small_l {
@@ -265,7 +261,7 @@ impl ProofRange {
     pub fn verify(
         &self,
         fixed_parameters: &FixedParameters,
-        config: &PreEncryptedBallotConfig,
+        config: &EncryptedBallotConfig,
         ct: &Ciphertext,
         big_l: usize,
     ) -> bool {
@@ -306,11 +302,6 @@ impl ProofRange {
             })
             .collect::<Vec<_>>();
 
-        println!("a: {:?}", a[0]);
-        println!("b: {:?}", b[0]);
-        println!("h_e: {:?}", config.h_e);
-        println!("k: {:?}", config.election_public_key);
-
         match ZMulPrimeElem::try_new(
             zmulq.clone(),
             Self::challenge(
@@ -323,8 +314,6 @@ impl ProofRange {
             ),
         ) {
             Some(c) => {
-                println!("c: {:?}", c);
-
                 let mut rhs = BigUint::from(0u8);
                 for c_i in self.c.iter() {
                     rhs += c_i;
@@ -333,11 +322,7 @@ impl ProofRange {
                 rhs = rhs % fixed_parameters.q.as_ref();
 
                 match ZMulPrimeElem::try_new(zmulq.clone(), rhs) {
-                    Some(rhs) => {
-                        println!("lhs {:?}", c.elem);
-                        println!("rhs {:?}", rhs.elem);
-                        c.elem == rhs.elem
-                    }
+                    Some(rhs) => c.elem == rhs.elem,
                     None => {
                         println!("rhs is not in ZmulPrime");
                         false
