@@ -46,6 +46,7 @@ impl std::fmt::Display for Hashes {
 }
 
 impl Hashes {
+    #[allow(dead_code)] //? TODO: Remove this
     fn new(election_parameters: &ElectionParameters, election_manifest: &ElectionManifest) -> Self {
         // Computation of the parameter base hash H_P.
         let h_p = {

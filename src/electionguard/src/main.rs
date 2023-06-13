@@ -5,103 +5,49 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+mod artifacts_dir;
+mod clargs;
 mod common_utils;
-mod manifest;
-mod verify_standard_parameters;
+mod subcommand_helper;
+mod subcommands;
 
-use std::path::PathBuf;
+//use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 
-use eg::{
-    election_manifest::ElectionManifest, example_election_manifest::example_election_manifest,
-};
-use util::csprng::Csprng;
+use artifacts_dir::{ArtifactFile, ArtifactsDir};
+use subcommand_helper::SubcommandHelper;
 
-use crate::{manifest::Manifest, verify_standard_parameters::VerifyStandardParameters};
-
-#[derive(Parser, Debug)]
-pub(crate) struct Clargs {
-    /// Make the output deterministic by using the given seed.
-    /// This is completely insecure and should only be used for testing.
-    #[arg(long)]
-    insecure_deterministic_seed: Option<String>,
-
-    /// Election manifest file.
-    #[arg(long)]
-    manifest: Option<PathBuf>,
-
-    /// Use the example election manifest.
-    #[arg(long)]
-    example_manifest: bool,
-
-    #[command(subcommand)]
-    subcmd: Subcommands,
-}
-
-impl Clargs {
-    /// Loads the election manifest based on common command line arguments.
-    pub fn load_election_manifest(&self) -> Result<ElectionManifest> {
-        match (self.example_manifest, &self.manifest) {
-            (false, Some(path)) => {
-                let bytes = std::fs::read(path).with_context(|| {
-                    format!("Couldn't read from manifest file: {}", path.display())
-                })?;
-                ElectionManifest::from_bytes(&bytes)
-            }
-            (true, None) => Ok(example_election_manifest()),
-            _ => bail!("Specify either `--example-manifest` or `--manifest FILE`, but not both."),
-        }
-    }
-}
-
-#[derive(clap::Subcommand, Debug)]
-enum Subcommands {
-    /// Operations on an election manifest.
-    Manifest(Manifest),
-
-    /// Verify standard parameters. Primarily for testing.
-    VerifyStandardParameters(VerifyStandardParameters),
-}
-
-pub(crate) trait Subcommand {
-    // If returns `true` the subcommand will be provided a csprng.
-    fn need_csprng(&self) -> bool;
-
-    // Call to perform the subcommand, if `need_csprng()` returned `false`.
-    fn do_it(&self, clargs: &Clargs) -> Result<()>;
-
-    //? TODO: this is kind of silly. We want to make sure the csprng is
-    //? instantiated exactly 0 or 1 times, depending on the actual subcommmand.
-    //? But it's tricky to enforce this statically, expecially because we
-    //? have multiple shared references to clargs. However, a mutable subcommand
-    //? could be handy in the future.
-    //? Maybe the subcommand struct doesn't have to be the same one as the
-    //? clap::Args struct.
-
-    // Call to perform the subcommand, if `need_csprng()` returned `true`.
-    fn do_it_with_csprng(&self, clargs: &Clargs, csprng: Csprng) -> Result<()>;
-}
+use crate::{clargs::Clargs, subcommands::Subcommand};
 
 fn main() -> Result<()> {
-    let clargs = Clargs::parse();
+    let mut clargs = Clargs::parse();
 
-    let subcommand: &dyn Subcommand = match clargs.subcmd {
-        Subcommands::Manifest(ref manifest) => manifest,
-        Subcommands::VerifyStandardParameters(ref verify_standard_parameters) => {
-            verify_standard_parameters
-        }
-    };
+    let insecure_deterministic_flag_passed = clargs.insecure_deterministic;
 
-    if subcommand.need_csprng() {
-        eprint!("Initializing csprng...");
-        eprint!("\n!!! WARNING TEMP TEST CODE !!! ...");
-        let csprng = Csprng::new(1234); //? TODO seed this for real
-        eprintln!("Done.");
+    let artifacts_dir = ArtifactsDir::new(&clargs.artifacts_dir)?;
 
-        subcommand.do_it_with_csprng(&clargs, csprng)
-    } else {
-        subcommand.do_it(&clargs)
+    // Takes the `Subcommand` out of `clargs`, replacing it with the default `PrintHelp`.
+    // We need it for the `self` parameter to call `do_it()`.
+    let mut subcommand = std::mem::take(&mut clargs.subcommand);
+
+    // Now we can pass ownership of `clargs` to `SubcommandInfo`.
+    let mut subcommand_info = SubcommandHelper::new(clargs, artifacts_dir)?;
+
+    let uses_csprng = Into::<&mut dyn Subcommand>::into(&mut subcommand).uses_csprng();
+    subcommand_info.subcommand_uses_csprng = uses_csprng;
+
+    if uses_csprng
+        && !insecure_deterministic_flag_passed
+        && subcommand_info
+            .artifacts_dir
+            .exists(ArtifactFile::PseudorandomSeedDefeatsAllSecrecy)
+    {
+        bail!("--insecure-deterministic is not set, but random seed file exists already exists in artifacts dir: {}",
+            subcommand_info.artifacts_dir.path(ArtifactFile::PseudorandomSeedDefeatsAllSecrecy).display()
+        );
     }
+
+    Into::<&mut dyn Subcommand>::into(&mut subcommand).do_it(&mut subcommand_info)
 }

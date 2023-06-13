@@ -91,9 +91,7 @@ pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
 }
 
 pub fn is_prime_default_csprng<T: Borrow<BigUint>>(n: &T) -> bool {
-    let seed = u64::from_be_bytes(*b"is_prime");
-
-    let mut csprng = Csprng::new(seed);
+    let mut csprng = Csprng::new(b"electionguard-rust/util::prime::is_prime_default_csprng");
     is_prime(n, &mut csprng)
 }
 
@@ -259,7 +257,7 @@ mod test_primes {
 
     #[test]
     fn test_is_prime() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_is_prime");
 
         // Test first 10 integers.
         for (n, expected_prime) in [
@@ -311,7 +309,7 @@ mod test_primes {
 
     #[test]
     fn test_conversion_biguintprime_biguint() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_conversion_biguintprime_biguint");
         let n = 3_u8;
         let p = BigUintPrime::new(n.into(), &mut csprng).unwrap();
         let b: BigUint = p.into();
@@ -320,7 +318,7 @@ mod test_primes {
 
     #[test]
     fn test_new_random_prime() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_new_random_prime");
 
         for bits in PRIMES_TABLE_U8_BITS_RANGE {
             for _ in 0..100 {
