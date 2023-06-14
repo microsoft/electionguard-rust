@@ -21,8 +21,9 @@ use eg::{
     hash::hex_to_bytes,
     hashes::Hashes,
     key::PublicKey,
+    nizk::ProofGuardian,
 };
-use util::csprng::Csprng;
+use util::{csprng::Csprng, file::read_path};
 
 #[derive(Args, Debug)]
 pub(crate) struct PreEncryptedBallots {
@@ -83,28 +84,43 @@ impl Subcommand for PreEncryptedBallots {
         }
 
         if self.example_manifest {
-            println!("Using sample manifest.");
-
             let election_parameters = example_election_parameters();
             let election_manifest = example_election_manifest_small();
-            let election_public_key: PublicKey;
 
             let path = Path::new(&self.data).join("guardians");
 
             let capital_k_i = (1..election_parameters.varying_parameters.n + 1)
-                .map(|i| {
-                    PublicKey::new_from_file(&path.join(format!("{}/public/public_key.json", i)))
-                })
+                .map(|i| PublicKey::new_from_file(&path.join(format!("{}/public/key.json", i))))
                 .collect::<Vec<PublicKey>>();
+            let proofs = (1..election_parameters.varying_parameters.n + 1)
+                .map(|i| {
+                    ProofGuardian::from_json(
+                        &String::from_utf8(read_path(
+                            &path.join(format!("{}/public/proof.json", i)),
+                        ))
+                        .unwrap(),
+                    )
+                })
+                .collect::<Vec<ProofGuardian>>();
+            let mut commitments = Vec::new();
+            proofs
+                .iter()
+                .for_each(|p| commitments.extend(p.capital_k.clone()));
 
-            election_public_key = PublicKey(aggregate_public_keys(fixed_parameters, &capital_k_i));
+            let election_public_key =
+                PublicKey(aggregate_public_keys(fixed_parameters, &capital_k_i));
 
-            let hashes = Hashes::new(&election_parameters, &election_manifest);
+            let hashes = Hashes::new_with_extended(
+                &election_parameters,
+                &election_manifest,
+                &election_public_key,
+                &commitments,
+            );
 
             let config: BallotConfig = BallotConfig {
                 manifest: election_manifest,
-                election_public_key: election_public_key,
-                h_e: hashes.h_p,
+                election_public_key,
+                h_e: hashes.h_e,
             };
 
             let path = Path::new(&self.data).join("ballots");

@@ -7,10 +7,13 @@
 
 use std::borrow::Borrow;
 
+use num_bigint::BigUint;
+
 use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     hash::{eg_h, HValue},
+    key::PublicKey,
 };
 
 pub struct Hashes {
@@ -22,9 +25,9 @@ pub struct Hashes {
 
     /// Election base hash.
     pub h_b: HValue,
-    //? TODO?
-    // /// Extended base hash.
-    // h_e: HValue,
+
+    /// Extended base hash.
+    pub h_e: HValue,
 }
 
 impl std::fmt::Debug for Hashes {
@@ -101,18 +104,34 @@ impl Hashes {
             eg_h(&h_p, &v)
         };
 
-        //? TODO?
-        // // Computation of the extended base hash H_E.
-        //
-        // let h_e = {
-        //     evaluate_h(HKEY_ALL_ZEROES, &v_pqgnk) //? TODO
-        // };
-
         Self {
             h_p,
             h_m,
-            h_b, //, h_e
+            h_b,
+            h_e: HValue::default(),
         }
+    }
+
+    pub fn new_with_extended(
+        election_parameters: &ElectionParameters,
+        election_manifest: &ElectionManifest,
+        capital_k: &PublicKey,
+        capital_k_i: &Vec<BigUint>,
+    ) -> Self {
+        let mut hashes = Hashes::new(election_parameters, election_manifest);
+
+        // Computation of the extended base hash H_E.
+
+        hashes.h_e = {
+            let mut v = vec![0x12];
+
+            v.extend(capital_k.0.to_bytes_be());
+            capital_k_i.iter().for_each(|u| v.extend(u.to_bytes_be()));
+
+            eg_h(&hashes.h_b, &v)
+        };
+
+        hashes
     }
 }
 
