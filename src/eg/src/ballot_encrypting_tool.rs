@@ -1,13 +1,9 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-use num_bigint::BigUint;
-
 use crate::ballot::BallotConfig;
 
-use crate::contest::ContestPreEncrypted;
 use crate::contest_selection::{ContestSelectionCiphertext, ContestSelectionPreEncrypted};
-use crate::fixed_parameters::FixedParameters;
-use crate::hash::{eg_h, hex_to_bytes};
+use crate::hash::eg_h;
 
 pub struct BallotEncryptingTool {}
 

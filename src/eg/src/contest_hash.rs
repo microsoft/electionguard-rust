@@ -1,13 +1,13 @@
 use crate::{
     ballot::BallotConfig,
-    contest_selection::ContestSelectionPreEncrypted,
+    contest_selection::{ContestSelectionEncrypted, ContestSelectionPreEncrypted},
     hash::{eg_h, hex_to_bytes},
 };
 
 pub struct ContestHash {}
 
 impl ContestHash {
-    /// Generates a selection hash (Equation 95)
+    /// Contest hash for pre-encrypted ballots (Equation 95)
     ///
     /// ψ_i = H(H_E;40,λ_i,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
     ///
@@ -30,6 +30,28 @@ impl ContestHash {
 
         sorted_selection_hashes.iter().for_each(|s| {
             v.extend(hex_to_bytes(s));
+        });
+
+        eg_h(&config.h_e, &v).to_string()
+    }
+
+    /// Contest hash for encrypted ballots (Equation 58)
+    ///
+    /// χl = H(H_E;23,Λ_l,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
+    ///
+    pub fn encrypted(
+        config: &BallotConfig,
+        contest_label: &String,
+        selection: &ContestSelectionEncrypted,
+    ) -> String {
+        let mut v = vec![0x23];
+
+        v.extend_from_slice(contest_label.as_bytes());
+        v.extend_from_slice(config.election_public_key.0.to_bytes_be().as_slice());
+
+        selection.vote.iter().for_each(|x| {
+            v.extend_from_slice(x.ciphertext.alpha.to_bytes_be().as_slice());
+            v.extend_from_slice(x.ciphertext.beta.to_bytes_be().as_slice());
         });
 
         eg_h(&config.h_e, &v).to_string()

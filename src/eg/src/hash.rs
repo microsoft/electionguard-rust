@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use std::{ops::BitXor, ptr::copy};
+
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use num_bigint::BigUint;
@@ -30,10 +32,6 @@ impl From<HValueByteArray> for HValue {
     }
 }
 
-pub fn hex_to_bytes(s: &str) -> Vec<u8> {
-    BigUint::from_str_radix(s, 16).unwrap().to_bytes_be()
-}
-
 /// Serialize a HValue as hex
 impl Serialize for HValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -42,6 +40,10 @@ impl Serialize for HValue {
     {
         format!("{:0>16}", BigUint::from_bytes_be(&self.0).to_str_radix(16)).serialize(serializer)
     }
+}
+
+pub fn hex_to_bytes(s: &str) -> Vec<u8> {
+    BigUint::from_str_radix(s, 16).unwrap().to_bytes_be()
 }
 
 /// Deserialize a HValue from hex

@@ -1,10 +1,7 @@
 use std::{
-    borrow::Borrow,
-    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
-    rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::SystemTime,
 };
 
 use qrcode::{render::svg, QrCode};
@@ -12,38 +9,16 @@ use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::{
-    ballot_encrypting_tool::BallotEncryptingTool,
     confirmation_code::ConfirmationCode,
     contest::{ContestEncrypted, ContestPreEncrypted},
+    contest_selection::{ContestSelection, ContestSelectionEncrypted},
+    device::Device,
     election_manifest::ElectionManifest,
     fixed_parameters::FixedParameters,
     hash::HValue,
     key::PublicKey,
+    voter::VoterVerificationCode,
 };
-
-#[derive(Debug, Serialize)]
-pub struct VoterContest {
-    /// Label
-    pub label: String,
-
-    /// Selection
-    pub selection: Vec<usize>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct VoterBallot {
-    /// Label
-    pub label: String,
-
-    /// Contests in this ballot
-    pub contests: Vec<VoterContest>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct InstantVerificationCode {
-    pub pn: String,
-    pub cc: String,
-}
 
 /// A pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
@@ -55,7 +30,7 @@ pub struct BallotPreEncrypted {
     pub contests: Vec<ContestPreEncrypted>,
 
     /// Confirmation code
-    pub crypto_hash: String,
+    pub confirmation_code: ConfirmationCode,
 }
 
 /// An encrypted ballot.
@@ -68,10 +43,33 @@ pub struct BallotEncrypted {
     pub contests: Vec<ContestEncrypted>,
 
     /// Confirmation code
-    pub crypto_hash: String,
+    pub confirmation_code: ConfirmationCode,
+
+    /// Date (and time) of ballot generation
+    pub date: String,
+
+    /// Device that generated this ballot
+    pub device: String,
+}
+
+/// A decrypted ballot.
+#[derive(Debug)]
+pub struct BallotDecrypted {
+    /// Label
+    pub label: String,
+
+    /// Encrypted selections made by the voter
+    pub encrypted_selections: Vec<ContestSelectionEncrypted>,
+
+    /// Decrypted selections made by the voter
+    pub decrypted_selections: Vec<ContestSelection>,
+
+    /// Confirmation code
+    pub confirmation_code: ConfirmationCode,
 }
 
 /// Configuration for generating encrypted ballots.
+#[derive(Clone)]
 pub struct BallotConfig {
     /// Election manifest
     pub manifest: ElectionManifest,
@@ -86,39 +84,21 @@ pub struct BallotConfig {
     pub h_e: HValue,
 }
 
-impl VoterBallot {
+impl BallotDecrypted {
     pub fn new_pick_random(config: &BallotConfig, csprng: &mut Csprng, label: String) -> Self {
         let mut contests = Vec::new();
         for contest in &config.manifest.contests {
-            contests.push(VoterContest::new_pick_random(
+            contests.push(ContestSelection::new_pick_random(
                 csprng,
-                contest.label.clone(),
                 contest.selection_limit,
                 contest.options.len(),
             ));
         }
-        Self { label, contests }
-    }
-}
-
-impl VoterContest {
-    pub fn new_pick_random(
-        csprng: &mut Csprng,
-        label: String,
-        selection_limit: usize,
-        num_options: usize,
-    ) -> Self {
-        let mut selection = HashSet::new();
-        // TODO: Allow 0 selections
-        let selection_limit = 1 + (csprng.next_u64() as usize % selection_limit);
-
-        while selection.len() < selection_limit {
-            selection.insert(csprng.next_u64() as usize % num_options);
-        }
-
         Self {
             label,
-            selection: selection.into_iter().collect(),
+            decrypted_selections: contests,
+            encrypted_selections: Vec::new(),
+            confirmation_code: ConfirmationCode("".to_string()),
         }
     }
 }
@@ -132,8 +112,8 @@ impl BallotPreEncrypted {
         &self.contests
     }
 
-    pub fn get_crypto_hash(&self) -> &String {
-        &self.crypto_hash
+    pub fn get_confirmation_code(&self) -> &ConfirmationCode {
+        &self.confirmation_code
     }
 
     pub fn try_new_with(
@@ -176,7 +156,7 @@ impl BallotPreEncrypted {
                 Some(BallotPreEncrypted {
                     label,
                     contests,
-                    crypto_hash,
+                    confirmation_code: crypto_hash,
                 })
             }
             false => None,
@@ -254,37 +234,42 @@ impl BallotPreEncrypted {
 
 impl BallotEncrypted {
     pub fn new_from_preencrypted(
-        config: &BallotConfig,
-        fixed_parameters: &FixedParameters,
+        device: &Device,
         csprng: &mut Csprng,
         pre_encrypted: &BallotPreEncrypted,
-        voter_ballot: &VoterBallot,
+        voter_ballot: &BallotDecrypted,
     ) -> Self {
         let contests = (0..pre_encrypted.contests.len())
             .map(|i| {
                 ContestEncrypted::new_from_preencrypted(
-                    config,
-                    fixed_parameters,
+                    &device.config,
+                    &device.election_parameters.fixed_parameters,
                     csprng,
                     &pre_encrypted.contests[i],
-                    &voter_ballot.contests[i].selection,
-                    config.manifest.contests[i].selection_limit,
+                    &voter_ballot.decrypted_selections[i].vote,
+                    device.config.manifest.contests[i].selection_limit,
                 )
             })
             .collect::<Vec<ContestEncrypted>>();
 
         BallotEncrypted {
+            date: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                .to_string(),
+            device: device.get_uuid().clone(),
             label: pre_encrypted.get_label().clone(),
             contests,
-            crypto_hash: pre_encrypted.get_crypto_hash().clone(),
+            confirmation_code: pre_encrypted.get_confirmation_code().clone(),
         }
     }
 
     pub fn instant_verification_code(&self, primary_nonce: &String, dir_path: &Path) {
         let code = QrCode::new(
-            serde_json::to_string(&InstantVerificationCode {
+            serde_json::to_string(&VoterVerificationCode {
                 pn: primary_nonce.clone(),
-                cc: self.crypto_hash.clone(),
+                cc: self.confirmation_code.0.clone(),
             })
             .unwrap()
             .as_bytes(),

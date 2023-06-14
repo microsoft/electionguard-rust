@@ -8,6 +8,8 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::contest::Contest;
+
 /// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElectionManifest {
@@ -44,27 +46,6 @@ impl ElectionManifest {
         #[allow(clippy::unwrap_used)]
         serde_json::to_vec(self).unwrap()
     }
-}
-
-/// A contest.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Contest {
-    /// The label.
-    pub label: String,
-
-    /// The maximum count of options that a voter may select.
-    pub selection_limit: usize,
-
-    /// The candidates/options.
-    /// The order of options matches the virtual ballot.
-    pub options: Vec<ContestOption>,
-}
-
-/// An option in a contest.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ContestOption {
-    /// Label
-    pub label: String,
 }
 
 // Unit tests for the election manifest.

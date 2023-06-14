@@ -108,13 +108,12 @@ fn main() -> Result<()> {
     };
 
     if subcommand.need_csprng() {
-        eprint!("Initializing csprng...");
-        eprint!("\n!!! WARNING TEMP TEST CODE !!! ...");
+        // eprint!("Initializing csprng...");
+        // eprint!("\n!!! WARNING TEMP TEST CODE !!! ...");
 
         match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
             Ok(n) => {
-                let csprng = Csprng::new(n.as_micros() as u64);
-                eprintln!("Done.");
+                let csprng = Csprng::new(n.as_secs() as u64);
                 subcommand.do_it_with_csprng(&clargs, csprng)
             }
             Err(_) => panic!("SystemTime before UNIX EPOCH!"),

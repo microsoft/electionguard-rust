@@ -106,7 +106,7 @@ pub fn homomorphic_addition(
     );
 
     let mut result = <Vec<ContestSelectionCiphertext>>::new();
-    (0..ctxts[0].len()).for_each(|i| {
+    (0..ctxts[0].len()).for_each(|_| {
         result.push(ContestSelectionCiphertext {
             ciphertext: Ciphertext {
                 alpha: BigUint::from(0 as usize),
@@ -167,6 +167,14 @@ impl PrivateKey {
 }
 
 impl PublicKey {
+    pub fn from_json(json: &str) -> Self {
+        serde_json::from_str(json).unwrap()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
     pub fn encrypt_with(
         &self,
         fixed_parameters: &FixedParameters,

@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, rc::Rc};
+use std::{borrow::Borrow, collections::HashSet, rc::Rc};
 
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
@@ -8,12 +8,39 @@ use crate::{
     ballot_encrypting_tool::BallotEncryptingTool,
     contest_hash::ContestHash,
     contest_selection::{
-        ContestSelectionCiphertext, ContestSelectionEncrypted, ContestSelectionPreEncrypted,
+        ContestSelectionCiphertext, ContestSelectionEncrypted, ContestSelectionPlaintext,
+        ContestSelectionPreEncrypted,
     },
-    election_manifest::Contest,
     fixed_parameters::FixedParameters,
     nizk::ProofRange,
 };
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BallotStyle(pub String);
+
+/// A contest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Contest {
+    /// The label.
+    pub label: String,
+
+    /// The maximum count of options that a voter may select.
+    pub selection_limit: usize,
+
+    /// The candidates/options.
+    /// The order of options matches the virtual ballot.
+    pub options: Vec<ContestOption>,
+
+    /// Ballot style
+    pub ballot_style: BallotStyle,
+}
+
+/// An option in a contest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContestOption {
+    /// Label
+    pub label: String,
+}
 
 /// A contest in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,6 +53,9 @@ pub struct ContestPreEncrypted {
 
     /// Contest hash
     pub crypto_hash: String,
+
+    /// Ballot style
+    pub ballot_style: BallotStyle,
 }
 
 /// A contest in a pre-encrypted ballot.
@@ -39,6 +69,9 @@ pub struct ContestEncrypted {
 
     /// Contest hash
     pub crypto_hash: String,
+
+    /// Ballot style
+    pub ballot_style: BallotStyle,
 
     /// Proof of ballot correctness
     pub proof_ballot_correctness: Vec<ProofRange>,
@@ -121,6 +154,7 @@ impl ContestPreEncrypted {
                     label: contest.label.clone(),
                     selections,
                     crypto_hash,
+                    ballot_style: contest.ballot_style.clone(),
                 })
             }
             false => None,
@@ -150,13 +184,13 @@ impl ContestPreEncrypted {
     pub fn combine_voter_selections(
         &self,
         fixed_parameters: &FixedParameters,
-        voter_selections: &[usize],
+        voter_selections: &[ContestSelectionPlaintext],
     ) -> Vec<ContestSelectionCiphertext> {
         assert!(0 < voter_selections.len() && voter_selections.len() <= self.selections.len());
 
         let mut selections = <Vec<&Vec<ContestSelectionCiphertext>>>::new();
         for idx in voter_selections {
-            selections.push(&self.selections[*idx].selections);
+            selections.push(&self.selections[*idx as usize].selections);
         }
 
         let mut combined_selection = selections[0].clone();
@@ -184,7 +218,7 @@ impl ContestEncrypted {
         fixed_parameters: &FixedParameters,
         csprng: &mut Csprng,
         pre_encrypted: &ContestPreEncrypted,
-        voter_selections: &Vec<usize>,
+        voter_selections: &Vec<ContestSelectionPlaintext>,
         selection_limit: usize,
     ) -> Self {
         let zmulq = Rc::new(ZMulPrime::new(fixed_parameters.q.clone()));
@@ -198,7 +232,7 @@ impl ContestEncrypted {
             .map(|_| false)
             .collect::<Vec<bool>>();
         for v in voter_selections {
-            selected_vec[*v] = true;
+            selected_vec[*v as usize] = true;
         }
         let proof_ballot_correctness = selection
             .vote
@@ -226,6 +260,7 @@ impl ContestEncrypted {
 
         // TODO: Change crypto hash
         ContestEncrypted {
+            ballot_style: pre_encrypted.ballot_style.clone(),
             label: pre_encrypted.label.clone(),
             selection,
             crypto_hash: pre_encrypted.get_crypto_hash().clone(),

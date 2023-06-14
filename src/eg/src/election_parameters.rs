@@ -7,7 +7,7 @@
 
 use crate::{fixed_parameters::FixedParameters, varying_parameters::VaryingParameters};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElectionParameters {
     /// The fixed ElectionGuard parameters that apply to all elections.
     pub fixed_parameters: FixedParameters,

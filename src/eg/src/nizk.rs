@@ -400,6 +400,14 @@ impl<'de> Deserialize<'de> for ProofGuardian {
 }
 
 impl ProofGuardian {
+    pub fn from_json(json: &str) -> Self {
+        serde_json::from_str(json).unwrap()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
     pub fn challenge(
         fixed_parameters: &FixedParameters,
         h_p: HValue,

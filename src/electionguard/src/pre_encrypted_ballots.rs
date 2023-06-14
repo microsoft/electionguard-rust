@@ -11,9 +11,10 @@ use crate::{Clargs, Subcommand};
 use anyhow::{bail, Result};
 use clap::Args;
 use eg::{
-    ballot::{BallotConfig, BallotEncrypted, VoterBallot},
+    ballot::{BallotConfig, BallotDecrypted, BallotEncrypted},
     ballot_list::BallotListPreEncrypted,
     ballot_recording_tool::BallotRecordingTool,
+    device::Device,
     example_election_manifest::{example_election_manifest, example_election_manifest_small},
     example_election_parameters::example_election_parameters,
     guardian::aggregate_public_keys,
@@ -126,11 +127,16 @@ impl Subcommand for PreEncryptedBallots {
                     None => bail!("Error reading ballots."),
                 }
 
+                let device = Device::new(
+                    "BallotReecordingDevice".to_string(),
+                    &config,
+                    &election_parameters,
+                );
+
                 for b_idx in 0..ballots.ballots.len() {
                     let pre_encrypted_ballot = &mut ballots.ballots[b_idx];
                     assert!(BallotRecordingTool::verify_ballot(
-                        &config,
-                        fixed_parameters,
+                        &device,
                         &pre_encrypted_ballot,
                         &ballots.primary_nonces[b_idx]
                     ));
@@ -142,15 +148,14 @@ impl Subcommand for PreEncryptedBallots {
                         hex_to_bytes(&ballots.primary_nonces[b_idx]).as_slice(),
                     );
 
-                    let voter_ballot = VoterBallot::new_pick_random(
+                    let voter_ballot = BallotDecrypted::new_pick_random(
                         &config,
                         &mut csprng,
                         String::from("Random Voter"),
                     );
 
                     let encrypted_ballot = BallotEncrypted::new_from_preencrypted(
-                        &config,
-                        fixed_parameters,
+                        &device,
                         &mut csprng,
                         pre_encrypted_ballot,
                         &voter_ballot,

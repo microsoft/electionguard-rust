@@ -49,7 +49,7 @@ impl BallotListPreEncrypted {
             println!("Primary nonce:\t{}", primary_nonce);
             primary_nonces.push(primary_nonce);
             ballots.push(ballot);
-            confirmation_codes.push(ballots[b_idx].get_crypto_hash().clone());
+            confirmation_codes.push(ballots[b_idx].get_confirmation_code().0.clone());
             fs::write(
                 path.join(format!("ballot-{}.json", confirmation_codes[b_idx])),
                 serde_json::to_string(&ballots[b_idx]).unwrap(),
@@ -115,7 +115,8 @@ impl BallotListPreEncrypted {
                                 return None;
                             }
                         }
-                        let crypto_hash = ballots[ballots.len() - 1].get_crypto_hash().to_string();
+                        let crypto_hash =
+                            ballots[ballots.len() - 1].get_confirmation_code().0.clone();
 
                         match codes_to_nonces.get(&crypto_hash) {
                             Some(nonce) => primary_nonces.push(nonce.clone()),

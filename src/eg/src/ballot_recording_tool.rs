@@ -2,19 +2,18 @@ use num_bigint::BigUint;
 use num_traits::Num;
 
 use crate::ballot::{BallotConfig, BallotEncrypted, BallotPreEncrypted};
-use crate::ballot_encrypting_tool::BallotEncryptingTool;
 use crate::contest::{ContestEncrypted, ContestPreEncrypted};
 use crate::contest_selection::{ContestSelectionCiphertext, ContestSelectionPreEncrypted};
+use crate::device::Device;
 use crate::fixed_parameters::FixedParameters;
 use crate::nizk::ProofRange;
-use crate::nonce::{self, Nonce};
+use crate::nonce::Nonce;
 
 pub struct BallotRecordingTool {}
 
 impl BallotRecordingTool {
     pub fn verify_ballot(
-        config: &BallotConfig,
-        fixed_parameters: &FixedParameters,
+        device: &Device,
         ballot: &BallotPreEncrypted,
         primary_nonce_str: &str,
     ) -> bool {
@@ -28,19 +27,23 @@ impl BallotRecordingTool {
             }
         };
 
-        match BallotPreEncrypted::try_new_with(config, fixed_parameters, primary_nonce.as_slice()) {
+        match BallotPreEncrypted::try_new_with(
+            &device.config,
+            &device.election_parameters.fixed_parameters,
+            primary_nonce.as_slice(),
+        ) {
             Some(regenerated_ballot) => {
-                if *ballot.get_crypto_hash() == *regenerated_ballot.get_crypto_hash() {
+                if *ballot.get_confirmation_code() == *regenerated_ballot.get_confirmation_code() {
                     return BallotRecordingTool::verify_ballot_contests(
-                        fixed_parameters,
+                        &device.election_parameters.fixed_parameters,
                         ballot.get_contests(),
                         regenerated_ballot.get_contests(),
                     );
                 } else {
                     println!(
                         "Ballot crypto hash mismatch {} {}.",
-                        ballot.get_crypto_hash(),
-                        regenerated_ballot.get_crypto_hash()
+                        ballot.get_confirmation_code().0,
+                        regenerated_ballot.get_confirmation_code().0
                     );
                     return false;
                 }

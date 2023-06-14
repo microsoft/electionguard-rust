@@ -1,14 +1,16 @@
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
-    ballot::BallotConfig, ballot_encrypting_tool::BallotEncryptingTool,
-    election_manifest::ContestOption, fixed_parameters::FixedParameters, key::Ciphertext,
-    nizk::ProofRange, nonce::Nonce,
+    ballot::BallotConfig, ballot_encrypting_tool::BallotEncryptingTool, contest::ContestOption,
+    fixed_parameters::FixedParameters, key::Ciphertext, nizk::ProofRange, nonce::Nonce,
 };
+
+/// A plaintext vote for an option in a contest.
+pub type ContestSelectionPlaintext = u8;
 
 /// An encrypted option in a contest.
 #[derive(Debug, Clone)]
@@ -44,6 +46,33 @@ pub struct ContestSelectionEncrypted {
 
     /// Selection hash
     pub crypto_hash: String,
+}
+
+/// A contest selection by a voter.
+#[derive(Debug, Serialize)]
+pub struct ContestSelection {
+    /// Vector used to represent the selection
+    pub vote: Vec<ContestSelectionPlaintext>,
+}
+
+impl ContestSelection {
+    pub fn new_pick_random(
+        csprng: &mut Csprng,
+        selection_limit: usize,
+        num_options: usize,
+    ) -> Self {
+        let mut vote = HashSet::new();
+        // TODO: Allow 0 selections
+        let selection_limit = 1 + (csprng.next_u64() as usize % selection_limit);
+
+        while vote.len() < selection_limit {
+            vote.insert((csprng.next_u64() as usize % num_options) as u8);
+        }
+
+        Self {
+            vote: vote.into_iter().collect(),
+        }
+    }
 }
 
 impl ContestSelectionPreEncrypted {
