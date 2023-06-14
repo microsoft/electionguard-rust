@@ -11,10 +11,8 @@ use crate::{Clargs, Subcommand};
 use anyhow::{bail, Result};
 use clap::Args;
 use eg::{
-    ballot::{
-        EncryptedBallot, EncryptedBallotConfig, EncryptedContest, PreEncryptedBallotList,
-        VoterBallot,
-    },
+    ballot::{BallotConfig, BallotEncrypted, VoterBallot},
+    ballot_list::BallotListPreEncrypted,
     ballot_recording_tool::BallotRecordingTool,
     example_election_manifest::{example_election_manifest, example_election_manifest_small},
     example_election_parameters::example_election_parameters,
@@ -102,7 +100,7 @@ impl Subcommand for PreEncryptedBallots {
 
             let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-            let config: EncryptedBallotConfig = EncryptedBallotConfig {
+            let config: BallotConfig = BallotConfig {
                 manifest: election_manifest,
                 election_public_key: election_public_key,
                 h_e: hashes.h_p,
@@ -111,7 +109,7 @@ impl Subcommand for PreEncryptedBallots {
             let path = Path::new(&self.data).join("ballots");
 
             if self.generate {
-                PreEncryptedBallotList::new(
+                BallotListPreEncrypted::new(
                     &config,
                     fixed_parameters,
                     &mut csprng,
@@ -121,9 +119,9 @@ impl Subcommand for PreEncryptedBallots {
             }
 
             if self.verify {
-                let mut ballots: PreEncryptedBallotList;
+                let mut ballots: BallotListPreEncrypted;
 
-                match PreEncryptedBallotList::read_from_directory(&path.join(self.tag.as_str())) {
+                match BallotListPreEncrypted::read_from_directory(&path.join(self.tag.as_str())) {
                     Some(b) => ballots = b,
                     None => bail!("Error reading ballots."),
                 }
@@ -150,7 +148,7 @@ impl Subcommand for PreEncryptedBallots {
                         String::from("Random Voter"),
                     );
 
-                    let encrypted_ballot = EncryptedBallot::new_from_preencrypted(
+                    let encrypted_ballot = BallotEncrypted::new_from_preencrypted(
                         &config,
                         fixed_parameters,
                         &mut csprng,

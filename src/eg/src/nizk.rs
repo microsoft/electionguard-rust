@@ -11,7 +11,7 @@ use util::{
 };
 
 use crate::{
-    ballot::EncryptedBallotConfig,
+    ballot::BallotConfig,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
     key::{Ciphertext, PublicKey},
@@ -74,7 +74,7 @@ impl ProofRange {
     pub fn new_zero_or_one(
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &EncryptedBallotConfig,
+        config: &BallotConfig,
         nonce: &BigUint,
         ct: &Ciphertext,
         selected: bool,
@@ -185,7 +185,7 @@ impl ProofRange {
     pub fn new(
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
-        config: &EncryptedBallotConfig,
+        config: &BallotConfig,
         zmulq: Rc<ZMulPrime>,
         nonce: &BigUint,
         ct: &Ciphertext,
@@ -261,7 +261,7 @@ impl ProofRange {
     pub fn verify(
         &self,
         fixed_parameters: &FixedParameters,
-        config: &EncryptedBallotConfig,
+        config: &BallotConfig,
         ct: &Ciphertext,
         big_l: usize,
     ) -> bool {

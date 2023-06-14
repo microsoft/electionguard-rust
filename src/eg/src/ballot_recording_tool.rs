@@ -1,22 +1,21 @@
 use num_bigint::BigUint;
 use num_traits::Num;
-use util::csprng::Csprng;
 
-use crate::ballot::{
-    CiphertextContestSelection, EncryptedBallot, EncryptedBallotConfig, EncryptedContest,
-    PreEncryptedBallot, PreEncryptedContest, PreEncryptedContestSelection,
-};
+use crate::ballot::{BallotConfig, BallotEncrypted, BallotPreEncrypted};
 use crate::ballot_encrypting_tool::BallotEncryptingTool;
+use crate::contest::{ContestEncrypted, ContestPreEncrypted};
+use crate::contest_selection::{ContestSelectionCiphertext, ContestSelectionPreEncrypted};
 use crate::fixed_parameters::FixedParameters;
 use crate::nizk::ProofRange;
+use crate::nonce::{self, Nonce};
 
 pub struct BallotRecordingTool {}
 
 impl BallotRecordingTool {
     pub fn verify_ballot(
-        config: &EncryptedBallotConfig,
+        config: &BallotConfig,
         fixed_parameters: &FixedParameters,
-        ballot: &PreEncryptedBallot,
+        ballot: &BallotPreEncrypted,
         primary_nonce_str: &str,
     ) -> bool {
         let mut primary_nonce = Vec::new();
@@ -29,7 +28,7 @@ impl BallotRecordingTool {
             }
         };
 
-        match PreEncryptedBallot::try_new_with(config, fixed_parameters, primary_nonce.as_slice()) {
+        match BallotPreEncrypted::try_new_with(config, fixed_parameters, primary_nonce.as_slice()) {
             Some(regenerated_ballot) => {
                 if *ballot.get_crypto_hash() == *regenerated_ballot.get_crypto_hash() {
                     return BallotRecordingTool::verify_ballot_contests(
@@ -54,8 +53,8 @@ impl BallotRecordingTool {
     }
 
     pub fn regenerate_nonces(
-        ballot: &mut PreEncryptedBallot,
-        config: &EncryptedBallotConfig,
+        ballot: &mut BallotPreEncrypted,
+        config: &BallotConfig,
         fixed_parameters: &FixedParameters,
         primary_nonce: &[u8],
     ) {
@@ -76,12 +75,12 @@ impl BallotRecordingTool {
                     .get_selections()
                     .len()
                 {
-                    ballot.contests[i].selections[j].selections[k] = CiphertextContestSelection {
+                    ballot.contests[i].selections[j].selections[k] = ContestSelectionCiphertext {
                         ciphertext: ballot.get_contests()[i].get_selections()[j].get_selections()
                             [k]
                             .ciphertext
                             .clone(),
-                        nonce: BallotEncryptingTool::generate_nonce(
+                        nonce: Nonce::pre_encrypted(
                             config,
                             primary_nonce,
                             ballot.get_contests()[i].label.as_bytes(),
@@ -96,9 +95,9 @@ impl BallotRecordingTool {
     }
 
     pub fn verify_ballot_proofs(
-        config: &EncryptedBallotConfig,
+        config: &BallotConfig,
         fixed_parameters: &FixedParameters,
-        ballot: &EncryptedBallot,
+        ballot: &BallotEncrypted,
     ) {
         for (i, contest) in ballot.contests.iter().enumerate() {
             // Verify proof of ballot correctness
@@ -121,7 +120,7 @@ impl BallotRecordingTool {
             assert!(contest.get_proof_selection_limit().verify(
                 fixed_parameters,
                 &config,
-                &EncryptedContest::sum_selection_vector(fixed_parameters, &contest.selection.vote)
+                &ContestEncrypted::sum_selection_vector(fixed_parameters, &contest.selection.vote)
                     .ciphertext,
                 config.manifest.contests[i].selection_limit,
             ));
@@ -130,8 +129,8 @@ impl BallotRecordingTool {
 
     fn verify_ballot_contests(
         fixed_parameters: &FixedParameters,
-        contests: &Vec<PreEncryptedContest>,
-        regenerated_contests: &Vec<PreEncryptedContest>,
+        contests: &Vec<ContestPreEncrypted>,
+        regenerated_contests: &Vec<ContestPreEncrypted>,
     ) -> bool {
         assert!(contests.len() == regenerated_contests.len());
         for (i, a) in contests.iter().enumerate() {
@@ -150,8 +149,8 @@ impl BallotRecordingTool {
 
     fn verify_contest_selections(
         fixed_parameters: &FixedParameters,
-        selections: &Vec<PreEncryptedContestSelection>,
-        regenerated_selections: &Vec<PreEncryptedContestSelection>,
+        selections: &Vec<ContestSelectionPreEncrypted>,
+        regenerated_selections: &Vec<ContestSelectionPreEncrypted>,
     ) -> bool {
         assert!(selections.len() == regenerated_selections.len());
 
@@ -228,9 +227,9 @@ impl BallotRecordingTool {
     // }
 
     pub fn verify_proof_of_ballot_correctness(
-        config: &EncryptedBallotConfig,
+        config: &BallotConfig,
         fixed_parameters: &FixedParameters,
-        selections: &Vec<Vec<CiphertextContestSelection>>,
+        selections: &Vec<Vec<ContestSelectionCiphertext>>,
         proofs: &Vec<Vec<ProofRange>>,
     ) -> bool {
         for (i, contest_selection) in selections.iter().enumerate() {

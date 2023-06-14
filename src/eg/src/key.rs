@@ -15,7 +15,7 @@ use num_traits::{Num, One};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
-use crate::ballot::CiphertextContestSelection;
+use crate::contest_selection::ContestSelectionCiphertext;
 use crate::fixed_parameters::FixedParameters;
 
 #[derive(Debug, Clone)]
@@ -95,9 +95,9 @@ impl<'de> Deserialize<'de> for Ciphertext {
 }
 
 pub fn homomorphic_addition(
-    ctxts: Vec<&Vec<CiphertextContestSelection>>,
+    ctxts: Vec<&Vec<ContestSelectionCiphertext>>,
     fixed_parameters: &FixedParameters,
-) -> Vec<CiphertextContestSelection> {
+) -> Vec<ContestSelectionCiphertext> {
     assert!(ctxts.len() > 0);
 
     eprintln!(
@@ -105,9 +105,9 @@ pub fn homomorphic_addition(
         ctxts[0].len()
     );
 
-    let mut result = <Vec<CiphertextContestSelection>>::new();
+    let mut result = <Vec<ContestSelectionCiphertext>>::new();
     (0..ctxts[0].len()).for_each(|i| {
-        result.push(CiphertextContestSelection {
+        result.push(ContestSelectionCiphertext {
             ciphertext: Ciphertext {
                 alpha: BigUint::from(0 as usize),
                 beta: BigUint::from(0 as usize),
