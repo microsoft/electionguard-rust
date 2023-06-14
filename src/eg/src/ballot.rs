@@ -6,7 +6,7 @@ use std::{
 
 use qrcode::{render::svg, QrCode};
 use serde::{Deserialize, Serialize};
-use util::csprng::Csprng;
+use util::{csprng::Csprng, logging::Logging};
 
 use crate::{
     confirmation_code::ConfirmationCode,
@@ -125,8 +125,6 @@ impl BallotPreEncrypted {
 
         // Generate contests
 
-        // println!("Primary nonce = {:?}", primary_nonce);
-
         let label = "Sample Election".to_string();
         let b_aux = "Sample Aux Info".as_bytes();
 
@@ -151,8 +149,6 @@ impl BallotPreEncrypted {
             true => {
                 let crypto_hash = ConfirmationCode::pre_encrypted(config, &contests, b_aux);
 
-                println!("Confirmation Code:\t{:?}", crypto_hash);
-
                 Some(BallotPreEncrypted {
                     label,
                     contests,
@@ -173,7 +169,6 @@ impl BallotPreEncrypted {
             let mut primary_nonce = [0u8; 32];
             (0..32).for_each(|i| primary_nonce[i] = csprng.next_u8());
 
-            println!("Primary nonce = {:?}", primary_nonce);
             match BallotPreEncrypted::try_new_with(config, fixed_parameters, &primary_nonce) {
                 Some(ballot) => return (ballot, HValue(primary_nonce).to_string()),
                 None => continue,
@@ -220,12 +215,12 @@ impl BallotPreEncrypted {
             Ok(contents) => match serde_json::from_str(&contents) {
                 Ok(ballot) => Some(ballot),
                 Err(e) => {
-                    println!("Error: {:?}", e);
+                    Logging::log("", &format!("Error: {:?}", e), line!(), file!());
                     None
                 }
             },
             Err(e) => {
-                println!("Error: {:?}", e);
+                Logging::log("", &format!("Error: {:?}", e), line!(), file!());
                 None
             }
         }
@@ -282,6 +277,5 @@ impl BallotEncrypted {
             .light_color(svg::Color("#ffff80"))
             .build();
         fs::write(dir_path.join(format!("{}.svg", primary_nonce)), image).unwrap();
-        // println!("{}", image);
     }
 }

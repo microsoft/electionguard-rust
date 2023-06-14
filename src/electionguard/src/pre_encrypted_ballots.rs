@@ -85,7 +85,7 @@ impl Subcommand for PreEncryptedBallots {
 
         if self.example_manifest {
             let election_parameters = example_election_parameters();
-            let election_manifest = example_election_manifest_small();
+            let election_manifest = example_election_manifest();
 
             let path = Path::new(&self.data).join("guardians");
 
@@ -182,9 +182,19 @@ impl Subcommand for PreEncryptedBallots {
                         &path.join(self.tag.as_str()),
                     );
 
-                    println!("{:?}", config.h_e);
+                    // Logging::log(
+                    //     "Pre-Encrypted",
+                    //     &format!("Extended Base Hash\t{:?}", config.h_e),
+                    //     line!(),
+                    //     file!(),
+                    // );
 
-                    println!("Voter selections = {:?}", voter_ballot);
+                    // Logging::log(
+                    //     "Pre-Encrypted",
+                    //     &format!("Voter selections\t\t{:?}", voter_ballot),
+                    //     line!(),
+                    //     file!(),
+                    // );
 
                     BallotRecordingTool::verify_ballot_proofs(
                         &config,

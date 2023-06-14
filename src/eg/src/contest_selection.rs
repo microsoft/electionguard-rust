@@ -144,11 +144,6 @@ impl ContestSelectionPreEncrypted {
             BallotEncryptingTool::generate_selection_hash(config, selections.as_ref());
         let shortcode = BallotEncryptingTool::generate_short_code(&crypto_hash);
 
-        eprintln!(
-            "Selection Hash for {}:\t{} / Shortcode: {}",
-            selection.label, crypto_hash, shortcode
-        );
-
         // Generate pre-encrypted votes for each possible (single) choice
         ContestSelectionPreEncrypted {
             label,

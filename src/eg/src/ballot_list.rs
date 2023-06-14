@@ -1,6 +1,10 @@
 use std::{collections::HashMap, fs, path::Path, time::SystemTime, time::UNIX_EPOCH};
 
-use util::csprng::Csprng;
+use util::{
+    csprng::Csprng,
+    file::{read_path, write_path},
+    logging::Logging,
+};
 
 use crate::{
     ballot::{BallotConfig, BallotPreEncrypted},
@@ -21,6 +25,28 @@ pub struct BallotListPreEncrypted {
 }
 
 impl BallotListPreEncrypted {
+    fn print_ballot(i: usize, ballot: &BallotPreEncrypted, primary_nonce: &str) {
+        let tag = "Pre-Encrypted";
+        Logging::log(tag, &format!("Ballot {}", i), line!(), file!());
+        Logging::log(tag, "  Primary Nonce", line!(), file!());
+        Logging::log(tag, &format!("    {}", primary_nonce), line!(), file!());
+        Logging::log(tag, "  Confirmation Code", line!(), file!());
+        Logging::log(
+            tag,
+            &format!("    {}", ballot.confirmation_code.0.to_string()),
+            line!(),
+            file!(),
+        );
+        Logging::log(tag, "  Contests", line!(), file!());
+        ballot.get_contests().iter().for_each(|c| {
+            Logging::log(
+                tag,
+                &format!("    {}", c.crypto_hash.to_string()),
+                line!(),
+                file!(),
+            );
+        });
+    }
     pub fn new(
         config: &BallotConfig,
         fixed_parameters: &FixedParameters,
@@ -45,8 +71,7 @@ impl BallotListPreEncrypted {
         for b_idx in 0..num_ballots {
             let (ballot, primary_nonce) =
                 BallotPreEncrypted::new(&config, fixed_parameters, csprng);
-
-            println!("Primary nonce:\t{}", primary_nonce);
+            Self::print_ballot(b_idx + 1, &ballot, &primary_nonce);
             primary_nonces.push(primary_nonce);
             ballots.push(ballot);
             confirmation_codes.push(ballots[b_idx].get_confirmation_code().0.clone());
@@ -57,11 +82,12 @@ impl BallotListPreEncrypted {
             .unwrap();
         }
 
-        fs::write(
-            path.join("primary-nonces.json"),
-            serde_json::to_string(&vec![confirmation_codes, primary_nonces.clone()]).unwrap(),
-        )
-        .unwrap();
+        write_path(
+            &path.join("primary-nonces.json"),
+            serde_json::to_string(&vec![confirmation_codes, primary_nonces.clone()])
+                .unwrap()
+                .as_bytes(),
+        );
 
         BallotListPreEncrypted {
             label,
@@ -77,21 +103,13 @@ impl BallotListPreEncrypted {
         let label = path.file_name().unwrap().to_str().unwrap().to_string();
 
         let mut codes_to_nonces = <HashMap<String, String>>::new();
-        match fs::read_to_string(path.join("primary-nonces.json")) {
-            Ok(nonce_file) => {
-                let (confirmation_codes, primary_nonces): (Vec<String>, Vec<String>) =
-                    serde_json::from_str(&nonce_file).unwrap();
+        let nonce_file = String::from_utf8(read_path(&path.join("primary-nonces.json"))).unwrap();
+        let (confirmation_codes, primary_nonces): (Vec<String>, Vec<String>) =
+            serde_json::from_str(&nonce_file).unwrap();
 
-                (0..confirmation_codes.len()).for_each(|i| {
-                    codes_to_nonces
-                        .insert(confirmation_codes[i].clone(), primary_nonces[i].clone());
-                });
-            }
-            Err(e) => {
-                eprintln!("Error reading nonce file: {}", e);
-                return None;
-            }
-        }
+        (0..confirmation_codes.len()).for_each(|i| {
+            codes_to_nonces.insert(confirmation_codes[i].clone(), primary_nonces[i].clone());
+        });
 
         let mut ballots = Vec::new();
         let mut primary_nonces = Vec::new();
@@ -111,7 +129,12 @@ impl BallotListPreEncrypted {
                         match BallotPreEncrypted::try_new_from_file(&path) {
                             Some(ballot) => ballots.push(ballot),
                             None => {
-                                eprintln!("Error reading ballot file {:?}", path);
+                                Logging::log(
+                                    "",
+                                    &format!("Error reading ballot file {:?}", path),
+                                    line!(),
+                                    file!(),
+                                );
                                 return None;
                             }
                         }
@@ -121,7 +144,12 @@ impl BallotListPreEncrypted {
                         match codes_to_nonces.get(&crypto_hash) {
                             Some(nonce) => primary_nonces.push(nonce.clone()),
                             None => {
-                                eprintln!("No nonce found for ballot {:?}", crypto_hash);
+                                Logging::log(
+                                    "",
+                                    &format!("No nonce found for ballot {:?}", crypto_hash),
+                                    line!(),
+                                    file!(),
+                                );
                                 return None;
                             }
                         }
@@ -129,7 +157,7 @@ impl BallotListPreEncrypted {
                 }
             }
             Err(_) => {
-                eprintln!("Error reading directory");
+                Logging::log("", "Error reading directory", line!(), file!());
                 return None;
             }
         }

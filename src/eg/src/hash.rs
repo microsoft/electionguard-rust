@@ -5,8 +5,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::{ops::BitXor, ptr::copy};
-
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use num_bigint::BigUint;

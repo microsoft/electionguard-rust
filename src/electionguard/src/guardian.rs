@@ -182,7 +182,7 @@ impl Subcommand for Guardian {
                         Logging::log(
                             &format!("Guardian {}", guardian.i),
                             &format!(
-                                "Proof: {:?}",
+                                "\tProof: {:?}",
                                 proof.verify(
                                     &election_parameters.fixed_parameters,
                                     hashes.h_p,
@@ -198,7 +198,7 @@ impl Subcommand for Guardian {
                         Logging::log(
                             &format!("Guardian {}", guardian.i),
                             &format!(
-                                "Share: {:?}",
+                                "\tShare: {:?}",
                                 verify_share_from(
                                     &election_parameters.fixed_parameters,
                                     self.i as usize,

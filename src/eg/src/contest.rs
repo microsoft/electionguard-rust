@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashSet, rc::Rc};
+use std::{borrow::Borrow, rc::Rc};
 
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
@@ -147,8 +147,6 @@ impl ContestPreEncrypted {
         match success {
             true => {
                 let crypto_hash = ContestHash::pre_encrypted(config, &contest.label, &selections);
-
-                eprintln!("Contest Hash:\t{:?}", crypto_hash);
 
                 Some(ContestPreEncrypted {
                     label: contest.label.clone(),

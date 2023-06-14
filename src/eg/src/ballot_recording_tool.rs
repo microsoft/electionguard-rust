@@ -1,5 +1,6 @@
 use num_bigint::BigUint;
 use num_traits::Num;
+use util::logging::Logging;
 
 use crate::ballot::{BallotConfig, BallotEncrypted, BallotPreEncrypted};
 use crate::contest::{ContestEncrypted, ContestPreEncrypted};
@@ -18,11 +19,21 @@ impl BallotRecordingTool {
         primary_nonce_str: &str,
     ) -> bool {
         let mut primary_nonce = Vec::new();
-        println!("primary_nonce_str: {}", primary_nonce_str);
+        // Logging::log(
+        //     "BallotRecordingTool",
+        //     &format!("Primary Nonce\t{}", primary_nonce_str),
+        //     line!(),
+        //     file!(),
+        // );
         match BigUint::from_str_radix(primary_nonce_str, 16) {
             Ok(nonce) => primary_nonce.extend_from_slice(nonce.to_bytes_be().as_slice()),
             Err(e) => {
-                println!("Error parsing primary nonce: {}", e);
+                Logging::log(
+                    "BallotRecordingTool",
+                    &format!("Error parsing primary nonce: {}", e),
+                    line!(),
+                    file!(),
+                );
                 return false;
             }
         };
@@ -40,10 +51,15 @@ impl BallotRecordingTool {
                         regenerated_ballot.get_contests(),
                     );
                 } else {
-                    println!(
-                        "Ballot crypto hash mismatch {} {}.",
-                        ballot.get_confirmation_code().0,
-                        regenerated_ballot.get_confirmation_code().0
+                    Logging::log(
+                        "BallotRecordingTool",
+                        &format!(
+                            "Ballot crypto hash mismatch {} {}.",
+                            ballot.get_confirmation_code().0,
+                            regenerated_ballot.get_confirmation_code().0
+                        ),
+                        line!(),
+                        file!(),
                     );
                     return false;
                 }
@@ -104,29 +120,59 @@ impl BallotRecordingTool {
     ) {
         for (i, contest) in ballot.contests.iter().enumerate() {
             // Verify proof of ballot correctness
-            for (j, proof) in contest.get_proof_ballot_correctness().iter().enumerate() {
-                println!("Verify proof of ballot correctness i: {}, j: {}", i, j);
-                assert!(proof.verify(
-                    fixed_parameters,
-                    &config,
-                    &contest.selection.vote[j].ciphertext,
-                    1 as usize,
-                ));
-            }
-
-            println!(
-                "Verify proof of satisfying the selection limit {}",
-                config.manifest.contests[i].selection_limit
+            Logging::log(
+                "BallotRecordingTool",
+                &format!("Verifying proofs for contest {}", i,),
+                line!(),
+                file!(),
             );
 
+            Logging::log(
+                "BallotRecordingTool",
+                "\tBallot correctness",
+                line!(),
+                file!(),
+            );
+
+            for (j, proof) in contest.get_proof_ballot_correctness().iter().enumerate() {
+                Logging::log(
+                    "BallotRecordingTool",
+                    &format!(
+                        "\t\tSelection {}: {:?}",
+                        j,
+                        proof.verify(
+                            fixed_parameters,
+                            &config,
+                            &contest.selection.vote[j].ciphertext,
+                            1 as usize,
+                        )
+                    ),
+                    line!(),
+                    file!(),
+                );
+            }
+
+            Logging::log("BallotRecordingTool", "\tSelection limit", line!(), file!());
+
             // Verify proof of satisfying the selection limit
-            assert!(contest.get_proof_selection_limit().verify(
-                fixed_parameters,
-                &config,
-                &ContestEncrypted::sum_selection_vector(fixed_parameters, &contest.selection.vote)
-                    .ciphertext,
-                config.manifest.contests[i].selection_limit,
-            ));
+            Logging::log(
+                "BallotRecordingTool",
+                &format!(
+                    "\t\t{:?}",
+                    contest.get_proof_selection_limit().verify(
+                        fixed_parameters,
+                        &config,
+                        &ContestEncrypted::sum_selection_vector(
+                            fixed_parameters,
+                            &contest.selection.vote
+                        )
+                        .ciphertext,
+                        config.manifest.contests[i].selection_limit,
+                    )
+                ),
+                line!(),
+                file!(),
+            );
         }
     }
 
