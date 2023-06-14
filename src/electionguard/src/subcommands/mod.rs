@@ -8,6 +8,7 @@
 mod none;
 mod verify_standard_parameters;
 mod write_manifest;
+mod write_parameters;
 mod write_random_seed;
 
 use anyhow::Result;
@@ -40,6 +41,9 @@ pub(crate) enum Subcommands {
 
     /// Write the manifest to a file.
     WriteManifest(crate::subcommands::write_manifest::WriteManifest),
+
+    /// Write the parameters to a file.
+    WriteParameters(crate::subcommands::write_parameters::WriteParameters),
 }
 
 impl Default for Subcommands {
@@ -55,6 +59,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             Subcommands::WriteRandomSeed(a) => a,
             Subcommands::VerifyStandardParameters(a) => a,
             Subcommands::WriteManifest(a) => a,
+            Subcommands::WriteParameters(a) => a,
         }
     }
 }

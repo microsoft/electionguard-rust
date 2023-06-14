@@ -5,9 +5,9 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::{fs::OpenOptions, io::Write, path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::ElectionManifestSource,
@@ -78,68 +78,27 @@ impl Subcommand for WriteManifest {
             ElectionManifestSource::ArtifactFileElectionManifestCanonical
         };
 
-        #[derive(PartialEq, Eq)]
-        enum ElectionManifestDest {
-            ArtifactFileElectionManifestPretty,
-            ArtifactFileElectionManifestCanonical,
-            SpecificFile(PathBuf),
-            Stdout,
-        }
-
-        let dest = match (&self.out_file, &self.out_format) {
-            (None, ElectionManifestFormat::Pretty) => {
-                ElectionManifestDest::ArtifactFileElectionManifestPretty
-            }
-            (None, ElectionManifestFormat::Canonical) => {
-                ElectionManifestDest::ArtifactFileElectionManifestCanonical
-            }
-            (Some(path), _) => {
-                if *path == PathBuf::from("-") {
-                    ElectionManifestDest::Stdout
-                } else {
-                    ElectionManifestDest::SpecificFile(path.clone())
-                }
-            }
-        };
-
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        let bytes = match self.out_format {
-            ElectionManifestFormat::Canonical => election_manifest.to_canonical_bytes(),
-            ElectionManifestFormat::Pretty => {
-                election_manifest.to_json_pretty().as_bytes().to_vec()
-            }
+        let (artifact_file, description, bytes) = match self.out_format {
+            ElectionManifestFormat::Canonical => (
+                ArtifactFile::ElectionManifestCanonical,
+                "election manifest canonical bytes",
+                election_manifest.to_canonical_bytes(),
+            ),
+            ElectionManifestFormat::Pretty => (
+                ArtifactFile::ElectionManifestPretty,
+                "election manifest pretty JSON",
+                election_manifest.to_json_pretty().as_bytes().to_vec(),
+            ),
         };
 
-        let mut open_options_write = OpenOptions::new();
-        open_options_write.write(true).create(true).truncate(true);
-
-        if dest == ElectionManifestDest::Stdout {
-            std::io::stdout().write_all(&bytes)?;
-        } else {
-            let (mut file, path) = match dest {
-                ElectionManifestDest::ArtifactFileElectionManifestPretty => subcommand_helper
-                    .artifacts_dir
-                    .open(ArtifactFile::ElectionManifestPretty, &open_options_write)?,
-                ElectionManifestDest::ArtifactFileElectionManifestCanonical => subcommand_helper
-                    .artifacts_dir
-                    .open(ArtifactFile::ElectionManifestCanonical, &open_options_write)?,
-                ElectionManifestDest::SpecificFile(path) => {
-                    let file = open_options_write
-                        .open(&path)
-                        .with_context(|| format!("Couldn't open file: {}", path.display()))?;
-                    (file, path)
-                }
-                _ => unreachable!(),
-            };
-
-            file.write_all(&bytes)
-                .with_context(|| format!("Couldn't write to file: {}", path.display()))?;
-
-            eprintln!("Wrote election manifest to {}", path.display());
-        };
-
-        Ok(())
+        subcommand_helper.artifacts_dir.out_file_write(
+            &self.out_file,
+            artifact_file,
+            description,
+            bytes.as_slice(),
+        )
     }
 }

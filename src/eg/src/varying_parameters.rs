@@ -5,8 +5,10 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use serde::{Deserialize, Serialize};
+
 /// The parameters for a specific election.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VaryingParameters {
     /// Number of guardians.
     pub n: u16, // Two bytes in the parameter base hash H_P.

@@ -18,7 +18,7 @@ impl Subcommand for None {
         false
     }
 
-    fn do_it(&mut self, _subcommand_info: &mut SubcommandHelper) -> Result<()> {
+    fn do_it(&mut self, _subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         Ok(())
     }
 }

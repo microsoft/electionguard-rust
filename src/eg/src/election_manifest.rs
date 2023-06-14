@@ -30,7 +30,7 @@ impl ElectionManifest {
     /// Returns a pretty JSON `String` representation of the `ElectionManifest`.
     /// The final line will end with a newline.
     pub fn to_json_pretty(&self) -> String {
-        // `unwrap()` is justified here because why would json serialization would fail?
+        // `unwrap()` is justified here because why would JSON serialization would fail?
         #[allow(clippy::unwrap_used)]
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');

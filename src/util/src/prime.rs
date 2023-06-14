@@ -15,6 +15,7 @@ use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     csprng::Csprng,
@@ -175,7 +176,7 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
     true
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct BigUintPrime(BigUint);
 
 impl BigUintPrime {
