@@ -158,6 +158,13 @@ impl Subcommand for PreEncryptedBallots {
                         &voter_ballot,
                     );
 
+                    encrypted_ballot.instant_verification_code(
+                        &ballots.primary_nonces[b_idx],
+                        &path.join(self.tag.as_str()),
+                    );
+
+                    println!("{:?}", config.h_e);
+
                     println!("Voter selections = {:?}", voter_ballot);
 
                     BallotRecordingTool::verify_ballot_proofs(

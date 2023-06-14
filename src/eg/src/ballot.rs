@@ -8,6 +8,7 @@ use std::{
 };
 
 use num_bigint::BigUint;
+use qrcode::{render::svg, QrCode};
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
@@ -15,7 +16,7 @@ use crate::{
     ballot_encrypting_tool::BallotEncryptingTool,
     election_manifest::{Contest, ContestOption, ElectionManifest},
     fixed_parameters::FixedParameters,
-    hash::HValue,
+    hash::{hex_to_bytes, HValue},
     key::{Ciphertext, PublicKey},
     nizk::ProofRange,
 };
@@ -36,6 +37,12 @@ pub struct VoterBallot {
 
     /// Contests in this ballot
     pub contests: Vec<VoterContest>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InstantVerificationCode {
+    pub pn: String,
+    pub cc: String,
 }
 
 /// A contest option in a pre-encrypted ballot.
@@ -78,6 +85,21 @@ pub struct EncryptedBallot {
 
     /// Confirmation code
     pub crypto_hash: String,
+}
+
+/// Configuration for generating encrypted ballots.
+pub struct EncryptedBallotConfig {
+    /// Election manifest
+    pub manifest: ElectionManifest,
+    // ballot_style: BallotStyle,
+    /// Election public key
+    pub election_public_key: PublicKey,
+
+    /// Whether to encrypt the nonce with the election public key
+    // pub encrypt_nonce: bool,
+
+    /// Election extended base hash
+    pub h_e: HValue,
 }
 
 /// An encrypted option in a contest.
@@ -143,21 +165,6 @@ pub struct PreEncryptedBallotList {
 
     /// Primary nonces
     pub primary_nonces: Vec<String>,
-}
-
-/// Configuration for generating pre-encrypted ballots.
-pub struct EncryptedBallotConfig {
-    /// Election manifest
-    pub manifest: ElectionManifest,
-    // ballot_style: BallotStyle,
-    /// Election public key
-    pub election_public_key: PublicKey,
-
-    /// Whether to encrypt the nonce with the election public key
-    // pub encrypt_nonce: bool,
-
-    /// Election extended base hash
-    pub h_e: HValue,
 }
 
 /// Serialize for CiphertextContestSelection
@@ -252,6 +259,26 @@ impl EncryptedBallot {
             contests,
             crypto_hash: pre_encrypted.get_crypto_hash().clone(),
         }
+    }
+
+    pub fn instant_verification_code(&self, primary_nonce: &String, dir_path: &Path) {
+        let code = QrCode::new(
+            serde_json::to_string(&InstantVerificationCode {
+                pn: primary_nonce.clone(),
+                cc: self.crypto_hash.clone(),
+            })
+            .unwrap()
+            .as_bytes(),
+        )
+        .unwrap();
+        let image = code
+            .render()
+            .min_dimensions(200, 200)
+            .dark_color(svg::Color("#800000"))
+            .light_color(svg::Color("#ffff80"))
+            .build();
+        fs::write(dir_path.join(format!("{}.svg", primary_nonce)), image).unwrap();
+        // println!("{}", image);
     }
 }
 
