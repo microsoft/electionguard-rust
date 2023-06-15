@@ -28,6 +28,9 @@ pub(crate) enum ArtifactFile {
 
     #[strum(to_string = "election_parameters.json")]
     ElectionParameters,
+
+    #[strum(to_string = "hashes.json")]
+    Hashes,
 }
 
 impl From<ArtifactFile> for PathBuf {

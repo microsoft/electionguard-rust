@@ -58,9 +58,17 @@ pub struct FixedParameters {
     pub q: BigUintPrime,
 
     /// Cofactor of q in p − 1.
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
     pub r: BigUint,
 
     /// Subgroup generator.
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
     pub g: BigUint,
 }
 

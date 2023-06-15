@@ -7,6 +7,7 @@
 
 mod none;
 mod verify_standard_parameters;
+mod write_hashes;
 mod write_manifest;
 mod write_parameters;
 mod write_random_seed;
@@ -39,11 +40,14 @@ pub(crate) enum Subcommands {
         crate::subcommands::verify_standard_parameters::VerifyStandardParameters,
     ),
 
-    /// Write the manifest to a file.
+    /// Write the election manifest to a file.
     WriteManifest(crate::subcommands::write_manifest::WriteManifest),
 
-    /// Write the parameters to a file.
+    /// Write the election parameters to a file.
     WriteParameters(crate::subcommands::write_parameters::WriteParameters),
+
+    /// Write the hashes to a file.
+    WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 }
 
 impl Default for Subcommands {
@@ -60,6 +64,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             Subcommands::VerifyStandardParameters(a) => a,
             Subcommands::WriteManifest(a) => a,
             Subcommands::WriteParameters(a) => a,
+            Subcommands::WriteHashes(a) => a,
         }
     }
 }

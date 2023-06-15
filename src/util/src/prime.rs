@@ -15,8 +15,9 @@ use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::biguint_serde;
 use crate::{
     csprng::Csprng,
     integer_util::{cnt_bits_repr_usize, largest_integer_a_such_that_2_to_a_divides_even_n},
@@ -176,7 +177,7 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
     true
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BigUintPrime(BigUint);
 
 impl BigUintPrime {
@@ -226,6 +227,26 @@ impl BigUintPrime {
         } else {
             todo!("implement BigUintPrime::new_random_prime for bits > PRIMES_TABLE_U8_BITS_RANGE")
         }
+    }
+}
+
+impl Serialize for BigUintPrime {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        biguint_serde::biguint_serialize(self.as_ref(), serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for BigUintPrime {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        //? TODO: check that the deserialized number is prime ?
+        biguint_serde::biguint_deserialize(deserializer)
+            .map(BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime)
     }
 }
 

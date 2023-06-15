@@ -153,15 +153,15 @@ mod test_csprng {
 
     #[test]
     fn test_csprng() {
-        let mut csprng = Csprng::new(&[0; 8]);
-        assert_eq!(csprng.next_u64(), 10686075903840013692);
-        assert_eq!(csprng.next_u8(), 168);
-        assert_eq!(csprng.next_bool(), false);
+        let mut csprng = Csprng::new(b"test_csprng::test_csprng");
+        assert_eq!(csprng.next_u64(), 2923606079226974570);
+        assert_eq!(csprng.next_u8(), 54);
+        assert_eq!(csprng.next_bool(), true);
     }
 
     #[test]
     fn next_biguint() {
-        let mut csprng = Csprng::new(&[0; 0]);
+        let mut csprng = Csprng::new(b"test_csprng::next_biguint");
         for bits in 1..100 {
             let j = csprng.next_biguint(NonZeroUsize::new(bits).unwrap());
             assert!(j < (BigUint::one() << bits));
@@ -170,7 +170,7 @@ mod test_csprng {
 
     #[test]
     fn next_biguint_requiring_bits() {
-        let mut csprng = Csprng::new(&[0; 0]);
+        let mut csprng = Csprng::new(b"test_csprng::next_biguint_requiring_bits");
         for bits in 1..100 {
             let j = csprng.next_biguint_requiring_bits(NonZeroUsize::new(bits).unwrap());
 
@@ -186,7 +186,7 @@ mod test_csprng {
 
     #[test]
     fn next_biguint_lt() {
-        let mut csprng = Csprng::new(&[0; 0]);
+        let mut csprng = Csprng::new(b"test_csprng::next_biguint_lt");
         for end in 1usize..100 {
             let end: BigUint = end.into();
             let j = csprng.next_biguint_lt(&end);
@@ -197,7 +197,7 @@ mod test_csprng {
 
     #[test]
     fn next_biguint_range() {
-        let mut csprng = Csprng::new(&[0; 0]);
+        let mut csprng = Csprng::new(b"test_csprng::next_biguint_range");
         for start_usize in 0usize..100 {
             let start: BigUint = start_usize.into();
             for end in start_usize + 1..101 {
@@ -210,9 +210,9 @@ mod test_csprng {
 
     #[test]
     fn test_csprng_rand_rngcore() {
-        let mut csprng = Csprng::new(&[0; 8]);
+        let mut csprng = Csprng::new(b"test_csprng::test_csprng_rand_rngcore");
 
         let n: u64 = rand::distributions::Standard.sample(&mut csprng);
-        assert_eq!(n, 10686075903840013692);
+        assert_eq!(n, 8275017704394333465);
     }
 }

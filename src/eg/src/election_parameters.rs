@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{fixed_parameters::FixedParameters, varying_parameters::VaryingParameters};
@@ -19,10 +20,15 @@ pub struct ElectionParameters {
 }
 
 impl ElectionParameters {
+    /// Reads an `ElectionParameters` from a byte sequence.
+    pub fn from_bytes(bytes: &[u8]) -> Result<ElectionParameters> {
+        serde_json::from_slice(bytes).with_context(|| "Error parsing ElectionParameters bytes")
+    }
+
     /// Returns a pretty JSON `String` representation of the `ElectionParameters`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization would fail?
+        // `unwrap()` is justified here because why would JSON serialization fail?
         #[allow(clippy::unwrap_used)]
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');

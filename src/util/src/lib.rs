@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+pub mod array_ascii;
+pub mod biguint_serde;
 pub mod csprng;
 pub mod hex_dump;
 pub mod integer_util;

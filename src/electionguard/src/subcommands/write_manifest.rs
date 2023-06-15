@@ -46,7 +46,7 @@ pub(crate) struct WriteManifest {
     #[arg(value_enum, long, default_value = "canonical")]
     pub out_format: ElectionManifestFormat,
 
-    /// File to which to write the the election manifest.
+    /// File to which to write the election manifest.
     /// Default is the appropriate election manifest file in the artifacts dir.
     /// If "-", write to stdout.
     #[arg(long)]

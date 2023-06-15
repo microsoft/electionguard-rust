@@ -39,7 +39,7 @@ pub(crate) struct WriteParameters {
     #[arg(long)]
     info: String,
 
-    /// File to which to write the the election manifest.
+    /// File to which to write the election parameters.
     /// Default is the election parameters file in the artifacts dir.
     /// If "-", write to stdout.
     #[arg(long)]
