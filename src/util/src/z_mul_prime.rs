@@ -182,8 +182,9 @@ mod test_zmulprime {
         let max_bits = crate::prime::PRIMES_TABLE_U8_BITS_RANGE.end;
         for bits in 3..max_bits {
             const CNT_ITER_SEEDS: u64 = 1000;
-            for seed in 0..CNT_ITER_SEEDS {
-                let mut csprng = Csprng::new((bits as u64) * CNT_ITER_SEEDS + seed);
+            for iter_seed in 0..CNT_ITER_SEEDS {
+                let seed = (bits as u64) * CNT_ITER_SEEDS + iter_seed;
+                let mut csprng = Csprng::new(&seed.to_be_bytes());
 
                 let zmulp = Rc::new(ZMulPrime::new_random(bits, &mut csprng));
 
@@ -199,7 +200,7 @@ mod test_zmulprime {
 
     #[test]
     fn test_zmulprime_pow() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_zmulprime_pow");
 
         for (p, elem, exponent, expected) in [
             (3_u8, 1_u8, 1_u8, 1_u8),

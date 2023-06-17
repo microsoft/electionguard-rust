@@ -1,9 +1,10 @@
-**/target
-**/local.settings.json
-**/.vscode
 **/Cargo.lock
+**/target
+**/.cargo
+**/.vscode
 
 data
 run_demo.sh
 **/pkg
 **/.DS_Store
+**/local.settings.json

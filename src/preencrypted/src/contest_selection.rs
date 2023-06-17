@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use eg::{
     ballot::BallotConfig, contest::ContestOption, contest_selection::ContestSelectionCiphertext,
-    device::Device, fixed_parameters::FixedParameters, key::Ciphertext, nizk::ProofRange,
+    device::Device, fixed_parameters::FixedParameters, hash::HValue, key::Ciphertext,
+    nizk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
@@ -25,7 +26,7 @@ pub struct ContestSelectionPreEncrypted {
     pub shortcode: String,
 
     /// Selection hash
-    pub crypto_hash: String,
+    pub crypto_hash: HValue,
 }
 
 impl ContestSelectionPreEncrypted {
@@ -37,7 +38,7 @@ impl ContestSelectionPreEncrypted {
         &self.selections
     }
 
-    pub fn get_crypto_hash(&self) -> &String {
+    pub fn get_crypto_hash(&self) -> &HValue {
         &self.crypto_hash
     }
 

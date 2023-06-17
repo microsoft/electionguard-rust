@@ -9,6 +9,7 @@ use util::{
 use eg::{
     ballot::BallotConfig,
     device::{self, Device},
+    hash::HValue,
 };
 
 use crate::ballot::BallotPreEncrypted;
@@ -23,7 +24,7 @@ pub struct BallotListPreEncrypted {
     pub ballots: Vec<BallotPreEncrypted>,
 
     /// Primary nonces
-    pub primary_nonces: Vec<String>,
+    pub primary_nonces: Vec<HValue>,
 }
 
 impl BallotListPreEncrypted {
@@ -66,10 +67,10 @@ impl BallotListPreEncrypted {
 
         for b_idx in 0..num_ballots {
             let (ballot, primary_nonce) = BallotPreEncrypted::new(device, csprng);
-            Self::print_ballot(b_idx + 1, &ballot, &primary_nonce);
+            Self::print_ballot(b_idx + 1, &ballot, &primary_nonce.to_string());
             primary_nonces.push(primary_nonce);
             ballots.push(ballot);
-            confirmation_codes.push(ballots[b_idx].get_confirmation_code().clone());
+            confirmation_codes.push(ballots[b_idx].confirmation_code);
             fs::write(
                 path.join(format!("ballot-{}.json", confirmation_codes[b_idx])),
                 serde_json::to_string(&ballots[b_idx]).unwrap(),
@@ -97,13 +98,13 @@ impl BallotListPreEncrypted {
         }
         let label = path.file_name().unwrap().to_str().unwrap().to_string();
 
-        let mut codes_to_nonces = <HashMap<String, String>>::new();
+        let mut codes_to_nonces = <HashMap<HValue, HValue>>::new();
         let nonce_file = String::from_utf8(read_path(&path.join("primary-nonces.json"))).unwrap();
-        let (confirmation_codes, primary_nonces): (Vec<String>, Vec<String>) =
+        let (confirmation_codes, primary_nonces): (Vec<HValue>, Vec<HValue>) =
             serde_json::from_str(&nonce_file).unwrap();
 
         (0..confirmation_codes.len()).for_each(|i| {
-            codes_to_nonces.insert(confirmation_codes[i].clone(), primary_nonces[i].clone());
+            codes_to_nonces.insert(confirmation_codes[i], primary_nonces[i]);
         });
 
         let mut ballots = Vec::new();
@@ -133,8 +134,7 @@ impl BallotListPreEncrypted {
                                 return None;
                             }
                         }
-                        let crypto_hash =
-                            ballots[ballots.len() - 1].get_confirmation_code().clone();
+                        let crypto_hash = ballots[ballots.len() - 1].get_confirmation_code();
 
                         match codes_to_nonces.get(&crypto_hash) {
                             Some(nonce) => primary_nonces.push(nonce.clone()),

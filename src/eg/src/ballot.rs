@@ -7,7 +7,7 @@ use crate::{
     contest_selection::{ContestSelection, ContestSelectionEncrypted},
     device::Device,
     election_manifest::ElectionManifest,
-    hash::{hex_to_bytes, HValue},
+    hash::HValue,
     key::PublicKey,
     voter::VoterVerificationCode,
 };
@@ -22,7 +22,7 @@ pub struct BallotEncrypted {
     pub contests: Vec<ContestEncrypted>,
 
     /// Confirmation code
-    pub confirmation_code: String,
+    pub confirmation_code: HValue,
 
     /// Date (and time) of ballot generation
     pub date: String,
@@ -44,7 +44,7 @@ pub struct BallotDecrypted {
     pub decrypted_selections: Vec<ContestSelection>,
 
     /// Confirmation code
-    pub confirmation_code: String,
+    pub confirmation_code: HValue,
 }
 
 /// Configuration for generating encrypted ballots.
@@ -77,7 +77,7 @@ impl BallotDecrypted {
             label,
             decrypted_selections: contests,
             encrypted_selections: Vec::new(),
-            confirmation_code: "".to_string(),
+            confirmation_code: HValue::default(),
         }
     }
 }
@@ -94,7 +94,7 @@ impl BallotEncrypted {
             &device.config,
             dir_path,
             primary_nonce,
-            &hex_to_bytes(&self.confirmation_code),
+            self.confirmation_code.as_ref(),
             &voter_ballot.decrypted_selections,
         );
     }

@@ -21,7 +21,7 @@ pub struct BallotPreEncrypted {
     pub contests: Vec<ContestPreEncrypted>,
 
     /// Confirmation code
-    pub confirmation_code: String,
+    pub confirmation_code: HValue,
 }
 
 impl BallotPreEncrypted {
@@ -33,7 +33,7 @@ impl BallotPreEncrypted {
         &self.contests
     }
 
-    pub fn get_confirmation_code(&self) -> &String {
+    pub fn get_confirmation_code(&self) -> &HValue {
         &self.confirmation_code
     }
 
@@ -71,14 +71,14 @@ impl BallotPreEncrypted {
         }
     }
 
-    pub fn new(device: &Device, csprng: &mut Csprng) -> (BallotPreEncrypted, String) {
+    pub fn new(device: &Device, csprng: &mut Csprng) -> (BallotPreEncrypted, HValue) {
         loop {
             // Generate primary nonce
             let mut primary_nonce = [0u8; 32];
             (0..32).for_each(|i| primary_nonce[i] = csprng.next_u8());
 
             match BallotPreEncrypted::try_new_with(device, &primary_nonce) {
-                Some(ballot) => return (ballot, HValue(primary_nonce).to_string()),
+                Some(ballot) => return (ballot, HValue(primary_nonce)),
                 None => continue,
             }
         }
@@ -158,9 +158,9 @@ impl BallotPreEncrypted {
                 .as_secs()
                 .to_string(),
             device: device.get_uuid().clone(),
-            label: self.get_label().clone(),
+            label: self.label.clone(),
             contests,
-            confirmation_code: self.get_confirmation_code().clone(),
+            confirmation_code: self.confirmation_code,
         }
     }
 }

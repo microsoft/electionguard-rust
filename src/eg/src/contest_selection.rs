@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
-    ballot::BallotConfig, device::Device, fixed_parameters::FixedParameters, key::Ciphertext,
-    nizk::ProofRange,
+    ballot::BallotConfig, device::Device, fixed_parameters::FixedParameters, hash::HValue,
+    key::Ciphertext, nizk::ProofRange,
 };
 
 /// A plaintext vote for an option in a contest.
@@ -29,7 +29,7 @@ pub struct ContestSelectionEncrypted {
     pub vote: Vec<ContestSelectionCiphertext>,
 
     /// Selection hash
-    pub crypto_hash: String,
+    pub crypto_hash: HValue,
 }
 
 /// A contest selection by a voter.

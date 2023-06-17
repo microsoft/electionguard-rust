@@ -15,7 +15,9 @@ use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::biguint_serde;
 use crate::{
     csprng::Csprng,
     integer_util::{cnt_bits_repr_usize, largest_integer_a_such_that_2_to_a_divides_even_n},
@@ -91,9 +93,7 @@ pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
 }
 
 pub fn is_prime_default_csprng<T: Borrow<BigUint>>(n: &T) -> bool {
-    let seed = u64::from_be_bytes(*b"is_prime");
-
-    let mut csprng = Csprng::new(seed);
+    let mut csprng = Csprng::new(b"electionguard-rust/util::prime::is_prime_default_csprng");
     is_prime(n, &mut csprng)
 }
 
@@ -230,6 +230,26 @@ impl BigUintPrime {
     }
 }
 
+impl Serialize for BigUintPrime {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        biguint_serde::biguint_serialize(self.as_ref(), serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for BigUintPrime {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        //? TODO: check that the deserialized number is prime ?
+        biguint_serde::biguint_deserialize(deserializer)
+            .map(BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime)
+    }
+}
+
 impl From<BigUintPrime> for BigUint {
     #[inline]
     fn from(val: BigUintPrime) -> Self {
@@ -259,7 +279,7 @@ mod test_primes {
 
     #[test]
     fn test_is_prime() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_is_prime");
 
         // Test first 10 integers.
         for (n, expected_prime) in [
@@ -311,7 +331,7 @@ mod test_primes {
 
     #[test]
     fn test_conversion_biguintprime_biguint() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_conversion_biguintprime_biguint");
         let n = 3_u8;
         let p = BigUintPrime::new(n.into(), &mut csprng).unwrap();
         let b: BigUint = p.into();
@@ -320,7 +340,7 @@ mod test_primes {
 
     #[test]
     fn test_new_random_prime() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(b"test_new_random_prime");
 
         for bits in PRIMES_TABLE_U8_BITS_RANGE {
             for _ in 0..100 {

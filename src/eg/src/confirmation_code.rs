@@ -1,8 +1,4 @@
-use crate::{
-    ballot::BallotConfig,
-    contest::ContestEncrypted,
-    hash::{eg_h, hex_to_bytes},
-};
+use crate::{ballot::BallotConfig, contest::ContestEncrypted, hash::eg_h};
 
 /// Confirmation code for an encrypted ballot (Equation 59)
 ///
@@ -12,7 +8,7 @@ pub fn encrypted(config: &BallotConfig, contests: &Vec<ContestEncrypted>, b_aux:
     let mut v = vec![0x24];
 
     contests.iter().for_each(|c| {
-        v.extend(hex_to_bytes(&c.crypto_hash));
+        v.extend(c.crypto_hash.as_ref());
     });
 
     v.extend_from_slice(b_aux);

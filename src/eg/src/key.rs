@@ -19,11 +19,18 @@ use crate::contest_selection::ContestSelectionCiphertext;
 use crate::fixed_parameters::FixedParameters;
 
 #[derive(Debug, Clone)]
+pub enum AsymmetricKeyType {
+    Public,
+    Private,
+}
+
+#[derive(Debug, Clone)]
 pub struct PublicKey(pub BigUint);
 
 #[derive(Debug)]
 pub struct PrivateKey {
     /// Integer secret, s < q
+    #[allow(dead_code)] //? TODO: Remove this
     s: BigUint,
 
     /// Public key, K = g^s mod p
@@ -226,7 +233,7 @@ mod test {
     #[test]
     fn test_key_generation() {
         let fixed_parameters = (*STANDARD_PARAMETERS).clone();
-        let mut csprng = Csprng::new(12345);
+        let mut csprng = Csprng::new(&[0u8; 0]);
 
         let private_key = PrivateKey::new(&mut csprng, &fixed_parameters);
 

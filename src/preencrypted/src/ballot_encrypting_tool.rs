@@ -3,13 +3,13 @@
 use eg::ballot::BallotConfig;
 
 use eg::contest_selection::ContestSelectionCiphertext;
-use eg::hash::eg_h;
+use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 
 use crate::contest_selection::ContestSelectionPreEncrypted;
 
 /// Returns the last byte of the hash value
-pub fn generate_short_code(full_hash: &String) -> String {
-    full_hash.chars().skip(full_hash.len() - 2).collect()
+pub fn generate_short_code(full_hash: &HValue) -> String {
+    String::from(full_hash.0[HVALUE_BYTE_LEN - 1] as char)
 }
 
 pub fn check_shortcode(
@@ -32,7 +32,7 @@ pub fn check_shortcode(
 pub fn generate_selection_hash(
     config: &BallotConfig,
     selections: &Vec<ContestSelectionCiphertext>,
-) -> String {
+) -> HValue {
     let mut v = vec![0x40];
 
     v.extend_from_slice(config.election_public_key.0.to_bytes_be().as_slice());
@@ -42,7 +42,7 @@ pub fn generate_selection_hash(
         v.extend_from_slice(s.ciphertext.beta.to_bytes_be().as_slice());
     });
 
-    eg_h(&config.h_e, &v).to_string()
+    eg_h(&config.h_e, &v)
 }
 
 // // Unit tests for pre-encrypted ballots.

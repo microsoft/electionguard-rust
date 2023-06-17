@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{Clargs, Subcommand};
+use crate::{subcommand_helper::SubcommandHelper, Subcommand};
 use anyhow::{bail, Result};
 use clap::Args;
 use eg::{
@@ -15,13 +15,12 @@ use eg::{
     nizk::ProofGuardian,
 };
 use util::{
-    csprng::Csprng,
     file::{create_path, read_path, write_path},
     logging::Logging,
 };
 
 #[derive(Args, Debug)]
-pub(crate) struct Guardian {
+pub(crate) struct GenerateKey {
     /// Sequence order
     #[arg(long)]
     i: i32,
@@ -47,16 +46,14 @@ pub(crate) struct Guardian {
     share_generate: bool,
 }
 
-impl Subcommand for Guardian {
-    fn need_csprng(&self) -> bool {
+impl Subcommand for GenerateKey {
+    fn uses_csprng(&self) -> bool {
         true
     }
 
-    fn do_it(&self, _clargs: &Clargs) -> Result<()> {
-        bail!("need csprng version instead");
-    }
+    fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let mut csprng = subcommand_helper.get_csprng(b"VerifyStandardParameters")?;
 
-    fn do_it_with_csprng(&self, _clargs: &Clargs, mut csprng: Csprng) -> Result<()> {
         use eg::guardian::Guardian;
 
         if self.example_manifest && self.manifest.is_some() {

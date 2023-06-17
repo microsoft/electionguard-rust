@@ -8,6 +8,7 @@ use eg::{
     },
     device::Device,
     fixed_parameters::FixedParameters,
+    hash::HValue,
     nizk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,7 @@ pub struct ContestPreEncrypted {
     pub selections: Vec<ContestSelectionPreEncrypted>,
 
     /// Contest hash
-    pub crypto_hash: String,
+    pub crypto_hash: HValue,
 
     /// Ballot style
     pub ballot_style: BallotStyle,
@@ -43,7 +44,7 @@ impl ContestPreEncrypted {
         &self.selections
     }
 
-    pub fn get_crypto_hash(&self) -> &String {
+    pub fn get_crypto_hash(&self) -> &HValue {
         &self.crypto_hash
     }
 
@@ -168,7 +169,7 @@ impl ContestPreEncrypted {
                 &device.election_parameters.fixed_parameters,
                 voter_selections,
             ),
-            crypto_hash: self.get_crypto_hash().clone(),
+            crypto_hash: self.crypto_hash,
         };
 
         let mut selected_vec = (0..selection.vote.len())
@@ -199,7 +200,7 @@ impl ContestPreEncrypted {
             ballot_style: self.ballot_style.clone(),
             label: self.label.clone(),
             selection,
-            crypto_hash: self.get_crypto_hash().clone(),
+            crypto_hash: self.crypto_hash,
             proof_ballot_correctness,
             proof_selection_limit,
         }

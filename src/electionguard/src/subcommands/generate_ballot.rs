@@ -5,18 +5,20 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use crate::{Clargs, Subcommand};
+use crate::{subcommand_helper::SubcommandHelper, Subcommand};
 use anyhow::{bail, Result};
 use clap::Args;
 use eg::{
-    ballot::{BallotConfig, BallotDecrypted, BallotEncrypted},
+    ballot::{BallotConfig, BallotDecrypted},
     device::Device,
     example_election_manifest::{example_election_manifest, example_election_manifest_small},
     example_election_parameters::example_election_parameters,
     guardian::aggregate_public_keys,
-    hash::hex_to_bytes,
     hashes::Hashes,
     key::PublicKey,
     nizk::ProofGuardian,
@@ -24,10 +26,10 @@ use eg::{
 use preencrypted::{
     ballot_list::BallotListPreEncrypted, ballot_recording_tool::BallotRecordingTool,
 };
-use util::{csprng::Csprng, file::read_path, logging::Logging};
+use util::{file::read_path, logging::Logging};
 
 #[derive(Args, Debug)]
-pub(crate) struct PreEncryptedBallots {
+pub(crate) struct GenerateBallot {
     /// Whether to encrypt the nonce with the election public key
     #[arg(long, default_value_t = false)]
     encrypt_nonce: bool,
@@ -63,16 +65,14 @@ pub(crate) struct PreEncryptedBallots {
     tag: String,
 }
 
-impl Subcommand for PreEncryptedBallots {
-    fn need_csprng(&self) -> bool {
+impl Subcommand for GenerateBallot {
+    fn uses_csprng(&self) -> bool {
         true
     }
 
-    fn do_it(&self, _clargs: &Clargs) -> Result<()> {
-        bail!("need csprng version instead");
-    }
+    fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let mut csprng = subcommand_helper.get_csprng(b"VerifyStandardParameters")?;
 
-    fn do_it_with_csprng(&self, _clargs: &Clargs, mut csprng: Csprng) -> Result<()> {
         use eg::standard_parameters::STANDARD_PARAMETERS;
         let fixed_parameters = &*STANDARD_PARAMETERS;
 
@@ -161,7 +161,7 @@ impl Subcommand for PreEncryptedBallots {
                     BallotRecordingTool::regenerate_nonces(
                         &device,
                         pre_encrypted_ballot,
-                        hex_to_bytes(&ballots.primary_nonces[b_idx]).as_slice(),
+                        &ballots.primary_nonces[b_idx],
                     );
 
                     let voter_ballot = BallotDecrypted::new_pick_random(
@@ -176,7 +176,7 @@ impl Subcommand for PreEncryptedBallots {
                     encrypted_ballot.instant_verification_code(
                         &device,
                         &voter_ballot,
-                        &hex_to_bytes(&ballots.primary_nonces[b_idx]).as_slice(),
+                        ballots.primary_nonces[b_idx].as_ref(),
                         &path.join(self.tag.as_str()),
                     );
 

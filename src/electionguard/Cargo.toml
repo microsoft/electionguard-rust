@@ -6,7 +6,10 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.70"
-clap = { version = "4.2.7", features = ["derive"] }
+clap = { version = "4.3.3", features = ["derive", "env"] }
+rand_core = { version = "0.6.4", features = ["getrandom"] }
+strum = { version = "0.24", features = ["derive"] }
+strum_macros = "0.24"
 
 eg = { path = "../eg" }
 util = { path = "../util" }

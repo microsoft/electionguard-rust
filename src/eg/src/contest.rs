@@ -8,6 +8,7 @@ use crate::{
     contest_selection::{ContestSelectionCiphertext, ContestSelectionEncrypted},
     device::Device,
     fixed_parameters::FixedParameters,
+    hash::HValue,
     nizk::ProofRange,
 };
 
@@ -48,7 +49,7 @@ pub struct ContestEncrypted {
     pub selection: ContestSelectionEncrypted,
 
     /// Contest hash
-    pub crypto_hash: String,
+    pub crypto_hash: HValue,
 
     /// Ballot style
     pub ballot_style: BallotStyle,

@@ -1,6 +1,6 @@
 use eg::{
     ballot::BallotConfig,
-    hash::{eg_h, hex_to_bytes},
+    hash::{eg_h, HValue},
 };
 
 use crate::contest::ContestPreEncrypted;
@@ -13,13 +13,13 @@ pub fn confirmation_code(
     config: &BallotConfig,
     contests: &Vec<ContestPreEncrypted>,
     b_aux: &[u8],
-) -> String {
+) -> HValue {
     let mut v = vec![0x42];
 
     contests.iter().for_each(|c| {
-        v.extend(hex_to_bytes(&c.crypto_hash));
+        v.extend(c.crypto_hash.as_ref());
     });
 
     v.extend_from_slice(b_aux);
-    eg_h(&config.h_e, &v).to_string()
+    eg_h(&config.h_e, &v)
 }

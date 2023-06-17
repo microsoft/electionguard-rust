@@ -1,3 +1,4 @@
+use eg::hash::HValue;
 use num_bigint::BigUint;
 use num_traits::Num;
 use util::logging::Logging;
@@ -19,29 +20,29 @@ impl BallotRecordingTool {
     pub fn verify_ballot(
         device: &Device,
         ballot: &BallotPreEncrypted,
-        primary_nonce_str: &str,
+        primary_nonce: &HValue,
     ) -> bool {
-        let mut primary_nonce = Vec::new();
+        // let mut primary_nonce = Vec::new();
         // Logging::log(
         //     "BallotRecordingTool",
         //     &format!("Primary Nonce\t{}", primary_nonce_str),
         //     line!(),
         //     file!(),
         // );
-        match BigUint::from_str_radix(primary_nonce_str, 16) {
-            Ok(nonce) => primary_nonce.extend_from_slice(nonce.to_bytes_be().as_slice()),
-            Err(e) => {
-                Logging::log(
-                    "BallotRecordingTool",
-                    &format!("Error parsing primary nonce: {}", e),
-                    line!(),
-                    file!(),
-                );
-                return false;
-            }
-        };
+        // match BigUint::from_str_radix(primary_nonce_str, 16) {
+        //     Ok(nonce) => primary_nonce.extend_from_slice(nonce.to_bytes_be().as_slice()),
+        //     Err(e) => {
+        //         Logging::log(
+        //             "BallotRecordingTool",
+        //             &format!("Error parsing primary nonce: {} {:?}", e, primary_nonce_str),
+        //             line!(),
+        //             file!(),
+        //         );
+        //         return false;
+        //     }
+        // };
 
-        match BallotPreEncrypted::try_new_with(device, primary_nonce.as_slice()) {
+        match BallotPreEncrypted::try_new_with(device, &primary_nonce.0) {
             Some(regenerated_ballot) => {
                 if *ballot.get_confirmation_code() == *regenerated_ballot.get_confirmation_code() {
                     return BallotRecordingTool::verify_ballot_contests(
@@ -73,7 +74,7 @@ impl BallotRecordingTool {
     pub fn regenerate_nonces(
         device: &Device,
         ballot: &mut BallotPreEncrypted,
-        primary_nonce: &[u8],
+        primary_nonce: &HValue,
     ) {
         let selection_labels = device
             .config
@@ -100,7 +101,7 @@ impl BallotRecordingTool {
                             .clone(),
                         nonce: option_nonce(
                             device,
-                            primary_nonce,
+                            primary_nonce.as_ref(),
                             ballot.get_contests()[i].label.as_bytes(),
                             selection_labels[i][j].as_bytes(),
                             selection_labels[i][k].as_bytes(),
