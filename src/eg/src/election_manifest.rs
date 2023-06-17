@@ -30,7 +30,7 @@ impl ElectionManifest {
     /// Returns a pretty JSON `String` representation of the `ElectionManifest`.
     /// The final line will end with a newline.
     pub fn to_json_pretty(&self) -> String {
-        // `unwrap()` is justified here because why would json serialization would fail?
+        // `unwrap()` is justified here because why would JSON serialization fail?
         #[allow(clippy::unwrap_used)]
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
@@ -40,7 +40,7 @@ impl ElectionManifest {
     /// Returns the canonical byte sequence representation of the `ElectionManifest`.
     /// This uses a more compact JSON format.
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        // `unwrap()` is justified here because why would json serialization would fail?
+        // `unwrap()` is justified here because why would JSON serialization fail?
         #[allow(clippy::unwrap_used)]
         serde_json::to_vec(self).unwrap()
     }

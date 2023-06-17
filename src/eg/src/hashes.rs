@@ -7,13 +7,16 @@
 
 use std::borrow::Borrow;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     hash::{eg_h, HValue},
 };
 
-struct Hashes {
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Hashes {
     /// Parameter base hash.
     h_p: HValue,
 
@@ -30,11 +33,11 @@ struct Hashes {
 impl std::fmt::Debug for Hashes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_str("Hashes {\n    h_p: ")?;
-        std::fmt::LowerHex::fmt(&self.h_p, f)?;
+        std::fmt::Display::fmt(&self.h_p, f)?;
         f.write_str(",\n    h_m: ")?;
-        std::fmt::LowerHex::fmt(&self.h_m, f)?;
+        std::fmt::Display::fmt(&self.h_m, f)?;
         f.write_str(",\n    h_b: ")?;
-        std::fmt::LowerHex::fmt(&self.h_b, f)?;
+        std::fmt::Display::fmt(&self.h_b, f)?;
         f.write_str(" }")
     }
 }
@@ -46,7 +49,11 @@ impl std::fmt::Display for Hashes {
 }
 
 impl Hashes {
-    fn new(election_parameters: &ElectionParameters, election_manifest: &ElectionManifest) -> Self {
+    #[allow(dead_code)] //? TODO: Remove this
+    pub fn new(
+        election_parameters: &ElectionParameters,
+        election_manifest: &ElectionManifest,
+    ) -> Self {
         // Computation of the parameter base hash H_P.
         let h_p = {
             // "B1 = 00 ∥ b(p, 512) ∥ b(q, 32) ∥ b(g, 512) ∥ b(n, 2) ∥ b(k, 2)"
@@ -110,6 +117,16 @@ impl Hashes {
             h_m,
             h_b, //, h_e
         }
+    }
+
+    /// Returns a pretty JSON `String` representation of the `Hashes`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
     }
 }
 

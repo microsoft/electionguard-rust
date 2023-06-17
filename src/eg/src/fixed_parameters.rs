@@ -9,6 +9,7 @@ use std::borrow::Borrow;
 
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 
 use util::{
     csprng::Csprng,
@@ -17,7 +18,7 @@ use util::{
 };
 
 // "Nothing up my sleeve" numbers for use in fixed parameters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NumsNumber {
     // The Euler-Mascheroni constant γ =~ 0.577215664901532...
     // Binary expansion: (0.)1001001111000100011001111110...
@@ -31,7 +32,7 @@ pub enum NumsNumber {
     Ln2,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameterGenerationParameters {
     pub q_bits_total: usize,
     pub p_bits_total: usize,
@@ -40,10 +41,10 @@ pub struct FixedParameterGenerationParameters {
     pub p_bits_lsb_fixed_1: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
     /// Version of the ElectionGuard to which these parameters conform.
-    /// E.g., `Some([1, 55])` for v1.55.
+    /// E.g., `Some([2, 0])` for v2.0 and `Some([1, 55])` for v1.55.
     /// `None` means the parameters may not conform to any version of the ElectionGuard spec.
     pub opt_version: Option<[usize; 2]>,
 
@@ -57,9 +58,17 @@ pub struct FixedParameters {
     pub q: BigUintPrime,
 
     /// Cofactor of q in p − 1.
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
     pub r: BigUint,
 
     /// Subgroup generator.
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
     pub g: BigUint,
 }
 

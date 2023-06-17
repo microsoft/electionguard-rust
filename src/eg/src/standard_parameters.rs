@@ -192,7 +192,7 @@ mod test {
     #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
     #[test]
     fn standard_parameters_v1_54() {
-        let mut csprng = util::csprng::Csprng::new(1234);
+        let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v1_54");
 
         let standard_parameters_v1_54 = make_standard_parameters_v1_54();
         assert_eq!(standard_parameters_v1_54.opt_version, Some([1, 54]));
@@ -203,7 +203,7 @@ mod test {
     #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
     #[test]
     fn standard_parameters_v2_0() {
-        let mut csprng = util::csprng::Csprng::new(1234);
+        let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v2_0");
 
         let standard_parameters_v2_0 = make_standard_parameters_v2_0();
         assert_eq!(standard_parameters_v2_0.opt_version, Some([2, 0]));
