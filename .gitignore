@@ -1,4 +1,5 @@
-**/target
-**/local.settings.json
-**/.vscode
 **/Cargo.lock
+**/target
+**/.cargo
+**/.vscode
+**/local.settings.json

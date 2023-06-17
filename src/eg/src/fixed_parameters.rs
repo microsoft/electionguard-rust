@@ -44,7 +44,7 @@ pub struct FixedParameterGenerationParameters {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
     /// Version of the ElectionGuard to which these parameters conform.
-    /// E.g., `Some([1, 55])` for v1.55.
+    /// E.g., `Some([2, 0])` for v2.0 and `Some([1, 55])` for v1.55.
     /// `None` means the parameters may not conform to any version of the ElectionGuard spec.
     pub opt_version: Option<[usize; 2]>,
 
