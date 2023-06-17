@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use base64::{engine::general_purpose, Engine as _};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use num_bigint::BigUint;
@@ -122,6 +123,18 @@ pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
     let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
 
     AsRef::<[u8; 32]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
+}
+
+// ElectionGuard "H" function (for WebAssembly)
+pub fn eg_h_js(key: &[u8], data: &[u8]) -> String {
+    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` only fails on slice of
+    // incorrect size.
+    #[allow(clippy::unwrap_used)]
+    let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
+
+    general_purpose::URL_SAFE_NO_PAD.encode(AsRef::<[u8; 32]>::as_ref(
+        &hmac_sha256.chain(data).finalize_fixed(),
+    ))
 }
 
 #[cfg(test)]

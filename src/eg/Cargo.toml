@@ -4,19 +4,23 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 digest = "0.10"
 hmac = "0.12"
 lazy_static = "1.4"
 num-bigint = "0.4"
-#num-integer = "0.1"
 num-traits = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 util = { path = "../util" }
 qrcode = "0.12"
+base64 = "0.21.2"
+getrandom = { version = "0.2.10", features = ["js"] }
 
-# in tests only
+# For testing
 anyhow = "1.0"
 hex-literal = "0.4"

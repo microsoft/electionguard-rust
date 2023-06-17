@@ -2,13 +2,16 @@ use num_bigint::BigUint;
 use num_traits::Num;
 use util::logging::Logging;
 
-use crate::ballot::{BallotConfig, BallotEncrypted, BallotPreEncrypted};
-use crate::contest::{ContestEncrypted, ContestPreEncrypted};
-use crate::contest_selection::{ContestSelectionCiphertext, ContestSelectionPreEncrypted};
-use crate::device::Device;
-use crate::fixed_parameters::FixedParameters;
-use crate::nizk::ProofRange;
-use crate::nonce::Nonce;
+use crate::ballot::BallotPreEncrypted;
+use crate::contest::ContestPreEncrypted;
+use crate::contest_selection::ContestSelectionPreEncrypted;
+use crate::nonce::option_nonce;
+use eg::ballot::{BallotConfig, BallotEncrypted};
+use eg::contest::ContestEncrypted;
+use eg::contest_selection::ContestSelectionCiphertext;
+use eg::device::Device;
+use eg::fixed_parameters::FixedParameters;
+use eg::nizk::ProofRange;
 
 pub struct BallotRecordingTool {}
 
@@ -38,11 +41,7 @@ impl BallotRecordingTool {
             }
         };
 
-        match BallotPreEncrypted::try_new_with(
-            &device.config,
-            &device.election_parameters.fixed_parameters,
-            primary_nonce.as_slice(),
-        ) {
+        match BallotPreEncrypted::try_new_with(device, primary_nonce.as_slice()) {
             Some(regenerated_ballot) => {
                 if *ballot.get_confirmation_code() == *regenerated_ballot.get_confirmation_code() {
                     return BallotRecordingTool::verify_ballot_contests(
@@ -55,8 +54,8 @@ impl BallotRecordingTool {
                         "BallotRecordingTool",
                         &format!(
                             "Ballot crypto hash mismatch {} {}.",
-                            ballot.get_confirmation_code().0,
-                            regenerated_ballot.get_confirmation_code().0
+                            ballot.get_confirmation_code(),
+                            regenerated_ballot.get_confirmation_code()
                         ),
                         line!(),
                         file!(),
@@ -72,12 +71,12 @@ impl BallotRecordingTool {
     }
 
     pub fn regenerate_nonces(
+        device: &Device,
         ballot: &mut BallotPreEncrypted,
-        config: &BallotConfig,
-        fixed_parameters: &FixedParameters,
         primary_nonce: &[u8],
     ) {
-        let selection_labels = config
+        let selection_labels = device
+            .config
             .manifest
             .contests
             .iter()
@@ -99,13 +98,12 @@ impl BallotRecordingTool {
                             [k]
                             .ciphertext
                             .clone(),
-                        nonce: Nonce::pre_encrypted(
-                            config,
+                        nonce: option_nonce(
+                            device,
                             primary_nonce,
                             ballot.get_contests()[i].label.as_bytes(),
                             selection_labels[i][j].as_bytes(),
                             selection_labels[i][k].as_bytes(),
-                            fixed_parameters,
                         ),
                     };
                 }
@@ -113,61 +111,43 @@ impl BallotRecordingTool {
         }
     }
 
-    pub fn verify_ballot_proofs(
-        config: &BallotConfig,
-        fixed_parameters: &FixedParameters,
-        ballot: &BallotEncrypted,
-    ) {
+    pub fn verify_ballot_proofs(device: &Device, ballot: &BallotEncrypted) {
+        let tag = "Pre-Encrypted";
         for (i, contest) in ballot.contests.iter().enumerate() {
             // Verify proof of ballot correctness
             Logging::log(
-                "BallotRecordingTool",
-                &format!("Verifying proofs for contest {}", i,),
-                line!(),
-                file!(),
-            );
-
-            Logging::log(
-                "BallotRecordingTool",
-                "\tBallot correctness",
+                tag,
+                &format!("  Verifying proofs for contest {}", i,),
                 line!(),
                 file!(),
             );
 
             for (j, proof) in contest.get_proof_ballot_correctness().iter().enumerate() {
                 Logging::log(
-                    "BallotRecordingTool",
+                    tag,
                     &format!(
-                        "\t\tSelection {}: {:?}",
+                        "    Ballot correctness / {}: {:?}",
                         j,
-                        proof.verify(
-                            fixed_parameters,
-                            &config,
-                            &contest.selection.vote[j].ciphertext,
-                            1 as usize,
-                        )
+                        proof.verify(device, &contest.selection.vote[j].ciphertext, 1 as usize,)
                     ),
                     line!(),
                     file!(),
                 );
             }
 
-            Logging::log("BallotRecordingTool", "\tSelection limit", line!(), file!());
-
             // Verify proof of satisfying the selection limit
             Logging::log(
-                "BallotRecordingTool",
+                tag,
                 &format!(
-                    "\t\t{:?}",
+                    "    Selection limit: {:?}",
                     contest.get_proof_selection_limit().verify(
-                        fixed_parameters,
-                        &config,
+                        device,
                         &ContestEncrypted::sum_selection_vector(
-                            fixed_parameters,
+                            &device.election_parameters.fixed_parameters,
                             &contest.selection.vote
                         )
                         .ciphertext,
-                        config.manifest.contests[i].selection_limit,
+                        device.config.manifest.contests[i].selection_limit,
                     )
                 ),
                 line!(),
@@ -276,18 +256,16 @@ impl BallotRecordingTool {
     // }
 
     pub fn verify_proof_of_ballot_correctness(
-        config: &BallotConfig,
-        fixed_parameters: &FixedParameters,
+        device: &Device,
         selections: &Vec<Vec<ContestSelectionCiphertext>>,
         proofs: &Vec<Vec<ProofRange>>,
     ) -> bool {
         for (i, contest_selection) in selections.iter().enumerate() {
             for (j, vote) in contest_selection.iter().enumerate() {
                 if !proofs[i][j].verify(
-                    fixed_parameters,
-                    config,
+                    device,
                     &vote.ciphertext,
-                    config.manifest.contests[i].selection_limit,
+                    device.config.manifest.contests[i].selection_limit,
                 ) {
                     return false;
                 };

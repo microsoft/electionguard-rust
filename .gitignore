@@ -5,3 +5,5 @@
 
 data
 run_demo.sh
+**/pkg
+**/.DS_Store

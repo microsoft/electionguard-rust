@@ -1,6 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{
-    ballot::BallotEncrypted, election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters, hashes::Hashes, key::PublicKey, nizk::ProofGuardian,
+    ballot::{BallotDecrypted, BallotEncrypted},
+    election_manifest::ElectionManifest,
+    election_parameters::ElectionParameters,
+    hashes::Hashes,
+    key::PublicKey,
+    nizk::ProofGuardian,
 };
 
 struct ElectionRecord {
@@ -23,5 +29,11 @@ struct ElectionRecord {
     /// Every encrypted ballot prepared in the election (whether cast or challenged)
     all_ballots: Vec<BallotEncrypted>,
 
-    challenged_ballots: Vec<BallotEncrypted>,
+    /// Every challenged ballot
+    challenged_ballots: Vec<BallotDecrypted>,
+
+    /// Tally of all cast ballots
+
+    /// Ordered lists of ballots encrypted by each device
+    ballots_by_device: HashMap<String, String>,
 }

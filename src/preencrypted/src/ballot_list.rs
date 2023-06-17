@@ -6,10 +6,12 @@ use util::{
     logging::Logging,
 };
 
-use crate::{
-    ballot::{BallotConfig, BallotPreEncrypted},
-    fixed_parameters::FixedParameters,
+use eg::{
+    ballot::BallotConfig,
+    device::{self, Device},
 };
+
+use crate::ballot::BallotPreEncrypted;
 
 /// Many pre-encrypted ballots.
 #[derive(Debug)]
@@ -33,7 +35,7 @@ impl BallotListPreEncrypted {
         Logging::log(tag, "  Confirmation Code", line!(), file!());
         Logging::log(
             tag,
-            &format!("    {}", ballot.confirmation_code.0.to_string()),
+            &format!("    {}", ballot.get_confirmation_code()),
             line!(),
             file!(),
         );
@@ -47,13 +49,7 @@ impl BallotListPreEncrypted {
             );
         });
     }
-    pub fn new(
-        config: &BallotConfig,
-        fixed_parameters: &FixedParameters,
-        csprng: &mut Csprng,
-        path: &Path,
-        num_ballots: usize,
-    ) -> Self {
+    pub fn new(device: &Device, csprng: &mut Csprng, path: &Path, num_ballots: usize) -> Self {
         // let mut ballot_list: Self;
         let mut ballots = Vec::with_capacity(num_ballots);
         let mut primary_nonces = Vec::with_capacity(num_ballots);
@@ -69,12 +65,11 @@ impl BallotListPreEncrypted {
         let mut confirmation_codes = Vec::with_capacity(num_ballots);
 
         for b_idx in 0..num_ballots {
-            let (ballot, primary_nonce) =
-                BallotPreEncrypted::new(&config, fixed_parameters, csprng);
+            let (ballot, primary_nonce) = BallotPreEncrypted::new(device, csprng);
             Self::print_ballot(b_idx + 1, &ballot, &primary_nonce);
             primary_nonces.push(primary_nonce);
             ballots.push(ballot);
-            confirmation_codes.push(ballots[b_idx].get_confirmation_code().0.clone());
+            confirmation_codes.push(ballots[b_idx].get_confirmation_code().clone());
             fs::write(
                 path.join(format!("ballot-{}.json", confirmation_codes[b_idx])),
                 serde_json::to_string(&ballots[b_idx]).unwrap(),
@@ -139,7 +134,7 @@ impl BallotListPreEncrypted {
                             }
                         }
                         let crypto_hash =
-                            ballots[ballots.len() - 1].get_confirmation_code().0.clone();
+                            ballots[ballots.len() - 1].get_confirmation_code().clone();
 
                         match codes_to_nonces.get(&crypto_hash) {
                             Some(nonce) => primary_nonces.push(nonce.clone()),

@@ -1,50 +1,48 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-use crate::ballot::BallotConfig;
+use eg::ballot::BallotConfig;
 
-use crate::contest_selection::{ContestSelectionCiphertext, ContestSelectionPreEncrypted};
-use crate::hash::eg_h;
+use eg::contest_selection::ContestSelectionCiphertext;
+use eg::hash::eg_h;
 
-pub struct BallotEncryptingTool {}
+use crate::contest_selection::ContestSelectionPreEncrypted;
 
-impl BallotEncryptingTool {
-    /// Returns the last byte of the hash value
-    pub fn generate_short_code(full_hash: &String) -> String {
-        full_hash.chars().skip(full_hash.len() - 2).collect()
-    }
+/// Returns the last byte of the hash value
+pub fn generate_short_code(full_hash: &String) -> String {
+    full_hash.chars().skip(full_hash.len() - 2).collect()
+}
 
-    pub fn check_shortcode(
-        previous: &Vec<ContestSelectionPreEncrypted>,
-        current: &ContestSelectionPreEncrypted,
-    ) -> bool {
-        for other in previous.iter() {
-            if other.shortcode == current.shortcode {
-                return false;
-            }
+pub fn check_shortcode(
+    previous: &Vec<ContestSelectionPreEncrypted>,
+    current: &ContestSelectionPreEncrypted,
+) -> bool {
+    for other in previous.iter() {
+        if other.shortcode == current.shortcode {
+            return false;
         }
-        true
     }
+    true
+}
 
-    /// Generates a selection hash (Equation 93/94)
-    ///
-    /// ψ_i = H(H_E;40,λ_i,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
-    ///
-    /// TODO: Remove label from the hash (equation 93)
-    pub fn generate_selection_hash(
-        config: &BallotConfig,
-        selections: &Vec<ContestSelectionCiphertext>,
-    ) -> String {
-        let mut v = vec![0x40];
+/// Generates a selection hash (Equation 93/94)
+///
+/// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
+///
+/// TODO: Remove label from the hash (equation 93)
+pub fn generate_selection_hash(
+    config: &BallotConfig,
+    selections: &Vec<ContestSelectionCiphertext>,
+) -> String {
+    let mut v = vec![0x40];
 
-        v.extend_from_slice(config.election_public_key.0.to_bytes_be().as_slice());
+    v.extend_from_slice(config.election_public_key.0.to_bytes_be().as_slice());
 
-        selections.iter().for_each(|s| {
-            v.extend_from_slice(s.ciphertext.alpha.to_bytes_be().as_slice());
-            v.extend_from_slice(s.ciphertext.beta.to_bytes_be().as_slice());
-        });
+    selections.iter().for_each(|s| {
+        v.extend_from_slice(s.ciphertext.alpha.to_bytes_be().as_slice());
+        v.extend_from_slice(s.ciphertext.beta.to_bytes_be().as_slice());
+    });
 
-        eg_h(&config.h_e, &v).to_string()
-    }
+    eg_h(&config.h_e, &v).to_string()
 }
 
 // // Unit tests for pre-encrypted ballots.

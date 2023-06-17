@@ -3,4 +3,9 @@ members = [
   "electionguard",
   "eg",
   "util",
+  "preencrypted",
+  "verifier"
 ]
+
+[profile.release]
+opt-level = "s"     # optimize for small code size

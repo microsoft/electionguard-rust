@@ -12,6 +12,7 @@ use util::{
 
 use crate::{
     ballot::BallotConfig,
+    device::Device,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
     key::{Ciphertext, PublicKey},
@@ -22,6 +23,15 @@ pub struct ProofRange {
     pub c: Vec<BigUint>,
     pub v: Vec<BigUint>,
 }
+
+#[derive(Debug)]
+pub struct ProofGuardian {
+    pub c: Vec<BigUint>,
+    pub v: Vec<BigUint>,
+    pub capital_k: Vec<BigUint>,
+}
+
+pub struct ProofCorrectDecryption {}
 
 /// Serialize for ProofRange
 
@@ -46,16 +56,14 @@ impl Serialize for ProofRange {
 
 impl ProofRange {
     pub fn challenge(
-        fixed_parameters: &FixedParameters,
-        h_e: HValue,
-        k: &PublicKey,
+        device: &Device,
         ct: &Ciphertext,
         a: &Vec<BigUint>,
         b: &Vec<BigUint>,
     ) -> BigUint {
         let mut v = vec![0x21];
 
-        v.extend_from_slice(k.0.to_bytes_be().as_slice());
+        v.extend_from_slice(device.config.election_public_key.0.to_bytes_be().as_slice());
         v.extend_from_slice(ct.alpha.to_bytes_be().as_slice());
         v.extend_from_slice(ct.beta.to_bytes_be().as_slice());
 
@@ -67,125 +75,118 @@ impl ProofRange {
         });
 
         // Equation 25
-        let c = eg_h(&h_e, &v);
-        BigUint::from_bytes_be(c.0.as_slice()) % fixed_parameters.q.as_ref()
+        let c = eg_h(&device.config.h_e, &v);
+        BigUint::from_bytes_be(c.0.as_slice())
+            % device.election_parameters.fixed_parameters.q.as_ref()
     }
 
-    pub fn new_zero_or_one(
-        csprng: &mut Csprng,
-        fixed_parameters: &FixedParameters,
-        config: &BallotConfig,
-        nonce: &BigUint,
-        ct: &Ciphertext,
-        selected: bool,
-        zmulq: Rc<ZMulPrime>,
-    ) -> Self {
-        let c0: ZMulPrimeElem;
-        let c1: ZMulPrimeElem;
-        let v0: ZMulPrimeElem;
-        let v1: ZMulPrimeElem;
+    // pub fn new_zero_or_one(
+    //     csprng: &mut Csprng,
+    //     fixed_parameters: &FixedParameters,
+    //     config: &BallotConfig,
+    //     nonce: &BigUint,
+    //     ct: &Ciphertext,
+    //     selected: bool,
+    //     zmulq: Rc<ZMulPrime>,
+    // ) -> Self {
+    //     let c0: ZMulPrimeElem;
+    //     let c1: ZMulPrimeElem;
+    //     let v0: ZMulPrimeElem;
+    //     let v1: ZMulPrimeElem;
 
-        let u0 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
-        let u1 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
+    //     let u0 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
+    //     let u1 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
 
-        if selected {
-            c0 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
+    //     if selected {
+    //         c0 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
 
-            // Equation 37
-            let a0 = fixed_parameters
-                .g
-                .modpow(&u0.elem, fixed_parameters.p.borrow());
+    //         // Equation 37
+    //         let a0 = fixed_parameters
+    //             .g
+    //             .modpow(&u0.elem, fixed_parameters.p.borrow());
 
-            let b_exp = &u0 + &c0;
-            let b0 = config
-                .election_public_key
-                .0
-                .modpow(&b_exp.elem, fixed_parameters.p.borrow());
+    //         let b_exp = &u0 + &c0;
+    //         let b0 = config
+    //             .election_public_key
+    //             .0
+    //             .modpow(&b_exp.elem, fixed_parameters.p.borrow());
 
-            // Equation 38
-            let a1 = fixed_parameters
-                .g
-                .modpow(&u1.elem, fixed_parameters.p.borrow());
-            let b1 = config
-                .election_public_key
-                .0
-                .modpow(&u1.elem, fixed_parameters.p.borrow());
+    //         // Equation 38
+    //         let a1 = fixed_parameters
+    //             .g
+    //             .modpow(&u1.elem, fixed_parameters.p.borrow());
+    //         let b1 = config
+    //             .election_public_key
+    //             .0
+    //             .modpow(&u1.elem, fixed_parameters.p.borrow());
 
-            // Equation 39
+    //         // Equation 39
 
-            match ZMulPrimeElem::try_new(
-                zmulq.clone(),
-                ProofRange::challenge(
-                    fixed_parameters,
-                    config.h_e,
-                    &config.election_public_key,
-                    &ct,
-                    &vec![a0, a1],
-                    &vec![b0, b1],
-                ),
-            ) {
-                Some(c) => {
-                    // Equations 40-42
-                    c1 = c.borrow() - &c0;
-                    v0 = u0.borrow() - &(&c0 * nonce);
-                    v1 = u1.borrow() - &(&c1 * nonce);
-                }
-                None => panic!("c is not in ZmulPrime"),
-            }
-        } else {
-            c1 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
+    //         match ZMulPrimeElem::try_new(
+    //             zmulq.clone(),
+    //             ProofRange::challenge(
+    //                 fixed_parameters,
+    //                 config.h_e,
+    //                 &config.election_public_key,
+    //                 &ct,
+    //                 &vec![a0, a1],
+    //                 &vec![b0, b1],
+    //             ),
+    //         ) {
+    //             Some(c) => {
+    //                 // Equations 40-42
+    //                 c1 = c.borrow() - &c0;
+    //                 v0 = u0.borrow() - &(&c0 * nonce);
+    //                 v1 = u1.borrow() - &(&c1 * nonce);
+    //             }
+    //             None => panic!("c is not in ZmulPrime"),
+    //         }
+    //     } else {
+    //         c1 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
 
-            // Equation 28
-            let a0 = fixed_parameters
-                .g
-                .modpow(&u0.elem, fixed_parameters.p.borrow());
-            let b0 = config
-                .election_public_key
-                .0
-                .modpow(&u0.elem, fixed_parameters.p.borrow());
+    //         // Equation 28
+    //         let a0 = fixed_parameters
+    //             .g
+    //             .modpow(&u0.elem, fixed_parameters.p.borrow());
+    //         let b0 = config
+    //             .election_public_key
+    //             .0
+    //             .modpow(&u0.elem, fixed_parameters.p.borrow());
 
-            // Equation 29
-            let a1 = fixed_parameters
-                .g
-                .modpow(&u1.elem, fixed_parameters.p.borrow());
-            let b1 = config
-                .election_public_key
-                .0
-                .modpow(&(&u1 - &c1).elem, fixed_parameters.p.borrow());
+    //         // Equation 29
+    //         let a1 = fixed_parameters
+    //             .g
+    //             .modpow(&u1.elem, fixed_parameters.p.borrow());
+    //         let b1 = config
+    //             .election_public_key
+    //             .0
+    //             .modpow(&(&u1 - &c1).elem, fixed_parameters.p.borrow());
 
-            // Equation 30
+    //         // Equation 30
 
-            match ZMulPrimeElem::try_new(
-                zmulq.clone(),
-                ProofRange::challenge(
-                    fixed_parameters,
-                    config.h_e,
-                    &config.election_public_key,
-                    &ct,
-                    &vec![a0, a1],
-                    &vec![b0, b1],
-                ),
-            ) {
-                Some(c) => {
-                    // Equations 31-33
-                    c0 = c.borrow() - &c1;
-                    v0 = u0.borrow() - &(&c0 * nonce);
-                    v1 = u1.borrow() - &(&c1 * nonce);
-                }
-                None => panic!("c is not in ZmulPrime"),
-            }
-        }
+    //         match ZMulPrimeElem::try_new(
+    //             zmulq.clone(),
+    //             ProofRange::challenge(device, &ct, &vec![a0, a1], &vec![b0, b1]),
+    //         ) {
+    //             Some(c) => {
+    //                 // Equations 31-33
+    //                 c0 = c.borrow() - &c1;
+    //                 v0 = u0.borrow() - &(&c0 * nonce);
+    //                 v1 = u1.borrow() - &(&c1 * nonce);
+    //             }
+    //             None => panic!("c is not in ZmulPrime"),
+    //         }
+    //     }
 
-        ProofRange {
-            c: vec![c0.elem, c1.elem],
-            v: vec![v0.elem, v1.elem],
-        }
-    }
+    //     ProofRange {
+    //         c: vec![c0.elem, c1.elem],
+    //         v: vec![v0.elem, v1.elem],
+    //     }
+    // }
 
     pub fn new(
+        device: &Device,
         csprng: &mut Csprng,
-        fixed_parameters: &FixedParameters,
-        config: &BallotConfig,
         zmulq: Rc<ZMulPrime>,
         nonce: &BigUint,
         ct: &Ciphertext,
@@ -204,9 +205,10 @@ impl ProofRange {
 
         let a = (0..big_l + 1)
             .map(|j| {
-                fixed_parameters
-                    .g
-                    .modpow(&u[j].elem, fixed_parameters.p.borrow())
+                device.election_parameters.fixed_parameters.g.modpow(
+                    &u[j].elem,
+                    device.election_parameters.fixed_parameters.p.borrow(),
+                )
             })
             .collect();
 
@@ -219,24 +221,14 @@ impl ProofRange {
 
         let b = (0..big_l + 1)
             .map(|j| {
-                config
-                    .election_public_key
-                    .0
-                    .modpow(&t[j].elem, fixed_parameters.p.borrow())
+                device.config.election_public_key.0.modpow(
+                    &t[j].elem,
+                    device.election_parameters.fixed_parameters.p.borrow(),
+                )
             })
             .collect();
 
-        match ZMulPrimeElem::try_new(
-            zmulq.clone(),
-            ProofRange::challenge(
-                fixed_parameters,
-                config.h_e,
-                &config.election_public_key,
-                &ct,
-                &a,
-                &b,
-            ),
-        ) {
+        match ZMulPrimeElem::try_new(zmulq.clone(), ProofRange::challenge(device, &ct, &a, &b)) {
             Some(challenge) => {
                 c[small_l] = challenge;
                 for j in 0..big_l + 1 {
@@ -258,23 +250,19 @@ impl ProofRange {
     }
 
     /// Verification 4 (TODO: Complete)
-    pub fn verify(
-        &self,
-        fixed_parameters: &FixedParameters,
-        config: &BallotConfig,
-        ct: &Ciphertext,
-        big_l: usize,
-    ) -> bool {
-        let zmulq = ZMulPrime::new(fixed_parameters.q.clone());
+    pub fn verify(&self, device: &Device, ct: &Ciphertext, big_l: usize) -> bool {
+        let zmulq = ZMulPrime::new(device.election_parameters.fixed_parameters.q.clone());
         let zmulq = Rc::new(zmulq);
 
         let a = (0..big_l + 1)
             .map(|j| {
-                (fixed_parameters
-                    .g
-                    .modpow(&self.v[j], fixed_parameters.p.borrow())
-                    * ct.alpha.modpow(&self.c[j], fixed_parameters.p.borrow()))
-                    % fixed_parameters.p.as_ref()
+                (device.election_parameters.fixed_parameters.g.modpow(
+                    &self.v[j],
+                    device.election_parameters.fixed_parameters.p.borrow(),
+                ) * ct.alpha.modpow(
+                    &self.c[j],
+                    device.election_parameters.fixed_parameters.p.borrow(),
+                )) % device.election_parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
@@ -293,33 +281,24 @@ impl ProofRange {
 
         let b = (0..big_l + 1)
             .map(|j| {
-                (config
-                    .election_public_key
-                    .0
-                    .modpow(&w[j].elem, fixed_parameters.p.borrow())
-                    * ct.beta.modpow(&self.c[j], fixed_parameters.p.borrow()))
-                    % fixed_parameters.p.as_ref()
+                (device.config.election_public_key.0.modpow(
+                    &w[j].elem,
+                    device.election_parameters.fixed_parameters.p.borrow(),
+                ) * ct.beta.modpow(
+                    &self.c[j],
+                    device.election_parameters.fixed_parameters.p.borrow(),
+                )) % device.election_parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
-        match ZMulPrimeElem::try_new(
-            zmulq.clone(),
-            Self::challenge(
-                fixed_parameters,
-                config.h_e,
-                &config.election_public_key,
-                ct,
-                &a,
-                &b,
-            ),
-        ) {
+        match ZMulPrimeElem::try_new(zmulq.clone(), Self::challenge(device, ct, &a, &b)) {
             Some(c) => {
                 let mut rhs = BigUint::from(0u8);
                 for c_i in self.c.iter() {
                     rhs += c_i;
                 }
 
-                rhs = rhs % fixed_parameters.q.as_ref();
+                rhs = rhs % device.election_parameters.fixed_parameters.q.as_ref();
 
                 match ZMulPrimeElem::try_new(zmulq.clone(), rhs) {
                     Some(rhs) => c.elem == rhs.elem,
@@ -341,13 +320,6 @@ impl ProofRange {
 
         // 4.C
     }
-}
-
-#[derive(Debug)]
-pub struct ProofGuardian {
-    pub c: Vec<BigUint>,
-    pub v: Vec<BigUint>,
-    pub capital_k: Vec<BigUint>,
 }
 
 /// Serialize for ProofGuardian

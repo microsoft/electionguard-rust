@@ -12,8 +12,6 @@ use anyhow::{bail, Result};
 use clap::Args;
 use eg::{
     ballot::{BallotConfig, BallotDecrypted, BallotEncrypted},
-    ballot_list::BallotListPreEncrypted,
-    ballot_recording_tool::BallotRecordingTool,
     device::Device,
     example_election_manifest::{example_election_manifest, example_election_manifest_small},
     example_election_parameters::example_election_parameters,
@@ -23,7 +21,10 @@ use eg::{
     key::PublicKey,
     nizk::ProofGuardian,
 };
-use util::{csprng::Csprng, file::read_path};
+use preencrypted::{
+    ballot_list::BallotListPreEncrypted, ballot_recording_tool::BallotRecordingTool,
+};
+use util::{csprng::Csprng, file::read_path, logging::Logging};
 
 #[derive(Args, Debug)]
 pub(crate) struct PreEncryptedBallots {
@@ -124,15 +125,14 @@ impl Subcommand for PreEncryptedBallots {
             };
 
             let path = Path::new(&self.data).join("ballots");
+            let device = Device::new(
+                "BallotReecordingDevice".to_string(),
+                &config,
+                &election_parameters,
+            );
 
             if self.generate {
-                BallotListPreEncrypted::new(
-                    &config,
-                    fixed_parameters,
-                    &mut csprng,
-                    &path,
-                    self.num_ballots,
-                );
+                BallotListPreEncrypted::new(&device, &mut csprng, &path, self.num_ballots);
             }
 
             if self.verify {
@@ -143,13 +143,14 @@ impl Subcommand for PreEncryptedBallots {
                     None => bail!("Error reading ballots."),
                 }
 
-                let device = Device::new(
-                    "BallotReecordingDevice".to_string(),
-                    &config,
-                    &election_parameters,
-                );
-
                 for b_idx in 0..ballots.ballots.len() {
+                    Logging::log(
+                        "Pre-Encrypted",
+                        &format!("Verifying Ballot {}", b_idx + 1),
+                        line!(),
+                        file!(),
+                    );
+
                     let pre_encrypted_ballot = &mut ballots.ballots[b_idx];
                     assert!(BallotRecordingTool::verify_ballot(
                         &device,
@@ -158,9 +159,8 @@ impl Subcommand for PreEncryptedBallots {
                     ));
 
                     BallotRecordingTool::regenerate_nonces(
+                        &device,
                         pre_encrypted_ballot,
-                        &config,
-                        fixed_parameters,
                         hex_to_bytes(&ballots.primary_nonces[b_idx]).as_slice(),
                     );
 
@@ -170,15 +170,13 @@ impl Subcommand for PreEncryptedBallots {
                         String::from("Random Voter"),
                     );
 
-                    let encrypted_ballot = BallotEncrypted::new_from_preencrypted(
-                        &device,
-                        &mut csprng,
-                        pre_encrypted_ballot,
-                        &voter_ballot,
-                    );
+                    let encrypted_ballot =
+                        pre_encrypted_ballot.finalize(&device, &mut csprng, &voter_ballot);
 
                     encrypted_ballot.instant_verification_code(
-                        &ballots.primary_nonces[b_idx],
+                        &device,
+                        &voter_ballot,
+                        &hex_to_bytes(&ballots.primary_nonces[b_idx]).as_slice(),
                         &path.join(self.tag.as_str()),
                     );
 
@@ -196,11 +194,7 @@ impl Subcommand for PreEncryptedBallots {
                     //     file!(),
                     // );
 
-                    BallotRecordingTool::verify_ballot_proofs(
-                        &config,
-                        fixed_parameters,
-                        &encrypted_ballot,
-                    );
+                    BallotRecordingTool::verify_ballot_proofs(&device, &encrypted_ballot);
                 }
             }
         } else if self.manifest.is_some() {

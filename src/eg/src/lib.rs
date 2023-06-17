@@ -6,9 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 pub mod ballot;
-pub mod ballot_encrypting_tool;
-pub mod ballot_list;
-pub mod ballot_recording_tool;
 pub mod confirmation_code;
 pub mod contest;
 pub mod contest_hash;
@@ -28,5 +25,4 @@ pub mod nizk;
 pub mod nonce;
 pub mod standard_parameters;
 pub mod varying_parameters;
-pub mod verifier;
 pub mod voter;
