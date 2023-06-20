@@ -6,7 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use crate::{
-    contest::{BallotStyle, Contest, ContestOption},
+    contest::{Contest, ContestOption},
     election_manifest::ElectionManifest,
 };
 
@@ -14,7 +14,6 @@ use crate::{
 pub fn example_election_manifest_small() -> ElectionManifest {
     ElectionManifest {
         contests: vec![Contest {
-            ballot_style: BallotStyle("Ministerial Election".to_string()),
             label: "Minister of Elemental Resources".to_string(),
             selection_limit: 2,
             options: vec![
@@ -51,7 +50,6 @@ pub fn example_election_manifest() -> ElectionManifest {
     ElectionManifest {
             contests: vec![
                 Contest {
-                    ballot_style: BallotStyle("Presidential Election".to_string()),
                     label: "For President and Vice President of The United Realms of Imaginaria"
                         .to_string(),
                     selection_limit: 1,
@@ -67,7 +65,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                     ],
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ministerial Election".to_string()),
                     label: "Minister of Arcane Sciences".to_string(),
                     selection_limit: 1,
                     options: vec![
@@ -86,7 +83,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                     ],
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ministerial Election".to_string()),
                     label: "Minister of Elemental Resources".to_string(),
                     selection_limit: 1,
                     options: vec![
@@ -102,7 +98,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                     ],
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ministerial Election".to_string()),
                     label: "Minister of Dance".to_string(),
                     selection_limit: 1,
                     options: vec![
@@ -118,7 +113,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                     ],
                 },
                 Contest {
-                    ballot_style: BallotStyle("Grand Council Election".to_string()),
                     label: "Gränd Cøuncil of Arcáne and Technomägical Affairs".to_string(),
                     selection_limit: 3,
                     options: vec![
@@ -158,7 +152,6 @@ pub fn example_election_manifest() -> ElectionManifest {
                     ],
                 },
                 Contest {
-                    ballot_style: BallotStyle("Amendment Referrendum".to_string()),
                     label: "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions".to_string(),
                     selection_limit: 1,
                     options: vec![
@@ -171,25 +164,21 @@ pub fn example_election_manifest() -> ElectionManifest {
                     ],
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ballot Proposal".to_string()),
                     label: "Privacy Protection in Techno-Magical Communications Act".to_string(),
                     selection_limit: 1,
                     options: referendum_options.clone(),
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ballot Proposal".to_string()),
                     label: "Public Transport Modernization and Enchantment Proposal".to_string(),
                     selection_limit: 1,
                     options: referendum_options.clone(),
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ballot Proposal".to_string()),
                     label: "Renewable Ætherwind Infrastructure Initiative".to_string(),
                     selection_limit: 1,
                     options: referendum_options,
                 },
                 Contest {
-                    ballot_style: BallotStyle("Ballot Proposal".to_string()),
                     label: "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained"
                         .to_string(),
                     selection_limit: 1,

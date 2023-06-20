@@ -3,13 +3,14 @@ use std::path::Path;
 use util::csprng::Csprng;
 
 use crate::{
+    confirmation_code::encrypted,
     contest::ContestEncrypted,
     contest_selection::{ContestSelection, ContestSelectionEncrypted},
     device::Device,
     election_manifest::ElectionManifest,
     hash::HValue,
     key::PublicKey,
-    voter::VoterVerificationCode,
+    voter::{VoterChallengeCode, VoterConfirmationCode},
 };
 
 /// An encrypted ballot.
@@ -63,6 +64,9 @@ pub struct BallotConfig {
     pub h_e: HValue,
 }
 
+/// A ballot style is an ordered list of contest labels.
+pub struct BallotStyle(pub Vec<String>);
+
 impl BallotDecrypted {
     pub fn new_pick_random(config: &BallotConfig, csprng: &mut Csprng, label: String) -> Self {
         let mut contests = Vec::new();
@@ -83,14 +87,50 @@ impl BallotDecrypted {
 }
 
 impl BallotEncrypted {
-    pub fn instant_verification_code(
+    pub fn new(
+        device: &Device,
+        csprng: &mut Csprng,
+        primary_nonce: &[u8],
+        selections: &Vec<ContestSelection>,
+    ) -> BallotEncrypted {
+        let mut contests = Vec::with_capacity(selections.len());
+
+        for (i, selection) in selections.iter().enumerate() {
+            contests.push(ContestEncrypted::new(
+                device,
+                csprng,
+                primary_nonce,
+                &device.config.manifest.contests[i],
+                selection,
+            ));
+        }
+
+        let confirmation_code = encrypted(&device.config, &contests, &vec![0u8; 32]);
+        BallotEncrypted {
+            label: String::new(),
+            contests,
+            confirmation_code,
+            date: device.election_parameters.varying_parameters.date.clone(),
+            device: device.uuid.clone(),
+        }
+    }
+
+    pub fn confirmation_code_qr(&self, device: &Device, dir_path: &Path) {
+        VoterConfirmationCode::new_as_file(
+            &device.config,
+            dir_path,
+            self.confirmation_code.as_ref(),
+        );
+    }
+
+    pub fn verification_code_qr(
         &self,
         device: &Device,
         voter_ballot: &BallotDecrypted,
         primary_nonce: &[u8],
         dir_path: &Path,
     ) {
-        VoterVerificationCode::new_as_file(
+        VoterChallengeCode::new_as_file(
             &device.config,
             dir_path,
             primary_nonce,

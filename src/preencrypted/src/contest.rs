@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
 use eg::{
-    ballot::BallotConfig,
-    contest::{BallotStyle, Contest, ContestEncrypted},
+    contest::{Contest, ContestEncrypted},
     contest_selection::{
         ContestSelectionCiphertext, ContestSelectionEncrypted, ContestSelectionPlaintext,
     },
@@ -30,9 +29,6 @@ pub struct ContestPreEncrypted {
 
     /// Contest hash
     pub crypto_hash: HValue,
-
-    /// Ballot style
-    pub ballot_style: BallotStyle,
 }
 
 impl ContestPreEncrypted {
@@ -103,7 +99,6 @@ impl ContestPreEncrypted {
                     label: contest.label.clone(),
                     selections,
                     crypto_hash,
-                    ballot_style: contest.ballot_style.clone(),
                 })
             }
             false => None,
@@ -128,16 +123,19 @@ impl ContestPreEncrypted {
         fixed_parameters: &FixedParameters,
         voter_selections: &[ContestSelectionPlaintext],
     ) -> Vec<ContestSelectionCiphertext> {
-        assert!(0 < voter_selections.len() && voter_selections.len() <= self.selections.len());
+        assert!(voter_selections.len() == self.selections.len());
 
         let mut selections = <Vec<&Vec<ContestSelectionCiphertext>>>::new();
-        for idx in voter_selections {
-            selections.push(&self.selections[*idx as usize].selections);
+
+        for (i, v) in voter_selections.iter().enumerate() {
+            if *v == 1 {
+                selections.push(&self.selections[i].selections);
+            }
         }
 
         let mut combined_selection = selections[0].clone();
 
-        for i in 1..voter_selections.len() {
+        for i in 1..selections.len() {
             for j in 0..combined_selection.len() {
                 combined_selection[j].ciphertext.alpha = (&combined_selection[j].ciphertext.alpha
                     * &selections[i][j].ciphertext.alpha)
@@ -172,32 +170,26 @@ impl ContestPreEncrypted {
             crypto_hash: self.crypto_hash,
         };
 
-        let mut selected_vec = (0..selection.vote.len())
-            .map(|_| false)
-            .collect::<Vec<bool>>();
-        for v in voter_selections {
-            selected_vec[*v as usize] = true;
-        }
         let proof_ballot_correctness = selection
             .vote
             .iter()
             .enumerate()
             .map(|(i, x)| {
-                x.proof_ballot_correctness(device, csprng, selected_vec[i], zmulq.clone())
+                x.proof_ballot_correctness(device, csprng, voter_selections[i] == 1, zmulq.clone())
             })
             .collect();
+        let num_selections: u8 = voter_selections.iter().sum();
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             device,
             csprng,
             zmulq.clone(),
             &selection.vote,
-            voter_selections.len(),
+            num_selections as usize,
             selection_limit,
         );
 
         // TODO: Change crypto hash
         ContestEncrypted {
-            ballot_style: self.ballot_style.clone(),
             label: self.label.clone(),
             selection,
             crypto_hash: self.crypto_hash,

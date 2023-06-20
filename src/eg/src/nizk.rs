@@ -11,11 +11,10 @@ use util::{
 };
 
 use crate::{
-    ballot::BallotConfig,
     device::Device,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
-    key::{Ciphertext, PublicKey},
+    key::Ciphertext,
 };
 
 #[derive(Debug, Clone)]
@@ -79,110 +78,6 @@ impl ProofRange {
         BigUint::from_bytes_be(c.0.as_slice())
             % device.election_parameters.fixed_parameters.q.as_ref()
     }
-
-    // pub fn new_zero_or_one(
-    //     csprng: &mut Csprng,
-    //     fixed_parameters: &FixedParameters,
-    //     config: &BallotConfig,
-    //     nonce: &BigUint,
-    //     ct: &Ciphertext,
-    //     selected: bool,
-    //     zmulq: Rc<ZMulPrime>,
-    // ) -> Self {
-    //     let c0: ZMulPrimeElem;
-    //     let c1: ZMulPrimeElem;
-    //     let v0: ZMulPrimeElem;
-    //     let v1: ZMulPrimeElem;
-
-    //     let u0 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
-    //     let u1 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
-
-    //     if selected {
-    //         c0 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
-
-    //         // Equation 37
-    //         let a0 = fixed_parameters
-    //             .g
-    //             .modpow(&u0.elem, fixed_parameters.p.borrow());
-
-    //         let b_exp = &u0 + &c0;
-    //         let b0 = config
-    //             .election_public_key
-    //             .0
-    //             .modpow(&b_exp.elem, fixed_parameters.p.borrow());
-
-    //         // Equation 38
-    //         let a1 = fixed_parameters
-    //             .g
-    //             .modpow(&u1.elem, fixed_parameters.p.borrow());
-    //         let b1 = config
-    //             .election_public_key
-    //             .0
-    //             .modpow(&u1.elem, fixed_parameters.p.borrow());
-
-    //         // Equation 39
-
-    //         match ZMulPrimeElem::try_new(
-    //             zmulq.clone(),
-    //             ProofRange::challenge(
-    //                 fixed_parameters,
-    //                 config.h_e,
-    //                 &config.election_public_key,
-    //                 &ct,
-    //                 &vec![a0, a1],
-    //                 &vec![b0, b1],
-    //             ),
-    //         ) {
-    //             Some(c) => {
-    //                 // Equations 40-42
-    //                 c1 = c.borrow() - &c0;
-    //                 v0 = u0.borrow() - &(&c0 * nonce);
-    //                 v1 = u1.borrow() - &(&c1 * nonce);
-    //             }
-    //             None => panic!("c is not in ZmulPrime"),
-    //         }
-    //     } else {
-    //         c1 = ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng);
-
-    //         // Equation 28
-    //         let a0 = fixed_parameters
-    //             .g
-    //             .modpow(&u0.elem, fixed_parameters.p.borrow());
-    //         let b0 = config
-    //             .election_public_key
-    //             .0
-    //             .modpow(&u0.elem, fixed_parameters.p.borrow());
-
-    //         // Equation 29
-    //         let a1 = fixed_parameters
-    //             .g
-    //             .modpow(&u1.elem, fixed_parameters.p.borrow());
-    //         let b1 = config
-    //             .election_public_key
-    //             .0
-    //             .modpow(&(&u1 - &c1).elem, fixed_parameters.p.borrow());
-
-    //         // Equation 30
-
-    //         match ZMulPrimeElem::try_new(
-    //             zmulq.clone(),
-    //             ProofRange::challenge(device, &ct, &vec![a0, a1], &vec![b0, b1]),
-    //         ) {
-    //             Some(c) => {
-    //                 // Equations 31-33
-    //                 c0 = c.borrow() - &c1;
-    //                 v0 = u0.borrow() - &(&c0 * nonce);
-    //                 v1 = u1.borrow() - &(&c1 * nonce);
-    //             }
-    //             None => panic!("c is not in ZmulPrime"),
-    //         }
-    //     }
-
-    //     ProofRange {
-    //         c: vec![c0.elem, c1.elem],
-    //         v: vec![v0.elem, v1.elem],
-    //     }
-    // }
 
     pub fn new(
         device: &Device,

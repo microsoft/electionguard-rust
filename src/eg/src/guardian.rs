@@ -1,17 +1,16 @@
-use std::fs;
-use std::{borrow::Borrow, path::PathBuf, rc::Rc};
+use std::{borrow::Borrow, rc::Rc};
 
 use num_bigint::BigUint;
 use num_traits::Num;
 
 use serde::{Deserialize, Serialize};
-use util::bitwise::xor;
+use util::bitwise::{pad_with_zeros, xor};
 use util::{
     csprng::Csprng,
     z_mul_prime::{ZMulPrime, ZMulPrimeElem},
 };
 
-use crate::hash::eg_h;
+use crate::hash::{eg_h, HVALUE_BYTE_LEN};
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters, hash::HValue,
     key::PublicKey, nizk::ProofGuardian,
@@ -29,6 +28,7 @@ pub struct Guardian {
 
 #[derive(Debug)]
 pub struct GuardianShare {
+    pub i: u16,
     c0: BigUint,
     c1: BigUint,
     c2: BigUint,
@@ -84,29 +84,6 @@ pub fn aggregate_public_keys(
     capital_k
 }
 
-pub fn export(dir: &PathBuf, public_key: &PublicKey, proof: &ProofGuardian) {
-    let private_dir = dir.join("private");
-    let public_dir = dir.join("public");
-    fs::create_dir_all(private_dir.clone()).unwrap();
-    fs::create_dir_all(public_dir.clone()).unwrap();
-
-    fs::write(
-        public_dir.join("public_key.json"),
-        serde_json::to_string(public_key).unwrap(),
-    )
-    .unwrap();
-    fs::write(
-        public_dir.join("proof.json"),
-        serde_json::to_string(proof).unwrap(),
-    )
-    .unwrap();
-    // fs::write(
-    //     private_dir.join("shares.json"),
-    //     serde_json::to_string(shares).unwrap(),
-    // )
-    // .unwrap();
-}
-
 pub fn verify_share_from(
     fixed_parameters: &FixedParameters,
     l: usize,
@@ -127,31 +104,13 @@ pub fn verify_share_from(
     lhs == rhs
 }
 
-pub fn import(dir: &PathBuf, i: usize) -> (PublicKey, ProofGuardian, BigUint) {
-    let private_dir = dir.join("private");
-    let public_dir = dir.join("public");
-
-    let public_key: PublicKey =
-        serde_json::from_str(&fs::read_to_string(public_dir.join("public_key.json")).unwrap())
-            .unwrap();
-    let proof: ProofGuardian =
-        serde_json::from_str(&fs::read_to_string(public_dir.join("proof.json")).unwrap()).unwrap();
-    let shares: Vec<String> =
-        serde_json::from_str(&fs::read_to_string(private_dir.join("shares.json")).unwrap())
-            .unwrap();
-    (
-        public_key,
-        proof,
-        BigUint::from_str_radix(&shares[i - 1], 16).unwrap(),
-    )
-}
-
 impl Serialize for GuardianShare {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
         (
+            self.i,
             self.c0.to_str_radix(16),
             self.c1.to_str_radix(16),
             self.c2.to_str_radix(16),
@@ -165,8 +124,9 @@ impl<'de> Deserialize<'de> for GuardianShare {
     where
         D: serde::de::Deserializer<'de>,
     {
-        match <(String, String, String)>::deserialize(deserializer) {
-            Ok((c0, c1, c2)) => Ok(GuardianShare {
+        match <(u16, String, String, String)>::deserialize(deserializer) {
+            Ok((i, c0, c1, c2)) => Ok(GuardianShare {
+                i: i,
                 c0: BigUint::from_str_radix(&c0, 16).unwrap(),
                 c1: BigUint::from_str_radix(&c1, 16).unwrap(),
                 c2: BigUint::from_str_radix(&c2, 16).unwrap(),
@@ -184,6 +144,14 @@ impl GuardianShare {
     pub fn from_json(json: &str) -> Self {
         serde_json::from_str(json).unwrap()
     }
+}
+
+pub fn shares_to_json(guardian_shares: &[GuardianShare]) -> String {
+    serde_json::to_string(guardian_shares).unwrap()
+}
+
+pub fn shares_from_json(json: &str) -> Vec<GuardianShare> {
+    serde_json::from_str(json).unwrap()
 }
 
 impl Polynomial {
@@ -357,10 +325,7 @@ impl Guardian {
 
         let c1 = BigUint::from_bytes_be(
             xor(
-                self.poly
-                    .evaluate(&BigUint::from(l))
-                    .to_bytes_be()
-                    .as_slice(),
+                &pad_with_zeros(&self.poly.evaluate(&BigUint::from(l)), HVALUE_BYTE_LEN).as_slice(),
                 keys[1].0.as_slice(),
                 32,
             )
@@ -376,7 +341,12 @@ impl Guardian {
             .as_slice(),
         );
 
-        GuardianShare { c0, c1, c2 }
+        GuardianShare {
+            i: l as u16,
+            c0,
+            c1,
+            c2,
+        }
     }
 
     pub fn decrypt_share(
@@ -416,7 +386,7 @@ impl Guardian {
         } else {
             BigUint::from_bytes_be(
                 xor(
-                    encrypted_share.c1.to_bytes_be().as_slice(),
+                    pad_with_zeros(&encrypted_share.c1, HVALUE_BYTE_LEN).as_slice(),
                     keys[1].0.as_slice(),
                     32,
                 )

@@ -60,24 +60,24 @@ impl Hashes {
         let h_p = {
             // "B1 = 00 ∥ b(p, 512) ∥ b(q, 32) ∥ b(g, 512) ∥ b(n, 2) ∥ b(k, 2)"
 
-            let mut v_pqgnk = vec![0x00];
+            let mut v_pqg = vec![0x00];
 
             for biguint in [
                 election_parameters.fixed_parameters.p.borrow(),
                 election_parameters.fixed_parameters.q.borrow(),
                 election_parameters.fixed_parameters.g.borrow(),
             ] {
-                v_pqgnk.append(&mut biguint.to_bytes_be());
+                v_pqg.append(&mut biguint.to_bytes_be());
             }
 
-            for u in [
-                election_parameters.varying_parameters.n,
-                election_parameters.varying_parameters.k,
-            ] {
-                v_pqgnk.extend_from_slice(&u.to_be_bytes());
-            }
+            // for u in [
+            //     election_parameters.varying_parameters.n,
+            //     election_parameters.varying_parameters.k,
+            // ] {
+            //     v_pqgnk.extend_from_slice(&u.to_be_bytes());
+            // }
 
-            eg_h(&HValue::default(), &v_pqgnk)
+            eg_h(&HValue::default(), &v_pqg)
         };
 
         // Computation of the manifest hash H_M.
@@ -115,6 +115,11 @@ impl Hashes {
         }
     }
 
+    fn pad(v: &Vec<u8>, l: usize) -> Vec<u8> {
+        let padding = vec![0u8; l - v.len()];
+        [padding, v.to_vec()].concat()
+    }
+
     pub fn new_with_extended(
         election_parameters: &ElectionParameters,
         election_manifest: &ElectionManifest,
@@ -128,8 +133,12 @@ impl Hashes {
         hashes.h_e = {
             let mut v = vec![0x12];
 
-            v.extend(capital_k.0.to_bytes_be());
-            capital_k_i.iter().for_each(|u| v.extend(u.to_bytes_be()));
+            v.extend(Self::pad(&capital_k.0.to_bytes_be(), 512));
+            capital_k_i
+                .iter()
+                .for_each(|u| v.extend(Self::pad(&u.to_bytes_be(), 512)));
+
+            println!("v: {:?}", v.len());
 
             eg_h(&hashes.h_b, &v)
         };

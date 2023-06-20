@@ -5,9 +5,12 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-mod generate_ballot;
-mod generate_key;
+mod generate_guardian_key;
+mod generate_guardian_shares;
 mod none;
+mod preencrypted_ballots;
+mod verify_guardian_proof;
+mod verify_guardian_shares;
 mod verify_standard_parameters;
 mod write_hashes;
 mod write_manifest;
@@ -52,10 +55,19 @@ pub(crate) enum Subcommands {
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 
     /// Generate a key pair for a guardian.
-    GenerateKey(crate::subcommands::generate_key::GenerateKey),
+    GenerateGuardianKey(crate::subcommands::generate_guardian_key::GenerateGuardianKey),
 
-    /// Generate a pre-encrypted ballot.
-    GenerateBallot(crate::subcommands::generate_ballot::GenerateBallot),
+    /// Generate secret shares and proofs for a guardian.
+    GenerateGuardianShares(crate::subcommands::generate_guardian_shares::GenerateGuardianShares),
+
+    /// Verify secret shares from a guardian.
+    VerifyGuardianShares(crate::subcommands::verify_guardian_shares::VerifyGuardianShares),
+
+    /// Verify proof of knowledge from a guardian.
+    VerifyGuardianProof(crate::subcommands::verify_guardian_proof::VerifyGuardianProof),
+
+    /// Generate or verify pre-encrypted ballots.
+    PreEncryptedBallots(crate::subcommands::preencrypted_ballots::PreEncryptedBallots),
 }
 
 impl Default for Subcommands {
@@ -73,8 +85,11 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             Subcommands::WriteManifest(a) => a,
             Subcommands::WriteParameters(a) => a,
             Subcommands::WriteHashes(a) => a,
-            Subcommands::GenerateKey(a) => a,
-            Subcommands::GenerateBallot(a) => a,
+            Subcommands::GenerateGuardianKey(a) => a,
+            Subcommands::PreEncryptedBallots(a) => a,
+            Subcommands::GenerateGuardianShares(a) => a,
+            Subcommands::VerifyGuardianShares(a) => a,
+            Subcommands::VerifyGuardianProof(a) => a,
         }
     }
 }

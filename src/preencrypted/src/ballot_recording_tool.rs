@@ -1,13 +1,11 @@
 use eg::hash::HValue;
-use num_bigint::BigUint;
-use num_traits::Num;
 use util::logging::Logging;
 
 use crate::ballot::BallotPreEncrypted;
 use crate::contest::ContestPreEncrypted;
 use crate::contest_selection::ContestSelectionPreEncrypted;
 use crate::nonce::option_nonce;
-use eg::ballot::{BallotConfig, BallotEncrypted};
+use eg::ballot::BallotEncrypted;
 use eg::contest::ContestEncrypted;
 use eg::contest_selection::ContestSelectionCiphertext;
 use eg::device::Device;

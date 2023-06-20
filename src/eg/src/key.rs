@@ -14,6 +14,7 @@ use num_bigint::BigUint;
 use num_traits::{Num, One};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::contest_selection::ContestSelectionCiphertext;
 use crate::fixed_parameters::FixedParameters;
@@ -246,7 +247,7 @@ mod test {
     #[test]
     fn test_encryption() {
         let fixed_parameters = (*STANDARD_PARAMETERS).clone();
-        let mut csprng = Csprng::new(12345);
+        let mut csprng = Csprng::new(&[0u8; 0]);
 
         let private_key = PrivateKey::new(&mut csprng, &fixed_parameters);
         let public_key: PublicKey = private_key.public_key().clone();

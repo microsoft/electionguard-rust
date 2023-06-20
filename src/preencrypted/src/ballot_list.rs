@@ -6,11 +6,7 @@ use util::{
     logging::Logging,
 };
 
-use eg::{
-    ballot::BallotConfig,
-    device::{self, Device},
-    hash::HValue,
-};
+use eg::{device::Device, hash::HValue};
 
 use crate::ballot::BallotPreEncrypted;
 

@@ -228,7 +228,7 @@ mod test_zmulprime {
     }
     #[test]
     fn test_zmulprime_sub() {
-        let mut csprng = Csprng::new(0);
+        let mut csprng = Csprng::new(&[0u8]);
 
         for (a, b, p, expected) in [
             (100u16, 50u16, 997u16, 50u16),

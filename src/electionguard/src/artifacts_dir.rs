@@ -29,8 +29,23 @@ pub(crate) enum ArtifactFile {
     #[strum(to_string = "election_parameters.json")]
     ElectionParameters,
 
+    #[strum(to_string = "election_record_header.json")]
+    ElectionRecordHeader,
+
     #[strum(to_string = "hashes.json")]
     Hashes,
+
+    #[strum(to_string = "guardian_private_data.json")]
+    GuardianPrivateData,
+
+    #[strum(to_string = "guardian_public_key.json")]
+    GuardianPublicKey,
+
+    #[strum(to_string = "guardian_proof.json")]
+    GuardianProof,
+
+    #[strum(to_string = "guardian_shares.json")]
+    GuardianEncryptedShares,
 }
 
 impl From<ArtifactFile> for PathBuf {

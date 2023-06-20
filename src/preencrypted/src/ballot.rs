@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf, time::SystemTime};
 use eg::{
     ballot::{BallotDecrypted, BallotEncrypted},
     contest::ContestEncrypted,
-    device::{self, Device},
+    device::Device,
     hash::HValue,
 };
 use serde::{Deserialize, Serialize};

@@ -1,11 +1,13 @@
+use core::num;
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    ballot::BallotConfig,
-    contest_selection::{ContestSelectionCiphertext, ContestSelectionEncrypted},
+    contest_hash,
+    contest_selection::{ContestSelection, ContestSelectionCiphertext, ContestSelectionEncrypted},
     device::Device,
     fixed_parameters::FixedParameters,
     hash::HValue,
@@ -27,9 +29,6 @@ pub struct Contest {
     /// The candidates/options.
     /// The order of options matches the virtual ballot.
     pub options: Vec<ContestOption>,
-
-    /// Ballot style
-    pub ballot_style: BallotStyle,
 }
 
 /// An option in a contest.
@@ -51,9 +50,6 @@ pub struct ContestEncrypted {
     /// Contest hash
     pub crypto_hash: HValue,
 
-    /// Ballot style
-    pub ballot_style: BallotStyle,
-
     /// Proof of ballot correctness
     pub proof_ballot_correctness: Vec<ProofRange>,
 
@@ -62,6 +58,44 @@ pub struct ContestEncrypted {
 }
 
 impl ContestEncrypted {
+    pub fn new(
+        device: &Device,
+        csprng: &mut Csprng,
+        primary_nonce: &[u8],
+        contest: &Contest,
+        pt_vote: &ContestSelection,
+    ) -> ContestEncrypted {
+        let selection = ContestSelectionEncrypted::new(device, primary_nonce, contest, pt_vote);
+        let crypto_hash = contest_hash::encrypted(&device.config, &contest.label, &selection.vote);
+        let zmulq = Rc::new(ZMulPrime::new(
+            device.election_parameters.fixed_parameters.q.clone(),
+        ));
+        let proof_ballot_correctness = selection
+            .vote
+            .iter()
+            .enumerate()
+            .map(|(i, x)| {
+                x.proof_ballot_correctness(device, csprng, pt_vote.vote[i] == 1u8, zmulq.clone())
+            })
+            .collect();
+        let num_selections: u8 = pt_vote.vote.iter().sum();
+        let proof_selection_limit = ContestEncrypted::proof_selection_limit(
+            device,
+            csprng,
+            zmulq.clone(),
+            &selection.vote,
+            num_selections as usize,
+            contest.selection_limit,
+        );
+        ContestEncrypted {
+            label: contest.label.clone(),
+            selection,
+            crypto_hash,
+            proof_ballot_correctness,
+            proof_selection_limit,
+        }
+    }
+
     pub fn get_proof_ballot_correctness(&self) -> &Vec<ProofRange> {
         &self.proof_ballot_correctness
     }

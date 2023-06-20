@@ -1,3 +1,4 @@
+use core::num;
 use std::{collections::HashSet, rc::Rc};
 
 use num_bigint::BigUint;
@@ -5,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
-    ballot::BallotConfig, device::Device, fixed_parameters::FixedParameters, hash::HValue,
-    key::Ciphertext, nizk::ProofRange,
+    contest::Contest, contest_hash::encrypted as contest_hash, device::Device, hash::HValue,
+    key::Ciphertext, nizk::ProofRange, nonce::encrypted as nonce,
 };
 
 /// A plaintext vote for an option in a contest.
@@ -45,17 +46,51 @@ impl ContestSelection {
         selection_limit: usize,
         num_options: usize,
     ) -> Self {
-        let mut vote = HashSet::new();
+        let mut vote = vec![0u8; num_options];
+
         // TODO: Allow 0 selections
         let selection_limit = 1 + (csprng.next_u64() as usize % selection_limit);
+        let mut changed = 0;
 
-        while vote.len() < selection_limit {
-            vote.insert((csprng.next_u64() as usize % num_options) as u8);
+        while changed < selection_limit {
+            let idx = csprng.next_u32() % (vote.len() as u32);
+            if vote[idx as usize] == 0 {
+                vote[idx as usize] = 1;
+                changed += 1;
+            }
         }
 
-        Self {
-            vote: vote.into_iter().collect(),
+        Self { vote }
+    }
+}
+
+impl ContestSelectionEncrypted {
+    // TODO: Check if selection limit is satisfied
+    pub fn new(
+        device: &Device,
+        primary_nonce: &[u8],
+        contest: &Contest,
+        pt_vote: &ContestSelection,
+    ) -> ContestSelectionEncrypted {
+        let mut vote: Vec<ContestSelectionCiphertext> = Vec::new();
+        for (j, v) in pt_vote.vote.iter().enumerate() {
+            let nonce = nonce(
+                &device,
+                primary_nonce,
+                contest.label.as_bytes(),
+                contest.options[j].label.as_bytes(),
+            );
+            vote.push(ContestSelectionCiphertext {
+                ciphertext: device.config.election_public_key.encrypt_with(
+                    &device.election_parameters.fixed_parameters,
+                    &nonce,
+                    *v as usize,
+                ),
+                nonce: BigUint::from(0u8),
+            });
         }
+        let crypto_hash = contest_hash(&device.config, &contest.label, &vote);
+        ContestSelectionEncrypted { vote, crypto_hash }
     }
 }
 
