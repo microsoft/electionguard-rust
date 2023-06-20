@@ -38,6 +38,23 @@ pub fn largest_integer_a_such_that_2_to_a_divides_even_n(n: &BigUint) -> u64 {
     n.trailing_zeros().unwrap()
 }
 
+pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
+    let n: &BigUint = n.borrow();
+
+    let mut v = n.to_bytes_be();
+
+    if v.len() < len {
+        let left_pad = len - v.len();
+        v.reserve(left_pad);
+        v.extend(std::iter::repeat(0).take(left_pad));
+        v.rotate_right(left_pad);
+    }
+
+    assert!(len <= v.len());
+
+    v
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,5 +87,13 @@ mod tests {
                 assert!(!n.is_multiple_of(&two_to_invalid_a));
             }
         }
+    }
+
+    #[test]
+    fn test_left_pad_to_len_bytes() {
+        let x_ff = BigUint::from(0xff_usize);
+        assert_eq!(to_be_bytes_left_pad(&x_ff, 0), vec![0xff]);
+        assert_eq!(to_be_bytes_left_pad(&x_ff, 1), vec![0xff]);
+        assert_eq!(to_be_bytes_left_pad(&x_ff, 2), vec![0x00, 0xff]);
     }
 }

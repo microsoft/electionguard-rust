@@ -116,26 +116,29 @@ impl std::fmt::Display for HValue {
 impl std::fmt::Debug for HValue {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        use std::fmt::Write;
+        std::fmt::Display::fmt(self, f)
+        /*
+            use std::fmt::Write;
 
-        let start_ix = HValue::HVALUE_SERIALIZE_PREFIX.len();
-        let end_ix = HValue::HVALUE_SERIALIZE_LEN - HValue::HVALUE_SERIALIZE_SUFFIX.len();
-        let ascii = &self.display_as_ascii();
-        let hex_chars = &ascii.as_str()[start_ix..end_ix];
+            let start_ix = HValue::HVALUE_SERIALIZE_PREFIX.len();
+            let end_ix = HValue::HVALUE_SERIALIZE_LEN - HValue::HVALUE_SERIALIZE_SUFFIX.len();
+            let ascii = &self.display_as_ascii();
+            let hex_chars = &ascii.as_str()[start_ix..end_ix];
 
-        f.write_str("HValue([")?;
+            f.write_str("HValue([")?;
 
-        for (ix, hex_char) in hex_chars.chars().enumerate() {
-            if ix % 2 == 0 {
-                if ix > 0 {
-                    f.write_str(", ")?;
+            for (ix, hex_char) in hex_chars.chars().enumerate() {
+                if ix % 2 == 0 {
+                    if ix > 0 {
+                        f.write_str(", ")?;
+                    }
+                    f.write_str("0x")?;
                 }
-                f.write_str("0x")?;
+                f.write_char(hex_char)?;
             }
-            f.write_char(hex_char)?;
-        }
 
-        f.write_str("])")
+            f.write_str("])")
+        */
     }
 }
 
@@ -162,7 +165,8 @@ mod test_hvalue_std_fmt {
         assert_eq!(h.to_string(), expected);
         assert_eq!(format!("{h}"), expected);
 
-        let expected_debug = "HValue([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F])";
+        //let expected_debug = "HValue([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F])";
+        let expected_debug = expected;
         assert_eq!(format!("{h:?}"), expected_debug);
     }
 }

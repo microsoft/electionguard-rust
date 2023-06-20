@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use util::{
     csprng::Csprng,
-    integer_util::cnt_bits_repr,
+    integer_util::{cnt_bits_repr, to_be_bytes_left_pad},
     prime::{is_prime, BigUintPrime},
 };
 
@@ -73,6 +73,28 @@ pub struct FixedParameters {
 }
 
 impl FixedParameters {
+    /// The length of the byte array representation of p.
+    pub fn l_p_bytes(&self) -> usize {
+        let p: &BigUint = self.p.borrow();
+        (cnt_bits_repr(p) + 7) / 8
+    }
+
+    /// The length of the byte array representation of q.
+    pub fn l_q_bytes(&self) -> usize {
+        let q: &BigUint = self.q.borrow();
+        (cnt_bits_repr(q) + 7) / 8
+    }
+
+    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod p`.
+    pub fn biguint_to_be_bytes_len_p(&self, u: &BigUint) -> Vec<u8> {
+        to_be_bytes_left_pad(&u, self.l_p_bytes())
+    }
+
+    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod q`.
+    pub fn biguint_to_be_bytes_len_q(&self, u: &BigUint) -> Vec<u8> {
+        to_be_bytes_left_pad(&u, self.l_q_bytes())
+    }
+
     /// Verifies the parameters meet some of the key validity requirements.
     #[allow(clippy::nonminimal_bool)]
     pub fn verify(&self, csprng: &mut Csprng) -> bool {
