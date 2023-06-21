@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{bail, Result};
+use anyhow::{Result, Context};
 
 use eg::standard_parameters::STANDARD_PARAMETERS;
 
@@ -32,9 +32,7 @@ impl Subcommand for VerifyStandardParameters {
         eprintln!("Verifying standard parameters...");
         for pass in 0..self.passes {
             eprintln!("    Starting pass {pass}/{}...", self.passes);
-            if !fixed_parameters.verify(&mut csprng) {
-                bail!("Parameter verification failed");
-            }
+            fixed_parameters.verify(&mut csprng).context("Parameter verification failed")?;
         }
 
         eprintln!("Done.");

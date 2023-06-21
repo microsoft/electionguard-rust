@@ -7,13 +7,22 @@
 
 use num_bigint::BigUint;
 use num_traits::One;
+use serde::{Deserialize, Serialize};
 
 use crate::{fixed_parameters::FixedParameters, key::PublicKey};
 
-pub struct JointElectionPublicKey(pub BigUint);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JointElectionPublicKey(
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub BigUint
+);
 
 impl JointElectionPublicKey {
     pub fn compute(fixed_parameters: &FixedParameters, guardian_public_keys: &[PublicKey]) -> Self {
+        //? TODO: Would it be useful to parallelize this?
         Self(
             guardian_public_keys
                 .iter()

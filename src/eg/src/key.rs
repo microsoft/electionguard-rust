@@ -8,17 +8,20 @@
 use std::borrow::Borrow;
 
 use num_bigint::BigUint;
+use serde::{Deserialize, Serialize};
 
 use util::{csprng::Csprng, integer_util::to_be_bytes_left_pad};
 
 use crate::{election_parameters::ElectionParameters, fixed_parameters::FixedParameters};
 
-// pub enum AsymmetricKeyType {
-//     Public,
-//     Private,
-// }
-
-pub struct SecretCoefficient(pub(crate) BigUint);
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SecretCoefficient(
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub BigUint
+);
 
 impl SecretCoefficient {
     /// Returns the `SecretCoefficient` as a big-endian byte array of the correct length for `mod q`.
@@ -30,6 +33,7 @@ impl SecretCoefficient {
 /// "Each guardian G_i in an election with a decryption threshold of k generates k secret
 /// polynomial coefficients a_i,j, for 0 ≤ j < k, by sampling them uniformly, at random in
 /// the range 0 ≤ a_i,j < q.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecretCoefficients(Vec<SecretCoefficient>);
 
 impl SecretCoefficients {
@@ -47,8 +51,14 @@ impl SecretCoefficients {
     }
 }
 
-#[derive(Clone)]
-pub struct CoefficientCommitment(pub(crate) BigUint);
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CoefficientCommitment(
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub BigUint
+);
 
 impl CoefficientCommitment {
     /// Returns the `CoefficientCommitment` as a big-endian byte array of the correct length for `mod p`.
@@ -57,7 +67,7 @@ impl CoefficientCommitment {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientCommitments(pub(crate) Vec<CoefficientCommitment>);
 
 impl CoefficientCommitments {
@@ -81,17 +91,28 @@ impl CoefficientCommitments {
     }
 }
 
-#[derive()]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivateKey {
+    /// Guardian number, 0 <= i < n.
+    pub i: u16,
+
+    /// Descriptive string for the guardian.
+    #[serde(rename = "name")]
+    pub opt_name: Option<String>,
+
     /// Secret polynomial coefficients.
-    pub(crate) secret_coefficients: SecretCoefficients,
+    pub secret_coefficients: SecretCoefficients,
 
     /// "Published" polynomial coefficient commitments.
-    pub(crate) coefficient_commitments: CoefficientCommitments,
+    pub coefficient_commitments: CoefficientCommitments,
 }
 
 impl PrivateKey {
-    pub fn generate(csprng: &mut Csprng, election_parameters: &ElectionParameters) -> Self {
+    pub fn generate(
+        csprng: &mut Csprng, election_parameters: &ElectionParameters,
+        i: u16,
+        opt_name: Option<String>,
+    ) -> Self {
         let secret_coefficients = SecretCoefficients::generate(csprng, election_parameters);
         assert_ne!(secret_coefficients.0.len(), 0);
 
@@ -104,6 +125,8 @@ impl PrivateKey {
         PrivateKey {
             secret_coefficients,
             coefficient_commitments,
+            i,
+            opt_name,
         }
     }
 
@@ -121,13 +144,32 @@ impl PrivateKey {
 
     pub fn make_public_key(&self) -> PublicKey {
         PublicKey {
+            i: self.i,
+            opt_name: self.opt_name.clone(),
             coefficient_commitments: self.coefficient_commitments.clone(),
         }
     }
+
+    /// Returns a pretty JSON `String` representation of the `PrivateKey`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PublicKey {
+    /// Guardian number, 0 <= i < n.
+    pub i: u16,
+
+    /// Descriptive string for the guardian.
+    #[serde(rename = "name")]
+    pub opt_name: Option<String>,
+
     /// "Published" polynomial coefficient commitments.
     pub(crate) coefficient_commitments: CoefficientCommitments,
 }
@@ -142,11 +184,21 @@ impl PublicKey {
         self.coefficient_commitments.0[0].0.borrow()
     }
 
-    /// Returns the public key as a big-endian byte vector of length l_p_bytes.
+    /// Returns the public key `K_i,0` as a big-endian byte vector of length l_p_bytes.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         //? TODO: Sure would be nice if we could avoid this allocation, but since we
         // store a BigUint representation, its length in bytes may be less than `l_p_bytes`.
         to_be_bytes_left_pad(&self.public_key_k0(), fixed_parameters.l_p_bytes())
+    }
+
+    /// Returns a pretty JSON `String` representation of the `PrivateKey`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
     }
 }
 
@@ -165,11 +217,11 @@ mod test {
 
         //let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        let n = varying_parameters.n as usize;
-        let k = varying_parameters.k as usize;
+        let n = varying_parameters.n;
+        let k = varying_parameters.k;
 
         let guardian_private_keys = (0..n)
-            .map(|_i| PrivateKey::generate(&mut csprng, &election_parameters))
+            .map(|i| PrivateKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
 
         let guardian_public_keys = guardian_private_keys
@@ -178,8 +230,8 @@ mod test {
             .collect::<Vec<_>>();
 
         for guardian_private_key in guardian_private_keys.iter() {
-            assert_eq!(guardian_private_key.secret_coefficients.0.len(), k);
-            assert_eq!(guardian_private_key.coefficient_commitments.0.len(), k);
+            assert_eq!(guardian_private_key.secret_coefficients.0.len(), k as usize);
+            assert_eq!(guardian_private_key.coefficient_commitments.0.len(), k as usize);
 
             for secret_coefficient in guardian_private_key.secret_coefficients.0.iter() {
                 assert!(&secret_coefficient.0 < fixed_parameters.q.borrow());
@@ -191,7 +243,7 @@ mod test {
         }
 
         for (i, guardian_public_key) in guardian_public_keys.iter().enumerate() {
-            assert_eq!(guardian_public_key.coefficient_commitments.0.len(), k);
+            assert_eq!(guardian_public_key.coefficient_commitments.0.len(), k as usize);
 
             for (j, coefficient_commitment) in guardian_public_key
                 .coefficient_commitments

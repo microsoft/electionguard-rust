@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
+base64 = "0.21.2"
 num-bigint = { version = "0.4", features = ["serde"] }
 num-integer = "0.1"
 num-traits = "0.2"

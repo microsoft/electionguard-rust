@@ -8,13 +8,13 @@
 use std::{fs::OpenOptions, io::Read};
 
 use anyhow::{bail, Result};
-use rand_core::{OsRng, RngCore};
 
-use util::{csprng::Csprng, hex_dump::HexDump};
+use util::csprng::Csprng;
 
 use crate::{
     artifacts_dir::{ArtifactFile, ArtifactsDir},
     clargs::Clargs,
+    common_utils::osrng_seed_data_for_csprng,
 };
 
 /// Stuff passed to every subcommand.
@@ -60,26 +60,19 @@ impl SubcommandHelper {
 
         let mut seed_data = Vec::new();
         if self.clargs.insecure_deterministic {
-            let (mut file, _path) = self.artifacts_dir.open(
+            let (mut file, path) = self.artifacts_dir.open(
                 ArtifactFile::PseudorandomSeedDefeatsAllSecrecy,
                 OpenOptions::new().read(true),
             )?;
 
             file.read_to_end(&mut seed_data)?;
 
-            eprintln!("!!! WARNING !!! Using insecure deterministic mode.");
-            eprintln!(
-                "Pseudorandom seed:\n{}",
-                HexDump::new()
-                    .line_prefix("    ")
-                    .show_addr(false)
-                    .show_ascii(false)
-                    .dump(&seed_data)
+            eprintln!("!!! WARNING !!! Using insecure deterministic mode, {} bytes of seed data read from: {}",
+                seed_data.len(), path.display()
             );
         } else {
-            let mut seed = [0u8; 32];
-            OsRng.fill_bytes(&mut seed);
-            seed_data.extend_from_slice(&seed);
+            // Read true random bytes from the OS.
+            seed_data.extend_from_slice(&osrng_seed_data_for_csprng());
         };
 
         let mut seed = Vec::new();

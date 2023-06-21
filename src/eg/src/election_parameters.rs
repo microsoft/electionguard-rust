@@ -9,6 +9,8 @@ use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
+use util::csprng::Csprng;
+
 use crate::{fixed_parameters::FixedParameters, varying_parameters::VaryingParameters};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,6 +23,14 @@ pub struct ElectionParameters {
 }
 
 impl ElectionParameters {
+
+    /// Verifies that the `ElectionParameters` meet some basic validity requirements.
+    pub fn verify(&self, csprng: &mut Csprng) -> Result<()> {
+        self.fixed_parameters.verify(csprng)?;
+        self.varying_parameters.verify()?;
+        Ok(())
+    }
+
     /// Reads an `ElectionParameters` from a byte sequence.
     pub fn from_bytes(bytes: &[u8]) -> Result<ElectionParameters> {
         serde_json::from_slice(bytes).with_context(|| "Error parsing ElectionParameters bytes")

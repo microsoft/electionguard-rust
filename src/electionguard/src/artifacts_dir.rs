@@ -11,31 +11,44 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 
 use anyhow::{Context, Result};
-use strum_macros::Display;
 
 /// Provides access to files in the artifacts directory.
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ArtifactFile {
-    #[strum(to_string = "pseudorandom_seed_defeats_all_secrecy.bin")]
     PseudorandomSeedDefeatsAllSecrecy,
-
-    #[strum(to_string = "election_manifest_pretty.json")]
     ElectionManifestPretty,
-
-    #[strum(to_string = "election_manifest_canonical.bin")]
     ElectionManifestCanonical,
-
-    #[strum(to_string = "election_parameters.json")]
     ElectionParameters,
-
-    #[strum(to_string = "hashes.json")]
     Hashes,
+    GuardianPrivateKey(u16),
+    GuardianPublicKey(u16),
+}
+
+impl std::fmt::Display for ArtifactFile {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        PathBuf::from(*self).as_path().display().fmt(f)
+    }
 }
 
 impl From<ArtifactFile> for PathBuf {
     fn from(artifact_file: ArtifactFile) -> PathBuf {
-        artifact_file.to_string().as_str().into()
+        use ArtifactFile::*;
+        match artifact_file {
+            PseudorandomSeedDefeatsAllSecrecy => PathBuf::from("pseudorandom_seed_defeats_all_secrecy.bin"),
+            ElectionManifestPretty => PathBuf::from("election_manifest_pretty.json"),
+            ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
+            ElectionParameters => PathBuf::from("election_parameters.json"),
+            Hashes => PathBuf::from("hashes.json"),
+            GuardianPrivateKey(i) =>
+                Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.private_key.KEEP_THIS_ONE_SECRET.json")),
+            GuardianPublicKey(i) =>
+                Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.public_key.json")),
+        }
     }
 }
 

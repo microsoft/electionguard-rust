@@ -113,11 +113,10 @@ mod test {
 
         let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        let n = varying_parameters.n as usize;
-        //let k = varying_parameters.k as usize;
+        let n = varying_parameters.n;
 
         let guardian_private_keys = (0..n)
-            .map(|_i| PrivateKey::generate(&mut csprng, &election_parameters))
+            .map(|i| PrivateKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
 
         let guardian_public_keys = guardian_private_keys

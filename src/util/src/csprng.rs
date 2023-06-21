@@ -12,6 +12,27 @@ use std::num::{NonZeroU64, NonZeroUsize};
 pub struct Csprng(Box<dyn sha3::digest::XofReader>);
 
 impl Csprng {
+    pub const fn state_bytes() -> usize { 1600/8 }
+    pub const fn rate_bytes() -> usize { 1088/8 }
+
+    pub const fn state_bits() -> usize { Csprng::state_bytes()*8 }
+    pub const fn rate_bits() -> usize { Csprng::rate_bytes()*8 }
+
+    // The number of bytes needed to seed the entire internal state by processing the optimum
+    // number of message input blocks.
+    // But if you are planning to append more entropy or customization data to the seed data,
+    // consider just starting with `state_bytes()` instead.
+    pub const fn recommended_max_seed_bytes() -> usize {
+        // The number of blocks needed to completely fill the internal state.
+        let msg_blocks = (Csprng::state_bits() + Csprng::rate_bits() - 1)/Csprng::rate_bits();
+
+        // The final message block is padded with at least 6 bits (1111 1 0* 1),
+        // so we take off one byte.
+        msg_blocks*Csprng::rate_bytes() - 1
+    }
+
+    //pub const fn internal_state_size_in_bytes() -> usize { internal_state_size_in_bits()/8 }
+
     pub fn new(seed: &[u8]) -> Csprng {
         use sha3::digest::{ExtendableOutput, Update};
 
@@ -153,6 +174,10 @@ mod test_csprng {
 
     #[test]
     fn test_csprng() {
+        assert_eq!(Csprng::state_bits(), 1600);
+        assert_eq!(Csprng::rate_bits(), 1088);
+        assert!(Csprng::state_bits() <= Csprng::recommended_max_seed_bytes()*8);
+        
         let mut csprng = Csprng::new(b"test_csprng::test_csprng");
         assert_eq!(csprng.next_u64(), 2923606079226974570);
         assert_eq!(csprng.next_u8(), 54);

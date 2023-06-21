@@ -7,6 +7,7 @@
 
 use std::borrow::Borrow;
 
+use anyhow::{bail, Result};
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
@@ -95,9 +96,9 @@ impl FixedParameters {
         to_be_bytes_left_pad(&u, self.l_q_bytes())
     }
 
-    /// Verifies the parameters meet some of the key validity requirements.
+    /// Verifies that the `FixedParameters` meet some basic validity requirements.
     #[allow(clippy::nonminimal_bool)]
-    pub fn verify(&self, csprng: &mut Csprng) -> bool {
+    pub fn verify(&self, csprng: &mut Csprng) -> Result<()> {
         let q: &BigUint = self.q.borrow();
         let p: &BigUint = self.p.borrow();
 
@@ -108,45 +109,46 @@ impl FixedParameters {
 
         // p is a prime of the requested number of bits
         if !is_prime(p, csprng) {
-            return false;
+            bail!("Fixed parameters: p is not prime");
         }
+
         if cnt_bits_repr(p) != self.generation_parameters.p_bits_total {
-            return false;
+            bail!("Fixed parameters: p wrong number of bits");
         }
 
         // q is a prime of the requested number of bits
         if !is_prime(q, csprng) {
-            return false;
+            bail!("Fixed parameters: q is not prime");
         }
         if cnt_bits_repr(q) != self.generation_parameters.q_bits_total {
-            return false;
+            bail!("Fixed parameters: q wrong number of bits");
         }
 
         // q < (p - 1)
         if !(q < &(p - 1_u8)) {
-            return false;
+            bail!("Fixed parameters failed check: q < (p - 1)");
         }
 
         // r = (p − 1)/q
         if !(self.r == ((p - 1_u8) / q)) {
-            return false;
+            bail!("Fixed parameters failed check: r = (p − 1)/q");
         }
 
         // q is not a divisor of r = (p − 1)/q
         let r: &BigUint = self.r.borrow();
         if (r % q).is_zero() {
-            return false;
+            bail!("Fixed parameters failed check: q is not a divisor of r = (p − 1)/q");
         }
 
-        // g is in Zmodp and not 1
+        // g is in Zmodp and not 0 or 1
         let g: &BigUint = self.g.borrow();
-        if !(&BigUint::one() < g) {
-            return false;
+        if !(&BigUint::one() < g && g < p) {
+            bail!("Fixed parameters failed check: g is in Zmodp and not 0 or 1");
         }
         if !(g < p) {
-            return false;
+            bail!("Fixed parameters failed check: g < p");
         }
 
-        true
+        Ok(())
     }
 }
