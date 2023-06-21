@@ -70,6 +70,7 @@ impl ContestSelectionPreEncrypted {
         j: usize,
         length: usize,
     ) -> ContestSelectionPreEncrypted {
+        assert!(selection_labels.len() == length);
         let label = selection.label.clone();
         let selections = (0..length)
             .map(|k| {
@@ -96,6 +97,42 @@ impl ContestSelectionPreEncrypted {
         // Generate pre-encrypted votes for each possible (single) choice
         ContestSelectionPreEncrypted {
             label,
+            selections,
+            shortcode,
+            crypto_hash,
+        }
+    }
+
+    pub fn new_null(
+        device: &Device,
+        primary_nonce: &[u8],
+        contest_label: &str,
+        selection_labels: &Vec<String>,
+        null_label: &str,
+    ) -> ContestSelectionPreEncrypted {
+        let selections = (0..selection_labels.len())
+            .map(|k| {
+                let ciphertext: Ciphertext;
+                let nonce = option_nonce(
+                    device,
+                    primary_nonce,
+                    contest_label.as_bytes(),
+                    null_label.as_bytes(),
+                    selection_labels[k].as_bytes(),
+                );
+                ciphertext = device.config.election_public_key.encrypt_with(
+                    &device.election_parameters.fixed_parameters,
+                    &nonce,
+                    0,
+                );
+                ContestSelectionCiphertext { ciphertext, nonce }
+            })
+            .collect::<Vec<ContestSelectionCiphertext>>();
+
+        let crypto_hash = generate_selection_hash(&device.config, selections.as_ref());
+        let shortcode = generate_short_code(&crypto_hash);
+        ContestSelectionPreEncrypted {
+            label: "".to_string(),
             selections,
             shortcode,
             crypto_hash,

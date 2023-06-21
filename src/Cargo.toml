@@ -4,7 +4,8 @@
   "eg",
   "util",
   "preencrypted",
-  "verifier"
+  "verifier",
+  "study"
 ]
 
 [profile.release]

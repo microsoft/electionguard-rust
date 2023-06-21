@@ -88,23 +88,50 @@ impl BallotRecordingTool {
             .collect::<Vec<Vec<String>>>();
         for i in 0..ballot.get_contests().len() {
             for j in 0..ballot.get_contests()[i].selections.len() {
-                for k in 0..ballot.get_contests()[i].selections[j]
-                    .get_selections()
-                    .len()
-                {
-                    ballot.contests[i].selections[j].selections[k] = ContestSelectionCiphertext {
-                        ciphertext: ballot.get_contests()[i].get_selections()[j].get_selections()
-                            [k]
-                            .ciphertext
-                            .clone(),
-                        nonce: option_nonce(
-                            device,
-                            primary_nonce.as_ref(),
-                            ballot.get_contests()[i].label.as_bytes(),
-                            selection_labels[i][j].as_bytes(),
-                            selection_labels[i][k].as_bytes(),
-                        ),
-                    };
+                // Selection vectors corresponding to candidates
+                if j < selection_labels[i].len() {
+                    for k in 0..ballot.get_contests()[i].selections[j]
+                        .get_selections()
+                        .len()
+                    {
+                        ballot.contests[i].selections[j].selections[k] =
+                            ContestSelectionCiphertext {
+                                ciphertext: ballot.get_contests()[i].get_selections()[j]
+                                    .get_selections()[k]
+                                    .ciphertext
+                                    .clone(),
+                                nonce: option_nonce(
+                                    device,
+                                    primary_nonce.as_ref(),
+                                    ballot.get_contests()[i].label.as_bytes(),
+                                    selection_labels[i][j].as_bytes(),
+                                    selection_labels[i][k].as_bytes(),
+                                ),
+                            };
+                    }
+                }
+                // Selection vectors corresponding to null votes
+                else {
+                    for k in 0..ballot.get_contests()[i].selections[j]
+                        .get_selections()
+                        .len()
+                    {
+                        ballot.contests[i].selections[j].selections[k] =
+                            ContestSelectionCiphertext {
+                                ciphertext: ballot.get_contests()[i].get_selections()[j]
+                                    .get_selections()[k]
+                                    .ciphertext
+                                    .clone(),
+                                nonce: option_nonce(
+                                    device,
+                                    primary_nonce.as_ref(),
+                                    ballot.get_contests()[i].label.as_bytes(),
+                                    format!("null_{}", j + 1 - selection_labels[i].len())
+                                        .as_bytes(),
+                                    selection_labels[i][k].as_bytes(),
+                                ),
+                            };
+                    }
                 }
             }
         }

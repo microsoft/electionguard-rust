@@ -49,16 +49,16 @@ impl ContestSelection {
         let mut vote = vec![0u8; num_options];
 
         // TODO: Allow 0 selections
-        let selection_limit = 1 + (csprng.next_u64() as usize % selection_limit);
-        let mut changed = 0;
+        // let selection_limit = 1 + (csprng.next_u64() as usize % selection_limit);
+        // let mut changed = 0;
 
-        while changed < selection_limit {
-            let idx = csprng.next_u32() % (vote.len() as u32);
-            if vote[idx as usize] == 0 {
-                vote[idx as usize] = 1;
-                changed += 1;
-            }
-        }
+        // while changed < selection_limit {
+        //     let idx = csprng.next_u32() % (vote.len() as u32);
+        //     if vote[idx as usize] == 0 {
+        //         vote[idx as usize] = 1;
+        //         changed += 1;
+        //     }
+        // }
 
         Self { vote }
     }

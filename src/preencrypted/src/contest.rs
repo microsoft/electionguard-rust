@@ -89,7 +89,21 @@ impl ContestPreEncrypted {
             }
         }
 
-        // generate_selection also generates encrypted null selections
+        // TODO: Add encrypted vectors corresponding to null selections
+
+        for j in 0..contest.selection_limit {
+            let selection = ContestSelectionPreEncrypted::new_null(
+                device,
+                primary_nonce,
+                &contest.label,
+                &selection_labels,
+                &format!("null_{}", j + 1),
+            );
+            success &= check_shortcode(&selections, &selection);
+            if success {
+                selections.push(selection);
+            }
+        }
 
         match success {
             true => {
@@ -122,8 +136,9 @@ impl ContestPreEncrypted {
         &self,
         fixed_parameters: &FixedParameters,
         voter_selections: &[ContestSelectionPlaintext],
+        selection_limit: usize,
     ) -> Vec<ContestSelectionCiphertext> {
-        assert!(voter_selections.len() == self.selections.len());
+        assert!(voter_selections.len() + selection_limit == self.selections.len());
 
         let mut selections = <Vec<&Vec<ContestSelectionCiphertext>>>::new();
 
@@ -132,6 +147,14 @@ impl ContestPreEncrypted {
                 selections.push(&self.selections[i].selections);
             }
         }
+
+        let mut i = self.selections.len() - 1;
+        while selections.len() < selection_limit {
+            selections.push(&self.selections[i].selections);
+            i -= 1;
+        }
+
+        assert!(selections.len() == selection_limit);
 
         let mut combined_selection = selections[0].clone();
 
@@ -166,6 +189,7 @@ impl ContestPreEncrypted {
             vote: self.combine_voter_selections(
                 &device.election_parameters.fixed_parameters,
                 voter_selections,
+                selection_limit,
             ),
             crypto_hash: self.crypto_hash,
         };
