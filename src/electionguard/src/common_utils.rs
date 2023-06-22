@@ -10,11 +10,13 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use rand_core::{OsRng, RngCore};
 
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
     example_election_manifest::example_election_manifest,
 };
+use util::csprng::Csprng;
 
 use crate::artifacts_dir::{ArtifactFile, ArtifactsDir};
 
@@ -63,7 +65,10 @@ impl ElectionManifestSource {
     }
 }
 
-pub(crate) fn load_election_parameters(artifacts_dir: &ArtifactsDir) -> Result<ElectionParameters> {
+pub(crate) fn load_election_parameters(
+    artifacts_dir: &ArtifactsDir,
+    csprng: &mut Csprng,
+) -> Result<ElectionParameters> {
     let mut open_options = OpenOptions::new();
     open_options.read(true);
 
@@ -80,5 +85,24 @@ pub(crate) fn load_election_parameters(artifacts_dir: &ArtifactsDir) -> Result<E
     let election_parameters = ElectionParameters::from_bytes(&bytes)?;
     eprintln!("Election parameters loaded from: {}", path.display());
 
+    election_parameters.verify(csprng)?;
+
     Ok(election_parameters)
+}
+
+/// Read the recommended amount of seed data from the OS RNG.
+///
+/// `OsRng` is implemented by the `getrandom` crate, which describes itself as an "Interface to
+/// the operating system's random number generator."
+///
+/// On Linux, this uses the `getrandom` system call
+/// https://man7.org/linux/man-pages/man2/getrandom.2.html
+///
+/// On Windows, this uses the `BCryptGenRandom` function
+/// https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom
+///
+pub fn osrng_seed_data_for_csprng() -> [u8; Csprng::recommended_max_seed_bytes()] {
+    let mut seed_bytes = core::array::from_fn(|_i| 0);
+    OsRng.fill_bytes(&mut seed_bytes);
+    seed_bytes
 }

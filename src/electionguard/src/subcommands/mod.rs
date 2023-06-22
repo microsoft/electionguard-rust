@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+mod guardian_key_generate;
 mod none;
 mod verify_standard_parameters;
 mod write_hashes;
@@ -48,6 +49,9 @@ pub(crate) enum Subcommands {
 
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
+
+    /// Generate a guardian public and private key.
+    GuardianKeyGenerate(crate::subcommands::guardian_key_generate::GuardianKeyGenerate),
 }
 
 impl Default for Subcommands {
@@ -58,13 +62,15 @@ impl Default for Subcommands {
 
 impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
     fn from(subcommands: &'a mut Subcommands) -> Self {
+        use Subcommands::*;
         match subcommands {
-            Subcommands::None(a) => a,
-            Subcommands::WriteRandomSeed(a) => a,
-            Subcommands::VerifyStandardParameters(a) => a,
-            Subcommands::WriteManifest(a) => a,
-            Subcommands::WriteParameters(a) => a,
-            Subcommands::WriteHashes(a) => a,
+            None(a) => a,
+            WriteRandomSeed(a) => a,
+            VerifyStandardParameters(a) => a,
+            WriteManifest(a) => a,
+            WriteParameters(a) => a,
+            WriteHashes(a) => a,
+            GuardianKeyGenerate(a) => a,
         }
     }
 }

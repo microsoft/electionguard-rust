@@ -18,16 +18,92 @@ use crate::{
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hashes {
     /// Parameter base hash.
-    h_p: HValue,
+    pub h_p: HValue,
 
     /// Election manifest hash.
-    h_m: HValue,
+    pub h_m: HValue,
 
     /// Election base hash.
-    h_b: HValue,
-    //? TODO?
-    // /// Extended base hash.
-    // h_e: HValue,
+    pub h_b: HValue,
+}
+
+impl Hashes {
+    pub fn new(
+        election_parameters: &ElectionParameters,
+        election_manifest: &ElectionManifest,
+    ) -> Self {
+        // H_V = 322E302E30 ∥ b(0, 27)
+        let h_v: HValue = [
+            0x32, 0x2E, 0x30, 0x2E, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ]
+        .into();
+
+        // Computation of the parameter base hash H_P.
+        let h_p = {
+            // H_P = H(HV ; 00, p, q, g)
+
+            let mut v_pqg = vec![0x00];
+
+            for biguint in [
+                election_parameters.fixed_parameters.p.borrow(),
+                election_parameters.fixed_parameters.q.borrow(),
+                election_parameters.fixed_parameters.g.borrow(),
+            ] {
+                v_pqg.append(&mut biguint.to_bytes_be());
+            }
+
+            eg_h(&h_v, &v_pqg)
+        };
+
+        // Computation of the election manifest hash H_M.
+
+        let h_m = {
+            let mut v = vec![0x01];
+
+            let mut v_manifest_bytes = election_manifest.to_canonical_bytes();
+            v.append(&mut v_manifest_bytes);
+
+            eg_h(&h_p, &v)
+        };
+
+        // Computation of the election base hash H_B.
+
+        let h_b = {
+            let mut v = vec![0x02];
+
+            for u in [
+                election_parameters.varying_parameters.n,
+                election_parameters.varying_parameters.k,
+            ] {
+                v.extend_from_slice(&u.to_be_bytes());
+            }
+
+            for u in [
+                &election_parameters.varying_parameters.date,
+                &election_parameters.varying_parameters.info,
+            ] {
+                v.extend_from_slice(u.as_bytes());
+            }
+
+            v.extend_from_slice(h_m.as_ref());
+
+            eg_h(&h_p, &v)
+        };
+
+        Self { h_p, h_m, h_b }
+    }
+
+    /// Returns a pretty JSON `String` representation of the `Hashes`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
+    }
 }
 
 impl std::fmt::Debug for Hashes {
@@ -48,89 +124,7 @@ impl std::fmt::Display for Hashes {
     }
 }
 
-impl Hashes {
-    #[allow(dead_code)] //? TODO: Remove this
-    pub fn new(
-        election_parameters: &ElectionParameters,
-        election_manifest: &ElectionManifest,
-    ) -> Self {
-        // Computation of the parameter base hash H_P.
-        let h_p = {
-            // "B1 = 00 ∥ b(p, 512) ∥ b(q, 32) ∥ b(g, 512) ∥ b(n, 2) ∥ b(k, 2)"
-
-            let mut v_pqgnk = vec![0x00];
-
-            for biguint in [
-                election_parameters.fixed_parameters.p.borrow(),
-                election_parameters.fixed_parameters.q.borrow(),
-                election_parameters.fixed_parameters.g.borrow(),
-            ] {
-                v_pqgnk.append(&mut biguint.to_bytes_be());
-            }
-
-            for u in [
-                election_parameters.varying_parameters.n,
-                election_parameters.varying_parameters.k,
-            ] {
-                v_pqgnk.extend_from_slice(&u.to_be_bytes());
-            }
-
-            eg_h(&HValue::default(), &v_pqgnk)
-        };
-
-        // Computation of the manifest hash H_M.
-
-        let h_m = {
-            let mut v = vec![0x01];
-
-            let mut v_manifest_bytes = election_manifest.to_canonical_bytes();
-            v.append(&mut v_manifest_bytes);
-
-            eg_h(&h_p, &v)
-        };
-
-        // Computation of the base hash H_B.
-
-        let h_b = {
-            let mut v = vec![0x02];
-
-            let v_date_bytes = election_parameters.varying_parameters.date.as_bytes();
-            v.extend_from_slice(v_date_bytes);
-
-            let v_info_bytes = election_parameters.varying_parameters.info.as_bytes();
-            v.extend_from_slice(v_info_bytes);
-
-            v.extend(h_m.as_ref().iter());
-
-            eg_h(&h_p, &v)
-        };
-
-        //? TODO?
-        // // Computation of the extended base hash H_E.
-        //
-        // let h_e = {
-        //     evaluate_h(HKEY_ALL_ZEROES, &v_pqgnk) //? TODO
-        // };
-
-        Self {
-            h_p,
-            h_m,
-            h_b, //, h_e
-        }
-    }
-
-    /// Returns a pretty JSON `String` representation of the `Hashes`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
-}
-
-// Unit tests for the ElectionGuard hash.
+// Unit tests for the ElectionGuard hashes.
 #[cfg(test)]
 mod test {
     use super::*;
@@ -148,13 +142,13 @@ mod test {
         let hashes = Hashes::new(&election_parameters, &election_manifest);
 
         let expected_h_p = HValue::from(hex!(
-            "eb16f520cd4776961e1e73947f34649413b822661b992dde7f546480e20501b6"
+            "BAD5EEBFE2C98C9031BA8C36E7E4FB76DAC20665FD3621DF33F3F666BEC9AC0D"
         ));
         let expected_h_m = HValue::from(hex!(
-            "7b7cda7b05bddef7381b890a76379de4a0e193f68b9204cd2e2db8d743326ad7"
+            "12A8E00AC71EB8713F2B69AB5719A919D5DD2D2231303B829B0E894F957A323A"
         ));
         let expected_h_b = HValue::from(hex!(
-            "763b1e6ab4f82494445173861581304fa68413744764359e9984d0a4a32b22d0"
+            "3343303A11785BFDFC6A42644FADFC3CD0868BA1E0FE38416579983C6CFC7E19"
         ));
 
         assert_eq!(hashes.h_p, expected_h_p);

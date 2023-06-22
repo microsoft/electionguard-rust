@@ -31,12 +31,15 @@ pub(crate) struct WriteHashes {
 
 impl Subcommand for WriteHashes {
     fn uses_csprng(&self) -> bool {
-        false
+        true
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let mut csprng = subcommand_helper.get_csprng(b"WriteHashes")?;
+
         //? TODO: Do we need a command line arg to specify the election parameters source?
-        let election_parameters = load_election_parameters(&subcommand_helper.artifacts_dir)?;
+        let election_parameters =
+            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
 
         //? TODO: Do we need a command line arg to specify the election manifest source?
         let election_manifest_source =

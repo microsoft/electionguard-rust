@@ -5,13 +5,68 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use num_bigint::BigUint;
-use num_traits::{CheckedSub, Zero};
 use std::num::{NonZeroU64, NonZeroUsize};
 
+use num_bigint::BigUint;
+use num_traits::{CheckedSub, Zero};
+
+/// CSPRNG based on the SHA-3 extendable output function SHAKE256.
+/// Defined By
+/// NIST FIPS Pub 202 SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions
+/// https://dx.doi.org/10.6028/NIST.FIPS.202
+///
+/// SHAKE256(M, d) = KECCAK[512] (M || 1111, d)
+/// KECCAK[c] = SPONGE[KECCAK-p[1600, 24], pad10*1, 1600–c]
+/// Capacity `c` = 512 bits
+/// Rate `r` = 1088 bits
 pub struct Csprng(Box<dyn sha3::digest::XofReader>);
 
 impl Csprng {
+    /// Width of the underlying KECCAK permutation in bits.
+    /// This is the effecitve internal state size or bandwidth.
+    pub const fn permutation_bits() -> usize {
+        1600 // Defined by NIST FIPS Pub 202 SHA-3 Standard
+    }
+
+    /// Width in bits of the underlying permutation minus the rate.
+    pub const fn capacity_bits() -> usize {
+        512 // Defined by NIST FIPS Pub 202 SHA-3 Standard
+    }
+
+    /// Bits consumed or generated for each invocation of the underlying permutation.
+    pub const fn rate_bits() -> usize {
+        Csprng::permutation_bits() - Csprng::capacity_bits()
+    }
+
+    /// The effecitve internal state size or bandwidth, in bytes.
+    pub const fn permutation_bytes() -> usize {
+        Csprng::permutation_bits() / 8
+    }
+
+    /// Bytes consumed or generated for each invocation of the underlying permutation.
+    pub const fn rate_bytes() -> usize {
+        Csprng::rate_bits() / 8
+    }
+
+    /// Width of the underlying permutation minus the rate, in bytes.
+    pub const fn capacity_bytes() -> usize {
+        Csprng::capacity_bits() / 8
+    }
+
+    // The number of bytes needed to seed the entire internal state by processing the optimum
+    // number of message input blocks.
+    // But if you are planning to append more entropy or customization data to the seed data,
+    // consider just starting with `permutation_bytes()` instead.
+    pub const fn recommended_max_seed_bytes() -> usize {
+        // The number of blocks needed to completely fill the internal state.
+        let msg_blocks =
+            (Csprng::permutation_bits() + Csprng::rate_bits() - 1) / Csprng::rate_bits();
+
+        // The final message block is padded with at least 6 bits (1111 || 1 0* 1),
+        // so we take off one byte.
+        msg_blocks * Csprng::rate_bytes() - 1
+    }
+
     pub fn new(seed: &[u8]) -> Csprng {
         use sha3::digest::{ExtendableOutput, Update};
 
@@ -152,10 +207,23 @@ mod test_csprng {
     use std::num::NonZeroUsize;
 
     #[test]
-    fn test_csprng() {
-        let mut csprng = Csprng::new(b"test_csprng::test_csprng");
-        assert_eq!(csprng.next_u64(), 2923606079226974570);
-        assert_eq!(csprng.next_u8(), 54);
+    fn test_csprng_basics() {
+        // The bit quantities match the spec.
+        assert_eq!(Csprng::permutation_bits(), 1600);
+        assert_eq!(Csprng::rate_bits(), 1088);
+        assert_eq!(Csprng::capacity_bits(), 512);
+
+        // The byte quantites match the bit quantities.
+        assert_eq!(Csprng::permutation_bits(), Csprng::permutation_bytes() * 8);
+        assert_eq!(Csprng::rate_bits(), Csprng::rate_bytes() * 8);
+        assert_eq!(Csprng::capacity_bits(), Csprng::capacity_bytes() * 8);
+
+        // The recommended seed bytes is not less than the internal state.
+        assert!(Csprng::permutation_bytes() <= Csprng::recommended_max_seed_bytes());
+
+        let mut csprng = Csprng::new(b"test_csprng::test_csprng_basics");
+        assert_eq!(csprng.next_u64(), 11117081707462498600);
+        assert_eq!(csprng.next_u8(), 202);
         assert_eq!(csprng.next_bool(), true);
     }
 

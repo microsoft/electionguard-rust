@@ -12,6 +12,8 @@ pub mod example_election_parameters;
 pub mod fixed_parameters;
 pub mod hash;
 pub mod hashes;
+pub mod hashes_ext;
+pub mod joint_election_public_key;
 pub mod key;
 pub mod standard_parameters;
 pub mod varying_parameters;

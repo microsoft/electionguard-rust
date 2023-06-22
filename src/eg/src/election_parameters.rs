@@ -6,7 +6,10 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{Context, Result};
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+
+use util::csprng::Csprng;
 
 use crate::{fixed_parameters::FixedParameters, varying_parameters::VaryingParameters};
 
@@ -20,6 +23,13 @@ pub struct ElectionParameters {
 }
 
 impl ElectionParameters {
+    /// Verifies that the `ElectionParameters` meet some basic validity requirements.
+    pub fn verify(&self, csprng: &mut Csprng) -> Result<()> {
+        self.fixed_parameters.verify(csprng)?;
+        self.varying_parameters.verify()?;
+        Ok(())
+    }
+
     /// Reads an `ElectionParameters` from a byte sequence.
     pub fn from_bytes(bytes: &[u8]) -> Result<ElectionParameters> {
         serde_json::from_slice(bytes).with_context(|| "Error parsing ElectionParameters bytes")
@@ -33,5 +43,15 @@ impl ElectionParameters {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
+    }
+
+    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod p`.
+    pub fn biguint_to_be_bytes_len_p(&self, u: &BigUint) -> Vec<u8> {
+        self.fixed_parameters.biguint_to_be_bytes_len_p(u)
+    }
+
+    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod q`.
+    pub fn biguint_to_be_bytes_len_q(&self, u: &BigUint) -> Vec<u8> {
+        self.fixed_parameters.biguint_to_be_bytes_len_q(u)
     }
 }

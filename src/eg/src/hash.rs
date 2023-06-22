@@ -116,26 +116,7 @@ impl std::fmt::Display for HValue {
 impl std::fmt::Debug for HValue {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        use std::fmt::Write;
-
-        let start_ix = HValue::HVALUE_SERIALIZE_PREFIX.len();
-        let end_ix = HValue::HVALUE_SERIALIZE_LEN - HValue::HVALUE_SERIALIZE_SUFFIX.len();
-        let ascii = &self.display_as_ascii();
-        let hex_chars = &ascii.as_str()[start_ix..end_ix];
-
-        f.write_str("HValue([")?;
-
-        for (ix, hex_char) in hex_chars.chars().enumerate() {
-            if ix % 2 == 0 {
-                if ix > 0 {
-                    f.write_str(", ")?;
-                }
-                f.write_str("0x")?;
-            }
-            f.write_char(hex_char)?;
-        }
-
-        f.write_str("])")
+        std::fmt::Display::fmt(self, f)
     }
 }
 
@@ -145,25 +126,6 @@ impl Serialize for HValue {
         S: Serializer,
     {
         self.display_as_ascii().as_str().serialize(serializer)
-    }
-}
-
-#[cfg(test)]
-mod test_hvalue_std_fmt {
-    use super::*;
-
-    #[test]
-    fn test_hvalue_std_fmt() {
-        let h: HValue = std::array::from_fn(|ix| ix as u8).into();
-        eprintln!("h Debug  : {h:?}");
-        eprintln!("h Display: {h}");
-
-        let expected = "H(000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F)";
-        assert_eq!(h.to_string(), expected);
-        assert_eq!(format!("{h}"), expected);
-
-        let expected_debug = "HValue([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F])";
-        assert_eq!(format!("{h:?}"), expected_debug);
     }
 }
 
@@ -249,9 +211,30 @@ impl<'de> Deserialize<'de> for HValue {
     }
 }
 
+// ElectionGuard "H" function.
+pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
+    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
+    // to only fail on slice of incorrect size.
+    #[allow(clippy::unwrap_used)]
+    let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
+
+    AsRef::<[u8; 32]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
+}
+
 #[cfg(test)]
-mod test_hvalue_serde_json {
+mod test_eg_h {
     use super::*;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_hvalue_std_fmt() {
+        let h: HValue = std::array::from_fn(|ix| ix as u8).into();
+
+        let expected = "H(000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F)";
+        assert_eq!(h.to_string(), expected);
+        assert_eq!(format!("{h}"), expected);
+        assert_eq!(format!("{h:?}"), expected);
+    }
 
     #[test]
     fn test_hvalue_serde_json() {
@@ -265,23 +248,6 @@ mod test_hvalue_serde_json {
         let h2: HValue = serde_json::from_str(&json).unwrap();
         assert_eq!(h2, h);
     }
-}
-
-// ElectionGuard "H" function.
-pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
-    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
-    // to only fail on slice of incorrect size.
-    #[allow(clippy::unwrap_used)]
-    let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
-
-    AsRef::<[u8; 32]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
-}
-
-#[cfg(test)]
-mod test_eg_h {
-    use std::str::FromStr;
-
-    use super::*;
 
     #[test]
     fn test_evaluate_h() {
