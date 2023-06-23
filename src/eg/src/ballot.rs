@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::{
@@ -9,7 +10,6 @@ use crate::{
     device::Device,
     election_manifest::ElectionManifest,
     hash::HValue,
-    key::PublicKey,
     voter::{VoterChallengeCode, VoterConfirmationCode},
 };
 
@@ -48,29 +48,34 @@ pub struct BallotDecrypted {
     pub confirmation_code: HValue,
 }
 
-/// Configuration for generating encrypted ballots.
-#[derive(Clone)]
-pub struct BallotConfig {
-    /// Election manifest
-    pub manifest: ElectionManifest,
-    // ballot_style: BallotStyle,
-    /// Election public key
-    pub election_public_key: PublicKey,
+// /// Configuration for generating encrypted ballots.
+// #[derive(Clone)]
+// pub struct BallotConfig {
+//     /// Election manifest
+//     pub manifest: ElectionManifest,
+//     // ballot_style: BallotStyle,
+//     /// Election public key
+//     pub election_public_key: PublicKey,
 
-    /// Whether to encrypt the nonce with the election public key
-    // pub encrypt_nonce: bool,
+//     /// Whether to encrypt the nonce with the election public key
+//     // pub encrypt_nonce: bool,
 
-    /// Election extended base hash
-    pub h_e: HValue,
-}
+//     /// Election extended base hash
+//     pub h_e: HValue,
+// }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A ballot style is an ordered list of contest labels.
 pub struct BallotStyle(pub Vec<String>);
 
 impl BallotDecrypted {
-    pub fn new_pick_random(config: &BallotConfig, csprng: &mut Csprng, label: String) -> Self {
+    pub fn new_pick_random(
+        manifest: &ElectionManifest,
+        csprng: &mut Csprng,
+        label: String,
+    ) -> Self {
         let mut contests = Vec::new();
-        for contest in &config.manifest.contests {
+        for contest in &manifest.contests {
             contests.push(ContestSelection::new_pick_random(
                 csprng,
                 contest.selection_limit,
@@ -100,38 +105,32 @@ impl BallotEncrypted {
                 device,
                 csprng,
                 primary_nonce,
-                &device.config.manifest.contests[i],
+                &device.header.manifest.contests[i],
                 selection,
             ));
         }
 
-        let confirmation_code = encrypted(&device.config, &contests, &vec![0u8; 32]);
+        let confirmation_code = encrypted(&device.header.hashes.h_e, &contests, &vec![0u8; 32]);
         BallotEncrypted {
             label: String::new(),
             contests,
             confirmation_code,
-            date: device.election_parameters.varying_parameters.date.clone(),
+            date: device.header.parameters.varying_parameters.date.clone(),
             device: device.uuid.clone(),
         }
     }
 
-    pub fn confirmation_code_qr(&self, device: &Device, dir_path: &Path) {
-        VoterConfirmationCode::new_as_file(
-            &device.config,
-            dir_path,
-            self.confirmation_code.as_ref(),
-        );
+    pub fn confirmation_code_qr(&self, dir_path: &Path) {
+        VoterConfirmationCode::new_as_file(dir_path, self.confirmation_code.as_ref());
     }
 
     pub fn verification_code_qr(
         &self,
-        device: &Device,
         voter_ballot: &BallotDecrypted,
         primary_nonce: &[u8],
         dir_path: &Path,
     ) {
         VoterChallengeCode::new_as_file(
-            &device.config,
             dir_path,
             primary_nonce,
             self.confirmation_code.as_ref(),

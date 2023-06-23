@@ -11,7 +11,7 @@ use util::{
 };
 
 use crate::{
-    device::Device,
+    election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
     key::Ciphertext,
@@ -23,7 +23,7 @@ pub struct ProofRange {
     pub v: Vec<BigUint>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProofGuardian {
     pub c: Vec<BigUint>,
     pub v: Vec<BigUint>,
@@ -55,14 +55,14 @@ impl Serialize for ProofRange {
 
 impl ProofRange {
     pub fn challenge(
-        device: &Device,
+        header: &ElectionRecordHeader,
         ct: &Ciphertext,
         a: &Vec<BigUint>,
         b: &Vec<BigUint>,
     ) -> BigUint {
         let mut v = vec![0x21];
 
-        v.extend_from_slice(device.config.election_public_key.0.to_bytes_be().as_slice());
+        v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
         v.extend_from_slice(ct.alpha.to_bytes_be().as_slice());
         v.extend_from_slice(ct.beta.to_bytes_be().as_slice());
 
@@ -74,13 +74,12 @@ impl ProofRange {
         });
 
         // Equation 25
-        let c = eg_h(&device.config.h_e, &v);
-        BigUint::from_bytes_be(c.0.as_slice())
-            % device.election_parameters.fixed_parameters.q.as_ref()
+        let c = eg_h(&header.hashes.h_e, &v);
+        BigUint::from_bytes_be(c.0.as_slice()) % header.parameters.fixed_parameters.q.as_ref()
     }
 
     pub fn new(
-        device: &Device,
+        header: &ElectionRecordHeader,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
         nonce: &BigUint,
@@ -100,10 +99,11 @@ impl ProofRange {
 
         let a = (0..big_l + 1)
             .map(|j| {
-                device.election_parameters.fixed_parameters.g.modpow(
-                    &u[j].elem,
-                    device.election_parameters.fixed_parameters.p.borrow(),
-                )
+                header
+                    .parameters
+                    .fixed_parameters
+                    .g
+                    .modpow(&u[j].elem, header.parameters.fixed_parameters.p.borrow())
             })
             .collect();
 
@@ -116,14 +116,14 @@ impl ProofRange {
 
         let b = (0..big_l + 1)
             .map(|j| {
-                device.config.election_public_key.0.modpow(
-                    &t[j].elem,
-                    device.election_parameters.fixed_parameters.p.borrow(),
-                )
+                header
+                    .public_key
+                    .0
+                    .modpow(&t[j].elem, header.parameters.fixed_parameters.p.borrow())
             })
             .collect();
 
-        match ZMulPrimeElem::try_new(zmulq.clone(), ProofRange::challenge(device, &ct, &a, &b)) {
+        match ZMulPrimeElem::try_new(zmulq.clone(), ProofRange::challenge(header, &ct, &a, &b)) {
             Some(challenge) => {
                 c[small_l] = challenge;
                 for j in 0..big_l + 1 {
@@ -145,19 +145,20 @@ impl ProofRange {
     }
 
     /// Verification 4 (TODO: Complete)
-    pub fn verify(&self, device: &Device, ct: &Ciphertext, big_l: usize) -> bool {
-        let zmulq = ZMulPrime::new(device.election_parameters.fixed_parameters.q.clone());
+    pub fn verify(&self, header: &ElectionRecordHeader, ct: &Ciphertext, big_l: usize) -> bool {
+        let zmulq = ZMulPrime::new(header.parameters.fixed_parameters.q.clone());
         let zmulq = Rc::new(zmulq);
 
         let a = (0..big_l + 1)
             .map(|j| {
-                (device.election_parameters.fixed_parameters.g.modpow(
-                    &self.v[j],
-                    device.election_parameters.fixed_parameters.p.borrow(),
-                ) * ct.alpha.modpow(
-                    &self.c[j],
-                    device.election_parameters.fixed_parameters.p.borrow(),
-                )) % device.election_parameters.fixed_parameters.p.as_ref()
+                (header
+                    .parameters
+                    .fixed_parameters
+                    .g
+                    .modpow(&self.v[j], header.parameters.fixed_parameters.p.borrow())
+                    * ct.alpha
+                        .modpow(&self.c[j], header.parameters.fixed_parameters.p.borrow()))
+                    % header.parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
@@ -176,24 +177,24 @@ impl ProofRange {
 
         let b = (0..big_l + 1)
             .map(|j| {
-                (device.config.election_public_key.0.modpow(
-                    &w[j].elem,
-                    device.election_parameters.fixed_parameters.p.borrow(),
-                ) * ct.beta.modpow(
-                    &self.c[j],
-                    device.election_parameters.fixed_parameters.p.borrow(),
-                )) % device.election_parameters.fixed_parameters.p.as_ref()
+                (header
+                    .public_key
+                    .0
+                    .modpow(&w[j].elem, header.parameters.fixed_parameters.p.borrow())
+                    * ct.beta
+                        .modpow(&self.c[j], header.parameters.fixed_parameters.p.borrow()))
+                    % header.parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
-        match ZMulPrimeElem::try_new(zmulq.clone(), Self::challenge(device, ct, &a, &b)) {
+        match ZMulPrimeElem::try_new(zmulq.clone(), Self::challenge(header, ct, &a, &b)) {
             Some(c) => {
                 let mut rhs = BigUint::from(0u8);
                 for c_i in self.c.iter() {
                     rhs += c_i;
                 }
 
-                rhs = rhs % device.election_parameters.fixed_parameters.q.as_ref();
+                rhs = rhs % header.parameters.fixed_parameters.q.as_ref();
 
                 match ZMulPrimeElem::try_new(zmulq.clone(), rhs) {
                     Some(rhs) => c.elem == rhs.elem,

@@ -1,26 +1,18 @@
-use crate::{ballot::BallotConfig, election_parameters::ElectionParameters};
+use crate::election_record::ElectionRecordHeader;
 
 pub struct Device {
     /// Unique identifier of the device
     pub uuid: String,
 
-    /// Ballot configuration
-    pub config: BallotConfig,
-
-    /// Election Parameters
-    pub election_parameters: ElectionParameters,
+    /// Election record header
+    pub header: ElectionRecordHeader,
 }
 
 impl Device {
-    pub fn new(
-        uuid: String,
-        config: &BallotConfig,
-        election_parameters: &ElectionParameters,
-    ) -> Self {
+    pub fn new(uuid: &str, header: ElectionRecordHeader) -> Self {
         Device {
-            uuid,
-            config: config.clone(),
-            election_parameters: election_parameters.clone(),
+            uuid: uuid.to_string(),
+            header: header,
         }
     }
 

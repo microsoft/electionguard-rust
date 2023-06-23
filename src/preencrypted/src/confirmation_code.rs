@@ -1,7 +1,4 @@
-use eg::{
-    ballot::BallotConfig,
-    hash::{eg_h, HValue},
-};
+use eg::hash::{eg_h, HValue};
 
 use crate::contest::ContestPreEncrypted;
 
@@ -10,7 +7,7 @@ use crate::contest::ContestPreEncrypted;
 /// H(B) = H(H_E;42,χ_1,χ_2,...,χ_m ,B_aux)
 ///
 pub fn confirmation_code(
-    config: &BallotConfig,
+    h_e: &HValue,
     contests: &Vec<ContestPreEncrypted>,
     b_aux: &[u8],
 ) -> HValue {
@@ -21,5 +18,5 @@ pub fn confirmation_code(
     });
 
     v.extend_from_slice(b_aux);
-    eg_h(&config.h_e, &v)
+    eg_h(&h_e, &v)
 }

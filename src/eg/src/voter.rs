@@ -5,7 +5,7 @@ use qrcode::{render::svg, QrCode};
 use serde::Serialize;
 use util::integer_util::round_to_next_multiple;
 
-use crate::{ballot::BallotConfig, contest_selection::ContestSelection};
+use crate::contest_selection::ContestSelection;
 
 #[derive(Debug, Serialize)]
 pub struct VoterChallengeCode {
@@ -20,6 +20,13 @@ pub struct VoterChallengeCode {
 pub struct VoterConfirmationCode {
     // Base 64 encoded ballot confirmation code
     pub cc: String,
+}
+
+pub fn generate_qr(data: &[u8]) -> QrCode {
+    match QrCode::new(data) {
+        Ok(qr) => qr,
+        Err(e) => panic!("Error generating QR code: {}", e),
+    }
 }
 
 impl VoterChallengeCode {
@@ -56,13 +63,7 @@ impl VoterChallengeCode {
         ret
     }
 
-    pub fn new_as_file(
-        config: &BallotConfig,
-        dir_path: &Path,
-        pn: &[u8],
-        cc: &[u8],
-        vs: &Vec<ContestSelection>,
-    ) {
+    pub fn new_as_file(dir_path: &Path, pn: &[u8], cc: &[u8], vs: &Vec<ContestSelection>) {
         let code_data = Self {
             pn: general_purpose::URL_SAFE_NO_PAD.encode(pn),
             vs: Self::encode_selections(vs),
@@ -86,18 +87,32 @@ impl VoterChallengeCode {
 }
 
 impl VoterConfirmationCode {
-    pub fn new_as_file(config: &BallotConfig, dir_path: &Path, cc: &[u8]) {
+    pub fn to_string(&self) -> Option<String> {
+        match serde_json::to_string(self) {
+            Ok(s) => Some(s),
+            Err(_) => None,
+        }
+    }
+
+    pub fn new_as_file(dir_path: &Path, cc: &[u8]) -> bool {
         let code_data = Self {
             cc: general_purpose::URL_SAFE_NO_PAD.encode(cc),
         };
-        let code = QrCode::new(serde_json::to_string(&code_data).unwrap().as_bytes()).unwrap();
+        let code: QrCode;
+        match code_data.to_string() {
+            Some(c) => code = generate_qr(c.as_bytes()),
+            None => return false,
+        }
         let image = code
             .render()
             .min_dimensions(300, 300)
             .dark_color(svg::Color("#000000"))
             .light_color(svg::Color("#ffffff"))
             .build();
-        fs::write(dir_path.join(format!("CC-{}.svg", code_data.cc)), image).unwrap();
+        match fs::write(dir_path.join(format!("CC-{}.svg", code_data.cc)), image) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use eg::election_record::ElectionRecordHeader;
 use eg::hash::HValue;
 use util::logging::Logging;
 
@@ -16,57 +17,40 @@ pub struct BallotRecordingTool {}
 
 impl BallotRecordingTool {
     pub fn verify_ballot(
-        device: &Device,
+        header: &ElectionRecordHeader,
         ballot: &BallotPreEncrypted,
         primary_nonce: &HValue,
     ) -> bool {
-        // let mut primary_nonce = Vec::new();
-        // Logging::log(
-        //     "BallotRecordingTool",
-        //     &format!("Primary Nonce\t{}", primary_nonce_str),
-        //     line!(),
-        //     file!(),
-        // );
-        // match BigUint::from_str_radix(primary_nonce_str, 16) {
-        //     Ok(nonce) => primary_nonce.extend_from_slice(nonce.to_bytes_be().as_slice()),
-        //     Err(e) => {
-        //         Logging::log(
-        //             "BallotRecordingTool",
-        //             &format!("Error parsing primary nonce: {} {:?}", e, primary_nonce_str),
-        //             line!(),
-        //             file!(),
-        //         );
+        let regenerated_ballot = BallotPreEncrypted::new_with(header, &primary_nonce.0);
+        if ballot.get_confirmation_code() == regenerated_ballot.get_confirmation_code() {
+            return BallotRecordingTool::verify_ballot_contests(
+                &header.parameters.fixed_parameters,
+                ballot.get_contests(),
+                regenerated_ballot.get_contests(),
+            );
+        } else {
+            Logging::log(
+                "BallotRecordingTool",
+                &format!(
+                    "Ballot crypto hash mismatch {} {}.",
+                    ballot.get_confirmation_code(),
+                    regenerated_ballot.get_confirmation_code()
+                ),
+                line!(),
+                file!(),
+            );
+            return false;
+        }
+
+        // match BallotPreEncrypted::new_with(header, &primary_nonce.0) {
+        //     Some(regenerated_ballot) => {
+
+        //     }
+        //     None => {
+        //         println!("Error regenerating ballot.");
         //         return false;
         //     }
-        // };
-
-        match BallotPreEncrypted::try_new_with(device, &primary_nonce.0) {
-            Some(regenerated_ballot) => {
-                if *ballot.get_confirmation_code() == *regenerated_ballot.get_confirmation_code() {
-                    return BallotRecordingTool::verify_ballot_contests(
-                        &device.election_parameters.fixed_parameters,
-                        ballot.get_contests(),
-                        regenerated_ballot.get_contests(),
-                    );
-                } else {
-                    Logging::log(
-                        "BallotRecordingTool",
-                        &format!(
-                            "Ballot crypto hash mismatch {} {}.",
-                            ballot.get_confirmation_code(),
-                            regenerated_ballot.get_confirmation_code()
-                        ),
-                        line!(),
-                        file!(),
-                    );
-                    return false;
-                }
-            }
-            None => {
-                println!("Error regenerating ballot.");
-                return false;
-            }
-        }
+        // }
     }
 
     pub fn regenerate_nonces(
@@ -75,7 +59,7 @@ impl BallotRecordingTool {
         primary_nonce: &HValue,
     ) {
         let selection_labels = device
-            .config
+            .header
             .manifest
             .contests
             .iter()
@@ -101,7 +85,7 @@ impl BallotRecordingTool {
                                     .ciphertext
                                     .clone(),
                                 nonce: option_nonce(
-                                    device,
+                                    &device.header,
                                     primary_nonce.as_ref(),
                                     ballot.get_contests()[i].label.as_bytes(),
                                     selection_labels[i][j].as_bytes(),
@@ -123,7 +107,7 @@ impl BallotRecordingTool {
                                     .ciphertext
                                     .clone(),
                                 nonce: option_nonce(
-                                    device,
+                                    &device.header,
                                     primary_nonce.as_ref(),
                                     ballot.get_contests()[i].label.as_bytes(),
                                     format!("null_{}", j + 1 - selection_labels[i].len())
@@ -154,7 +138,11 @@ impl BallotRecordingTool {
                     &format!(
                         "    Ballot correctness / {}: {:?}",
                         j,
-                        proof.verify(device, &contest.selection.vote[j].ciphertext, 1 as usize,)
+                        proof.verify(
+                            &device.header,
+                            &contest.selection.vote[j].ciphertext,
+                            1 as usize,
+                        )
                     ),
                     line!(),
                     file!(),
@@ -167,13 +155,13 @@ impl BallotRecordingTool {
                 &format!(
                     "    Selection limit: {:?}",
                     contest.get_proof_selection_limit().verify(
-                        device,
+                        &device.header,
                         &ContestEncrypted::sum_selection_vector(
-                            &device.election_parameters.fixed_parameters,
+                            &device.header.parameters.fixed_parameters,
                             &contest.selection.vote
                         )
                         .ciphertext,
-                        device.config.manifest.contests[i].selection_limit,
+                        device.header.manifest.contests[i].selection_limit,
                     )
                 ),
                 line!(),
@@ -289,9 +277,9 @@ impl BallotRecordingTool {
         for (i, contest_selection) in selections.iter().enumerate() {
             for (j, vote) in contest_selection.iter().enumerate() {
                 if !proofs[i][j].verify(
-                    device,
+                    &device.header,
                     &vote.ciphertext,
-                    device.config.manifest.contests[i].selection_limit,
+                    device.header.manifest.contests[i].selection_limit,
                 ) {
                     return false;
                 };

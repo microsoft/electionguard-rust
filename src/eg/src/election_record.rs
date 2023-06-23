@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     ballot::{BallotDecrypted, BallotEncrypted},
@@ -14,7 +13,7 @@ use crate::{
 };
 
 /// The header of the election record, generated before the election begins.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ElectionRecordHeader {
     /// The election manifest
     pub manifest: ElectionManifest,
@@ -30,7 +29,7 @@ pub struct ElectionRecordHeader {
     pub guardian_proofs: Vec<ProofGuardian>,
 
     /// The election public key
-    public_key: PublicKey,
+    pub public_key: PublicKey,
 }
 
 /// The body of the election record, generated after the election is complete.

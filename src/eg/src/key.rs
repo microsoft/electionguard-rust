@@ -14,7 +14,6 @@ use num_bigint::BigUint;
 use num_traits::{Num, One};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::contest_selection::ContestSelectionCiphertext;
 use crate::fixed_parameters::FixedParameters;

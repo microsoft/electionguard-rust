@@ -1,4 +1,4 @@
-use eg::{device::Device, hash::eg_h};
+use eg::{election_record::ElectionRecordHeader, hash::eg_h};
 use num_bigint::BigUint;
 
 // impl Nonce {
@@ -7,7 +7,7 @@ use num_bigint::BigUint;
 /// ξ_(i,j,k) = H(H_E;43,ξ,Λ_i,λ_j,λ_k) mod q
 ///
 pub fn option_nonce(
-    device: &Device,
+    header: &ElectionRecordHeader,
     primary_nonce: &[u8],
     label_i: &[u8],
     label_j: &[u8],
@@ -20,7 +20,6 @@ pub fn option_nonce(
     v.extend_from_slice(label_j);
     v.extend_from_slice(label_k);
 
-    let nonce = eg_h(&device.config.h_e, &v);
-    BigUint::from_bytes_be(nonce.0.as_slice())
-        % device.election_parameters.fixed_parameters.q.as_ref()
+    let nonce = eg_h(&header.hashes.h_e, &v);
+    BigUint::from_bytes_be(nonce.0.as_slice()) % header.parameters.fixed_parameters.q.as_ref()
 }

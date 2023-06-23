@@ -6,6 +6,7 @@ use eg::{
         ContestSelectionCiphertext, ContestSelectionEncrypted, ContestSelectionPlaintext,
     },
     device::Device,
+    election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::HValue,
     nizk::ProofRange,
@@ -61,11 +62,11 @@ impl ContestPreEncrypted {
         }
     }
 
-    pub fn try_new(
-        device: &Device,
+    pub fn new(
+        header: &ElectionRecordHeader,
         primary_nonce: &[u8],
         contest: &Contest,
-    ) -> Option<ContestPreEncrypted> {
+    ) -> ContestPreEncrypted {
         let mut success = true;
         let mut selections = <Vec<ContestSelectionPreEncrypted>>::new();
         let selection_labels = contest
@@ -75,7 +76,7 @@ impl ContestPreEncrypted {
             .collect::<Vec<String>>();
         for j in 0..contest.options.len() {
             let selection = ContestSelectionPreEncrypted::new(
-                device,
+                header,
                 primary_nonce,
                 &contest.options[j],
                 &contest.label,
@@ -83,51 +84,58 @@ impl ContestPreEncrypted {
                 j,
                 selection_labels.len(),
             );
-            success &= check_shortcode(&selections, &selection);
-            if success {
-                selections.push(selection);
-            }
+            selections.push(selection);
+            // success &= check_shortcode(&selections, &selection);
+            // if success {
+            //     selections.push(selection);
+            // }
         }
-
-        // TODO: Add encrypted vectors corresponding to null selections
 
         for j in 0..contest.selection_limit {
             let selection = ContestSelectionPreEncrypted::new_null(
-                device,
+                header,
                 primary_nonce,
                 &contest.label,
                 &selection_labels,
                 &format!("null_{}", j + 1),
             );
-            success &= check_shortcode(&selections, &selection);
-            if success {
-                selections.push(selection);
-            }
+            selections.push(selection);
+            // success &= check_shortcode(&selections, &selection);
+            // if success {
+            //     selections.push(selection);
+            // }
         }
 
-        match success {
-            true => {
-                let crypto_hash = contest_hash(&device.config, &contest.label, &selections);
+        // match success {
+        //     true => {
+        //         let crypto_hash = contest_hash(header, &contest.label, &selections);
 
-                Some(ContestPreEncrypted {
-                    label: contest.label.clone(),
-                    selections,
-                    crypto_hash,
-                })
-            }
-            false => None,
+        //         Some(ContestPreEncrypted {
+        //             label: contest.label.clone(),
+        //             selections,
+        //             crypto_hash,
+        //         })
+        //     }
+        //     false => None,
+        // }
+
+        let crypto_hash = contest_hash(header, &contest.label, &selections);
+        ContestPreEncrypted {
+            label: contest.label.clone(),
+            selections,
+            crypto_hash,
         }
     }
 
     pub fn proof_ballot_correctness(
         &self,
-        device: &Device,
+        header: &ElectionRecordHeader,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
     ) -> Vec<Vec<ProofRange>> {
         let mut proofs = <Vec<Vec<ProofRange>>>::new();
         for (i, selection) in self.selections.iter().enumerate() {
-            proofs.push(selection.proof_ballot_correctness(device, csprng, i, zmulq.clone()));
+            proofs.push(selection.proof_ballot_correctness(header, csprng, i, zmulq.clone()));
         }
         proofs
     }
@@ -182,12 +190,12 @@ impl ContestPreEncrypted {
         selection_limit: usize,
     ) -> ContestEncrypted {
         let zmulq = Rc::new(ZMulPrime::new(
-            device.election_parameters.fixed_parameters.q.clone(),
+            device.header.parameters.fixed_parameters.q.clone(),
         ));
 
         let selection = ContestSelectionEncrypted {
             vote: self.combine_voter_selections(
-                &device.election_parameters.fixed_parameters,
+                &device.header.parameters.fixed_parameters,
                 voter_selections,
                 selection_limit,
             ),
@@ -199,12 +207,17 @@ impl ContestPreEncrypted {
             .iter()
             .enumerate()
             .map(|(i, x)| {
-                x.proof_ballot_correctness(device, csprng, voter_selections[i] == 1, zmulq.clone())
+                x.proof_ballot_correctness(
+                    &device.header,
+                    csprng,
+                    voter_selections[i] == 1,
+                    zmulq.clone(),
+                )
             })
             .collect();
         let num_selections: u8 = voter_selections.iter().sum();
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
-            device,
+            &device.header,
             csprng,
             zmulq.clone(),
             &selection.vote,

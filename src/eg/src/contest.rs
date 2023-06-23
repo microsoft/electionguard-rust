@@ -1,21 +1,17 @@
-use core::num;
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
-use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     contest_hash,
     contest_selection::{ContestSelection, ContestSelectionCiphertext, ContestSelectionEncrypted},
     device::Device,
+    election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::HValue,
     nizk::ProofRange,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BallotStyle(pub String);
 
 /// A contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,21 +62,26 @@ impl ContestEncrypted {
         pt_vote: &ContestSelection,
     ) -> ContestEncrypted {
         let selection = ContestSelectionEncrypted::new(device, primary_nonce, contest, pt_vote);
-        let crypto_hash = contest_hash::encrypted(&device.config, &contest.label, &selection.vote);
+        let crypto_hash = contest_hash::encrypted(&device.header, &contest.label, &selection.vote);
         let zmulq = Rc::new(ZMulPrime::new(
-            device.election_parameters.fixed_parameters.q.clone(),
+            device.header.parameters.fixed_parameters.q.clone(),
         ));
         let proof_ballot_correctness = selection
             .vote
             .iter()
             .enumerate()
             .map(|(i, x)| {
-                x.proof_ballot_correctness(device, csprng, pt_vote.vote[i] == 1u8, zmulq.clone())
+                x.proof_ballot_correctness(
+                    &device.header,
+                    csprng,
+                    pt_vote.vote[i] == 1u8,
+                    zmulq.clone(),
+                )
             })
             .collect();
         let num_selections: u8 = pt_vote.vote.iter().sum();
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
-            device,
+            &device.header,
             csprng,
             zmulq.clone(),
             &selection.vote,
@@ -105,7 +106,7 @@ impl ContestEncrypted {
     }
 
     pub fn proof_selection_limit(
-        device: &Device,
+        header: &ElectionRecordHeader,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
         selection: &Vec<ContestSelectionCiphertext>,
@@ -113,9 +114,9 @@ impl ContestEncrypted {
         selection_limit: usize,
     ) -> ProofRange {
         let combined_selection =
-            Self::sum_selection_vector(&device.election_parameters.fixed_parameters, selection);
+            Self::sum_selection_vector(&header.parameters.fixed_parameters, selection);
         ProofRange::new(
-            device,
+            header,
             csprng,
             zmulq,
             &combined_selection.nonce,

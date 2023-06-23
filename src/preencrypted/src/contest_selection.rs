@@ -1,9 +1,8 @@
 use std::rc::Rc;
 
 use eg::{
-    ballot::BallotConfig, contest::ContestOption, contest_selection::ContestSelectionCiphertext,
-    device::Device, fixed_parameters::FixedParameters, hash::HValue, key::Ciphertext,
-    nizk::ProofRange,
+    contest::ContestOption, contest_selection::ContestSelectionCiphertext, device::Device,
+    election_record::ElectionRecordHeader, hash::HValue, key::Ciphertext, nizk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
@@ -52,7 +51,7 @@ impl ContestSelectionPreEncrypted {
     ) {
         for k in 0..self.selections.len() {
             self.selections[k].nonce = option_nonce(
-                device,
+                &device.header,
                 primary_nonce,
                 contest_label.as_bytes(),
                 selection_labels[j].as_bytes(),
@@ -62,7 +61,7 @@ impl ContestSelectionPreEncrypted {
     }
 
     pub fn new(
-        device: &Device,
+        header: &ElectionRecordHeader,
         primary_nonce: &[u8],
         selection: &ContestOption,
         contest_label: &String,
@@ -76,14 +75,14 @@ impl ContestSelectionPreEncrypted {
             .map(|k| {
                 let ciphertext: Ciphertext;
                 let nonce = option_nonce(
-                    device,
+                    header,
                     primary_nonce,
                     contest_label.as_bytes(),
                     selection_labels[j].as_bytes(),
                     selection_labels[k].as_bytes(),
                 );
-                ciphertext = device.config.election_public_key.encrypt_with(
-                    &device.election_parameters.fixed_parameters,
+                ciphertext = header.public_key.encrypt_with(
+                    &header.parameters.fixed_parameters,
                     &nonce,
                     (j == k) as usize,
                 );
@@ -91,7 +90,7 @@ impl ContestSelectionPreEncrypted {
             })
             .collect::<Vec<ContestSelectionCiphertext>>();
 
-        let crypto_hash = generate_selection_hash(&device.config, selections.as_ref());
+        let crypto_hash = generate_selection_hash(&header, selections.as_ref());
         let shortcode = generate_short_code(&crypto_hash);
 
         // Generate pre-encrypted votes for each possible (single) choice
@@ -104,7 +103,7 @@ impl ContestSelectionPreEncrypted {
     }
 
     pub fn new_null(
-        device: &Device,
+        header: &ElectionRecordHeader,
         primary_nonce: &[u8],
         contest_label: &str,
         selection_labels: &Vec<String>,
@@ -114,22 +113,21 @@ impl ContestSelectionPreEncrypted {
             .map(|k| {
                 let ciphertext: Ciphertext;
                 let nonce = option_nonce(
-                    device,
+                    header,
                     primary_nonce,
                     contest_label.as_bytes(),
                     null_label.as_bytes(),
                     selection_labels[k].as_bytes(),
                 );
-                ciphertext = device.config.election_public_key.encrypt_with(
-                    &device.election_parameters.fixed_parameters,
-                    &nonce,
-                    0,
-                );
+                ciphertext =
+                    header
+                        .public_key
+                        .encrypt_with(&header.parameters.fixed_parameters, &nonce, 0);
                 ContestSelectionCiphertext { ciphertext, nonce }
             })
             .collect::<Vec<ContestSelectionCiphertext>>();
 
-        let crypto_hash = generate_selection_hash(&device.config, selections.as_ref());
+        let crypto_hash = generate_selection_hash(header, selections.as_ref());
         let shortcode = generate_short_code(&crypto_hash);
         ContestSelectionPreEncrypted {
             label: "".to_string(),
@@ -141,7 +139,7 @@ impl ContestSelectionPreEncrypted {
 
     pub fn proof_ballot_correctness(
         &self,
-        device: &Device,
+        header: &ElectionRecordHeader,
         csprng: &mut Csprng,
         sequence_order: usize,
         zmulq: Rc<ZMulPrime>,
@@ -149,7 +147,7 @@ impl ContestSelectionPreEncrypted {
         let mut proofs = <Vec<ProofRange>>::new();
         for (i, selection) in self.selections.iter().enumerate() {
             proofs.push(selection.proof_ballot_correctness(
-                device,
+                header,
                 csprng,
                 sequence_order == i,
                 zmulq.clone(),

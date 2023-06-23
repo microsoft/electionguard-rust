@@ -6,7 +6,7 @@ use util::{
     logging::Logging,
 };
 
-use eg::{device::Device, hash::HValue};
+use eg::{device::Device, election_record::ElectionRecordHeader, hash::HValue};
 
 use crate::ballot::BallotPreEncrypted;
 
@@ -24,69 +24,74 @@ pub struct BallotListPreEncrypted {
 }
 
 impl BallotListPreEncrypted {
-    fn print_ballot(i: usize, ballot: &BallotPreEncrypted, primary_nonce: &str) {
-        let tag = "Pre-Encrypted";
-        Logging::log(tag, &format!("Ballot {}", i), line!(), file!());
-        Logging::log(tag, "  Primary Nonce", line!(), file!());
-        Logging::log(tag, &format!("    {}", primary_nonce), line!(), file!());
-        Logging::log(tag, "  Confirmation Code", line!(), file!());
-        Logging::log(
-            tag,
-            &format!("    {}", ballot.get_confirmation_code()),
-            line!(),
-            file!(),
-        );
-        Logging::log(tag, "  Contests", line!(), file!());
-        ballot.get_contests().iter().for_each(|c| {
-            Logging::log(
-                tag,
-                &format!("    {}", c.crypto_hash.to_string()),
-                line!(),
-                file!(),
-            );
-        });
-    }
-    pub fn new(device: &Device, csprng: &mut Csprng, path: &Path, num_ballots: usize) -> Self {
-        // let mut ballot_list: Self;
-        let mut ballots = Vec::with_capacity(num_ballots);
-        let mut primary_nonces = Vec::with_capacity(num_ballots);
-        let label: String;
-        match SystemTime::now().duration_since(UNIX_EPOCH) {
-            Ok(n) => {
-                label = format!("{}", n.as_secs());
-            }
-            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-        }
-        let path = path.join(label.clone());
-        fs::create_dir_all(&path).unwrap();
-        let mut confirmation_codes = Vec::with_capacity(num_ballots);
+    // fn print_ballot(i: usize, ballot: &BallotPreEncrypted, primary_nonce: &str) {
+    //     let tag = "Pre-Encrypted";
+    //     Logging::log(tag, &format!("Ballot {}", i), line!(), file!());
+    //     Logging::log(tag, "  Primary Nonce", line!(), file!());
+    //     Logging::log(tag, &format!("    {}", primary_nonce), line!(), file!());
+    //     Logging::log(tag, "  Confirmation Code", line!(), file!());
+    //     Logging::log(
+    //         tag,
+    //         &format!("    {}", ballot.get_confirmation_code()),
+    //         line!(),
+    //         file!(),
+    //     );
+    //     Logging::log(tag, "  Contests", line!(), file!());
+    //     ballot.get_contests().iter().for_each(|c| {
+    //         Logging::log(
+    //             tag,
+    //             &format!("    {}", c.crypto_hash.to_string()),
+    //             line!(),
+    //             file!(),
+    //         );
+    //     });
+    // }
+    // pub fn new(
+    //     header: &ElectionRecordHeader,
+    //     csprng: &mut Csprng,
+    //     path: &Path,
+    //     num_ballots: usize,
+    // ) -> Self {
+    //     // let mut ballot_list: Self;
+    //     let mut ballots = Vec::with_capacity(num_ballots);
+    //     let mut primary_nonces = Vec::with_capacity(num_ballots);
+    //     let label: String;
+    //     match SystemTime::now().duration_since(UNIX_EPOCH) {
+    //         Ok(n) => {
+    //             label = format!("{}", n.as_secs());
+    //         }
+    //         Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+    //     }
+    //     let path = path.join(label.clone());
+    //     fs::create_dir_all(&path).unwrap();
+    //     let mut confirmation_codes = Vec::with_capacity(num_ballots);
 
-        for b_idx in 0..num_ballots {
-            let (ballot, primary_nonce) = BallotPreEncrypted::new(device, csprng);
-            Self::print_ballot(b_idx + 1, &ballot, &primary_nonce.to_string());
-            primary_nonces.push(primary_nonce);
-            ballots.push(ballot);
-            confirmation_codes.push(ballots[b_idx].confirmation_code);
-            fs::write(
-                path.join(format!("ballot-{}.json", confirmation_codes[b_idx])),
-                serde_json::to_string(&ballots[b_idx]).unwrap(),
-            )
-            .unwrap();
-        }
+    //     for b_idx in 0..num_ballots {
+    //         let (ballot, primary_nonce) = BallotPreEncrypted::new(header, csprng);
+    //         Self::print_ballot(b_idx + 1, &ballot, &primary_nonce.to_string());
+    //         primary_nonces.push(primary_nonce);
+    //         ballots.push(ballot);
+    //         confirmation_codes.push(ballots[b_idx].confirmation_code);
+    //         fs::write(
+    //             path.join(format!("ballot-{}.json", confirmation_codes[b_idx])),
+    //             serde_json::to_string(&ballots[b_idx]).unwrap(),
+    //         )
+    //         .unwrap();
+    //     }
 
-        write_path(
-            &path.join("primary-nonces.json"),
-            serde_json::to_string(&vec![confirmation_codes, primary_nonces.clone()])
-                .unwrap()
-                .as_bytes(),
-        );
+    //     write_path(
+    //         &path.join("primary-nonces.json"),
+    //         serde_json::to_string(&vec![confirmation_codes, primary_nonces.clone()])
+    //             .unwrap()
+    //             .as_bytes(),
+    //     );
 
-        BallotListPreEncrypted {
-            label,
-            ballots,
-            primary_nonces,
-        }
-    }
+    //     BallotListPreEncrypted {
+    //         label,
+    //         ballots,
+    //         primary_nonces,
+    //     }
+    // }
 
     pub fn read_from_directory(path: &Path) -> Option<Self> {
         if !path.is_dir() {

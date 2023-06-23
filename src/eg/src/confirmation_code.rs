@@ -1,5 +1,4 @@
 use crate::{
-    ballot::BallotConfig,
     contest::ContestEncrypted,
     hash::{eg_h, HValue},
 };
@@ -8,7 +7,7 @@ use crate::{
 ///
 /// H(B) = H(H_E;24,χ_1,χ_2,...,χ_{m_B} ,B_aux).
 ///
-pub fn encrypted(config: &BallotConfig, contests: &Vec<ContestEncrypted>, b_aux: &[u8]) -> HValue {
+pub fn encrypted(h_e: &HValue, contests: &Vec<ContestEncrypted>, b_aux: &[u8]) -> HValue {
     let mut v = vec![0x24];
 
     contests.iter().for_each(|c| {
@@ -16,5 +15,5 @@ pub fn encrypted(config: &BallotConfig, contests: &Vec<ContestEncrypted>, b_aux:
     });
 
     v.extend_from_slice(b_aux);
-    eg_h(&config.h_e, &v)
+    eg_h(h_e, &v)
 }

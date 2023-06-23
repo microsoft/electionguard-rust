@@ -1,6 +1,5 @@
 use eg::{
     hash::{eg_h, eg_h_js, HValue},
-    nonce::encrypted,
     voter::VoterChallengeCode,
 };
 use serde::Serialize;

@@ -1,5 +1,5 @@
 use eg::{
-    ballot::BallotConfig,
+    election_record::ElectionRecordHeader,
     hash::{eg_h, HValue},
 };
 
@@ -10,14 +10,14 @@ use crate::contest_selection::ContestSelectionPreEncrypted;
 /// ψ_i = H(H_E;40,λ_i,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
 pub fn contest_hash(
-    config: &BallotConfig,
+    header: &ElectionRecordHeader,
     contest_label: &String,
     selections: &Vec<ContestSelectionPreEncrypted>,
 ) -> HValue {
     let mut v = vec![0x41];
 
     v.extend_from_slice(contest_label.as_bytes());
-    v.extend_from_slice(config.election_public_key.0.to_bytes_be().as_slice());
+    v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
 
     // TODO: Check if this sorting works
     let mut sorted_selection_hashes = selections
@@ -30,5 +30,5 @@ pub fn contest_hash(
         v.extend(s.as_ref());
     });
 
-    eg_h(&config.h_e, &v)
+    eg_h(&header.hashes.h_e, &v)
 }
