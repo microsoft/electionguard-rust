@@ -7,12 +7,16 @@
 
 use std::borrow::Borrow;
 
+use anyhow::{anyhow, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use util::csprng::Csprng;
 
-use crate::{election_parameters::ElectionParameters, fixed_parameters::FixedParameters, guardian_public_key::GuardianPublicKey};
+use crate::{
+    election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
+    guardian_public_key::GuardianPublicKey,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecretCoefficient(
@@ -97,7 +101,7 @@ pub struct GuardianSecretKey {
     /// Guardian number, 0 <= i < n.
     pub i: u16,
 
-    /// Descriptive string for the guardian.
+    /// Short name with which to refer to the guardian. Should not have any line breaks.
     #[serde(rename = "name")]
     pub opt_name: Option<String>,
 
@@ -152,7 +156,7 @@ impl GuardianSecretKey {
         }
     }
 
-    /// Returns a pretty JSON `String` representation of the `SecretKey`.
+    /// Returns a pretty JSON `String` representation of the `GuardianSecretKey`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?
@@ -160,5 +164,11 @@ impl GuardianSecretKey {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
+    }
+
+    /// Reads an `GuardianSecretKey` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<GuardianSecretKey> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing GuardianSecretKey: {}", e))
     }
 }

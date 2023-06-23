@@ -97,7 +97,6 @@ if "_%ELECTIONGUARD_ARTIFACTS_DIR%" EQU "_" (
 )
 
 (set guardians_dir=%ELECTIONGUARD_ARTIFACTS_DIR%\guardians)
-echo guardians_dir=%guardians_dir%
 
 rem ----- Change to the directory from which we should run cargo.
 
@@ -283,6 +282,8 @@ rem ---- For each guardian
 
 set /a "eg_n_minus_1=eg_n - 1"
 for /L %%N in (0, 1, %eg_n_minus_1%) do call :sub_egtest_per_guardian %%N
+echo.
+echo ---- All guardians done.
 
 rem ---- Write HashesExt
 
@@ -325,26 +326,41 @@ echo.
 echo Secret key file: %guardian_secret_key_file%
 echo Public key file: %guardian_public_key_file%
 
-if not exist "%guardian_secret_key_file%" goto :dont_skip_generate_secret_key
-if not exist "%guardian_public_key_file%" goto :dont_skip_generate_secret_key
-echo Guardian %i% secret and public key files already exist.
-goto :skip_generate_secret_key
-:dont_skip_generate_secret_key
+if exist "%guardian_secret_key_file%" goto :skip_generate_secret_key
+
+if exist "%guardian_public_key_file%" (
+    echo erase "%guardian_public_key_file%"
+    erase "%guardian_public_key_file%"
+    if "%ERRORLEVEL%" NEQ "0" exit /b
+)
+
 echo.
 echo %electionguard_exe% --insecure-deterministic guardian-secret-key-generate --i %i% --name "%guardian_name%"
 %electionguard_exe% --insecure-deterministic guardian-secret-key-generate --i %i% --name "%guardian_name%"
 if "%ERRORLEVEL%" NEQ "0" exit /b
-:skip_generate_secret_key
-
 if not exist "%guardian_secret_key_file%" (
-    echo.
     echo ERROR: Guardian %i% secret key file does not exist: %guardian_secret_key_file%
     exit /b 1
 )
+:skip_generate_secret_key
+
+if exist "%guardian_public_key_file%" goto :skip_writing_public_key
+echo.
+echo %electionguard_exe% guardian-secret-key-write-public-key --i %i%
+%electionguard_exe% guardian-secret-key-write-public-key --i %i%
+if "%ERRORLEVEL%" NEQ "0" exit /b
+
 if not exist "%guardian_public_key_file%" (
-    echo.
     echo ERROR: Guardian %i% public key file does not exist: %guardian_public_key_file%
     exit /b 1
 )
+:skip_writing_public_key
+
+goto :skip_printing_public_key
+echo.
+echo vvvvvvvvvvvvvv Guardian %i% "%guardian_name%" public key vvvvvvvvvvvvvv
+type %guardian_public_key_file%
+echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Guardian %i% "%guardian_name%" public key ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:skip_printing_public_key
 
 exit /b 0 & rem ------- end of :sub_egtest_per_guardian

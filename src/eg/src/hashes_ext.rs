@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters,
+    guardian_public_key::GuardianPublicKey,
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
-    guardian_public_key::GuardianPublicKey,
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,8 +95,7 @@ mod test {
     use crate::{
         example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters,
-        joint_election_public_key::JointElectionPublicKey,
-        guardian_secret_key::GuardianSecretKey,
+        guardian_secret_key::GuardianSecretKey, joint_election_public_key::JointElectionPublicKey,
     };
     use hex_literal::hex;
     use std::borrow::Borrow;

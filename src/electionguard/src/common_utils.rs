@@ -9,12 +9,12 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use rand_core::{OsRng, RngCore};
 
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
-    example_election_manifest::example_election_manifest,
+    example_election_manifest::example_election_manifest, guardian_secret_key::GuardianSecretKey,
 };
 use util::csprng::Csprng;
 
@@ -88,6 +88,51 @@ pub(crate) fn load_election_parameters(
     election_parameters.verify(csprng)?;
 
     Ok(election_parameters)
+}
+
+pub(crate) fn load_guardian_secret_key(
+    opt_i: Option<u16>,
+    opt_secret_key_path: &Option<PathBuf>,
+    artifacts_dir: &ArtifactsDir,
+) -> Result<GuardianSecretKey> {
+    if opt_secret_key_path.is_none() && opt_i.is_none() {
+        bail!("Need at least one of the guardian `i` or secret key file path");
+    }
+
+    let (mut io_read, path) = artifacts_dir.in_file_read(
+        opt_secret_key_path,
+        opt_i.map(ArtifactFile::GuardianSecretKey),
+    )?;
+
+    let guardian_secret_key = GuardianSecretKey::from_reader(&mut io_read)?;
+
+    if let Some(i) = opt_i {
+        if i != guardian_secret_key.i {
+            bail!(
+                "Guardian number specified by --i {} does not match the guardian number {} in the secret key file: {}",
+                i,
+                guardian_secret_key.i,
+                path.display()
+            );
+        }
+    }
+
+    if let Some(name) = &guardian_secret_key.opt_name {
+        eprintln!(
+            "Secret key for guardian number {} {:?} loaded from: {}",
+            guardian_secret_key.i,
+            name,
+            path.display()
+        )
+    } else {
+        eprintln!(
+            "Secret key for guardian number {} loaded from: {}",
+            guardian_secret_key.i,
+            path.display()
+        )
+    }
+
+    Ok(guardian_secret_key)
 }
 
 /// Read the recommended amount of seed data from the OS RNG.

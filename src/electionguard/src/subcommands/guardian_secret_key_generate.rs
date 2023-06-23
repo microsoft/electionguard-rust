@@ -32,12 +32,6 @@ pub(crate) struct GuardianSecretKeyGenerate {
     /// If "-", write to stdout.
     #[arg(long)]
     secret_key_out_file: Option<PathBuf>,
-
-    /// File to which to write the guardian's public key.
-    /// Default is in the artifacts dir.
-    /// If "-", write to stdout.
-    #[arg(long)]
-    public_key_out_file: Option<PathBuf>,
 }
 
 impl Subcommand for GuardianSecretKeyGenerate {
@@ -76,15 +70,6 @@ impl Subcommand for GuardianSecretKeyGenerate {
             ArtifactFile::GuardianSecretKey(self.i),
             format!("secret key for guardian {}", self.i).as_str(),
             secret_key.to_json().as_bytes(),
-        )?;
-
-        let public_key = secret_key.make_public_key();
-
-        subcommand_helper.artifacts_dir.out_file_write(
-            &self.public_key_out_file,
-            ArtifactFile::GuardianPublicKey(self.i),
-            format!("public key for guardian {}", self.i).as_str(),
-            public_key.to_json().as_bytes(),
         )
     }
 }

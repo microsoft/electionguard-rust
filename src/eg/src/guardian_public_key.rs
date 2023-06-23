@@ -20,12 +20,12 @@ pub struct GuardianPublicKey {
     /// Guardian number, 0 <= i < n.
     pub i: u16,
 
-    /// Descriptive string for the guardian.
+    /// Short name with which to refer to the guardian. Should not have any line breaks.
     #[serde(rename = "name")]
     pub opt_name: Option<String>,
 
     /// "Published" polynomial coefficient commitments.
-    pub(crate) coefficient_commitments: CoefficientCommitments,
+    pub coefficient_commitments: CoefficientCommitments,
 }
 
 impl GuardianPublicKey {
@@ -59,11 +59,11 @@ impl GuardianPublicKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use util::csprng::Csprng;
     use crate::{
         example_election_parameters::example_election_parameters,
         guardian_secret_key::GuardianSecretKey,
     };
+    use util::csprng::Csprng;
 
     #[test]
     fn test_key_generation() {

@@ -5,7 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-mod guardian_key_generate;
+mod guardian_secret_key_generate;
+mod guardian_secret_key_write_public_key;
 mod none;
 mod verify_standard_parameters;
 mod write_hashes;
@@ -50,8 +51,15 @@ pub(crate) enum Subcommands {
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 
-    /// Generate a guardian secret key and public key.
-    GuardianSecretKeyGenerate(crate::subcommands::guardian_key_generate::GuardianSecretKeyGenerate),
+    /// Generate a guardian secret key.
+    GuardianSecretKeyGenerate(
+        crate::subcommands::guardian_secret_key_generate::GuardianSecretKeyGenerate,
+    ),
+
+    /// Write a guardian public key from a guardian secret key.
+    GuardianSecretKeyWritePublicKey(
+        crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
+    ),
 }
 
 impl Default for Subcommands {
@@ -71,6 +79,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteParameters(a) => a,
             WriteHashes(a) => a,
             GuardianSecretKeyGenerate(a) => a,
+            GuardianSecretKeyWritePublicKey(a) => a,
         }
     }
 }

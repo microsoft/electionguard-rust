@@ -10,7 +10,7 @@ use std::io::Stdout;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -93,7 +93,39 @@ impl ArtifactsDir {
         Ok((file, file_path))
     }
 
-    /// Writes the buf to the specified file, or if "-" write to stdout.
+    /// Opens the specified file for reading, or if "-" then read from stdin.
+    /// Next it tries any specified artifact file.
+    pub fn in_file_read(
+        &self,
+        opt_path: &Option<PathBuf>,
+        opt_artifact_file: Option<ArtifactFile>,
+    ) -> Result<(Box<dyn std::io::Read>, PathBuf)> {
+        let mut open_options_read = OpenOptions::new();
+        open_options_read.read(true);
+
+        let ioread_and_path: (Box<dyn std::io::Read>, PathBuf) = if let Some(ref path) = opt_path {
+            let bx_read: Box<dyn std::io::Read> = if *path == PathBuf::from("-") {
+                Box::new(std::io::stdin())
+            } else {
+                let file = open_options_read
+                    .open(path)
+                    .with_context(|| format!("Couldn't open file: {}", path.display()))?;
+                Box::new(file)
+            };
+
+            (bx_read, path.clone())
+        } else if let Some(artifact_file) = opt_artifact_file {
+            let (file, path) = self.open(artifact_file, &open_options_read)?;
+            let bx_read: Box<dyn std::io::Read> = Box::new(file);
+            (bx_read, path)
+        } else {
+            bail!("Specify at least one of opt_path or opt_artifact_file");
+        };
+
+        Ok(ioread_and_path)
+    }
+
+    /// Writes the buf to the specified file, or if "-" then write to stdout.
     /// Default is the specified artifact file.
     pub fn out_file_write(
         &self,
