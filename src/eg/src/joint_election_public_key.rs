@@ -9,7 +9,7 @@ use num_bigint::BigUint;
 use num_traits::One;
 use serde::{Deserialize, Serialize};
 
-use crate::{fixed_parameters::FixedParameters, key::GuardianPublicKey};
+use crate::{fixed_parameters::FixedParameters, guardian_public_key::GuardianPublicKey};
 
 /// The joint election public key.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -12,7 +12,7 @@ use crate::{
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
-    key::GuardianPublicKey,
+    guardian_public_key::GuardianPublicKey,
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,7 +95,8 @@ mod test {
     use crate::{
         example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters,
-        joint_election_public_key::JointElectionPublicKey, key::GuardianSecretKey,
+        joint_election_public_key::JointElectionPublicKey,
+        guardian_secret_key::GuardianSecretKey,
     };
     use hex_literal::hex;
     use std::borrow::Borrow;

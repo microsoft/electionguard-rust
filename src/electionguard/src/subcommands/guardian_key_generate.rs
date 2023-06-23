@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 
-use eg::key::GuardianSecretKey;
+use eg::guardian_secret_key::GuardianSecretKey;
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::load_election_parameters,

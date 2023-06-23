@@ -14,6 +14,7 @@ pub mod hash;
 pub mod hashes;
 pub mod hashes_ext;
 pub mod joint_election_public_key;
-pub mod key;
+pub mod guardian_public_key;
+pub mod guardian_secret_key;
 pub mod standard_parameters;
 pub mod varying_parameters;
