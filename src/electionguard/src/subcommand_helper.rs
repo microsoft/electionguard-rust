@@ -67,8 +67,11 @@ impl SubcommandHelper {
 
             file.read_to_end(&mut seed_data)?;
 
-            eprintln!("!!! WARNING !!! Using insecure deterministic mode, {} bytes of seed data read from: {}",
-                seed_data.len(), path.display()
+            eprintln!("!!! WARNING: Using INSECURE deterministic mode. !!!",);
+            eprintln!(
+                "{} bytes of seed data read from: {}",
+                seed_data.len(),
+                path.display()
             );
         } else {
             // Read true random bytes from the OS.

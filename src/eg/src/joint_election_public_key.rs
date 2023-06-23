@@ -9,8 +9,9 @@ use num_bigint::BigUint;
 use num_traits::One;
 use serde::{Deserialize, Serialize};
 
-use crate::{fixed_parameters::FixedParameters, key::PublicKey};
+use crate::{fixed_parameters::FixedParameters, key::GuardianPublicKey};
 
+/// The joint election public key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JointElectionPublicKey(
     #[serde(
@@ -21,7 +22,10 @@ pub struct JointElectionPublicKey(
 );
 
 impl JointElectionPublicKey {
-    pub fn compute(fixed_parameters: &FixedParameters, guardian_public_keys: &[PublicKey]) -> Self {
+    pub fn compute(
+        fixed_parameters: &FixedParameters,
+        guardian_public_keys: &[GuardianPublicKey],
+    ) -> Self {
         //? TODO: Would it be useful to parallelize this?
         Self(
             guardian_public_keys

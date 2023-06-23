@@ -12,7 +12,7 @@ use crate::{
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
-    key::PublicKey,
+    key::GuardianPublicKey,
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ impl HashesExt {
         election_parameters: &ElectionParameters,
         hashes: &Hashes,
         joint_election_public_key: &JointElectionPublicKey,
-        guardian_public_keys: &[PublicKey],
+        guardian_public_keys: &[GuardianPublicKey],
     ) -> Self {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
@@ -95,7 +95,7 @@ mod test {
     use crate::{
         example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters,
-        joint_election_public_key::JointElectionPublicKey, key::PrivateKey,
+        joint_election_public_key::JointElectionPublicKey, key::GuardianSecretKey,
     };
     use hex_literal::hex;
     use std::borrow::Borrow;
@@ -115,13 +115,13 @@ mod test {
 
         let n = varying_parameters.n;
 
-        let guardian_private_keys = (0..n)
-            .map(|i| PrivateKey::generate(&mut csprng, &election_parameters, i, None))
+        let guardian_secret_keys = (0..n)
+            .map(|i| GuardianSecretKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
 
-        let guardian_public_keys = guardian_private_keys
+        let guardian_public_keys = guardian_secret_keys
             .iter()
-            .map(|private_key| private_key.make_public_key())
+            .map(|secret_key| secret_key.make_public_key())
             .collect::<Vec<_>>();
 
         let joint_election_public_key =

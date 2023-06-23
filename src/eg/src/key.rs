@@ -91,8 +91,9 @@ impl CoefficientCommitments {
     }
 }
 
+/// Secret key for a guardian.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PrivateKey {
+pub struct GuardianSecretKey {
     /// Guardian number, 0 <= i < n.
     pub i: u16,
 
@@ -107,7 +108,7 @@ pub struct PrivateKey {
     pub coefficient_commitments: CoefficientCommitments,
 }
 
-impl PrivateKey {
+impl GuardianSecretKey {
     pub fn generate(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
@@ -123,7 +124,7 @@ impl PrivateKey {
         );
         assert_ne!(secret_coefficients.0.len(), 0);
 
-        PrivateKey {
+        GuardianSecretKey {
             secret_coefficients,
             coefficient_commitments,
             i,
@@ -143,15 +144,15 @@ impl PrivateKey {
         &self.coefficient_commitments
     }
 
-    pub fn make_public_key(&self) -> PublicKey {
-        PublicKey {
+    pub fn make_public_key(&self) -> GuardianPublicKey {
+        GuardianPublicKey {
             i: self.i,
             opt_name: self.opt_name.clone(),
             coefficient_commitments: self.coefficient_commitments.clone(),
         }
     }
 
-    /// Returns a pretty JSON `String` representation of the `PrivateKey`.
+    /// Returns a pretty JSON `String` representation of the `SecretKey`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?
@@ -162,8 +163,9 @@ impl PrivateKey {
     }
 }
 
+/// Public key for a guardian.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PublicKey {
+pub struct GuardianPublicKey {
     /// Guardian number, 0 <= i < n.
     pub i: u16,
 
@@ -175,7 +177,7 @@ pub struct PublicKey {
     pub(crate) coefficient_commitments: CoefficientCommitments,
 }
 
-impl PublicKey {
+impl GuardianPublicKey {
     pub fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
     }
@@ -192,7 +194,7 @@ impl PublicKey {
         to_be_bytes_left_pad(&self.public_key_k0(), fixed_parameters.l_p_bytes())
     }
 
-    /// Returns a pretty JSON `String` representation of the `PrivateKey`.
+    /// Returns a pretty JSON `String` representation of the `SecretKey`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?
@@ -219,27 +221,27 @@ mod test {
         let n = varying_parameters.n;
         let k = varying_parameters.k;
 
-        let guardian_private_keys = (0..n)
-            .map(|i| PrivateKey::generate(&mut csprng, &election_parameters, i, None))
+        let guardian_secret_keys = (0..n)
+            .map(|i| GuardianSecretKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
 
-        let guardian_public_keys = guardian_private_keys
+        let guardian_public_keys = guardian_secret_keys
             .iter()
-            .map(|private_key| private_key.make_public_key())
+            .map(|secret_key| secret_key.make_public_key())
             .collect::<Vec<_>>();
 
-        for guardian_private_key in guardian_private_keys.iter() {
-            assert_eq!(guardian_private_key.secret_coefficients.0.len(), k as usize);
+        for guardian_secret_key in guardian_secret_keys.iter() {
+            assert_eq!(guardian_secret_key.secret_coefficients.0.len(), k as usize);
             assert_eq!(
-                guardian_private_key.coefficient_commitments.0.len(),
+                guardian_secret_key.coefficient_commitments.0.len(),
                 k as usize
             );
 
-            for secret_coefficient in guardian_private_key.secret_coefficients.0.iter() {
+            for secret_coefficient in guardian_secret_key.secret_coefficients.0.iter() {
                 assert!(&secret_coefficient.0 < fixed_parameters.q.borrow());
             }
 
-            for coefficient_commitment in guardian_private_key.coefficient_commitments.0.iter() {
+            for coefficient_commitment in guardian_secret_key.coefficient_commitments.0.iter() {
                 assert!(&coefficient_commitment.0 < fixed_parameters.p.borrow());
             }
         }
@@ -258,7 +260,7 @@ mod test {
             {
                 assert_eq!(
                     &coefficient_commitment.0,
-                    &guardian_private_keys[i].coefficient_commitments.0[j].0
+                    &guardian_secret_keys[i].coefficient_commitments.0[j].0
                 );
             }
 

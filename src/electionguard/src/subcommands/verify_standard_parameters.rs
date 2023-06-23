@@ -11,6 +11,7 @@ use eg::standard_parameters::STANDARD_PARAMETERS;
 
 use crate::{subcommand_helper::SubcommandHelper, subcommands::Subcommand};
 
+/// Verify the standard parameters.
 #[derive(clap::Args, Debug)]
 pub(crate) struct VerifyStandardParameters {
     #[arg(long, default_value_t = 1)]

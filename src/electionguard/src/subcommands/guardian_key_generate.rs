@@ -9,38 +9,38 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 
-use eg::key::PrivateKey;
+use eg::key::GuardianSecretKey;
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::load_election_parameters,
     subcommand_helper::SubcommandHelper, subcommands::Subcommand,
 };
 
-/// A subcommand that does nothing. For a default value.
+/// Generate a guardian secret key and public key.
 #[derive(clap::Args, Debug, Default)]
-pub(crate) struct GuardianKeyGenerate {
+pub(crate) struct GuardianSecretKeyGenerate {
     /// Guardian number, 0 <= i < n.
     #[arg(long)]
     i: u16,
 
-    /// Descriptive string for the guardian.
+    /// Guardian's name or other short description.
     #[arg(long)]
     name: Option<String>,
 
-    /// File to which to write the public key.
+    /// File to which to write the guardian's secret key.
+    /// Default is in the guardian's dir under the artifacts dir.
+    /// If "-", write to stdout.
+    #[arg(long)]
+    secret_key_out_file: Option<PathBuf>,
+
+    /// File to which to write the guardian's public key.
     /// Default is in the artifacts dir.
     /// If "-", write to stdout.
     #[arg(long)]
     public_key_out_file: Option<PathBuf>,
-
-    /// File to which to write the private key.
-    /// Default is in the guardian's dir under the artifacts dir.
-    /// If "-", write to stdout.
-    #[arg(long)]
-    private_key_out_file: Option<PathBuf>,
 }
 
-impl Subcommand for GuardianKeyGenerate {
+impl Subcommand for GuardianSecretKeyGenerate {
     fn uses_csprng(&self) -> bool {
         true
     }
@@ -64,17 +64,21 @@ impl Subcommand for GuardianKeyGenerate {
             );
         }
 
-        let private_key =
-            PrivateKey::generate(&mut csprng, &election_parameters, self.i, self.name.clone());
+        let secret_key = GuardianSecretKey::generate(
+            &mut csprng,
+            &election_parameters,
+            self.i,
+            self.name.clone(),
+        );
 
         subcommand_helper.artifacts_dir.out_file_write(
-            &self.private_key_out_file,
-            ArtifactFile::GuardianPrivateKey(self.i),
-            format!("private key for guardian {}", self.i).as_str(),
-            private_key.to_json().as_bytes(),
+            &self.secret_key_out_file,
+            ArtifactFile::GuardianSecretKey(self.i),
+            format!("secret key for guardian {}", self.i).as_str(),
+            secret_key.to_json().as_bytes(),
         )?;
 
-        let public_key = private_key.make_public_key();
+        let public_key = secret_key.make_public_key();
 
         subcommand_helper.artifacts_dir.out_file_write(
             &self.public_key_out_file,

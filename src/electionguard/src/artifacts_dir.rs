@@ -20,7 +20,7 @@ pub(crate) enum ArtifactFile {
     ElectionManifestCanonical,
     ElectionParameters,
     Hashes,
-    GuardianPrivateKey(u16),
+    GuardianSecretKey(u16),
     GuardianPublicKey(u16),
 }
 
@@ -42,9 +42,9 @@ impl From<ArtifactFile> for PathBuf {
             ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
             ElectionParameters => PathBuf::from("election_parameters.json"),
             Hashes => PathBuf::from("hashes.json"),
-            GuardianPrivateKey(i) => Path::new("guardians").join(format!("{i}")).join(format!(
-                "guardian_{i}.private_key.KEEP_THIS_ONE_SECRET.json"
-            )),
+            GuardianSecretKey(i) => Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.SECRET_key.json")),
             GuardianPublicKey(i) => Path::new("guardians")
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.public_key.json")),

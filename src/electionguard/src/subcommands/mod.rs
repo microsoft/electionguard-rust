@@ -50,8 +50,8 @@ pub(crate) enum Subcommands {
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 
-    /// Generate a guardian public and private key.
-    GuardianKeyGenerate(crate::subcommands::guardian_key_generate::GuardianKeyGenerate),
+    /// Generate a guardian secret key and public key.
+    GuardianSecretKeyGenerate(crate::subcommands::guardian_key_generate::GuardianSecretKeyGenerate),
 }
 
 impl Default for Subcommands {
@@ -70,7 +70,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteManifest(a) => a,
             WriteParameters(a) => a,
             WriteHashes(a) => a,
-            GuardianKeyGenerate(a) => a,
+            GuardianSecretKeyGenerate(a) => a,
         }
     }
 }
