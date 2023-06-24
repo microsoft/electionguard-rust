@@ -67,7 +67,7 @@ impl Subcommand for GenerateGuardianShares {
             &String::from_utf8(read_path(
                 &subcommand_helper
                     .artifacts_dir
-                    .path(ArtifactFile::GuardianPrivateData),
+                    .path(ArtifactFile::GuardianPrivateData(self.i as u16)),
             ))
             .unwrap(),
         );
@@ -78,21 +78,23 @@ impl Subcommand for GenerateGuardianShares {
         // Read public keys associated with other guardians
         for l in 1..election_parameters.varying_parameters.n + 1 {
             if guardian.i != l as usize {
-                let their_artifacts = ArtifactsDir::new(
-                    subcommand_helper
-                        .artifacts_dir
-                        .dir_path
-                        .parent()
-                        .unwrap()
-                        .join(format!("{}", l)),
-                )
-                .unwrap();
+                // let their_artifacts = ArtifactsDir::new(
+                //     subcommand_helper
+                //         .artifacts_dir
+                //         .dir_path
+                //         .parent()
+                //         .unwrap()
+                //         .join(format!("{}", l)),
+                // )
+                // .unwrap();
 
                 public_keys.insert(
                     l,
                     PublicKey::from_json(
                         &String::from_utf8(read_path(
-                            &their_artifacts.path(ArtifactFile::GuardianPublicKey),
+                            &subcommand_helper
+                                .artifacts_dir
+                                .path(ArtifactFile::GuardianPublicKey(l as u16)),
                         ))
                         .unwrap(),
                     ),
@@ -100,29 +102,34 @@ impl Subcommand for GenerateGuardianShares {
             }
         }
 
-        let mut shares = Vec::with_capacity(election_parameters.varying_parameters.n as usize - 1);
+        // let mut shares = Vec::with_capacity(election_parameters.varying_parameters.n as usize - 1);
         // Generate encrypted share for each other guardian
         for l in 1..election_parameters.varying_parameters.n + 1 {
             if guardian.i != l as usize {
-                shares.push(guardian.share_for(
+                let share = guardian.share_for(
                     &mut csprng,
                     &election_parameters,
                     &hashes.h_p,
                     l as usize,
                     &public_keys[&l],
-                ));
+                );
+
+                // subcommand_helper.artifacts_dir.out_file_write(
+                //     &Some(
+                //         subcommand_helper
+                //             .artifacts_dir
+                //             .path(ArtifactFile::GuardianEncryptedShares(guardian.i as u16, l)),
+                //     ),
+                //     ArtifactFile::GuardianEncryptedShares(ArtifactFile::GuardianEncryptedShares(
+                //         guardian.i as u16,
+                //         l,
+                //     )),
+                //     "guardian encrypted shares",
+                //     share.as_bytes(),
+                // );
             }
         }
 
-        subcommand_helper.artifacts_dir.out_file_write(
-            &Some(
-                subcommand_helper
-                    .artifacts_dir
-                    .path(ArtifactFile::GuardianEncryptedShares),
-            ),
-            ArtifactFile::GuardianEncryptedShares,
-            "guardian encrypted shares",
-            shares_to_json(&shares).as_bytes(),
-        )
+        Ok(())
     }
 }

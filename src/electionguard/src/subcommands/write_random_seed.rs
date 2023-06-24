@@ -8,12 +8,12 @@
 use std::io::Write;
 
 use anyhow::Result;
-use rand_core::{OsRng, RngCore};
 
 use util::hex_dump::HexDump;
 
 use crate::{
-    artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, subcommands::Subcommand,
+    artifacts_dir::ArtifactFile, common_utils::osrng_seed_data_for_csprng,
+    subcommand_helper::SubcommandHelper, subcommands::Subcommand,
 };
 
 #[derive(clap::Args, Debug)]
@@ -50,8 +50,7 @@ impl Subcommand for WriteRandomSeed {
             &open_options,
         )?;
 
-        let mut seed_data = [0u8; 32];
-        OsRng.fill_bytes(&mut seed_data);
+        let seed_data = osrng_seed_data_for_csprng();
 
         eprintln!(
             "Random seed data:\n{}",

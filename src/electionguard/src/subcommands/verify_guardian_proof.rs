@@ -53,7 +53,7 @@ impl Subcommand for VerifyGuardianProof {
             &String::from_utf8(read_path(
                 &subcommand_helper
                     .artifacts_dir
-                    .path(ArtifactFile::GuardianProof),
+                    .path(ArtifactFile::GuardianProof(self.i as u16)),
             ))
             .unwrap(),
         );

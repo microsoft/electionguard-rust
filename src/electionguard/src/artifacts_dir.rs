@@ -10,47 +10,59 @@ use std::io::Stdout;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
-use anyhow::{Context, Result};
-use strum_macros::Display;
+use anyhow::{bail, Context, Result};
 
 /// Provides access to files in the artifacts directory.
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ArtifactFile {
-    #[strum(to_string = "pseudorandom_seed_defeats_all_secrecy.bin")]
     PseudorandomSeedDefeatsAllSecrecy,
-
-    #[strum(to_string = "election_manifest_pretty.json")]
     ElectionManifestPretty,
-
-    #[strum(to_string = "election_manifest_canonical.bin")]
     ElectionManifestCanonical,
-
-    #[strum(to_string = "election_parameters.json")]
     ElectionParameters,
-
-    #[strum(to_string = "election_record_header.json")]
     ElectionRecordHeader,
-
-    #[strum(to_string = "hashes.json")]
+    GuardianPrivateData(u16),
+    GuardianProof(u16),
+    GuardianEncryptedShares(u16, u16),
+    GuardianSecretKey(u16),
+    GuardianPublicKey(u16),
     Hashes,
+}
 
-    #[strum(to_string = "guardian_private_data.json")]
-    GuardianPrivateData,
-
-    #[strum(to_string = "guardian_public_key.json")]
-    GuardianPublicKey,
-
-    #[strum(to_string = "guardian_proof.json")]
-    GuardianProof,
-
-    #[strum(to_string = "guardian_shares.json")]
-    GuardianEncryptedShares,
+impl std::fmt::Display for ArtifactFile {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        PathBuf::from(*self).as_path().display().fmt(f)
+    }
 }
 
 impl From<ArtifactFile> for PathBuf {
     fn from(artifact_file: ArtifactFile) -> PathBuf {
-        artifact_file.to_string().as_str().into()
+        use ArtifactFile::*;
+        match artifact_file {
+            PseudorandomSeedDefeatsAllSecrecy => {
+                PathBuf::from("pseudorandom_seed_defeats_all_secrecy.bin")
+            }
+            ElectionManifestPretty => PathBuf::from("election_manifest_pretty.json"),
+            ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
+            ElectionParameters => PathBuf::from("election_parameters.json"),
+            ElectionRecordHeader => PathBuf::from("election_record_header.json"),
+            Hashes => PathBuf::from("hashes.json"),
+            GuardianPrivateData(i) => Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.private_data.json")),
+            GuardianProof(i) => Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.proof.json")),
+            GuardianEncryptedShares(i, j) => Path::new("guardians")
+                .join(format!("{j}"))
+                .join(format!("guardian_{i}.share.json")),
+            GuardianSecretKey(i) => Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.SECRET_key.json")),
+            GuardianPublicKey(i) => Path::new("guardians")
+                .join(format!("{i}"))
+                .join(format!("guardian_{i}.public_key.json")),
+        }
     }
 }
 
@@ -95,7 +107,39 @@ impl ArtifactsDir {
         Ok((file, file_path))
     }
 
-    /// Writes the buf to the specified file, or if "-" write to stdout.
+    /// Opens the specified file for reading, or if "-" then read from stdin.
+    /// Next it tries any specified artifact file.
+    pub fn in_file_read(
+        &self,
+        opt_path: &Option<PathBuf>,
+        opt_artifact_file: Option<ArtifactFile>,
+    ) -> Result<(Box<dyn std::io::Read>, PathBuf)> {
+        let mut open_options_read = OpenOptions::new();
+        open_options_read.read(true);
+
+        let ioread_and_path: (Box<dyn std::io::Read>, PathBuf) = if let Some(ref path) = opt_path {
+            let bx_read: Box<dyn std::io::Read> = if *path == PathBuf::from("-") {
+                Box::new(std::io::stdin())
+            } else {
+                let file = open_options_read
+                    .open(path)
+                    .with_context(|| format!("Couldn't open file: {}", path.display()))?;
+                Box::new(file)
+            };
+
+            (bx_read, path.clone())
+        } else if let Some(artifact_file) = opt_artifact_file {
+            let (file, path) = self.open(artifact_file, &open_options_read)?;
+            let bx_read: Box<dyn std::io::Read> = Box::new(file);
+            (bx_read, path)
+        } else {
+            bail!("Specify at least one of opt_path or opt_artifact_file");
+        };
+
+        Ok(ioread_and_path)
+    }
+
+    /// Writes the buf to the specified file, or if "-" then write to stdout.
     /// Default is the specified artifact file.
     pub fn out_file_write(
         &self,

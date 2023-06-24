@@ -60,16 +60,18 @@ impl Subcommand for VerifyGuardianShares {
         assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters.n);
 
         // Read guardian private data
-        let our_artifacts = ArtifactsDir::new(
-            subcommand_helper
-                .artifacts_dir
-                .dir_path
-                .join(format!("{}", self.i)),
-        )
-        .unwrap();
+        // let our_artifacts = ArtifactsDir::new(
+        //     subcommand_helper
+        //         .artifacts_dir
+        //         .dir_path
+        //         .join(format!("{}", self.i)),
+        // )
+        // .unwrap();
         let guardian = Guardian::from_json(
             &String::from_utf8(read_path(
-                &our_artifacts.path(ArtifactFile::GuardianPrivateData),
+                &subcommand_helper
+                    .artifacts_dir
+                    .path(ArtifactFile::GuardianPrivateData(self.i as u16)),
             ))
             .unwrap(),
         );
@@ -86,14 +88,14 @@ impl Subcommand for VerifyGuardianShares {
                 .unwrap();
                 // Read encrypted share and proof
                 let encrypted_shares = shares_from_json(
-                    &String::from_utf8(read_path(
-                        &their_artifacts.path(ArtifactFile::GuardianEncryptedShares),
-                    ))
+                    &String::from_utf8(read_path(&their_artifacts.path(
+                        ArtifactFile::GuardianEncryptedShares(l as u16, guardian.i as u16),
+                    )))
                     .unwrap(),
                 );
                 let proof = ProofGuardian::from_json(
                     &String::from_utf8(read_path(
-                        &their_artifacts.path(ArtifactFile::GuardianProof),
+                        &their_artifacts.path(ArtifactFile::GuardianProof(l as u16)),
                     ))
                     .unwrap(),
                 );

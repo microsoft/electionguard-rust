@@ -5,12 +5,13 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result};
 
 use eg::standard_parameters::STANDARD_PARAMETERS;
 
 use crate::{subcommand_helper::SubcommandHelper, subcommands::Subcommand};
 
+/// Verify the standard parameters.
 #[derive(clap::Args, Debug)]
 pub(crate) struct VerifyStandardParameters {
     #[arg(long, default_value_t = 1)]
@@ -32,9 +33,9 @@ impl Subcommand for VerifyStandardParameters {
         eprintln!("Verifying standard parameters...");
         for pass in 0..self.passes {
             eprintln!("    Starting pass {pass}/{}...", self.passes);
-            if !fixed_parameters.verify(&mut csprng) {
-                bail!("Parameter verification failed");
-            }
+            fixed_parameters
+                .verify(&mut csprng)
+                .context("Parameter verification failed")?;
         }
 
         eprintln!("Done.");

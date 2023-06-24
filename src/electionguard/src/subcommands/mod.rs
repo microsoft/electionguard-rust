@@ -7,6 +7,8 @@
 
 mod generate_guardian_key;
 mod generate_guardian_shares;
+mod guardian_secret_key_generate;
+mod guardian_secret_key_write_public_key;
 mod none;
 mod preencrypted_ballots;
 mod verify_guardian_proof;
@@ -68,6 +70,16 @@ pub(crate) enum Subcommands {
 
     /// Generate or verify pre-encrypted ballots.
     PreEncryptedBallots(crate::subcommands::preencrypted_ballots::PreEncryptedBallots),
+
+    /// Generate a guardian secret key.
+    GuardianSecretKeyGenerate(
+        crate::subcommands::guardian_secret_key_generate::GuardianSecretKeyGenerate,
+    ),
+
+    /// Write a guardian public key from a guardian secret key.
+    GuardianSecretKeyWritePublicKey(
+        crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
+    ),
 }
 
 impl Default for Subcommands {
@@ -78,18 +90,21 @@ impl Default for Subcommands {
 
 impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
     fn from(subcommands: &'a mut Subcommands) -> Self {
+        use Subcommands::*;
         match subcommands {
-            Subcommands::None(a) => a,
-            Subcommands::WriteRandomSeed(a) => a,
-            Subcommands::VerifyStandardParameters(a) => a,
-            Subcommands::WriteManifest(a) => a,
-            Subcommands::WriteParameters(a) => a,
-            Subcommands::WriteHashes(a) => a,
-            Subcommands::GenerateGuardianKey(a) => a,
-            Subcommands::PreEncryptedBallots(a) => a,
-            Subcommands::GenerateGuardianShares(a) => a,
-            Subcommands::VerifyGuardianShares(a) => a,
-            Subcommands::VerifyGuardianProof(a) => a,
+            None(a) => a,
+            WriteRandomSeed(a) => a,
+            VerifyStandardParameters(a) => a,
+            WriteManifest(a) => a,
+            WriteParameters(a) => a,
+            WriteHashes(a) => a,
+            GuardianSecretKeyGenerate(a) => a,
+            GuardianSecretKeyWritePublicKey(a) => a,
+            GenerateGuardianKey(a) => a,
+            PreEncryptedBallots(a) => a,
+            GenerateGuardianShares(a) => a,
+            VerifyGuardianShares(a) => a,
+            VerifyGuardianProof(a) => a,
         }
     }
 }

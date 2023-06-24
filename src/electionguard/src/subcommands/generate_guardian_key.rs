@@ -68,9 +68,9 @@ impl Subcommand for GenerateGuardianKey {
                 &Some(
                     subcommand_helper
                         .artifacts_dir
-                        .path(ArtifactFile::GuardianPrivateData),
+                        .path(ArtifactFile::GuardianPrivateData(guardian.i as u16)),
                 ),
-                ArtifactFile::GuardianPrivateData,
+                ArtifactFile::GuardianPrivateData(guardian.i as u16),
                 "guardian private data",
                 guardian.to_json().as_bytes(),
             )
@@ -79,9 +79,9 @@ impl Subcommand for GenerateGuardianKey {
                     &Some(
                         subcommand_helper
                             .artifacts_dir
-                            .path(ArtifactFile::GuardianPublicKey),
+                            .path(ArtifactFile::GuardianPublicKey(guardian.i as u16)),
                     ),
-                    ArtifactFile::GuardianPublicKey,
+                    ArtifactFile::GuardianPublicKey(guardian.i as u16),
                     "guardian public key",
                     public_key.to_json().as_bytes(),
                 )
@@ -91,9 +91,9 @@ impl Subcommand for GenerateGuardianKey {
                     &Some(
                         subcommand_helper
                             .artifacts_dir
-                            .path(ArtifactFile::GuardianProof),
+                            .path(ArtifactFile::GuardianProof(guardian.i as u16)),
                     ),
-                    ArtifactFile::GuardianProof,
+                    ArtifactFile::GuardianProof(guardian.i as u16),
                     "guardian proof",
                     proof.to_json().as_bytes(),
                 )
