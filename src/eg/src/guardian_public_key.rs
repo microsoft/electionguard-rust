@@ -7,6 +7,7 @@
 
 use std::borrow::Borrow;
 
+use anyhow::{anyhow, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +46,7 @@ impl GuardianPublicKey {
         to_be_bytes_left_pad(&self.public_key_k0(), fixed_parameters.l_p_bytes())
     }
 
-    /// Returns a pretty JSON `String` representation of the `SecretKey`.
+    /// Returns a pretty JSON `String` representation of the `GuardianPublicKey`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?
@@ -53,6 +54,12 @@ impl GuardianPublicKey {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
+    }
+
+    /// Reads an `GuardianPublicKey` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<GuardianPublicKey> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing GuardianPublicKey: {}", e))
     }
 }
 

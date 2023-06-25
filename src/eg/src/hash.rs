@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose, Engine as _};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
@@ -83,6 +83,21 @@ impl HValue {
                 b' '
             }
         })
+    }
+
+    /// Reads `HValue` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HValue> {
+        serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing HValue: {}", e))
+    }
+
+    /// Returns a pretty JSON `String` representation of the `HValue`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
     }
 }
 

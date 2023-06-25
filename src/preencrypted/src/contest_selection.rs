@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use eg::{
     contest::ContestOption, contest_selection::ContestSelectionCiphertext, device::Device,
-    election_record::ElectionRecordHeader, hash::HValue, key::Ciphertext, nizk::ProofRange,
+    election_record::ElectionRecordHeader, hash::HValue, joint_election_public_key::Ciphertext,
+    nizk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};

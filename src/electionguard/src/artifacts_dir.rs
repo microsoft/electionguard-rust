@@ -20,11 +20,14 @@ pub(crate) enum ArtifactFile {
     ElectionManifestCanonical,
     ElectionParameters,
     ElectionRecordHeader,
+    JointElectionPublicKey,
     GuardianPrivateData(u16),
     GuardianProof(u16),
     GuardianEncryptedShares(u16, u16),
     GuardianSecretKey(u16),
     GuardianPublicKey(u16),
+    PreEncryptedBallots(u128, u128),
+    PreEncryptedBallotNonces(u128, u128),
     Hashes,
 }
 
@@ -46,6 +49,7 @@ impl From<ArtifactFile> for PathBuf {
             ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
             ElectionParameters => PathBuf::from("election_parameters.json"),
             ElectionRecordHeader => PathBuf::from("election_record_header.json"),
+            JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
             Hashes => PathBuf::from("hashes.json"),
             GuardianPrivateData(i) => Path::new("guardians")
                 .join(format!("{i}"))
@@ -62,6 +66,12 @@ impl From<ArtifactFile> for PathBuf {
             GuardianPublicKey(i) => Path::new("guardians")
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.public_key.json")),
+            PreEncryptedBallots(ts, i) => Path::new("pre_encrypted_ballots")
+                .join(format!("{ts}"))
+                .join(format!("ballot_{i}.json")),
+            PreEncryptedBallotNonces(ts, i) => Path::new("pre_encrypted_ballots")
+                .join(format!("{ts}"))
+                .join(format!("ballot_{i}_primary_nonce.json")),
         }
     }
 }

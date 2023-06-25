@@ -8,7 +8,7 @@ use eg::contest_selection::ContestSelectionCiphertext;
 use eg::election_manifest::ElectionManifest;
 use eg::election_record::ElectionRecordHeader;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
-use eg::key::{Ciphertext, PublicKey};
+use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
 use util::csprng::Csprng;
 use util::file::{create_path, write_path};
 use util::logging::Logging;
@@ -19,7 +19,7 @@ use crate::contest_selection::ContestSelectionPreEncrypted;
 pub struct BallotEncryptingTool {
     pub header: ElectionRecordHeader,
     pub ballot_style: BallotStyle,
-    pub encryption_key: Option<PublicKey>,
+    pub encryption_key: Option<JointElectionPublicKey>,
 }
 
 pub struct EncryptedNonce {
@@ -30,7 +30,7 @@ impl BallotEncryptingTool {
     pub fn new(
         header: ElectionRecordHeader,
         ballot_style: BallotStyle,
-        encryption_key: Option<PublicKey>,
+        encryption_key: Option<JointElectionPublicKey>,
     ) -> Self {
         Self {
             header,
@@ -39,7 +39,7 @@ impl BallotEncryptingTool {
         }
     }
 
-    fn print_ballot(i: usize, ballot: &BallotPreEncrypted, primary_nonce: &str) {
+    pub fn print_ballot(i: usize, ballot: &BallotPreEncrypted, primary_nonce: &str) {
         let tag = "Pre-Encrypted";
         Logging::log(tag, &format!("Ballot {}", i), line!(), file!());
         Logging::log(tag, "  Primary Nonce", line!(), file!());
@@ -62,7 +62,7 @@ impl BallotEncryptingTool {
         });
     }
 
-    fn generate_ballots(
+    pub fn generate_ballots(
         &self,
         csprng: &mut Csprng,
         num_ballots: usize,
@@ -77,48 +77,6 @@ impl BallotEncryptingTool {
         }
 
         (ballots, primary_nonces)
-    }
-
-    /// Generates and writes to disk num_ballots pre-encrypted ballots
-    pub fn generate_and_save_ballots(&self, csprng: &mut Csprng, num_ballots: usize, path: &Path) {
-        let (ballots, primary_nonces) = self.generate_ballots(csprng, num_ballots);
-
-        let label: String;
-        match SystemTime::now().duration_since(UNIX_EPOCH) {
-            Ok(n) => {
-                label = format!("{}", n.as_secs());
-            }
-            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-        }
-
-        let path = path.join(label.clone());
-        create_path(&path);
-        let mut confirmation_codes = Vec::with_capacity(num_ballots);
-
-        for b_idx in 0..num_ballots {
-            Self::print_ballot(
-                b_idx + 1,
-                &ballots[b_idx],
-                &primary_nonces[b_idx].to_string(),
-            );
-            confirmation_codes.push(ballots[b_idx].confirmation_code);
-            write_path(
-                &path.join(format!("ballot-{}.json", confirmation_codes[b_idx])),
-                serde_json::to_string(&ballots[b_idx]).unwrap().as_bytes(),
-            );
-        }
-
-        match &self.encryption_key {
-            Some(key) => {}
-            None => {
-                write_path(
-                    &path.join("primary-nonces.json"),
-                    serde_json::to_string(&vec![confirmation_codes, primary_nonces.clone()])
-                        .unwrap()
-                        .as_bytes(),
-                );
-            }
-        }
     }
 }
 

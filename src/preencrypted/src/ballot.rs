@@ -1,5 +1,6 @@
 use std::{fs, path::PathBuf, time::SystemTime};
 
+use anyhow::{anyhow, Result};
 use eg::{
     ballot::{BallotDecrypted, BallotEncrypted},
     contest::ContestEncrypted,
@@ -86,10 +87,10 @@ impl BallotPreEncrypted {
     }
 
     fn unix_timestamp() -> u64 {
-        match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-            Ok(n) => n.as_secs(),
-            Err(_) => panic!("Error in getting timestamp."),
-        }
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
     }
 
     pub fn finalize(
@@ -116,5 +117,21 @@ impl BallotPreEncrypted {
             contests,
             confirmation_code: self.confirmation_code,
         }
+    }
+
+    /// Returns a pretty JSON `String` representation of `BallotPreEncrypted`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
+    }
+
+    /// Reads `BallotPreEncrypted` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<BallotPreEncrypted> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing BallotPreEncrypted: {}", e))
     }
 }

@@ -5,8 +5,9 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use anyhow::{anyhow, Result};
 use num_bigint::BigUint;
-use num_traits::One;
+use num_traits::{Num, One};
 use serde::{Deserialize, Serialize};
 
 use crate::{fixed_parameters::FixedParameters, guardian_public_key::GuardianPublicKey};
@@ -21,6 +22,37 @@ pub struct JointElectionPublicKey(
     pub BigUint,
 );
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Ciphertext {
+    pub alpha: BigUint,
+    pub beta: BigUint,
+}
+
+/// Serialize for Ciphertext
+impl Serialize for Ciphertext {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        (self.alpha.to_str_radix(16), self.beta.to_str_radix(16)).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Ciphertext {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match <(String, String)>::deserialize(deserializer) {
+            Ok((alpha, beta)) => Ok(Ciphertext {
+                alpha: BigUint::from_str_radix(&alpha, 16).unwrap(),
+                beta: BigUint::from_str_radix(&beta, 16).unwrap(),
+            }),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 impl JointElectionPublicKey {
     pub fn compute(
         fixed_parameters: &FixedParameters,
@@ -32,13 +64,42 @@ impl JointElectionPublicKey {
                 .iter()
                 .fold(BigUint::one(), |acc, public_key| {
                     let k0 = public_key.public_key_k0();
-                    acc.modpow(k0, fixed_parameters.p.as_ref())
+                    (acc * k0) % fixed_parameters.p.as_ref()
                 }),
         )
+    }
+
+    pub fn encrypt_with(
+        &self,
+        fixed_parameters: &FixedParameters,
+        nonce: &BigUint,
+        vote: usize,
+    ) -> Ciphertext {
+        let alpha = fixed_parameters
+            .g
+            .modpow(&nonce, fixed_parameters.p.as_ref());
+        let beta = self.0.modpow(&(nonce + vote), fixed_parameters.p.as_ref());
+        Ciphertext { alpha, beta }
     }
 
     /// Returns the `JointElectionPublicKey` as a big-endian byte array of the correct length for `mod p`.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
+    }
+
+    /// Returns a pretty JSON `String` representation of the `JointElectionPublicKey`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
+    }
+
+    /// Reads an `JointElectionPublicKey` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<JointElectionPublicKey> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
     }
 }

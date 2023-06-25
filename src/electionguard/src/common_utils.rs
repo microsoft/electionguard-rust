@@ -14,7 +14,9 @@ use rand_core::{OsRng, RngCore};
 
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
-    example_election_manifest::example_election_manifest, guardian_secret_key::GuardianSecretKey,
+    example_election_manifest::example_election_manifest, guardian_public_key::GuardianPublicKey,
+    guardian_secret_key::GuardianSecretKey, hashes::Hashes,
+    joint_election_public_key::JointElectionPublicKey,
 };
 use util::csprng::Csprng;
 
@@ -133,6 +135,81 @@ pub(crate) fn load_guardian_secret_key(
     }
 
     Ok(guardian_secret_key)
+}
+
+pub(crate) fn load_guardian_public_key(
+    opt_i: Option<u16>,
+    opt_public_key_path: &Option<PathBuf>,
+    artifacts_dir: &ArtifactsDir,
+) -> Result<GuardianPublicKey> {
+    if opt_public_key_path.is_none() && opt_i.is_none() {
+        bail!("Need at least one of the guardian `i` or public key file path");
+    }
+
+    let (mut io_read, path) = artifacts_dir.in_file_read(
+        opt_public_key_path,
+        opt_i.map(ArtifactFile::GuardianPublicKey),
+    )?;
+
+    let guardian_public_key = GuardianPublicKey::from_reader(&mut io_read)?;
+
+    if let Some(i) = opt_i {
+        if i != guardian_public_key.i {
+            bail!(
+                "Guardian number specified by --i {} does not match the guardian number {} in the public key file: {}",
+                i,
+                guardian_public_key.i,
+                path.display()
+            );
+        }
+    }
+
+    if let Some(name) = &guardian_public_key.opt_name {
+        eprintln!(
+            "Public key for guardian number {} {:?} loaded from: {}",
+            guardian_public_key.i,
+            name,
+            path.display()
+        )
+    } else {
+        eprintln!(
+            "Public key for guardian number {} loaded from: {}",
+            guardian_public_key.i,
+            path.display()
+        )
+    }
+
+    Ok(guardian_public_key)
+}
+
+pub(crate) fn load_joint_election_public_key(
+    opt_joint_election_public_key_path: &Option<PathBuf>,
+    artifacts_dir: &ArtifactsDir,
+) -> Result<JointElectionPublicKey> {
+    let (mut io_read, path) = artifacts_dir.in_file_read(
+        opt_joint_election_public_key_path,
+        Some(ArtifactFile::JointElectionPublicKey),
+    )?;
+
+    let jepk = JointElectionPublicKey::from_reader(&mut io_read)?;
+
+    eprintln!("Joint election public key loaded from: {}", path.display());
+
+    Ok(jepk)
+}
+
+pub(crate) fn load_hashes(
+    opt_hashes_path: &Option<PathBuf>,
+    artifacts_dir: &ArtifactsDir,
+) -> Result<Hashes> {
+    let (mut io_read, path) =
+        artifacts_dir.in_file_read(opt_hashes_path, Some(ArtifactFile::Hashes))?;
+
+    let hashes = Hashes::from_reader(&mut io_read)?;
+
+    eprintln!("Hashes loaded from: {}", path.display());
+
+    Ok(hashes)
 }
 
 /// Read the recommended amount of seed data from the OS RNG.

@@ -14,7 +14,7 @@ use crate::{
     election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
-    key::Ciphertext,
+    joint_election_public_key::Ciphertext,
 };
 
 #[derive(Debug, Clone)]

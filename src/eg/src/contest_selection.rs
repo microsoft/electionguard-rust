@@ -6,8 +6,8 @@ use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
     contest::Contest, contest_hash::encrypted as contest_hash, device::Device,
-    election_record::ElectionRecordHeader, hash::HValue, key::Ciphertext, nizk::ProofRange,
-    nonce::encrypted as nonce,
+    election_record::ElectionRecordHeader, hash::HValue, joint_election_public_key::Ciphertext,
+    nizk::ProofRange, nonce::encrypted as nonce,
 };
 
 /// A plaintext vote for an option in a contest.

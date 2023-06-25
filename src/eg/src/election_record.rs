@@ -8,7 +8,7 @@ use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     hashes::Hashes,
-    key::PublicKey,
+    joint_election_public_key::JointElectionPublicKey,
     nizk::ProofGuardian,
 };
 
@@ -24,12 +24,8 @@ pub struct ElectionRecordHeader {
     /// Hashes H_P, H_M, H_B, and H_E
     pub hashes: Hashes,
 
-    /// Commitments from each election guardian to each of their polynomial coefficients and
-    /// proofs from each guardian of possession of each of the associated coefficients
-    pub guardian_proofs: Vec<ProofGuardian>,
-
     /// The election public key
-    pub public_key: PublicKey,
+    pub public_key: JointElectionPublicKey,
 }
 
 /// The body of the election record, generated after the election is complete.
@@ -59,14 +55,12 @@ impl ElectionRecordHeader {
         manifest: ElectionManifest,
         parameters: ElectionParameters,
         hashes: Hashes,
-        guardian_proofs: Vec<ProofGuardian>,
-        public_key: PublicKey,
+        public_key: JointElectionPublicKey,
     ) -> ElectionRecordHeader {
         ElectionRecordHeader {
             manifest,
             parameters,
             hashes,
-            guardian_proofs,
             public_key,
         }
     }

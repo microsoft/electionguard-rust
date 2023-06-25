@@ -7,14 +7,15 @@
 
 use std::borrow::Borrow;
 
-use num_bigint::BigUint;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
+    guardian_secret_key::CoefficientCommitments,
     hash::{eg_h, HValue},
-    key::PublicKey,
+    joint_election_public_key::JointElectionPublicKey,
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -115,6 +116,12 @@ impl Hashes {
         s
     }
 
+    /// Reads `Hashes` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<Hashes> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
+    }
+
     fn pad(v: &Vec<u8>, l: usize) -> Vec<u8> {
         let padding = vec![0u8; l - v.len()];
         [padding, v.to_vec()].concat()
@@ -123,8 +130,8 @@ impl Hashes {
     pub fn new_with_extended(
         election_parameters: &ElectionParameters,
         election_manifest: &ElectionManifest,
-        capital_k: &PublicKey,
-        capital_k_i: &Vec<BigUint>,
+        capital_k: &JointElectionPublicKey,
+        capital_k_i: &CoefficientCommitments,
     ) -> Self {
         let mut hashes = Hashes::new(election_parameters, election_manifest);
 
@@ -134,11 +141,12 @@ impl Hashes {
             let mut v = vec![0x12];
 
             v.extend(Self::pad(&capital_k.0.to_bytes_be(), 512));
-            capital_k_i
-                .iter()
-                .for_each(|u| v.extend(Self::pad(&u.to_bytes_be(), 512)));
-
-            println!("v: {:?}", v.len());
+            capital_k_i.0.iter().for_each(|u| {
+                v.extend(Self::pad(
+                    &u.to_be_bytes_len_p(&election_parameters.fixed_parameters),
+                    512,
+                ))
+            });
 
             eg_h(&hashes.h_b, &v)
         };

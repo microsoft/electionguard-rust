@@ -5,16 +5,17 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-mod generate_guardian_key;
-mod generate_guardian_shares;
 mod guardian_secret_key_generate;
+mod guardian_secret_key_write_encrypted_share;
 mod guardian_secret_key_write_public_key;
 mod none;
-mod preencrypted_ballots;
+mod preencrypted_ballot_generate;
+mod preencrypted_ballot_record;
 mod verify_guardian_proof;
 mod verify_guardian_shares;
 mod verify_standard_parameters;
 mod write_hashes;
+mod write_joint_election_public_key;
 mod write_manifest;
 mod write_parameters;
 mod write_random_seed;
@@ -56,11 +57,8 @@ pub(crate) enum Subcommands {
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 
-    /// Generate a key pair for a guardian.
-    GenerateGuardianKey(crate::subcommands::generate_guardian_key::GenerateGuardianKey),
-
-    /// Generate secret shares and proofs for a guardian.
-    GenerateGuardianShares(crate::subcommands::generate_guardian_shares::GenerateGuardianShares),
+    /// Generate an encrypted share of the guardian secret key.
+    GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
 
     /// Verify secret shares from a guardian.
     VerifyGuardianShares(crate::subcommands::verify_guardian_shares::VerifyGuardianShares),
@@ -68,8 +66,12 @@ pub(crate) enum Subcommands {
     /// Verify proof of knowledge from a guardian.
     VerifyGuardianProof(crate::subcommands::verify_guardian_proof::VerifyGuardianProof),
 
-    /// Generate or verify pre-encrypted ballots.
-    PreEncryptedBallots(crate::subcommands::preencrypted_ballots::PreEncryptedBallots),
+    /// Generate pre-encrypted ballots.
+    PreEncryptedBallotGenerate(crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate),
+
+    /// Record voter selections for pre-encrypted ballots.
+    PreEncryptedBallotRecord(crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord),
+
 
     /// Generate a guardian secret key.
     GuardianSecretKeyGenerate(
@@ -80,6 +82,9 @@ pub(crate) enum Subcommands {
     GuardianSecretKeyWritePublicKey(
         crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
     ),
+
+    /// Write the aggregated election public key from guardian public keys.
+    WriteJointElectionPublicKey(crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey),
 }
 
 impl Default for Subcommands {
@@ -98,11 +103,12 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteManifest(a) => a,
             WriteParameters(a) => a,
             WriteHashes(a) => a,
+            WriteJointElectionPublicKey(a) => a,
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
-            GenerateGuardianKey(a) => a,
-            PreEncryptedBallots(a) => a,
-            GenerateGuardianShares(a) => a,
+            GuardianSecretKeyWriteEncryptedShare(a) => a,
+            PreEncryptedBallotGenerate(a) => a,
+            PreEncryptedBallotRecord(a) => a,
             VerifyGuardianShares(a) => a,
             VerifyGuardianProof(a) => a,
         }

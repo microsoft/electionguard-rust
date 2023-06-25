@@ -13,7 +13,7 @@ use util::{
 use crate::hash::{eg_h, HVALUE_BYTE_LEN};
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters, hash::HValue,
-    key::PublicKey, nizk::ProofGuardian,
+    nizk::ProofGuardian,
 };
 pub struct Guardian {
     /// Sequence order
@@ -72,17 +72,17 @@ impl<'de> Deserialize<'de> for Polynomial {
     }
 }
 
-/// Aggregates public keys from guardians
-pub fn aggregate_public_keys(
-    fixed_parameters: &FixedParameters,
-    capital_k_i: &[PublicKey],
-) -> BigUint {
-    let mut capital_k = BigUint::from(1 as u8);
-    for capital_k_i_j in capital_k_i {
-        capital_k = (&capital_k * &capital_k_i_j.0) % fixed_parameters.p.as_ref();
-    }
-    capital_k
-}
+// /// Aggregates public keys from guardians
+// pub fn aggregate_public_keys(
+//     fixed_parameters: &FixedParameters,
+//     capital_k_i: &[PublicKey],
+// ) -> BigUint {
+//     let mut capital_k = BigUint::from(1 as u8);
+//     for capital_k_i_j in capital_k_i {
+//         capital_k = (&capital_k * &capital_k_i_j.0) % fixed_parameters.p.as_ref();
+//     }
+//     capital_k
+// }
 
 pub fn verify_share_from(
     fixed_parameters: &FixedParameters,
