@@ -2,22 +2,17 @@ use std::rc::Rc;
 
 use eg::{
     contest::{Contest, ContestEncrypted},
-    contest_selection::{
-        ContestSelectionCiphertext, ContestSelectionEncrypted, ContestSelectionPlaintext,
-    },
+    contest_selection::{ContestSelectionCiphertext, ContestSelectionPlaintext},
     device::Device,
     election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    nizk::ProofRange,
+    zk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
-use crate::{
-    ballot_encrypting_tool::check_shortcode, contest_hash::contest_hash,
-    contest_selection::ContestSelectionPreEncrypted,
-};
+use crate::{contest_hash::contest_hash, contest_selection::ContestSelectionPreEncrypted};
 
 /// A contest in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,7 +24,7 @@ pub struct ContestPreEncrypted {
     pub selections: Vec<ContestSelectionPreEncrypted>,
 
     /// Contest hash
-    pub crypto_hash: HValue,
+    pub contest_hash: HValue,
 }
 
 impl ContestPreEncrypted {
@@ -42,7 +37,7 @@ impl ContestPreEncrypted {
     }
 
     pub fn get_crypto_hash(&self) -> &HValue {
-        &self.crypto_hash
+        &self.contest_hash
     }
 
     pub fn regenerate_nonces(
@@ -67,7 +62,6 @@ impl ContestPreEncrypted {
         primary_nonce: &[u8],
         contest: &Contest,
     ) -> ContestPreEncrypted {
-        let mut success = true;
         let mut selections = <Vec<ContestSelectionPreEncrypted>>::new();
         let selection_labels = contest
             .options
@@ -85,10 +79,6 @@ impl ContestPreEncrypted {
                 selection_labels.len(),
             );
             selections.push(selection);
-            // success &= check_shortcode(&selections, &selection);
-            // if success {
-            //     selections.push(selection);
-            // }
         }
 
         for j in 0..contest.selection_limit {
@@ -100,30 +90,13 @@ impl ContestPreEncrypted {
                 &format!("null_{}", j + 1),
             );
             selections.push(selection);
-            // success &= check_shortcode(&selections, &selection);
-            // if success {
-            //     selections.push(selection);
-            // }
         }
 
-        // match success {
-        //     true => {
-        //         let crypto_hash = contest_hash(header, &contest.label, &selections);
-
-        //         Some(ContestPreEncrypted {
-        //             label: contest.label.clone(),
-        //             selections,
-        //             crypto_hash,
-        //         })
-        //     }
-        //     false => None,
-        // }
-
-        let crypto_hash = contest_hash(header, &contest.label, &selections);
+        let contest_hash = contest_hash(header, &contest.label, &selections);
         ContestPreEncrypted {
             label: contest.label.clone(),
             selections,
-            crypto_hash,
+            contest_hash,
         }
     }
 
@@ -193,17 +166,13 @@ impl ContestPreEncrypted {
             device.header.parameters.fixed_parameters.q.clone(),
         ));
 
-        let selection = ContestSelectionEncrypted {
-            vote: self.combine_voter_selections(
-                &device.header.parameters.fixed_parameters,
-                voter_selections,
-                selection_limit,
-            ),
-            crypto_hash: self.crypto_hash,
-        };
+        let selection = self.combine_voter_selections(
+            &device.header.parameters.fixed_parameters,
+            voter_selections,
+            selection_limit,
+        );
 
         let proof_ballot_correctness = selection
-            .vote
             .iter()
             .enumerate()
             .map(|(i, x)| {
@@ -220,7 +189,7 @@ impl ContestPreEncrypted {
             &device.header,
             csprng,
             zmulq.clone(),
-            &selection.vote,
+            &selection,
             num_selections as usize,
             selection_limit,
         );
@@ -229,7 +198,7 @@ impl ContestPreEncrypted {
         ContestEncrypted {
             label: self.label.clone(),
             selection,
-            crypto_hash: self.crypto_hash,
+            contest_hash: self.contest_hash,
             proof_ballot_correctness,
             proof_selection_limit,
         }

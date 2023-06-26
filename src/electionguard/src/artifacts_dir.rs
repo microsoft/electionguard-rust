@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 
 use anyhow::{bail, Context, Result};
+use eg::hash::HValue;
 
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,14 +22,13 @@ pub(crate) enum ArtifactFile {
     ElectionParameters,
     ElectionRecordHeader,
     JointElectionPublicKey,
-    GuardianPrivateData(u16),
-    GuardianProof(u16),
-    GuardianEncryptedShares(u16, u16),
     GuardianSecretKey(u16),
     GuardianPublicKey(u16),
     PreEncryptedBallots(u128, u128),
     PreEncryptedBallotNonces(u128, u128),
     Hashes,
+    HashesExt,
+    VoterConfirmationCode,
 }
 
 impl std::fmt::Display for ArtifactFile {
@@ -51,15 +51,7 @@ impl From<ArtifactFile> for PathBuf {
             ElectionRecordHeader => PathBuf::from("election_record_header.json"),
             JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
             Hashes => PathBuf::from("hashes.json"),
-            GuardianPrivateData(i) => Path::new("guardians")
-                .join(format!("{i}"))
-                .join(format!("guardian_{i}.private_data.json")),
-            GuardianProof(i) => Path::new("guardians")
-                .join(format!("{i}"))
-                .join(format!("guardian_{i}.proof.json")),
-            GuardianEncryptedShares(i, j) => Path::new("guardians")
-                .join(format!("{j}"))
-                .join(format!("guardian_{i}.share.json")),
+            HashesExt => PathBuf::from("hashes_ext.json"),
             GuardianSecretKey(i) => Path::new("guardians")
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.SECRET_key.json")),
@@ -72,6 +64,9 @@ impl From<ArtifactFile> for PathBuf {
             PreEncryptedBallotNonces(ts, i) => Path::new("pre_encrypted_ballots")
                 .join(format!("{ts}"))
                 .join(format!("ballot_{i}_primary_nonce.json")),
+            VoterConfirmationCode => {
+                Path::new("pre_encrypted_ballots").join(format!("confirmation_code.svg"))
+            }
         }
     }
 }

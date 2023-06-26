@@ -12,3 +12,4 @@ rand_core = { version = "0.6.4", features = ["getrandom"] }
 eg = { path = "../eg" }
 util = { path = "../util" }
 preencrypted = { path = "../preencrypted" }
+voter = { path = "../voter" }

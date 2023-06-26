@@ -23,5 +23,5 @@ pub fn encrypted(
         v.extend_from_slice(x.ciphertext.beta.to_bytes_be().as_slice());
     });
 
-    eg_h(&header.hashes.h_e, &v)
+    eg_h(&header.hashes_ext.h_e, &v)
 }

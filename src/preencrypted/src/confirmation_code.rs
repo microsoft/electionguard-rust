@@ -14,7 +14,7 @@ pub fn confirmation_code(
     let mut v = vec![0x42];
 
     contests.iter().for_each(|c| {
-        v.extend(c.crypto_hash.as_ref());
+        v.extend(c.contest_hash.as_ref());
     });
 
     v.extend_from_slice(b_aux);

@@ -11,7 +11,7 @@ pub fn encrypted(h_e: &HValue, contests: &Vec<ContestEncrypted>, b_aux: &[u8]) -
     let mut v = vec![0x24];
 
     contests.iter().for_each(|c| {
-        v.extend(c.crypto_hash.as_ref());
+        v.extend(c.contest_hash.as_ref());
     });
 
     v.extend_from_slice(b_aux);

@@ -1,24 +1,18 @@
 use std::{fs, path::PathBuf, time::SystemTime};
 
+use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Result};
 use eg::{
-    ballot::{BallotDecrypted, BallotEncrypted},
-    contest::ContestEncrypted,
-    device::Device,
-    election_record::ElectionRecordHeader,
-    hash::HValue,
+    ballot::BallotEncrypted, contest::ContestEncrypted, device::Device,
+    election_record::ElectionRecordHeader, hash::HValue,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, logging::Logging};
-
-use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
+use voter::ballot::BallotSelections;
 
 /// A pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BallotPreEncrypted {
-    /// Label
-    pub label: String,
-
     /// Contests in this ballot
     pub contests: Vec<ContestPreEncrypted>,
 
@@ -27,10 +21,6 @@ pub struct BallotPreEncrypted {
 }
 
 impl BallotPreEncrypted {
-    pub fn get_label(&self) -> &String {
-        &self.label
-    }
-
     pub fn get_contests(&self) -> &Vec<ContestPreEncrypted> {
         &self.contests
     }
@@ -42,7 +32,6 @@ impl BallotPreEncrypted {
     pub fn new_with(header: &ElectionRecordHeader, primary_nonce: &[u8]) -> BallotPreEncrypted {
         // TODO: Find contests in manifest corresponding to requested ballot style
 
-        let label = "Sample Election".to_string();
         let b_aux = "Sample Aux Info".as_bytes();
 
         let contests = header
@@ -51,10 +40,9 @@ impl BallotPreEncrypted {
             .iter()
             .map(|c| ContestPreEncrypted::new(header, primary_nonce.as_ref(), c))
             .collect();
-        let confirmation_code = confirmation_code(&header.hashes.h_e, &contests, b_aux);
+        let confirmation_code = confirmation_code(&header.hashes_ext.h_e, &contests, b_aux);
 
         BallotPreEncrypted {
-            label,
             contests,
             confirmation_code,
         }
@@ -97,7 +85,7 @@ impl BallotPreEncrypted {
         &self,
         device: &Device,
         csprng: &mut Csprng,
-        voter_ballot: &BallotDecrypted,
+        voter_ballot: &BallotSelections,
     ) -> BallotEncrypted {
         let contests = (0..self.contests.len())
             .map(|i| {
@@ -113,7 +101,6 @@ impl BallotPreEncrypted {
         BallotEncrypted {
             date: Self::unix_timestamp().to_string(),
             device: device.get_uuid().clone(),
-            label: self.label.clone(),
             contests,
             confirmation_code: self.confirmation_code,
         }

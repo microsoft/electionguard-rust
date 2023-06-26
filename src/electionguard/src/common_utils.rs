@@ -15,7 +15,7 @@ use rand_core::{OsRng, RngCore};
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
     example_election_manifest::example_election_manifest, guardian_public_key::GuardianPublicKey,
-    guardian_secret_key::GuardianSecretKey, hashes::Hashes,
+    guardian_secret_key::GuardianSecretKey, hashes::Hashes, hashes_ext::HashesExt,
     joint_election_public_key::JointElectionPublicKey,
 };
 use util::csprng::Csprng;
@@ -200,16 +200,22 @@ pub(crate) fn load_joint_election_public_key(
 
 pub(crate) fn load_hashes(
     opt_hashes_path: &Option<PathBuf>,
+    opt_hashes_ext_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
-) -> Result<Hashes> {
+) -> Result<(Hashes, HashesExt)> {
     let (mut io_read, path) =
         artifacts_dir.in_file_read(opt_hashes_path, Some(ArtifactFile::Hashes))?;
-
     let hashes = Hashes::from_reader(&mut io_read)?;
 
     eprintln!("Hashes loaded from: {}", path.display());
 
-    Ok(hashes)
+    let (mut io_read, path) =
+        artifacts_dir.in_file_read(opt_hashes_ext_path, Some(ArtifactFile::HashesExt))?;
+    let hashes_ext = HashesExt::from_reader(&mut io_read)?;
+
+    eprintln!("Hashes (extended) loaded from: {}", path.display());
+
+    Ok((hashes, hashes_ext))
 }
 
 /// Read the recommended amount of seed data from the OS RNG.

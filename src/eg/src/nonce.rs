@@ -19,7 +19,7 @@ pub fn encrypted(
     v.extend_from_slice(label_i);
     v.extend_from_slice(label_j);
 
-    let nonce = eg_h(&header.hashes.h_e, &v);
+    let nonce = eg_h(&header.hashes_ext.h_e, &v);
 
     BigUint::from_bytes_be(nonce.0.as_slice()) % header.parameters.fixed_parameters.q.as_ref()
 }

@@ -5,9 +5,7 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
-    contest::Contest, contest_hash::encrypted as contest_hash, device::Device,
-    election_record::ElectionRecordHeader, hash::HValue, joint_election_public_key::Ciphertext,
-    nizk::ProofRange, nonce::encrypted as nonce,
+    election_record::ElectionRecordHeader, joint_election_public_key::Ciphertext, zk::ProofRange,
 };
 
 /// A plaintext vote for an option in a contest.
@@ -19,19 +17,17 @@ pub struct ContestSelectionCiphertext {
     /// Ciphertext
     pub ciphertext: Ciphertext,
 
+    // TODO: Probably shouldn't be here
     /// Nonce used to produce the ciphertext
     pub nonce: BigUint,
 }
 
-/// A contest option in a pre-encrypted ballot.
-#[derive(Debug, Serialize)]
-pub struct ContestSelectionEncrypted {
-    /// Vector of ciphertexts used to represent the selection
-    pub vote: Vec<ContestSelectionCiphertext>,
-
-    /// Selection hash
-    pub crypto_hash: HValue,
-}
+// /// A contest option in an encrypted ballot.
+// #[derive(Debug, Serialize)]
+// pub struct ContestSelectionEncrypted {
+//     /// Vector of ciphertexts used to represent the selection
+//     pub vote: Vec<ContestSelectionCiphertext>,
+// }
 
 /// A contest selection by a voter.
 #[derive(Debug, Serialize)]
@@ -63,35 +59,34 @@ impl ContestSelection {
     }
 }
 
-impl ContestSelectionEncrypted {
-    // TODO: Check if selection limit is satisfied
-    pub fn new(
-        device: &Device,
-        primary_nonce: &[u8],
-        contest: &Contest,
-        pt_vote: &ContestSelection,
-    ) -> ContestSelectionEncrypted {
-        let mut vote: Vec<ContestSelectionCiphertext> = Vec::new();
-        for (j, v) in pt_vote.vote.iter().enumerate() {
-            let nonce = nonce(
-                &device.header,
-                primary_nonce,
-                contest.label.as_bytes(),
-                contest.options[j].label.as_bytes(),
-            );
-            vote.push(ContestSelectionCiphertext {
-                ciphertext: device.header.public_key.encrypt_with(
-                    &device.header.parameters.fixed_parameters,
-                    &nonce,
-                    *v as usize,
-                ),
-                nonce: BigUint::from(0u8),
-            });
-        }
-        let crypto_hash = contest_hash(&device.header, &contest.label, &vote);
-        ContestSelectionEncrypted { vote, crypto_hash }
-    }
-}
+// impl ContestSelectionEncrypted {
+//     // TODO: Check if selection limit is satisfied
+//     pub fn new(
+//         device: &Device,
+//         primary_nonce: &[u8],
+//         contest: &Contest,
+//         pt_vote: &ContestSelection,
+//     ) -> ContestSelectionEncrypted {
+//         let mut vote: Vec<ContestSelectionCiphertext> = Vec::new();
+//         for (j, v) in pt_vote.vote.iter().enumerate() {
+//             let nonce = nonce(
+//                 &device.header,
+//                 primary_nonce,
+//                 contest.label.as_bytes(),
+//                 contest.options[j].label.as_bytes(),
+//             );
+//             vote.push(ContestSelectionCiphertext {
+//                 ciphertext: device.header.public_key.encrypt_with(
+//                     &device.header.parameters.fixed_parameters,
+//                     &nonce,
+//                     *v as usize,
+//                 ),
+//                 nonce: BigUint::from(0u8),
+//             });
+//         }
+//         ContestSelectionEncrypted { vote }
+//     }
+// }
 
 impl ContestSelectionCiphertext {
     pub fn proof_ballot_correctness(

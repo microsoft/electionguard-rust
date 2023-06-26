@@ -1,16 +1,18 @@
 use std::rc::Rc;
 
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
     contest_hash,
-    contest_selection::{ContestSelection, ContestSelectionCiphertext, ContestSelectionEncrypted},
+    contest_selection::{ContestSelection, ContestSelectionCiphertext},
     device::Device,
     election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    nizk::ProofRange,
+    nonce::encrypted as nonce,
+    zk::ProofRange,
 };
 
 /// A contest.
@@ -22,38 +24,65 @@ pub struct Contest {
     /// The maximum count of options that a voter may select.
     pub selection_limit: usize,
 
-    /// The candidates/options.
-    /// The order of options matches the virtual ballot.
+    /// The candidates/options. The order of options matches the virtual ballot.
     pub options: Vec<ContestOption>,
 }
 
 /// An option in a contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContestOption {
-    /// Label
+    /// The label.
     pub label: String,
 }
 
-/// A contest in a pre-encrypted ballot.
+/// A contest in an encrypted ballot.
 #[derive(Debug)]
 pub struct ContestEncrypted {
-    /// Label
+    /// The label.
     pub label: String,
 
-    /// Selection in this contest
-    pub selection: ContestSelectionEncrypted,
+    /// Encrypted voter selection vector.
+    pub selection: Vec<ContestSelectionCiphertext>,
 
-    /// Contest hash
-    pub crypto_hash: HValue,
+    /// Contest hash.
+    pub contest_hash: HValue,
 
-    /// Proof of ballot correctness
+    /// Proof of ballot correctness.
     pub proof_ballot_correctness: Vec<ProofRange>,
 
-    // Proof of satisfying the selection limit
+    // Proof of satisfying the selection limit.
     pub proof_selection_limit: ProofRange,
 }
 
 impl ContestEncrypted {
+    fn encrypt_selection(
+        header: &ElectionRecordHeader,
+        primary_nonce: &[u8],
+        contest: &Contest,
+        pt_vote: &ContestSelection,
+    ) -> Vec<ContestSelectionCiphertext> {
+        // TODO: Check if selection limit is satisfied
+
+        let mut vote: Vec<ContestSelectionCiphertext> = Vec::new();
+        for (j, v) in pt_vote.vote.iter().enumerate() {
+            let nonce = nonce(
+                header,
+                primary_nonce,
+                contest.label.as_bytes(),
+                contest.options[j].label.as_bytes(),
+            );
+            vote.push(ContestSelectionCiphertext {
+                ciphertext: header.public_key.encrypt_with(
+                    &header.parameters.fixed_parameters,
+                    &nonce,
+                    *v as usize,
+                ),
+                nonce: BigUint::from(0u8),
+            });
+        }
+        vote
+    }
+
     pub fn new(
         device: &Device,
         csprng: &mut Csprng,
@@ -61,13 +90,13 @@ impl ContestEncrypted {
         contest: &Contest,
         pt_vote: &ContestSelection,
     ) -> ContestEncrypted {
-        let selection = ContestSelectionEncrypted::new(device, primary_nonce, contest, pt_vote);
-        let crypto_hash = contest_hash::encrypted(&device.header, &contest.label, &selection.vote);
+        // let selection = ContestSelectionEncrypted::new(device, primary_nonce, contest, pt_vote);
+        let selection = Self::encrypt_selection(&device.header, primary_nonce, contest, pt_vote);
+        let contest_hash = contest_hash::encrypted(&device.header, &contest.label, &selection);
         let zmulq = Rc::new(ZMulPrime::new(
             device.header.parameters.fixed_parameters.q.clone(),
         ));
         let proof_ballot_correctness = selection
-            .vote
             .iter()
             .enumerate()
             .map(|(i, x)| {
@@ -84,14 +113,14 @@ impl ContestEncrypted {
             &device.header,
             csprng,
             zmulq.clone(),
-            &selection.vote,
+            &selection,
             num_selections as usize,
             contest.selection_limit,
         );
         ContestEncrypted {
             label: contest.label.clone(),
             selection,
-            crypto_hash,
+            contest_hash,
             proof_ballot_correctness,
             proof_selection_limit,
         }

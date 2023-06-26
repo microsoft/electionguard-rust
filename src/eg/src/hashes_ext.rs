@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,7 +19,7 @@ use crate::{
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HashesExt {
     /// Extended base hash.
-    h_e: HValue,
+    pub h_e: HValue,
 }
 
 impl HashesExt {
@@ -65,7 +66,7 @@ impl HashesExt {
         Self { h_e }
     }
 
-    /// Returns a pretty JSON `String` representation of the `Hashes`.
+    /// Returns a pretty JSON `String` representation of the `HashesExt`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?
@@ -73,6 +74,12 @@ impl HashesExt {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
+    }
+
+    /// Reads `HashesExt` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HashesExt> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
     }
 }
 

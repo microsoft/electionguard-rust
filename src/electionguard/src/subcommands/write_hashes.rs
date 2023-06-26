@@ -9,11 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use eg::{
-    guardian_secret_key::{CoefficientCommitment, CoefficientCommitments},
-    hashes::Hashes,
-    joint_election_public_key::JointElectionPublicKey,
-};
+use eg::{hashes::Hashes, hashes_ext::HashesExt};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -58,40 +54,45 @@ impl Subcommand for WriteHashes {
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        let hashes: Hashes;
+        let guardian_public_keys = (1..election_parameters.varying_parameters.n + 1)
+            .map(|i| {
+                load_guardian_public_key(Some(i), &None, &subcommand_helper.artifacts_dir).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let jepk = load_joint_election_public_key(&None, &subcommand_helper.artifacts_dir)?;
+        // let capital_k_i = CoefficientCommitments(
+        //     guardian_public_keys
+        //         .iter()
+        //         .flat_map(|k| k.coefficient_commitments().0.clone())
+        //         .collect(),
+        // );
+
+        let hashes = Hashes::new(&election_parameters, &election_manifest);
+        subcommand_helper
+            .artifacts_dir
+            .out_file_write(
+                &self.out_file,
+                ArtifactFile::Hashes,
+                "hashes",
+                hashes.to_json().as_bytes(),
+            )
+            .unwrap();
+
         if self.extended {
-            let guardian_public_keys = (1..election_parameters.varying_parameters.n + 1)
-                .map(|i| {
-                    load_guardian_public_key(Some(i), &None, &subcommand_helper.artifacts_dir)
-                        .unwrap()
-                })
-                .collect::<Vec<_>>();
-
-            let jepk = load_joint_election_public_key(&None, &subcommand_helper.artifacts_dir)?;
-            let capital_k_i = CoefficientCommitments(
-                guardian_public_keys
-                    .iter()
-                    .flat_map(|k| k.coefficient_commitments().0.clone())
-                    .collect(),
-            );
-
-            hashes = Hashes::new_with_extended(
-                &election_parameters,
-                &election_manifest,
-                &jepk,
-                &capital_k_i,
-            );
-        } else {
-            hashes = Hashes::new(&election_parameters, &election_manifest);
+            let hashes_ext =
+                HashesExt::new(&election_parameters, &hashes, &jepk, &guardian_public_keys);
+            subcommand_helper
+                .artifacts_dir
+                .out_file_write(
+                    &self.out_file,
+                    ArtifactFile::HashesExt,
+                    "hashes (extended)",
+                    hashes_ext.to_json().as_bytes(),
+                )
+                .unwrap();
         }
 
-        let json = hashes.to_json();
-
-        subcommand_helper.artifacts_dir.out_file_write(
-            &self.out_file,
-            ArtifactFile::Hashes,
-            "hashes",
-            json.as_bytes(),
-        )
+        Ok(())
     }
 }

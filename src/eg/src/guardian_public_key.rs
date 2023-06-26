@@ -18,7 +18,7 @@ use crate::{fixed_parameters::FixedParameters, guardian_secret_key::CoefficientC
 /// Public key for a guardian.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianPublicKey {
-    /// Guardian number, 0 <= i < n.
+    /// Guardian number, 1 <= i <= n.
     pub i: u16,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.

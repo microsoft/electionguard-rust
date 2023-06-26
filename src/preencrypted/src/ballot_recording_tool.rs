@@ -1,17 +1,13 @@
-use eg::election_record::ElectionRecordHeader;
-use eg::hash::HValue;
+use crate::{
+    ballot::BallotPreEncrypted, contest::ContestPreEncrypted,
+    contest_selection::ContestSelectionPreEncrypted, nonce::option_nonce,
+};
+use eg::{
+    ballot::BallotEncrypted, contest::ContestEncrypted,
+    contest_selection::ContestSelectionCiphertext, device::Device,
+    election_record::ElectionRecordHeader, hash::HValue, zk::ProofRange,
+};
 use util::logging::Logging;
-
-use crate::ballot::BallotPreEncrypted;
-use crate::contest::ContestPreEncrypted;
-use crate::contest_selection::ContestSelectionPreEncrypted;
-use crate::nonce::option_nonce;
-use eg::ballot::BallotEncrypted;
-use eg::contest::ContestEncrypted;
-use eg::contest_selection::ContestSelectionCiphertext;
-use eg::device::Device;
-use eg::fixed_parameters::FixedParameters;
-use eg::nizk::ProofRange;
 
 pub struct BallotRecordingTool {}
 
@@ -24,7 +20,6 @@ impl BallotRecordingTool {
         let regenerated_ballot = BallotPreEncrypted::new_with(header, &primary_nonce.0);
         if ballot.get_confirmation_code() == regenerated_ballot.get_confirmation_code() {
             return BallotRecordingTool::verify_ballot_contests(
-                &header.parameters.fixed_parameters,
                 ballot.get_contests(),
                 regenerated_ballot.get_contests(),
             );
@@ -138,11 +133,7 @@ impl BallotRecordingTool {
                     &format!(
                         "    Ballot correctness / {}: {:?}",
                         j,
-                        proof.verify(
-                            &device.header,
-                            &contest.selection.vote[j].ciphertext,
-                            1 as usize,
-                        )
+                        proof.verify(&device.header, &contest.selection[j].ciphertext, 1 as usize,)
                     ),
                     line!(),
                     file!(),
@@ -158,7 +149,7 @@ impl BallotRecordingTool {
                         &device.header,
                         &ContestEncrypted::sum_selection_vector(
                             &device.header.parameters.fixed_parameters,
-                            &contest.selection.vote
+                            &contest.selection
                         )
                         .ciphertext,
                         device.header.manifest.contests[i].selection_limit,
@@ -171,18 +162,16 @@ impl BallotRecordingTool {
     }
 
     fn verify_ballot_contests(
-        fixed_parameters: &FixedParameters,
         contests: &Vec<ContestPreEncrypted>,
         regenerated_contests: &Vec<ContestPreEncrypted>,
     ) -> bool {
         assert!(contests.len() == regenerated_contests.len());
         for (i, a) in contests.iter().enumerate() {
-            if a.crypto_hash != regenerated_contests[i].crypto_hash {
+            if a.contest_hash != regenerated_contests[i].contest_hash {
                 println!("Contest crypto hash mismatch.");
                 return false;
             }
             BallotRecordingTool::verify_contest_selections(
-                fixed_parameters,
                 &a.selections,
                 &regenerated_contests[i].selections,
             );
@@ -191,16 +180,13 @@ impl BallotRecordingTool {
     }
 
     fn verify_contest_selections(
-        fixed_parameters: &FixedParameters,
         selections: &Vec<ContestSelectionPreEncrypted>,
         regenerated_selections: &Vec<ContestSelectionPreEncrypted>,
     ) -> bool {
         assert!(selections.len() == regenerated_selections.len());
 
-        // eprintln!("Number of voter selections:\t{}", voter_selections.len());
-
         for (i, a) in selections.iter().enumerate() {
-            if a.crypto_hash != regenerated_selections[i].crypto_hash {
+            if a.selection_hash != regenerated_selections[i].selection_hash {
                 return false;
             }
             assert!(a.selections.len() == regenerated_selections[i].selections.len());
@@ -211,11 +197,6 @@ impl BallotRecordingTool {
             }
         }
 
-        // if ctxts_to_combine.len() == 0 {
-        //     return false;
-        // }
-
-        // // combined_selection
         true
     }
 

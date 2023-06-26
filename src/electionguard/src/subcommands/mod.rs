@@ -11,9 +11,8 @@ mod guardian_secret_key_write_public_key;
 mod none;
 mod preencrypted_ballot_generate;
 mod preencrypted_ballot_record;
-mod verify_guardian_proof;
-mod verify_guardian_shares;
 mod verify_standard_parameters;
+mod voter_write_confirmation_code;
 mod write_hashes;
 mod write_joint_election_public_key;
 mod write_manifest;
@@ -60,18 +59,11 @@ pub(crate) enum Subcommands {
     /// Generate an encrypted share of the guardian secret key.
     GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
 
-    /// Verify secret shares from a guardian.
-    VerifyGuardianShares(crate::subcommands::verify_guardian_shares::VerifyGuardianShares),
-
-    /// Verify proof of knowledge from a guardian.
-    VerifyGuardianProof(crate::subcommands::verify_guardian_proof::VerifyGuardianProof),
-
     /// Generate pre-encrypted ballots.
     PreEncryptedBallotGenerate(crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate),
 
     /// Record voter selections for pre-encrypted ballots.
     PreEncryptedBallotRecord(crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord),
-
 
     /// Generate a guardian secret key.
     GuardianSecretKeyGenerate(
@@ -85,6 +77,9 @@ pub(crate) enum Subcommands {
 
     /// Write the aggregated election public key from guardian public keys.
     WriteJointElectionPublicKey(crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey),
+
+    /// Write the confirmation QR code for a voter.
+    VoterWriteConfirmationCode(crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode),
 }
 
 impl Default for Subcommands {
@@ -109,8 +104,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             GuardianSecretKeyWriteEncryptedShare(a) => a,
             PreEncryptedBallotGenerate(a) => a,
             PreEncryptedBallotRecord(a) => a,
-            VerifyGuardianShares(a) => a,
-            VerifyGuardianProof(a) => a,
+            VoterWriteConfirmationCode(a) => a,
         }
     }
 }

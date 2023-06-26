@@ -4,27 +4,27 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ballot::{BallotDecrypted, BallotEncrypted},
-    election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters,
-    hashes::Hashes,
+    ballot::BallotEncrypted, election_manifest::ElectionManifest,
+    election_parameters::ElectionParameters, hashes::Hashes, hashes_ext::HashesExt,
     joint_election_public_key::JointElectionPublicKey,
-    nizk::ProofGuardian,
 };
 
 /// The header of the election record, generated before the election begins.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ElectionRecordHeader {
-    /// The election manifest
+    /// The election manifest.
     pub manifest: ElectionManifest,
 
     /// Baseline election and cryptographic parameters
     pub parameters: ElectionParameters,
 
-    /// Hashes H_P, H_M, H_B, and H_E
+    /// Hashes H_P, H_M, H_B.
     pub hashes: Hashes,
 
-    /// The election public key
+    /// Hash H_E
+    pub hashes_ext: HashesExt,
+
+    /// The joint election public key.
     pub public_key: JointElectionPublicKey,
 }
 
@@ -35,7 +35,7 @@ pub struct ElectionRecordBody {
     all_ballots: Vec<BallotEncrypted>,
 
     /// Every challenged ballot
-    challenged_ballots: Vec<BallotDecrypted>,
+    // challenged_ballots: Vec<BallotSelections>,
 
     /// Tally of all cast ballots
 
@@ -55,12 +55,14 @@ impl ElectionRecordHeader {
         manifest: ElectionManifest,
         parameters: ElectionParameters,
         hashes: Hashes,
+        hashes_ext: HashesExt,
         public_key: JointElectionPublicKey,
     ) -> ElectionRecordHeader {
         ElectionRecordHeader {
             manifest,
             parameters,
             hashes,
+            hashes_ext,
             public_key,
         }
     }

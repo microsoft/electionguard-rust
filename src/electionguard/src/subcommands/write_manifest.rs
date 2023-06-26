@@ -8,7 +8,6 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
-use eg::example_election_manifest::example_election_manifest;
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::ElectionManifestSource,

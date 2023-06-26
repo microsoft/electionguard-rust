@@ -30,5 +30,5 @@ pub fn contest_hash(
         v.extend(s.as_ref());
     });
 
-    eg_h(&header.hashes.h_e, &v)
+    eg_h(&header.hashes_ext.h_e, &v)
 }

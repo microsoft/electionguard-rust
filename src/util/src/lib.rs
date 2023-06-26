@@ -7,7 +7,6 @@
 
 pub mod array_ascii;
 pub mod biguint_serde;
-pub mod bitwise;
 pub mod csprng;
 pub mod file;
 pub mod hex_dump;

@@ -1,20 +1,14 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use eg::ballot::BallotStyle;
 use eg::contest_selection::ContestSelectionCiphertext;
-use eg::election_manifest::ElectionManifest;
 use eg::election_record::ElectionRecordHeader;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
 use util::csprng::Csprng;
-use util::file::{create_path, write_path};
 use util::logging::Logging;
 
 use crate::ballot::BallotPreEncrypted;
-use crate::contest_selection::ContestSelectionPreEncrypted;
 
 pub struct BallotEncryptingTool {
     pub header: ElectionRecordHeader,
@@ -55,7 +49,7 @@ impl BallotEncryptingTool {
         ballot.get_contests().iter().for_each(|c| {
             Logging::log(
                 tag,
-                &format!("    {}", c.crypto_hash.to_string()),
+                &format!("    {}", c.contest_hash.to_string()),
                 line!(),
                 file!(),
             );
@@ -86,24 +80,24 @@ pub fn generate_short_code(full_hash: &HValue) -> String {
 }
 
 /// Checks whether previous selections contain the same short code
-pub fn check_shortcode(
-    previous: &Vec<ContestSelectionPreEncrypted>,
-    current: &ContestSelectionPreEncrypted,
-) -> bool {
-    for other in previous.iter() {
-        if other.shortcode == current.shortcode {
-            return false;
-        }
-    }
-    true
-}
+// pub fn check_shortcode(
+//     previous: &Vec<ContestSelectionPreEncrypted>,
+//     current: &ContestSelectionPreEncrypted,
+// ) -> bool {
+//     for other in previous.iter() {
+//         if other.shortcode == current.shortcode {
+//             return false;
+//         }
+//     }
+//     true
+// }
 
 /// Generates a selection hash (Equation 93/94)
 ///
 /// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
 /// TODO: Remove label from the hash (equation 93)
-pub fn generate_selection_hash(
+pub fn selection_hash(
     header: &ElectionRecordHeader,
     selections: &Vec<ContestSelectionCiphertext>,
 ) -> HValue {
@@ -116,7 +110,7 @@ pub fn generate_selection_hash(
         v.extend_from_slice(s.ciphertext.beta.to_bytes_be().as_slice());
     });
 
-    eg_h(&header.hashes.h_e, &v)
+    eg_h(&header.hashes_ext.h_e, &v)
 }
 
 // // Unit tests for pre-encrypted ballots.
