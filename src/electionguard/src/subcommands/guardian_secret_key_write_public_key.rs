@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::path::PathBuf;
+use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::{bail, Result};
 
@@ -19,7 +19,7 @@ use crate::{
 pub(crate) struct GuardianSecretKeyWritePublicKey {
     /// Guardian number, 1 <= i <= n.
     #[arg(long)]
-    i: Option<u16>,
+    i: Option<NonZeroU16>,
 
     /// File containing the guardian's secret key.
     /// Default is to look in the artifacts dir, if --i is provided.

@@ -32,8 +32,8 @@ impl HashesExt {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let n = varying_parameters.n as usize;
-        let k = varying_parameters.k as usize;
+        let n: usize = varying_parameters.n.into();
+        let k: usize = varying_parameters.k.into();
 
         assert_eq!(guardian_public_keys.len(), n);
 
@@ -120,9 +120,8 @@ mod test {
 
         let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        let n = varying_parameters.n;
-
-        let guardian_secret_keys = (0..n)
+        let guardian_secret_keys = varying_parameters
+            .each_guardian_i()
             .map(|i| GuardianSecretKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
 

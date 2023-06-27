@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::path::PathBuf;
+use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::Result;
 
@@ -56,18 +56,16 @@ impl Subcommand for WriteHashes {
 
         let guardian_public_keys = (1..election_parameters.varying_parameters.n + 1)
             .map(|i| {
-                load_guardian_public_key(Some(i), &None, &subcommand_helper.artifacts_dir).unwrap()
+                load_guardian_public_key(
+                    Some(NonZeroU16::new(i).unwrap()),
+                    &None,
+                    &subcommand_helper.artifacts_dir,
+                )
+                .unwrap()
             })
             .collect::<Vec<_>>();
 
         let jepk = load_joint_election_public_key(&None, &subcommand_helper.artifacts_dir)?;
-        // let capital_k_i = CoefficientCommitments(
-        //     guardian_public_keys
-        //         .iter()
-        //         .flat_map(|k| k.coefficient_commitments().0.clone())
-        //         .collect(),
-        // );
-
         let hashes = Hashes::new(&election_parameters, &election_manifest);
         subcommand_helper
             .artifacts_dir

@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
+use std::num::NonZeroU16;
 
 use anyhow::{anyhow, Result};
 use num_bigint::BigUint;
@@ -19,7 +20,7 @@ use crate::{fixed_parameters::FixedParameters, guardian_secret_key::CoefficientC
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianPublicKey {
     /// Guardian number, 1 <= i <= n.
-    pub i: u16,
+    pub i: NonZeroU16,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
     #[serde(rename = "name")]
@@ -80,10 +81,10 @@ mod test {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let n = varying_parameters.n;
-        let k = varying_parameters.k;
+        let k: usize = varying_parameters.k.into();
 
-        let guardian_secret_keys = (0..n)
+        let guardian_secret_keys = varying_parameters
+            .each_guardian_i()
             .map(|i| GuardianSecretKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
 
@@ -93,11 +94,8 @@ mod test {
             .collect::<Vec<_>>();
 
         for guardian_secret_key in guardian_secret_keys.iter() {
-            assert_eq!(guardian_secret_key.secret_coefficients.0.len(), k as usize);
-            assert_eq!(
-                guardian_secret_key.coefficient_commitments.0.len(),
-                k as usize
-            );
+            assert_eq!(guardian_secret_key.secret_coefficients.0.len(), k);
+            assert_eq!(guardian_secret_key.coefficient_commitments.0.len(), k);
 
             for secret_coefficient in guardian_secret_key.secret_coefficients.0.iter() {
                 assert!(&secret_coefficient.0 < fixed_parameters.q.borrow());
@@ -109,10 +107,7 @@ mod test {
         }
 
         for (i, guardian_public_key) in guardian_public_keys.iter().enumerate() {
-            assert_eq!(
-                guardian_public_key.coefficient_commitments.0.len(),
-                k as usize
-            );
+            assert_eq!(guardian_public_key.coefficient_commitments.0.len(), k);
 
             for (j, coefficient_commitment) in guardian_public_key
                 .coefficient_commitments

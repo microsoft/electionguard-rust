@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
+use std::num::NonZeroU16;
 
 use anyhow::{anyhow, Result};
 use num_bigint::BigUint;
@@ -45,7 +46,7 @@ impl SecretCoefficients {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let k = varying_parameters.k as usize;
+        let k = varying_parameters.k;
 
         SecretCoefficients(
             (0..k)
@@ -99,7 +100,7 @@ impl CoefficientCommitments {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianSecretKey {
     /// Guardian number, 1 <= i <= n.
-    pub i: u16,
+    pub i: NonZeroU16,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
     #[serde(rename = "name")]
@@ -116,7 +117,7 @@ impl GuardianSecretKey {
     pub fn generate(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
-        i: u16,
+        i: NonZeroU16,
         opt_name: Option<String>,
     ) -> Self {
         let secret_coefficients = SecretCoefficients::generate(csprng, election_parameters);

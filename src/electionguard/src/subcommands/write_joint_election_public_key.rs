@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::path::PathBuf;
+use std::{num::NonZeroU16, path::PathBuf};
 
 use anyhow::Result;
 
@@ -43,7 +43,12 @@ impl Subcommand for WriteJointElectionPublicKey {
 
         let guardian_public_keys = (1..election_parameters.varying_parameters.n + 1)
             .map(|i| {
-                load_guardian_public_key(Some(i), &None, &subcommand_helper.artifacts_dir).unwrap()
+                load_guardian_public_key(
+                    Some(NonZeroU16::new(i).unwrap()),
+                    &None,
+                    &subcommand_helper.artifacts_dir,
+                )
+                .unwrap()
             })
             .collect::<Vec<_>>();
 
