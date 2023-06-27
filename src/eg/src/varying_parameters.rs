@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use std::num::NonZeroU16;
+
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
@@ -44,5 +46,21 @@ impl VaryingParameters {
         }
 
         Ok(())
+    }
+
+    /// Iterates over the guardian numbers, 1 <= i <= n.
+    /// This is useful because `NonZeroU16` doesn't (yet) implement
+    /// the `Step` trait necessary for iteration.
+    ///
+    /// See rust issue 73121 "[ER] NonZeroX Step and better constructors"
+    /// https://github.com/rust-lang/rust/issues/73121
+    /// and libs-team issue 130 "Implement Step for NonZeroUxx"
+    /// https://github.com/rust-lang/libs-team/issues/130
+    pub fn each_guardian_i(&self) -> impl Iterator<Item = NonZeroU16> {
+        (1..=self.n).map(|i| {
+            // `unwrap()` is justified here because we iterate over `1..=n`
+            #[allow(clippy::unwrap_used)]
+            NonZeroU16::new(i).unwrap()
+        })
     }
 }

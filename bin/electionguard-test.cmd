@@ -280,8 +280,7 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- For each guardian
 
-set /a "eg_n_minus_1=eg_n - 1"
-for /L %%N in (0, 1, %eg_n_minus_1%) do call :sub_egtest_per_guardian %%N
+for /L %%N in (1, 1, %eg_n%) do call :sub_egtest_per_guardian %%N
 echo.
 echo ---- All guardians done.
 

@@ -7,6 +7,7 @@
 
 use std::fs::OpenOptions;
 use std::io::Read;
+use std::num::NonZeroU16;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
@@ -91,7 +92,7 @@ pub(crate) fn load_election_parameters(
 }
 
 pub(crate) fn load_guardian_secret_key(
-    opt_i: Option<u16>,
+    opt_i: Option<NonZeroU16>,
     opt_secret_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
 ) -> Result<GuardianSecretKey> {

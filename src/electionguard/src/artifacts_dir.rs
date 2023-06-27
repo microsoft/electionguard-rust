@@ -7,6 +7,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::Stdout;
+use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 use std::string::ToString;
 
@@ -20,8 +21,8 @@ pub(crate) enum ArtifactFile {
     ElectionManifestCanonical,
     ElectionParameters,
     Hashes,
-    GuardianSecretKey(u16),
-    GuardianPublicKey(u16),
+    GuardianSecretKey(NonZeroU16),
+    GuardianPublicKey(NonZeroU16),
 }
 
 impl std::fmt::Display for ArtifactFile {

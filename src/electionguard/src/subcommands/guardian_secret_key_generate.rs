@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use std::num::NonZeroU16;
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
@@ -17,11 +18,11 @@ use crate::{
 };
 
 /// Generate a guardian secret key and public key.
-#[derive(clap::Args, Debug, Default)]
+#[derive(clap::Args, Debug)]
 pub(crate) struct GuardianSecretKeyGenerate {
-    /// Guardian number, 0 <= i < n.
+    /// Guardian number, 1 <= i <= n.
     #[arg(long)]
-    i: u16,
+    i: NonZeroU16,
 
     /// Guardian's name or other short description.
     #[arg(long)]
@@ -50,9 +51,9 @@ impl Subcommand for GuardianSecretKeyGenerate {
         let varying_parameters = &election_parameters.varying_parameters;
 
         #[allow(clippy::nonminimal_bool)]
-        if !(self.i < varying_parameters.n) {
+        if !(self.i.get() <= varying_parameters.n) {
             bail!(
-                "Guardian number {} must be less than n = {} from election parameters",
+                "Guardian number {} must be less than or equal to n = {} from election parameters",
                 self.i,
                 varying_parameters.n
             );
