@@ -1,7 +1,5 @@
+use serde::Serialize;
 use std::rc::Rc;
-
-use num_bigint::BigUint;
-use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
@@ -11,22 +9,14 @@ use crate::{
 /// A plaintext vote for an option in a contest.
 pub type ContestSelectionPlaintext = u8;
 
-/// An encrypted option in a contest.
-#[derive(Debug, Clone)]
-pub struct ContestSelectionCiphertext {
-    /// Ciphertext
-    pub ciphertext: Ciphertext,
-
-    // TODO: Probably shouldn't be here
-    /// Nonce used to produce the ciphertext
-    pub nonce: BigUint,
-}
-
-// /// A contest option in an encrypted ballot.
-// #[derive(Debug, Serialize)]
-// pub struct ContestSelectionEncrypted {
-//     /// Vector of ciphertexts used to represent the selection
-//     pub vote: Vec<ContestSelectionCiphertext>,
+// An encrypted option in a contest.
+// #[derive(Debug, Clone)]
+// pub struct ContestSelectionCiphertext {
+//     /// Ciphertext
+//     pub ciphertext: Ciphertext,
+//     // TODO: Probably shouldn't be here
+//     // Nonce used to produce the ciphertext
+//     // pub nonce: BigUint,
 // }
 
 /// A contest selection by a voter.
@@ -59,36 +49,7 @@ impl ContestSelection {
     }
 }
 
-// impl ContestSelectionEncrypted {
-//     // TODO: Check if selection limit is satisfied
-//     pub fn new(
-//         device: &Device,
-//         primary_nonce: &[u8],
-//         contest: &Contest,
-//         pt_vote: &ContestSelection,
-//     ) -> ContestSelectionEncrypted {
-//         let mut vote: Vec<ContestSelectionCiphertext> = Vec::new();
-//         for (j, v) in pt_vote.vote.iter().enumerate() {
-//             let nonce = nonce(
-//                 &device.header,
-//                 primary_nonce,
-//                 contest.label.as_bytes(),
-//                 contest.options[j].label.as_bytes(),
-//             );
-//             vote.push(ContestSelectionCiphertext {
-//                 ciphertext: device.header.public_key.encrypt_with(
-//                     &device.header.parameters.fixed_parameters,
-//                     &nonce,
-//                     *v as usize,
-//                 ),
-//                 nonce: BigUint::from(0u8),
-//             });
-//         }
-//         ContestSelectionEncrypted { vote }
-//     }
-// }
-
-impl ContestSelectionCiphertext {
+impl Ciphertext {
     pub fn proof_ballot_correctness(
         &self,
         header: &ElectionRecordHeader,
@@ -96,39 +57,31 @@ impl ContestSelectionCiphertext {
         selected: bool,
         zmulq: Rc<ZMulPrime>,
     ) -> ProofRange {
-        ProofRange::new(
-            header,
-            csprng,
-            zmulq,
-            &self.nonce,
-            &self.ciphertext,
-            selected as usize,
-            1,
-        )
+        ProofRange::new(header, csprng, zmulq, &self, selected as usize, 1)
     }
 }
 
-/// Serialize for CiphertextContestSelection
-impl Serialize for ContestSelectionCiphertext {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        self.ciphertext.clone().serialize(serializer)
-    }
-}
+// /// Serialize for CiphertextContestSelection
+// impl Serialize for ContestSelectionCiphertext {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::ser::Serializer,
+//     {
+//         self.ciphertext.clone().serialize(serializer)
+//     }
+// }
 
-impl<'de> Deserialize<'de> for ContestSelectionCiphertext {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match Ciphertext::deserialize(deserializer) {
-            Ok(ciphertext) => Ok(ContestSelectionCiphertext {
-                ciphertext,
-                nonce: BigUint::from(0 as u8),
-            }),
-            Err(e) => Err(e),
-        }
-    }
-}
+// impl<'de> Deserialize<'de> for ContestSelectionCiphertext {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         match Ciphertext::deserialize(deserializer) {
+//             Ok(ciphertext) => Ok(ContestSelectionCiphertext {
+//                 ciphertext,
+//                 nonce: BigUint::from(0 as u8),
+//             }),
+//             Err(e) => Err(e),
+//         }
+//     }
+// }

@@ -78,7 +78,6 @@ impl ProofRange {
         header: &ElectionRecordHeader,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
-        nonce: &BigUint,
         ct: &Ciphertext,
         small_l: usize,
         big_l: usize,
@@ -128,7 +127,7 @@ impl ProofRange {
                     }
                 }
                 for j in 0..big_l + 1 {
-                    v.push(&u[j] - &(&c[j] * nonce));
+                    v.push(&u[j] - &(&c[j] * ct.nonce.as_ref().unwrap()));
                 }
             }
             None => panic!("challenge is not in ZmulPrime"),

@@ -1,7 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 use eg::ballot::BallotStyle;
-use eg::contest_selection::ContestSelectionCiphertext;
 use eg::election_record::ElectionRecordHeader;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
@@ -41,18 +40,13 @@ impl BallotEncryptingTool {
         Logging::log(tag, "  Confirmation Code", line!(), file!());
         Logging::log(
             tag,
-            &format!("    {}", ballot.get_confirmation_code()),
+            &format!("    {}", ballot.confirmation_code),
             line!(),
             file!(),
         );
         Logging::log(tag, "  Contests", line!(), file!());
-        ballot.get_contests().iter().for_each(|c| {
-            Logging::log(
-                tag,
-                &format!("    {}", c.contest_hash.to_string()),
-                line!(),
-                file!(),
-            );
+        ballot.contests.iter().for_each(|c| {
+            Logging::log(tag, &format!("    {}", c.contest_hash), line!(), file!());
         });
     }
 
@@ -97,17 +91,14 @@ pub fn generate_short_code(full_hash: &HValue) -> String {
 /// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
 /// TODO: Remove label from the hash (equation 93)
-pub fn selection_hash(
-    header: &ElectionRecordHeader,
-    selections: &Vec<ContestSelectionCiphertext>,
-) -> HValue {
+pub fn selection_hash(header: &ElectionRecordHeader, selections: &Vec<Ciphertext>) -> HValue {
     let mut v = vec![0x40];
 
     v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
 
     selections.iter().for_each(|s| {
-        v.extend_from_slice(s.ciphertext.alpha.to_bytes_be().as_slice());
-        v.extend_from_slice(s.ciphertext.beta.to_bytes_be().as_slice());
+        v.extend_from_slice(s.alpha.to_bytes_be().as_slice());
+        v.extend_from_slice(s.beta.to_bytes_be().as_slice());
     });
 
     eg_h(&header.hashes_ext.h_e, &v)

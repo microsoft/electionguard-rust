@@ -21,14 +21,6 @@ pub struct BallotPreEncrypted {
 }
 
 impl BallotPreEncrypted {
-    pub fn get_contests(&self) -> &Vec<ContestPreEncrypted> {
-        &self.contests
-    }
-
-    pub fn get_confirmation_code(&self) -> &HValue {
-        &self.confirmation_code
-    }
-
     pub fn new_with(header: &ElectionRecordHeader, primary_nonce: &[u8]) -> BallotPreEncrypted {
         // TODO: Find contests in manifest corresponding to requested ballot style
 
@@ -98,12 +90,12 @@ impl BallotPreEncrypted {
             })
             .collect::<Vec<ContestEncrypted>>();
 
-        BallotEncrypted {
-            date: Self::unix_timestamp().to_string(),
-            device: device.get_uuid().clone(),
-            contests,
-            confirmation_code: self.confirmation_code,
-        }
+        BallotEncrypted::new(
+            contests.as_slice(),
+            self.confirmation_code,
+            Self::unix_timestamp().to_string().as_str(),
+            device.get_uuid(),
+        )
     }
 
     /// Returns a pretty JSON `String` representation of `BallotPreEncrypted`.

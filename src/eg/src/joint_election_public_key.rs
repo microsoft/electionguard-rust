@@ -7,7 +7,7 @@
 
 use anyhow::{anyhow, Result};
 use num_bigint::BigUint;
-use num_traits::{Num, One};
+use num_traits::One;
 use serde::{Deserialize, Serialize};
 
 use crate::{fixed_parameters::FixedParameters, guardian_public_key::GuardianPublicKey};
@@ -22,36 +22,46 @@ pub struct JointElectionPublicKey(
     pub BigUint,
 );
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+/// The ciphertext used to store a vote value corresponding to one option.
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Ciphertext {
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
     pub alpha: BigUint,
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
     pub beta: BigUint,
+    pub nonce: Option<BigUint>,
 }
 
-/// Serialize for Ciphertext
-impl Serialize for Ciphertext {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        (self.alpha.to_str_radix(16), self.beta.to_str_radix(16)).serialize(serializer)
-    }
-}
+// /// Serialize for Ciphertext
+// impl Serialize for Ciphertext {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::ser::Serializer,
+//     {
+//         (self.alpha.to_str_radix(16), self.beta.to_str_radix(16)).serialize(serializer)
+//     }
+// }
 
-impl<'de> Deserialize<'de> for Ciphertext {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match <(String, String)>::deserialize(deserializer) {
-            Ok((alpha, beta)) => Ok(Ciphertext {
-                alpha: BigUint::from_str_radix(&alpha, 16).unwrap(),
-                beta: BigUint::from_str_radix(&beta, 16).unwrap(),
-            }),
-            Err(e) => Err(e),
-        }
-    }
-}
+// impl<'de> Deserialize<'de> for Ciphertext {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         match <(String, String)>::deserialize(deserializer) {
+//             Ok((alpha, beta)) => Ok(Ciphertext {
+//                 alpha: BigUint::from_str_radix(&alpha, 16).unwrap(),
+//                 beta: BigUint::from_str_radix(&beta, 16).unwrap(),
+//             }),
+//             Err(e) => Err(e),
+//         }
+//     }
+// }
 
 impl JointElectionPublicKey {
     pub fn compute(
@@ -74,12 +84,26 @@ impl JointElectionPublicKey {
         fixed_parameters: &FixedParameters,
         nonce: &BigUint,
         vote: usize,
+        store_nonce: bool,
     ) -> Ciphertext {
         let alpha = fixed_parameters
             .g
             .modpow(&nonce, fixed_parameters.p.as_ref());
         let beta = self.0.modpow(&(nonce + vote), fixed_parameters.p.as_ref());
-        Ciphertext { alpha, beta }
+
+        if store_nonce {
+            Ciphertext {
+                alpha,
+                beta,
+                nonce: Some(nonce.clone()),
+            }
+        } else {
+            Ciphertext {
+                alpha,
+                beta,
+                nonce: None,
+            }
+        }
     }
 
     /// Returns the `JointElectionPublicKey` as a big-endian byte array of the correct length for `mod p`.

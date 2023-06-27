@@ -22,8 +22,8 @@ pub fn contest_hash(
     // TODO: Check if this sorting works
     let mut sorted_selection_hashes = selections
         .iter()
-        .map(|s| s.get_crypto_hash())
-        .collect::<Vec<&HValue>>();
+        .map(|s| s.selection_hash)
+        .collect::<Vec<HValue>>();
     sorted_selection_hashes.sort();
 
     sorted_selection_hashes.iter().for_each(|s| {

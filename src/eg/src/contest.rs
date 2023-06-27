@@ -1,18 +1,12 @@
 use std::rc::Rc;
 
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
-    contest_hash,
-    contest_selection::{ContestSelection, ContestSelectionCiphertext},
-    device::Device,
-    election_record::ElectionRecordHeader,
-    fixed_parameters::FixedParameters,
-    hash::HValue,
-    nonce::encrypted as nonce,
-    zk::ProofRange,
+    contest_hash, contest_selection::ContestSelection, device::Device,
+    election_record::ElectionRecordHeader, fixed_parameters::FixedParameters, hash::HValue,
+    joint_election_public_key::Ciphertext, nonce::encrypted as nonce, zk::ProofRange,
 };
 
 /// A contest.
@@ -36,13 +30,13 @@ pub struct ContestOption {
 }
 
 /// A contest in an encrypted ballot.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContestEncrypted {
     /// The label.
     pub label: String,
 
     /// Encrypted voter selection vector.
-    pub selection: Vec<ContestSelectionCiphertext>,
+    pub selection: Vec<Ciphertext>,
 
     /// Contest hash.
     pub contest_hash: HValue,
@@ -60,10 +54,10 @@ impl ContestEncrypted {
         primary_nonce: &[u8],
         contest: &Contest,
         pt_vote: &ContestSelection,
-    ) -> Vec<ContestSelectionCiphertext> {
+    ) -> Vec<Ciphertext> {
         // TODO: Check if selection limit is satisfied
 
-        let mut vote: Vec<ContestSelectionCiphertext> = Vec::new();
+        let mut vote: Vec<Ciphertext> = Vec::new();
         for (j, v) in pt_vote.vote.iter().enumerate() {
             let nonce = nonce(
                 header,
@@ -71,14 +65,12 @@ impl ContestEncrypted {
                 contest.label.as_bytes(),
                 contest.options[j].label.as_bytes(),
             );
-            vote.push(ContestSelectionCiphertext {
-                ciphertext: header.public_key.encrypt_with(
-                    &header.parameters.fixed_parameters,
-                    &nonce,
-                    *v as usize,
-                ),
-                nonce: BigUint::from(0u8),
-            });
+            vote.push(header.public_key.encrypt_with(
+                &header.parameters.fixed_parameters,
+                &nonce,
+                *v as usize,
+                true,
+            ));
         }
         vote
     }
@@ -90,9 +82,8 @@ impl ContestEncrypted {
         contest: &Contest,
         pt_vote: &ContestSelection,
     ) -> ContestEncrypted {
-        // let selection = ContestSelectionEncrypted::new(device, primary_nonce, contest, pt_vote);
         let selection = Self::encrypt_selection(&device.header, primary_nonce, contest, pt_vote);
-        let contest_hash = contest_hash::encrypted(&device.header, &contest.label, &selection);
+        let contest_hash = contest_hash::contest_hash(&device.header, &contest.label, &selection);
         let zmulq = Rc::new(ZMulPrime::new(
             device.header.parameters.fixed_parameters.q.clone(),
         ));
@@ -138,18 +129,17 @@ impl ContestEncrypted {
         header: &ElectionRecordHeader,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
-        selection: &Vec<ContestSelectionCiphertext>,
+        selection: &Vec<Ciphertext>,
         num_selections: usize,
         selection_limit: usize,
     ) -> ProofRange {
-        let combined_selection =
+        let combined_ct =
             Self::sum_selection_vector(&header.parameters.fixed_parameters, selection);
         ProofRange::new(
             header,
             csprng,
             zmulq,
-            &combined_selection.nonce,
-            &combined_selection.ciphertext,
+            &combined_ct,
             num_selections,
             selection_limit,
         )
@@ -157,21 +147,21 @@ impl ContestEncrypted {
 
     pub fn sum_selection_vector(
         fixed_parameters: &FixedParameters,
-        selection: &Vec<ContestSelectionCiphertext>,
-    ) -> ContestSelectionCiphertext {
-        let mut sum_ct = selection[0].ciphertext.clone();
-        let mut sum_nonce = selection[0].nonce.clone();
+        selection: &Vec<Ciphertext>,
+    ) -> Ciphertext {
+        let mut sum_ct = selection[0].clone();
+        assert!(sum_ct.nonce.is_some());
+        let mut sum_nonce = selection[0].nonce.as_ref().unwrap().clone();
+
         for i in 1..selection.len() {
-            sum_ct.alpha =
-                (&sum_ct.alpha * &selection[i].ciphertext.alpha) % fixed_parameters.p.as_ref();
-            sum_ct.beta =
-                (&sum_ct.beta * &selection[i].ciphertext.beta) % fixed_parameters.p.as_ref();
-            sum_nonce = (&sum_nonce + &selection[i].nonce) % fixed_parameters.q.as_ref();
+            sum_ct.alpha = (&sum_ct.alpha * &selection[i].alpha) % fixed_parameters.p.as_ref();
+            sum_ct.beta = (&sum_ct.beta * &selection[i].beta) % fixed_parameters.p.as_ref();
+
+            sum_nonce =
+                (sum_nonce + selection[i].nonce.as_ref().unwrap()) % fixed_parameters.q.as_ref();
         }
 
-        ContestSelectionCiphertext {
-            ciphertext: sum_ct,
-            nonce: sum_nonce,
-        }
+        sum_ct.nonce = Some(sum_nonce);
+        sum_ct
     }
 }

@@ -7,7 +7,7 @@ use crate::{
 ///
 /// H(B) = H(H_E;24,χ_1,χ_2,...,χ_{m_B} ,B_aux).
 ///
-pub fn encrypted(h_e: &HValue, contests: &Vec<ContestEncrypted>, b_aux: &[u8]) -> HValue {
+pub fn confirmation_code(h_e: &HValue, contests: &Vec<ContestEncrypted>, b_aux: &[u8]) -> HValue {
     let mut v = vec![0x24];
 
     contests.iter().for_each(|c| {

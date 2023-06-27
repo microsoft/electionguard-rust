@@ -2,11 +2,12 @@ use std::rc::Rc;
 
 use eg::{
     contest::{Contest, ContestEncrypted},
-    contest_selection::{ContestSelectionCiphertext, ContestSelectionPlaintext},
+    contest_selection::ContestSelectionPlaintext,
     device::Device,
     election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
     hash::HValue,
+    joint_election_public_key::Ciphertext,
     zk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
@@ -28,18 +29,6 @@ pub struct ContestPreEncrypted {
 }
 
 impl ContestPreEncrypted {
-    pub fn get_label(&self) -> &String {
-        &self.label
-    }
-
-    pub fn get_selections(&self) -> &Vec<ContestSelectionPreEncrypted> {
-        &self.selections
-    }
-
-    pub fn get_crypto_hash(&self) -> &HValue {
-        &self.contest_hash
-    }
-
     pub fn regenerate_nonces(
         &mut self,
         device: &Device,
@@ -118,10 +107,10 @@ impl ContestPreEncrypted {
         fixed_parameters: &FixedParameters,
         voter_selections: &[ContestSelectionPlaintext],
         selection_limit: usize,
-    ) -> Vec<ContestSelectionCiphertext> {
+    ) -> Vec<Ciphertext> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
 
-        let mut selections = <Vec<&Vec<ContestSelectionCiphertext>>>::new();
+        let mut selections = <Vec<&Vec<Ciphertext>>>::new();
 
         for (i, v) in voter_selections.iter().enumerate() {
             if *v == 1 {
@@ -141,15 +130,16 @@ impl ContestPreEncrypted {
 
         for i in 1..selections.len() {
             for j in 0..combined_selection.len() {
-                combined_selection[j].ciphertext.alpha = (&combined_selection[j].ciphertext.alpha
-                    * &selections[i][j].ciphertext.alpha)
+                combined_selection[j].alpha = (&combined_selection[j].alpha
+                    * &selections[i][j].alpha)
                     % fixed_parameters.p.as_ref();
-                combined_selection[j].ciphertext.beta = (&combined_selection[j].ciphertext.beta
-                    * &selections[i][j].ciphertext.beta)
+                combined_selection[j].beta = (&combined_selection[j].beta * &selections[i][j].beta)
                     % fixed_parameters.p.as_ref();
-                combined_selection[j].nonce = (&combined_selection[j].nonce
-                    + &selections[i][j].nonce)
-                    % fixed_parameters.q.as_ref();
+                combined_selection[j].nonce = Some(
+                    (combined_selection[j].nonce.as_ref().unwrap()
+                        + selections[i][j].nonce.as_ref().unwrap())
+                        % fixed_parameters.q.as_ref(),
+                );
             }
         }
         combined_selection

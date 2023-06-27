@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::{
-    confirmation_code::encrypted, contest::ContestEncrypted, contest_selection::ContestSelection,
-    device::Device, hash::HValue,
+    confirmation_code::confirmation_code, contest::ContestEncrypted,
+    contest_selection::ContestSelection, device::Device, hash::HValue,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -14,20 +14,34 @@ pub struct BallotStyle(pub Vec<String>);
 #[derive(Debug)]
 pub struct BallotEncrypted {
     /// Contests in this ballot
-    pub contests: Vec<ContestEncrypted>,
+    contests: Vec<ContestEncrypted>,
 
     /// Confirmation code
-    pub confirmation_code: HValue,
+    confirmation_code: HValue,
 
     /// Date (and time) of ballot generation
-    pub date: String,
+    date: String,
 
     /// Device that generated this ballot
-    pub device: String,
+    device: String,
 }
 
 impl BallotEncrypted {
     pub fn new(
+        contests: &[ContestEncrypted],
+        confirmation_code: HValue,
+        date: &str,
+        device: &str,
+    ) -> BallotEncrypted {
+        BallotEncrypted {
+            contests: contests.to_vec(),
+            confirmation_code,
+            date: date.to_string(),
+            device: device.to_string(),
+        }
+    }
+
+    pub fn new_from_selections(
         device: &Device,
         csprng: &mut Csprng,
         primary_nonce: &[u8],
@@ -45,12 +59,29 @@ impl BallotEncrypted {
             ));
         }
 
-        let confirmation_code = encrypted(&device.header.hashes_ext.h_e, &contests, &vec![0u8; 32]);
+        let confirmation_code =
+            confirmation_code(&device.header.hashes_ext.h_e, &contests, &vec![0u8; 32]);
         BallotEncrypted {
             contests,
             confirmation_code,
             date: device.header.parameters.varying_parameters.date.clone(),
             device: device.uuid.clone(),
         }
+    }
+
+    pub fn contests(&self) -> &Vec<ContestEncrypted> {
+        &self.contests
+    }
+
+    pub fn confirmation_code(&self) -> &HValue {
+        &self.confirmation_code
+    }
+
+    pub fn date(&self) -> &String {
+        &self.date
+    }
+
+    pub fn device(&self) -> &String {
+        &self.device
     }
 }

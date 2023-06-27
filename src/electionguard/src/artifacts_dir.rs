@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::string::ToString;
 
 use anyhow::{bail, Context, Result};
-use eg::hash::HValue;
 
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

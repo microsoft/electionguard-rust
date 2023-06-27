@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
 use eg::{
-    contest::ContestOption, contest_selection::ContestSelectionCiphertext, device::Device,
-    election_record::ElectionRecordHeader, hash::HValue, joint_election_public_key::Ciphertext,
-    zk::ProofRange,
+    contest::ContestOption, device::Device, election_record::ElectionRecordHeader, hash::HValue,
+    joint_election_public_key::Ciphertext, zk::ProofRange,
 };
+
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
@@ -17,25 +17,13 @@ pub struct ContestSelectionPreEncrypted {
     pub label: String,
 
     /// Vector of ciphertexts used to represent the selection
-    pub selections: Vec<ContestSelectionCiphertext>,
+    pub selections: Vec<Ciphertext>,
 
     /// Selection hash
     pub selection_hash: HValue,
 }
 
 impl ContestSelectionPreEncrypted {
-    pub fn get_label(&self) -> &String {
-        &self.label
-    }
-
-    pub fn get_selections(&self) -> &Vec<ContestSelectionCiphertext> {
-        &self.selections
-    }
-
-    pub fn get_crypto_hash(&self) -> &HValue {
-        &self.selection_hash
-    }
-
     pub fn regenerate_nonces(
         &mut self,
         device: &Device,
@@ -45,13 +33,13 @@ impl ContestSelectionPreEncrypted {
         j: usize,
     ) {
         for k in 0..self.selections.len() {
-            self.selections[k].nonce = option_nonce(
+            self.selections[k].nonce = Some(option_nonce(
                 &device.header,
                 primary_nonce,
                 contest_label.as_bytes(),
                 selection_labels[j].as_bytes(),
                 selection_labels[k].as_bytes(),
-            );
+            ));
         }
     }
 
@@ -68,7 +56,6 @@ impl ContestSelectionPreEncrypted {
         let label = selection.label.clone();
         let selections = (0..length)
             .map(|k| {
-                let ciphertext: Ciphertext;
                 let nonce = option_nonce(
                     header,
                     primary_nonce,
@@ -76,14 +63,14 @@ impl ContestSelectionPreEncrypted {
                     selection_labels[j].as_bytes(),
                     selection_labels[k].as_bytes(),
                 );
-                ciphertext = header.public_key.encrypt_with(
+                header.public_key.encrypt_with(
                     &header.parameters.fixed_parameters,
                     &nonce,
                     (j == k) as usize,
-                );
-                ContestSelectionCiphertext { ciphertext, nonce }
+                    false,
+                )
             })
-            .collect::<Vec<ContestSelectionCiphertext>>();
+            .collect::<Vec<Ciphertext>>();
 
         let selection_hash = selection_hash(&header, selections.as_ref());
 
@@ -104,7 +91,6 @@ impl ContestSelectionPreEncrypted {
     ) -> ContestSelectionPreEncrypted {
         let selections = (0..selection_labels.len())
             .map(|k| {
-                let ciphertext: Ciphertext;
                 let nonce = option_nonce(
                     header,
                     primary_nonce,
@@ -112,13 +98,14 @@ impl ContestSelectionPreEncrypted {
                     null_label.as_bytes(),
                     selection_labels[k].as_bytes(),
                 );
-                ciphertext =
-                    header
-                        .public_key
-                        .encrypt_with(&header.parameters.fixed_parameters, &nonce, 0);
-                ContestSelectionCiphertext { ciphertext, nonce }
+                header.public_key.encrypt_with(
+                    &header.parameters.fixed_parameters,
+                    &nonce,
+                    0,
+                    false,
+                )
             })
-            .collect::<Vec<ContestSelectionCiphertext>>();
+            .collect::<Vec<Ciphertext>>();
 
         let crypto_hash = selection_hash(header, selections.as_ref());
         // let shortcode = generate_short_code(&crypto_hash);

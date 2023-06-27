@@ -3,9 +3,9 @@ use crate::{
     contest_selection::ContestSelectionPreEncrypted, nonce::option_nonce,
 };
 use eg::{
-    ballot::BallotEncrypted, contest::ContestEncrypted,
-    contest_selection::ContestSelectionCiphertext, device::Device,
-    election_record::ElectionRecordHeader, hash::HValue, zk::ProofRange,
+    ballot::BallotEncrypted, contest::ContestEncrypted, device::Device,
+    election_record::ElectionRecordHeader, hash::HValue, joint_election_public_key::Ciphertext,
+    zk::ProofRange,
 };
 use util::logging::Logging;
 
@@ -18,18 +18,17 @@ impl BallotRecordingTool {
         primary_nonce: &HValue,
     ) -> bool {
         let regenerated_ballot = BallotPreEncrypted::new_with(header, &primary_nonce.0);
-        if ballot.get_confirmation_code() == regenerated_ballot.get_confirmation_code() {
+        if ballot.confirmation_code == regenerated_ballot.confirmation_code {
             return BallotRecordingTool::verify_ballot_contests(
-                ballot.get_contests(),
-                regenerated_ballot.get_contests(),
+                &ballot.contests,
+                &regenerated_ballot.contests,
             );
         } else {
             Logging::log(
                 "BallotRecordingTool",
                 &format!(
                     "Ballot crypto hash mismatch {} {}.",
-                    ballot.get_confirmation_code(),
-                    regenerated_ballot.get_confirmation_code()
+                    ballot.confirmation_code, regenerated_ballot.confirmation_code
                 ),
                 line!(),
                 file!(),
@@ -65,51 +64,31 @@ impl BallotRecordingTool {
                     .collect::<Vec<String>>()
             })
             .collect::<Vec<Vec<String>>>();
-        for i in 0..ballot.get_contests().len() {
-            for j in 0..ballot.get_contests()[i].selections.len() {
+
+        for i in 0..ballot.contests.len() {
+            for j in 0..ballot.contests[i].selections.len() {
                 // Selection vectors corresponding to candidates
                 if j < selection_labels[i].len() {
-                    for k in 0..ballot.get_contests()[i].selections[j]
-                        .get_selections()
-                        .len()
-                    {
-                        ballot.contests[i].selections[j].selections[k] =
-                            ContestSelectionCiphertext {
-                                ciphertext: ballot.get_contests()[i].get_selections()[j]
-                                    .get_selections()[k]
-                                    .ciphertext
-                                    .clone(),
-                                nonce: option_nonce(
-                                    &device.header,
-                                    primary_nonce.as_ref(),
-                                    ballot.get_contests()[i].label.as_bytes(),
-                                    selection_labels[i][j].as_bytes(),
-                                    selection_labels[i][k].as_bytes(),
-                                ),
-                            };
+                    for k in 0..ballot.contests[i].selections[j].selections.len() {
+                        ballot.contests[i].selections[j].selections[k].nonce = Some(option_nonce(
+                            &device.header,
+                            primary_nonce.as_ref(),
+                            ballot.contests[i].label.as_bytes(),
+                            selection_labels[i][j].as_bytes(),
+                            selection_labels[i][k].as_bytes(),
+                        ));
                     }
                 }
                 // Selection vectors corresponding to null votes
                 else {
-                    for k in 0..ballot.get_contests()[i].selections[j]
-                        .get_selections()
-                        .len()
-                    {
-                        ballot.contests[i].selections[j].selections[k] =
-                            ContestSelectionCiphertext {
-                                ciphertext: ballot.get_contests()[i].get_selections()[j]
-                                    .get_selections()[k]
-                                    .ciphertext
-                                    .clone(),
-                                nonce: option_nonce(
-                                    &device.header,
-                                    primary_nonce.as_ref(),
-                                    ballot.get_contests()[i].label.as_bytes(),
-                                    format!("null_{}", j + 1 - selection_labels[i].len())
-                                        .as_bytes(),
-                                    selection_labels[i][k].as_bytes(),
-                                ),
-                            };
+                    for k in 0..ballot.contests[i].selections[j].selections.len() {
+                        ballot.contests[i].selections[j].selections[k].nonce = Some(option_nonce(
+                            &device.header,
+                            primary_nonce.as_ref(),
+                            ballot.contests[i].label.as_bytes(),
+                            format!("null_{}", j + 1 - selection_labels[i].len()).as_bytes(),
+                            selection_labels[i][k].as_bytes(),
+                        ));
                     }
                 }
             }
@@ -118,7 +97,7 @@ impl BallotRecordingTool {
 
     pub fn verify_ballot_proofs(device: &Device, ballot: &BallotEncrypted) {
         let tag = "Pre-Encrypted";
-        for (i, contest) in ballot.contests.iter().enumerate() {
+        for (i, contest) in ballot.contests().iter().enumerate() {
             // Verify proof of ballot correctness
             Logging::log(
                 tag,
@@ -133,13 +112,17 @@ impl BallotRecordingTool {
                     &format!(
                         "    Ballot correctness / {}: {:?}",
                         j,
-                        proof.verify(&device.header, &contest.selection[j].ciphertext, 1 as usize,)
+                        proof.verify(&device.header, &contest.selection[j], 1 as usize,)
                     ),
                     line!(),
                     file!(),
                 );
             }
 
+            let ct_combined = ContestEncrypted::sum_selection_vector(
+                &device.header.parameters.fixed_parameters,
+                &contest.selection,
+            );
             // Verify proof of satisfying the selection limit
             Logging::log(
                 tag,
@@ -147,11 +130,7 @@ impl BallotRecordingTool {
                     "    Selection limit: {:?}",
                     contest.get_proof_selection_limit().verify(
                         &device.header,
-                        &ContestEncrypted::sum_selection_vector(
-                            &device.header.parameters.fixed_parameters,
-                            &contest.selection
-                        )
-                        .ciphertext,
+                        &ct_combined,
                         device.header.manifest.contests[i].selection_limit,
                     )
                 ),
@@ -191,7 +170,9 @@ impl BallotRecordingTool {
             }
             assert!(a.selections.len() == regenerated_selections[i].selections.len());
             for (j, s) in a.selections.iter().enumerate() {
-                if s.ciphertext != regenerated_selections[i].selections[j].ciphertext {
+                if s.alpha != regenerated_selections[i].selections[j].alpha
+                    || s.beta != regenerated_selections[i].selections[j].beta
+                {
                     return false;
                 }
             }
@@ -200,66 +181,16 @@ impl BallotRecordingTool {
         true
     }
 
-    // pub fn proof_of_ballot_correctness(
-    //     csprng: &mut Csprng,
-    //     config: &PreEncryptedBallotConfig,
-    //     fixed_parameters: &FixedParameters,
-    //     ballot: &PreEncryptedBallot,
-    //     voter_selections: &Vec<Vec<usize>>,
-    // ) -> (Vec<Vec<ProofRange>>, Vec<Vec<CiphertextContestSelection>>) {
-    //     let mut proofs = vec![<Vec<ProofRange>>::new(); ballot.get_contests().len()];
-    //     let mut combined_selections =
-    //         vec![<Vec<CiphertextContestSelection>>::new(); ballot.get_contests().len()];
-
-    //     for (i, contest) in ballot.get_contests().iter().enumerate() {
-    //         assert!(voter_selections.len() <= config.manifest.contests[i].selection_limit);
-    //         if voter_selections[i].len() == 0 {
-    //             todo!();
-    //         } else if voter_selections[i].len() == 1 {
-    //             combined_selections[i] = contest.selections[voter_selections[i][0]]
-    //                 .selections
-    //                 .clone();
-    //         } else {
-    //             let mut selections_to_combine = voter_selections[i]
-    //                 .iter()
-    //                 .map(|j| &contest.selections[*j].selections)
-    //                 .collect::<Vec<&Vec<CiphertextContestSelection>>>();
-    //             combined_selections[i] =
-    //                 homomorphic_addition(selections_to_combine, fixed_parameters)
-    //         }
-
-    //         let mut votes = vec![false; contest.selections.len()];
-    //         for v in &voter_selections[i] {
-    //             votes[*v] = true;
-    //         }
-    //         proofs[i] = (0..combined_selections[i].len())
-    //             .map(|j| {
-    //                 ProofRange::new(
-    //                     csprng,
-    //                     fixed_parameters,
-    //                     config.h_e,
-    //                     &config.election_public_key,
-    //                     &combined_selections[i][j].nonce,
-    //                     &combined_selections[i][j].ciphertext,
-    //                     config.manifest.contests[i].selection_limit,
-    //                     votes[j] as usize,
-    //                 )
-    //             })
-    //             .collect::<Vec<_>>();
-    //     }
-    //     (proofs, combined_selections)
-    // }
-
     pub fn verify_proof_of_ballot_correctness(
         device: &Device,
-        selections: &Vec<Vec<ContestSelectionCiphertext>>,
+        selections: &Vec<Vec<Ciphertext>>,
         proofs: &Vec<Vec<ProofRange>>,
     ) -> bool {
         for (i, contest_selection) in selections.iter().enumerate() {
             for (j, vote) in contest_selection.iter().enumerate() {
                 if !proofs[i][j].verify(
                     &device.header,
-                    &vote.ciphertext,
+                    &vote,
                     device.header.manifest.contests[i].selection_limit,
                 ) {
                     return false;
