@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use crate::{artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, Subcommand};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Args;
-use voter::ballot::VoterConfirmationCode;
+use voter::ballot::VoterConfirmationQRCode;
 
 #[derive(Args, Debug)]
 pub(crate) struct VoterWriteConfirmationCode {
@@ -14,7 +14,7 @@ pub(crate) struct VoterWriteConfirmationCode {
     /// File to which to write the QR code as SVG.
     /// Default is in the artifacts dir.
     #[arg(long)]
-    qr_code_out: Option<PathBuf>,
+    out_file: Option<PathBuf>,
 }
 
 impl Subcommand for VoterWriteConfirmationCode {
@@ -23,18 +23,31 @@ impl Subcommand for VoterWriteConfirmationCode {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        match VoterConfirmationCode::new(&self.code) {
-            Some(code_data) => subcommand_helper
-                .artifacts_dir
-                .out_file_write(
-                    &None,
-                    ArtifactFile::VoterConfirmationCode,
-                    "voter confirmation QR code",
-                    code_data.as_bytes(),
-                )
-                .unwrap(),
+        match VoterConfirmationQRCode::new(&self.code) {
+            Some(qr_code) => {
+                let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+                    &self.out_file,
+                    Some(ArtifactFile::VoterConfirmationCode),
+                )?;
+
+                qr_code.to_stdiowrite(bx_write.as_mut()).with_context(|| {
+                    format!("Writing voter confirmation QR code to: {}", path.display())
+                })?;
+
+                drop(bx_write);
+            }
             None => {}
         }
+
+        // subcommand_helper
+        // .artifacts_dir
+        // .out_file_write(
+        //     &None,
+        //     ArtifactFile::VoterConfirmationCode,
+        //     "voter confirmation QR code",
+        //     code_data.as_bytes(),
+        // )
+        // .unwrap()
 
         Ok(())
     }

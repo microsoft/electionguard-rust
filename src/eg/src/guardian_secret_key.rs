@@ -8,19 +8,22 @@
 use std::borrow::Borrow;
 use std::num::NonZeroU16;
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use util::csprng::Csprng;
 
 use crate::{
-    election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
+    election_parameters::ElectionParameters,
+    fixed_parameters::FixedParameters,
     guardian_public_key::GuardianPublicKey,
+    guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecretCoefficient(
+    //? TODO ensure this is serialized in a fixed-length format
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
@@ -66,6 +69,16 @@ pub struct CoefficientCommitment(
 );
 
 impl CoefficientCommitment {
+    /// Verifies that `CoefficientCommitment` is well-formed and conforms
+    /// to the election parameters. Useful after deserialization.
+    pub(crate) fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
+        if !election_parameters.fixed_parameters.is_valid_modp(&self.0) {
+            bail!("Coefficient commitment is not a valid mod p value");
+        }
+
+        Ok(())
+    }
+
     /// Returns the `CoefficientCommitment` as a big-endian byte array of the correct length for `mod p`.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
@@ -113,6 +126,18 @@ pub struct GuardianSecretKey {
     pub coefficient_commitments: CoefficientCommitments,
 }
 
+impl GuardianPublicKeyInfo for GuardianSecretKey {
+    fn i(&self) -> NonZeroU16 {
+        self.i
+    }
+    fn opt_name(&self) -> &Option<String> {
+        &self.opt_name
+    }
+    fn coefficient_commitments(&self) -> &CoefficientCommitments {
+        &self.coefficient_commitments
+    }
+}
+
 impl GuardianSecretKey {
     pub fn generate(
         csprng: &mut Csprng,
@@ -145,8 +170,11 @@ impl GuardianSecretKey {
         &self.secret_coefficients.0[0].0
     }
 
-    pub fn coefficient_commitments(&self) -> &CoefficientCommitments {
-        &self.coefficient_commitments
+    /// Verifies that the `GuardianSecretKey` is well-formed
+    /// and conforms to the election parameters.
+    /// Useful after deserialization.
+    pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
+        validate_guardian_public_key_info(self, election_parameters)
     }
 
     pub fn make_public_key(&self) -> GuardianPublicKey {
@@ -157,19 +185,28 @@ impl GuardianSecretKey {
         }
     }
 
-    /// Returns a pretty JSON `String` representation of the `GuardianSecretKey`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
+    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let guardian_secret_key: GuardianSecretKey =
+            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
+
+        guardian_secret_key.validate(election_parameters)?;
+
+        Ok(guardian_secret_key)
     }
 
-    /// Reads an `GuardianSecretKey` from a `std::io::Read`.
-    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<GuardianSecretKey> {
-        serde_json::from_reader(io_read)
-            .map_err(|e| anyhow!("Error parsing GuardianSecretKey: {}", e))
+    /// Writes a `GuardianSecretKey` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error writing guardian secret key")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing guardian secret key file")
     }
 }

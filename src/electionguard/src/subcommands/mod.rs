@@ -75,11 +75,13 @@ pub(crate) enum Subcommands {
         crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
     ),
 
-    /// Write the aggregated election public key from guardian public keys.
-    WriteJointElectionPublicKey(crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey),
-
     /// Write the confirmation QR code for a voter.
     VoterWriteConfirmationCode(crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode),
+    
+    /// Write the joint election public key from guardian public keys.
+    WriteJointElectionPublicKey(
+        crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
+    ),
 }
 
 impl Default for Subcommands {
@@ -98,13 +100,13 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteManifest(a) => a,
             WriteParameters(a) => a,
             WriteHashes(a) => a,
-            WriteJointElectionPublicKey(a) => a,
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
             GuardianSecretKeyWriteEncryptedShare(a) => a,
             PreEncryptedBallotGenerate(a) => a,
             PreEncryptedBallotRecord(a) => a,
             VoterWriteConfirmationCode(a) => a,
+            WriteJointElectionPublicKey(a) => a,
         }
     }
 }

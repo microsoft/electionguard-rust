@@ -5,12 +5,13 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters,
     guardian_public_key::GuardianPublicKey,
+    guardian_public_key_info::GuardianPublicKeyInfo,
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
@@ -81,6 +82,18 @@ impl HashesExt {
         serde_json::from_reader(io_read)
             .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
     }
+
+    /// Writes a `HashesExt` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error writing hashes (extended)")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing hashes (extended) file")
+    }
 }
 
 impl std::fmt::Display for HashesExt {
@@ -131,7 +144,7 @@ mod test {
             .collect::<Vec<_>>();
 
         let joint_election_public_key =
-            JointElectionPublicKey::compute(fixed_parameters, &guardian_public_keys);
+            JointElectionPublicKey::compute(&election_parameters, &guardian_public_keys).unwrap();
 
         assert!(&joint_election_public_key.0 < fixed_parameters.p.borrow());
 

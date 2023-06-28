@@ -7,7 +7,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use eg::{ballot::BallotStyle, device::Device, election_record::ElectionRecordHeader};
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
@@ -65,19 +65,15 @@ impl Subcommand for PreEncryptedBallotGenerate {
         );
 
         // Write election record header to file
-        subcommand_helper
-            .artifacts_dir
-            .out_file_write(
-                &Some(
-                    subcommand_helper
-                        .artifacts_dir
-                        .path(ArtifactFile::ElectionRecordHeader),
-                ),
-                ArtifactFile::ElectionRecordHeader,
-                "Election Record Header",
-                record_header.to_canonical_bytes().as_slice(),
-            )
-            .unwrap();
+        // subcommand_helper
+        //     .artifacts_dir
+        //     .out_file_stdiowrite(
+        //         &None,
+        //         ArtifactFile::ElectionRecordHeader,
+        //         "Election Record Header",
+        //         record_header.to_canonical_bytes().as_slice(),
+        //     )
+        //     .unwrap();
 
         let device = Device::new(&"Ballot Encrypting Tool".to_string(), record_header.clone());
 
@@ -96,25 +92,37 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
         let mut confirmation_codes = Vec::with_capacity(self.num_ballots);
         for b_idx in 0..self.num_ballots {
-            // BallotEncryptingTool::print_ballot(
-            //     b_idx + 1,
-            //     &ballots[b_idx],
-            //     &primary_nonces[b_idx].to_string(),
-            // );
             confirmation_codes.push(ballots[b_idx].confirmation_code);
-            subcommand_helper.artifacts_dir.out_file_write(
+
+            let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                 &None,
-                ArtifactFile::PreEncryptedBallots(label as u128, b_idx as u128 + 1),
-                format!("pre-encrypted ballot #{}", b_idx + 1).as_str(),
-                ballots[b_idx].to_json().as_bytes(),
+                Some(ArtifactFile::PreEncryptedBallots(
+                    label as u128,
+                    b_idx as u128 + 1,
+                )),
             )?;
 
-            subcommand_helper.artifacts_dir.out_file_write(
+            ballots[b_idx]
+                .to_stdiowrite(bx_write.as_mut())
+                .with_context(|| format!("Writing pre-encrypted ballot to: {}", path.display()))?;
+
+            drop(bx_write);
+
+            let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                 &None,
-                ArtifactFile::PreEncryptedBallotNonces(label as u128, b_idx as u128 + 1),
-                format!("pre-encrypted ballot nonce #{}", b_idx + 1).as_str(),
-                primary_nonces[b_idx].to_json().as_bytes(),
+                Some(ArtifactFile::PreEncryptedBallotNonces(
+                    label as u128,
+                    b_idx as u128 + 1,
+                )),
             )?;
+
+            primary_nonces[b_idx]
+                .to_stdiowrite(bx_write.as_mut())
+                .with_context(|| {
+                    format!("Writing pre-encrypted ballot nonce to: {}", path.display())
+                })?;
+
+            drop(bx_write);
         }
 
         Ok(())

@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::ElectionManifestSource,
@@ -94,11 +94,18 @@ impl Subcommand for WriteManifest {
             ),
         };
 
-        subcommand_helper.artifacts_dir.out_file_write(
-            &self.out_file,
-            artifact_file,
-            description,
-            bytes.as_slice(),
-        )
+        let (mut bx_write, path) = subcommand_helper
+            .artifacts_dir
+            .out_file_stdiowrite(&self.out_file, Some(artifact_file))?;
+
+        bx_write
+            .write_all(bytes.as_slice())
+            .with_context(|| format!("Writing {description} to: {}", path.display()))?;
+
+        drop(bx_write);
+
+        eprintln!("Wrote {description} to: {}", path.display());
+
+        Ok(())
     }
 }

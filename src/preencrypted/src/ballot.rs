@@ -1,10 +1,10 @@
 use std::{fs, path::PathBuf, time::SystemTime};
 
 use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use eg::{
     ballot::BallotEncrypted, contest::ContestEncrypted, device::Device,
-    election_record::ElectionRecordHeader, hash::HValue,
+    election_parameters::ElectionParameters, election_record::ElectionRecordHeader, hash::HValue,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, logging::Logging};
@@ -112,5 +112,28 @@ impl BallotPreEncrypted {
     pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<BallotPreEncrypted> {
         serde_json::from_reader(io_read)
             .map_err(|e| anyhow!("Error parsing BallotPreEncrypted: {}", e))
+    }
+
+    /// Reads a `BallotPreEncrypted` from a `std::io::Write`.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let hashes: Self =
+            serde_json::from_reader(stdioread).context("Reading BallotPreEncrypted")?;
+
+        Ok(hashes)
+    }
+
+    /// Writes a `BallotPreEncrypted` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error writing pre-encrypted ballot")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing pre-encrypted ballot file")
     }
 }

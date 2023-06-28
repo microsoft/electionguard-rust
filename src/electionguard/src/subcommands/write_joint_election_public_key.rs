@@ -5,11 +5,13 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::{num::NonZeroU16, path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
-use eg::joint_election_public_key::JointElectionPublicKey;
+use eg::{
+    guardian_public_key::GuardianPublicKey, joint_election_public_key::JointElectionPublicKey,
+};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -22,6 +24,8 @@ use crate::{
 /// The election parameters and election manifest are read from the artifacts dir.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct WriteJointElectionPublicKey {
+    //? TODO do we need to be able to specify a file for every guardian public key?
+    /* */
     /// File to which to write the election public key.
     /// Default is in the artifacts dir.
     /// If "-", write to stdout.
@@ -41,27 +45,32 @@ impl Subcommand for WriteJointElectionPublicKey {
         let election_parameters =
             load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
 
-        let guardian_public_keys = (1..election_parameters.varying_parameters.n + 1)
-            .map(|i| {
-                load_guardian_public_key(
-                    Some(NonZeroU16::new(i).unwrap()),
-                    &None,
-                    &subcommand_helper.artifacts_dir,
-                )
-                .unwrap()
-            })
-            .collect::<Vec<_>>();
+        let mut guardian_public_keys = Vec::<GuardianPublicKey>::new();
+        for i in election_parameters.varying_parameters.each_guardian_i() {
+            let gpk = load_guardian_public_key(
+                Some(i),
+                &None,
+                &subcommand_helper.artifacts_dir,
+                &election_parameters,
+            )?;
+            guardian_public_keys.push(gpk);
+        }
 
-        let jepk = JointElectionPublicKey::compute(
-            &election_parameters.fixed_parameters,
-            guardian_public_keys.as_slice(),
-        );
+        let joint_election_public_key =
+            JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())?;
 
-        subcommand_helper.artifacts_dir.out_file_write(
-            &self.out_file,
-            ArtifactFile::JointElectionPublicKey,
-            "joint election public key",
-            jepk.to_json().as_bytes(),
-        )
+        let (mut bx_write, path) = subcommand_helper
+            .artifacts_dir
+            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::JointElectionPublicKey))?;
+
+        joint_election_public_key
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| format!("Writing joint election public key to: {}", path.display()))?;
+
+        drop(bx_write);
+
+        eprintln!("Wrote joint election public key to: {}", path.display());
+
+        Ok(())
     }
 }

@@ -31,7 +31,10 @@ pub(crate) enum ElectionManifestSource {
 }
 
 impl ElectionManifestSource {
-    pub fn load_election_manifest(&self, artifacts_dir: &ArtifactsDir) -> Result<ElectionManifest> {
+    pub(crate) fn load_election_manifest(
+        &self,
+        artifacts_dir: &ArtifactsDir,
+    ) -> Result<ElectionManifest> {
         let mut open_options = OpenOptions::new();
         open_options.read(true);
 
@@ -72,6 +75,7 @@ pub(crate) fn load_election_parameters(
     artifacts_dir: &ArtifactsDir,
     csprng: &mut Csprng,
 ) -> Result<ElectionParameters> {
+    artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::ElectionParameters))?;
     let mut open_options = OpenOptions::new();
     open_options.read(true);
 
@@ -88,7 +92,7 @@ pub(crate) fn load_election_parameters(
     let election_parameters = ElectionParameters::from_bytes(&bytes)?;
     eprintln!("Election parameters loaded from: {}", path.display());
 
-    election_parameters.verify(csprng)?;
+    election_parameters.validate(csprng)?;
 
     Ok(election_parameters)
 }
@@ -97,23 +101,24 @@ pub(crate) fn load_guardian_secret_key(
     opt_i: Option<NonZeroU16>,
     opt_secret_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
+    election_parameters: &ElectionParameters,
 ) -> Result<GuardianSecretKey> {
     if opt_secret_key_path.is_none() && opt_i.is_none() {
         bail!("Need at least one of the guardian `i` or secret key file path");
     }
 
-    let (mut io_read, path) = artifacts_dir.in_file_read(
+    let (mut stdioread, path) = artifacts_dir.in_file_stdioread(
         opt_secret_key_path,
         opt_i.map(ArtifactFile::GuardianSecretKey),
     )?;
 
-    let guardian_secret_key = GuardianSecretKey::from_reader(&mut io_read)?;
+    let guardian_secret_key =
+        GuardianSecretKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
 
     if let Some(i) = opt_i {
         if i != guardian_secret_key.i {
             bail!(
-                "Guardian number specified by --i {} does not match the guardian number {} in the secret key file: {}",
-                i,
+                "Guardian number specified by --i {i} does not match the guardian number {} in the secret key file: {}",
                 guardian_secret_key.i,
                 path.display()
             );
@@ -142,17 +147,19 @@ pub(crate) fn load_guardian_public_key(
     opt_i: Option<NonZeroU16>,
     opt_public_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
+    election_parameters: &ElectionParameters,
 ) -> Result<GuardianPublicKey> {
     if opt_public_key_path.is_none() && opt_i.is_none() {
         bail!("Need at least one of the guardian `i` or public key file path");
     }
 
-    let (mut io_read, path) = artifacts_dir.in_file_read(
+    let (mut stdioread, path) = artifacts_dir.in_file_stdioread(
         opt_public_key_path,
         opt_i.map(ArtifactFile::GuardianPublicKey),
     )?;
 
-    let guardian_public_key = GuardianPublicKey::from_reader(&mut io_read)?;
+    let guardian_public_key =
+        GuardianPublicKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
 
     if let Some(i) = opt_i {
         if i != guardian_public_key.i {
@@ -187,7 +194,7 @@ pub(crate) fn load_joint_election_public_key(
     opt_joint_election_public_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
 ) -> Result<JointElectionPublicKey> {
-    let (mut io_read, path) = artifacts_dir.in_file_read(
+    let (mut io_read, path) = artifacts_dir.in_file_stdioread(
         opt_joint_election_public_key_path,
         Some(ArtifactFile::JointElectionPublicKey),
     )?;
@@ -205,13 +212,13 @@ pub(crate) fn load_hashes(
     artifacts_dir: &ArtifactsDir,
 ) -> Result<(Hashes, HashesExt)> {
     let (mut io_read, path) =
-        artifacts_dir.in_file_read(opt_hashes_path, Some(ArtifactFile::Hashes))?;
+        artifacts_dir.in_file_stdioread(opt_hashes_path, Some(ArtifactFile::Hashes))?;
     let hashes = Hashes::from_reader(&mut io_read)?;
 
     eprintln!("Hashes loaded from: {}", path.display());
 
     let (mut io_read, path) =
-        artifacts_dir.in_file_read(opt_hashes_ext_path, Some(ArtifactFile::HashesExt))?;
+        artifacts_dir.in_file_stdioread(opt_hashes_ext_path, Some(ArtifactFile::HashesExt))?;
     let hashes_ext = HashesExt::from_reader(&mut io_read)?;
 
     eprintln!("Hashes (extended) loaded from: {}", path.display());
@@ -230,7 +237,7 @@ pub(crate) fn load_hashes(
 /// On Windows, this uses the `BCryptGenRandom` function
 /// https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom
 ///
-pub fn osrng_seed_data_for_csprng() -> [u8; Csprng::recommended_max_seed_bytes()] {
+pub(crate) fn osrng_seed_data_for_csprng() -> [u8; Csprng::recommended_max_seed_bytes()] {
     let mut seed_bytes = core::array::from_fn(|_i| 0);
     OsRng.fill_bytes(&mut seed_bytes);
     seed_bytes

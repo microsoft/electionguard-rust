@@ -188,7 +188,7 @@ fn hex_to_biguint(s: &str) -> BigUint {
 mod test {
     use super::*;
 
-    /// Verify the standard parameters v1.54.
+    /// Validate the standard parameters v1.54.
     #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
     #[test]
     fn standard_parameters_v1_54() {
@@ -196,10 +196,10 @@ mod test {
 
         let standard_parameters_v1_54 = make_standard_parameters_v1_54();
         assert_eq!(standard_parameters_v1_54.opt_version, Some([1, 54]));
-        assert!(standard_parameters_v1_54.verify(&mut csprng).is_ok());
+        assert!(standard_parameters_v1_54.validate(&mut csprng).is_ok());
     }
 
-    /// Verify the standard parameters v2.0.
+    /// Validate the standard parameters v2.0.
     #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
     #[test]
     fn standard_parameters_v2_0() {
@@ -207,10 +207,10 @@ mod test {
 
         let standard_parameters_v2_0 = make_standard_parameters_v2_0();
         assert_eq!(standard_parameters_v2_0.opt_version, Some([2, 0]));
-        assert!(standard_parameters_v2_0.verify(&mut csprng).is_ok());
+        assert!(standard_parameters_v2_0.validate(&mut csprng).is_ok());
     }
 
-    /// Verify `pub static STANDARD_PARAMETERS` reflect the latest version (currently v2.0).
+    /// Verify that `pub static STANDARD_PARAMETERS` reflect the latest version (currently v2.0).
     #[test]
     fn standard_parameters_pub_static() {
         // Latest standard parameters are v2.0.

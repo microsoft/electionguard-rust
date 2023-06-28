@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
@@ -98,6 +98,24 @@ impl HValue {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
+    }
+
+    /// Reads a `HValue` from a `std::io::Write`.
+    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let hashes: Self = serde_json::from_reader(stdioread).context("Reading HValue")?;
+
+        Ok(hashes)
+    }
+
+    /// Writes a `HValue` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser).context("Error writing HValue")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing HValue file")
     }
 }
 

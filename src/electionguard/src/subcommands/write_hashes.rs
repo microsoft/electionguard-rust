@@ -7,7 +7,7 @@
 
 use std::{num::NonZeroU16, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use eg::{hashes::Hashes, hashes_ext::HashesExt};
 
@@ -60,6 +60,7 @@ impl Subcommand for WriteHashes {
                     Some(NonZeroU16::new(i).unwrap()),
                     &None,
                     &subcommand_helper.artifacts_dir,
+                    &election_parameters,
                 )
                 .unwrap()
             })
@@ -67,29 +68,33 @@ impl Subcommand for WriteHashes {
 
         let jepk = load_joint_election_public_key(&None, &subcommand_helper.artifacts_dir)?;
         let hashes = Hashes::new(&election_parameters, &election_manifest);
-        subcommand_helper
+
+        let (mut bx_write, path) = subcommand_helper
             .artifacts_dir
-            .out_file_write(
-                &self.out_file,
-                ArtifactFile::Hashes,
-                "hashes",
-                hashes.to_json().as_bytes(),
-            )
-            .unwrap();
+            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::Hashes))?;
+
+        hashes
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| format!("Writing hashes to: {}", path.display()))?;
+
+        drop(bx_write);
 
         if self.extended {
             let hashes_ext =
                 HashesExt::new(&election_parameters, &hashes, &jepk, &guardian_public_keys);
-            subcommand_helper
+
+            let (mut bx_write, path) = subcommand_helper
                 .artifacts_dir
-                .out_file_write(
-                    &self.out_file,
-                    ArtifactFile::HashesExt,
-                    "hashes (extended)",
-                    hashes_ext.to_json().as_bytes(),
-                )
-                .unwrap();
+                .out_file_stdiowrite(&None, Some(ArtifactFile::HashesExt))?;
+
+            hashes_ext
+                .to_stdiowrite(bx_write.as_mut())
+                .with_context(|| format!("Writing hashes (extended) to: {}", path.display()))?;
+
+            drop(bx_write);
         }
+
+        eprintln!("Wrote hashes to: {}", path.display());
 
         Ok(())
     }

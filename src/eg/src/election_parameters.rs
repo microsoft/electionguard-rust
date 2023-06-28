@@ -24,9 +24,9 @@ pub struct ElectionParameters {
 
 impl ElectionParameters {
     /// Verifies that the `ElectionParameters` meet some basic validity requirements.
-    pub fn verify(&self, csprng: &mut Csprng) -> Result<()> {
-        self.fixed_parameters.verify(csprng)?;
-        self.varying_parameters.verify()?;
+    pub fn validate(&self, csprng: &mut Csprng) -> Result<()> {
+        self.fixed_parameters.validate(csprng)?;
+        self.varying_parameters.validate()?;
         Ok(())
     }
 
@@ -53,5 +53,30 @@ impl ElectionParameters {
     /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod q`.
     pub fn biguint_to_be_bytes_len_q(&self, u: &BigUint) -> Vec<u8> {
         self.fixed_parameters.biguint_to_be_bytes_len_q(u)
+    }
+
+    /// Reads a `ElectionParameters` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        csprng: &mut Csprng,
+    ) -> Result<Self> {
+        let election_parameters: Self =
+            serde_json::from_reader(stdioread).context("Reading ElectionParameters")?;
+
+        election_parameters.validate(csprng)?;
+
+        Ok(election_parameters)
+    }
+
+    /// Writes a `ElectionParameters` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error writing ElectionParameters")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing ElectionParameters file")
     }
 }

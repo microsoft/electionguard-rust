@@ -56,7 +56,7 @@ impl Subcommand for PreEncryptedBallotRecord {
 
         let record_header = ElectionRecordHeader::new(
             election_manifest,
-            election_parameters,
+            election_parameters.clone(),
             hashes,
             hashes_ext,
             jepk,
@@ -65,22 +65,22 @@ impl Subcommand for PreEncryptedBallotRecord {
 
         for b_idx in 1..self.num_ballots {
             let mut pre_encrypted_ballot = {
-                let (mut io_read, _) = subcommand_helper.artifacts_dir.in_file_read(
+                let (mut stdioread, path) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
                     Some(ArtifactFile::PreEncryptedBallots(self.tag, b_idx as u128)),
                 )?;
-                BallotPreEncrypted::from_reader(&mut io_read)?
+                BallotPreEncrypted::from_stdioread_validated(&mut stdioread, &election_parameters)?
             };
 
             let nonce = {
-                let (mut io_read, _) = subcommand_helper.artifacts_dir.in_file_read(
+                let (mut stdioread, path) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
                     Some(ArtifactFile::PreEncryptedBallotNonces(
                         self.tag,
                         b_idx as u128,
                     )),
                 )?;
-                HValue::from_reader(&mut io_read)?
+                HValue::from_stdioread(&mut stdioread)?
             };
 
             // let pre_encrypted_ballot = &mut ballots.ballots[b_idx];

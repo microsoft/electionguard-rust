@@ -8,7 +8,7 @@
 use std::num::NonZeroU16;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use eg::guardian_secret_key::GuardianSecretKey;
 
@@ -66,11 +66,21 @@ impl Subcommand for GuardianSecretKeyGenerate {
             self.name.clone(),
         );
 
-        subcommand_helper.artifacts_dir.out_file_write(
+        let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
             &self.secret_key_out_file,
-            ArtifactFile::GuardianSecretKey(self.i),
-            format!("secret key for guardian {}", self.i).as_str(),
-            secret_key.to_json().as_bytes(),
-        )
+            Some(ArtifactFile::GuardianSecretKey(self.i)),
+        )?;
+
+        let description = format!("secret key for guardian {} to: {}", self.i, path.display());
+
+        secret_key
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| format!("Writing {description}"))?;
+
+        drop(bx_write);
+
+        eprintln!("Wrote {description}");
+
+        Ok(())
     }
 }
