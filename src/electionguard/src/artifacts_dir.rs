@@ -104,7 +104,8 @@ impl ArtifactsDir {
         let mut open_options_read = OpenOptions::new();
         open_options_read.read(true);
 
-        let stdioread_and_path: (Box<dyn std::io::Read>, PathBuf) = if let Some(ref path) = opt_path {
+        let stdioread_and_path: (Box<dyn std::io::Read>, PathBuf) = if let Some(ref path) = opt_path
+        {
             let stdioread: Box<dyn std::io::Read> = if *path == PathBuf::from("-") {
                 Box::new(std::io::stdin())
             } else {
