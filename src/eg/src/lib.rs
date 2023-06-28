@@ -11,6 +11,7 @@ pub mod example_election_manifest;
 pub mod example_election_parameters;
 pub mod fixed_parameters;
 pub mod guardian_public_key;
+pub mod guardian_public_key_info;
 pub mod guardian_secret_key;
 pub mod hash;
 pub mod hashes;

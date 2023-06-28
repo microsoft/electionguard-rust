@@ -86,6 +86,16 @@ impl FixedParameters {
         (cnt_bits_repr(q) + 7) / 8
     }
 
+    /// Returns `true` iff `n` is a valid result of `mod p`.
+    pub fn is_valid_modp<T: Borrow<BigUint>>(&self, n: &T) -> bool {
+        n.borrow() < self.p.borrow()
+    }
+
+    /// Returns `true` iff `n` is a valid result of `mod q`.
+    pub fn is_valid_modq<T: Borrow<BigUint>>(&self, n: &T) -> bool {
+        n.borrow() < self.q.borrow()
+    }
+
     /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod p`.
     pub fn biguint_to_be_bytes_len_p(&self, u: &BigUint) -> Vec<u8> {
         to_be_bytes_left_pad(&u, self.l_p_bytes())
@@ -98,7 +108,7 @@ impl FixedParameters {
 
     /// Verifies that the `FixedParameters` meet some basic validity requirements.
     #[allow(clippy::nonminimal_bool)]
-    pub fn verify(&self, csprng: &mut Csprng) -> Result<()> {
+    pub fn validate(&self, csprng: &mut Csprng) -> Result<()> {
         let q: &BigUint = self.q.borrow();
         let p: &BigUint = self.p.borrow();
 

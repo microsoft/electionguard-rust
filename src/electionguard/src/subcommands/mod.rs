@@ -10,6 +10,7 @@ mod guardian_secret_key_write_public_key;
 mod none;
 mod verify_standard_parameters;
 mod write_hashes;
+mod write_joint_election_public_key;
 mod write_manifest;
 mod write_parameters;
 mod write_random_seed;
@@ -60,6 +61,11 @@ pub(crate) enum Subcommands {
     GuardianSecretKeyWritePublicKey(
         crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
     ),
+
+    /// Write the joint election public key from guardian public keys.
+    WriteJointElectionPublicKey(
+        crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
+    ),
 }
 
 impl Default for Subcommands {
@@ -80,6 +86,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteHashes(a) => a,
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
+            WriteJointElectionPublicKey(a) => a,
         }
     }
 }

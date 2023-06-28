@@ -284,6 +284,15 @@ for /L %%N in (1, 1, %eg_n%) do call :sub_egtest_per_guardian %%N
 echo.
 echo ---- All guardians done.
 
+rem ---- Write joint election public key
+
+if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\joint_election_public_key.json" goto :skip_write_joint_election_public_key
+echo.
+echo %electionguard_exe% --insecure-deterministic write-joint-election-public-key
+%electionguard_exe% --insecure-deterministic write-joint-election-public-key
+if "%ERRORLEVEL%" NEQ "0" exit /b
+:skip_write_joint_election_public_key
+
 rem ---- Write HashesExt
 
 echo.
@@ -345,8 +354,8 @@ if not exist "%guardian_secret_key_file%" (
 
 if exist "%guardian_public_key_file%" goto :skip_writing_public_key
 echo.
-echo %electionguard_exe% guardian-secret-key-write-public-key --i %i%
-%electionguard_exe% guardian-secret-key-write-public-key --i %i%
+echo %electionguard_exe% --insecure-deterministic guardian-secret-key-write-public-key --i %i%
+%electionguard_exe% --insecure-deterministic guardian-secret-key-write-public-key --i %i%
 if "%ERRORLEVEL%" NEQ "0" exit /b
 
 if not exist "%guardian_public_key_file%" (

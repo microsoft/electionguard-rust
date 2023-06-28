@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     election_parameters::ElectionParameters,
     guardian_public_key::GuardianPublicKey,
+    guardian_public_key_info::GuardianPublicKeyInfo,
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
@@ -124,7 +125,7 @@ mod test {
             .collect::<Vec<_>>();
 
         let joint_election_public_key =
-            JointElectionPublicKey::compute(fixed_parameters, &guardian_public_keys);
+            JointElectionPublicKey::compute(&election_parameters, &guardian_public_keys).unwrap();
 
         assert!(&joint_election_public_key.0 < fixed_parameters.p.borrow());
 

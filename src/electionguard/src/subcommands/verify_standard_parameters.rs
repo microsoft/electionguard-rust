@@ -34,7 +34,7 @@ impl Subcommand for VerifyStandardParameters {
         for pass in 0..self.passes {
             eprintln!("    Starting pass {pass}/{}...", self.passes);
             fixed_parameters
-                .verify(&mut csprng)
+                .validate(&mut csprng)
                 .context("Parameter verification failed")?;
         }
 

@@ -6,10 +6,8 @@
 #![deny(clippy::manual_assert)]
 
 use std::fs::{File, OpenOptions};
-use std::io::Stdout;
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
-use std::string::ToString;
 
 use anyhow::{bail, Context, Result};
 
@@ -23,6 +21,7 @@ pub(crate) enum ArtifactFile {
     Hashes,
     GuardianSecretKey(NonZeroU16),
     GuardianPublicKey(NonZeroU16),
+    JointElectionPublicKey,
 }
 
 impl std::fmt::Display for ArtifactFile {
@@ -49,6 +48,7 @@ impl From<ArtifactFile> for PathBuf {
             GuardianPublicKey(i) => Path::new("guardians")
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.public_key.json")),
+            JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
         }
     }
 }
@@ -96,7 +96,7 @@ impl ArtifactsDir {
 
     /// Opens the specified file for reading, or if "-" then read from stdin.
     /// Next it tries any specified artifact file.
-    pub fn in_file_read(
+    pub fn in_file_stdioread(
         &self,
         opt_path: &Option<PathBuf>,
         opt_artifact_file: Option<ArtifactFile>,
@@ -104,8 +104,8 @@ impl ArtifactsDir {
         let mut open_options_read = OpenOptions::new();
         open_options_read.read(true);
 
-        let ioread_and_path: (Box<dyn std::io::Read>, PathBuf) = if let Some(ref path) = opt_path {
-            let bx_read: Box<dyn std::io::Read> = if *path == PathBuf::from("-") {
+        let stdioread_and_path: (Box<dyn std::io::Read>, PathBuf) = if let Some(ref path) = opt_path {
+            let stdioread: Box<dyn std::io::Read> = if *path == PathBuf::from("-") {
                 Box::new(std::io::stdin())
             } else {
                 let file = open_options_read
@@ -114,62 +114,48 @@ impl ArtifactsDir {
                 Box::new(file)
             };
 
-            (bx_read, path.clone())
+            (stdioread, path.clone())
         } else if let Some(artifact_file) = opt_artifact_file {
             let (file, path) = self.open(artifact_file, &open_options_read)?;
-            let bx_read: Box<dyn std::io::Read> = Box::new(file);
-            (bx_read, path)
+            let stdioread: Box<dyn std::io::Read> = Box::new(file);
+            (stdioread, path)
         } else {
             bail!("Specify at least one of opt_path or opt_artifact_file");
         };
 
-        Ok(ioread_and_path)
+        Ok(stdioread_and_path)
     }
 
-    /// Writes the buf to the specified file, or if "-" then write to stdout.
-    /// Default is the specified artifact file.
-    pub fn out_file_write(
+    /// Opens the specified file for writing, or if "-" then write to stdout.
+    /// Next it tries any specified artifact file.
+    pub fn out_file_stdiowrite(
         &self,
-        out_file: &Option<PathBuf>,
-        artifact_file: ArtifactFile,
-        description: &str,
-        buf: &[u8],
-    ) -> Result<()> {
+        opt_path: &Option<PathBuf>,
+        opt_artifact_file: Option<ArtifactFile>,
+    ) -> Result<(Box<dyn std::io::Write>, PathBuf)> {
         let mut open_options_write = OpenOptions::new();
         open_options_write.write(true).create(true).truncate(true);
 
-        let mut opt_stdout: Option<Stdout> = None;
-        let mut opt_file: Option<File> = None;
-        let mut opt_path: Option<PathBuf> = None;
-
-        let dest: &mut dyn std::io::Write = if let Some(ref path) = out_file {
-            if *path == PathBuf::from("-") {
-                opt_stdout.insert(std::io::stdout())
-            } else {
-                let file = open_options_write
-                    .open(path)
-                    .with_context(|| format!("Couldn't open file: {}", path.display()))?;
-                opt_path = Some(path.clone());
-                opt_file.insert(file)
-            }
-        } else {
-            let (file, path) = self.open(artifact_file, &open_options_write)?;
-            opt_path = Some(path);
-            opt_file.insert(file)
-        };
-
-        dest.write_all(buf).with_context(|| {
+        let stdiowrite_and_path: (Box<dyn std::io::Write>, PathBuf) =
             if let Some(ref path) = opt_path {
-                format!("Couldn't write to file: {}", path.display())
+                let stdiowrite: Box<dyn std::io::Write> = if *path == PathBuf::from("-") {
+                    Box::new(std::io::stdout())
+                } else {
+                    let file = open_options_write.open(path).with_context(|| {
+                        format!("Couldn't open file for writing: {}", path.display())
+                    })?;
+                    Box::new(file)
+                };
+
+                (stdiowrite, path.clone())
+            } else if let Some(artifact_file) = opt_artifact_file {
+                let (file, path) = self.open(artifact_file, &open_options_write)?;
+                let bx_write: Box<dyn std::io::Write> = Box::new(file);
+                (bx_write, path)
             } else {
-                "Couldn't write to stdout".to_string()
-            }
-        })?;
+                bail!("Specify at least one of opt_path or opt_artifact_file");
+            };
 
-        if let Some(path) = opt_path {
-            eprintln!("Wrote {description} to: {}", path.display());
-        }
-
-        Ok(())
+        Ok(stdiowrite_and_path)
     }
 }

@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use eg::{
     election_parameters::ElectionParameters, standard_parameters::STANDARD_PARAMETERS,
@@ -68,13 +68,18 @@ impl Subcommand for WriteParameters {
             varying_parameters,
         };
 
-        let json = election_parameters.to_json();
+        let (mut bx_write, path) = subcommand_helper
+            .artifacts_dir
+            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::ElectionParameters))?;
 
-        subcommand_helper.artifacts_dir.out_file_write(
-            &self.out_file,
-            ArtifactFile::ElectionParameters,
-            "election parameters",
-            json.as_bytes(),
-        )
+        election_parameters
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| format!("Writing election parameters to: {}", path.display()))?;
+
+        drop(bx_write);
+
+        eprintln!("Wrote election parameters to: {}", path.display());
+
+        Ok(())
     }
 }

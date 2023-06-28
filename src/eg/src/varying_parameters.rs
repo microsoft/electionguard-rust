@@ -29,7 +29,7 @@ pub struct VaryingParameters {
 impl VaryingParameters {
     /// Verifies the `VaryingParameters` meet some basic validity requirements.
     #[allow(clippy::nonminimal_bool)]
-    pub fn verify(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         // `n` must be greater than or equal to 1
         if !(1 <= self.n) {
             bail!("Varying parameters failed check: 1 <= n");
@@ -46,6 +46,14 @@ impl VaryingParameters {
         }
 
         Ok(())
+    }
+
+    pub fn is_valid_guardian_i<T>(&self, i: T) -> bool
+    where
+        T: Into<usize>,
+    {
+        let i: usize = i.into();
+        (1usize..=self.n.into()).contains(&i)
     }
 
     /// Iterates over the guardian numbers, 1 <= i <= n.

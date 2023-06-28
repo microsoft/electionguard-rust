@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use eg::hashes::Hashes;
 
@@ -49,13 +49,18 @@ impl Subcommand for WriteHashes {
 
         let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        let json = hashes.to_json();
+        let (mut bx_write, path) = subcommand_helper
+            .artifacts_dir
+            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::Hashes))?;
 
-        subcommand_helper.artifacts_dir.out_file_write(
-            &self.out_file,
-            ArtifactFile::Hashes,
-            "hashes",
-            json.as_bytes(),
-        )
+        hashes
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| format!("Writing hashes to: {}", path.display()))?;
+
+        drop(bx_write);
+
+        eprintln!("Wrote hashes to: {}", path.display());
+
+        Ok(())
     }
 }

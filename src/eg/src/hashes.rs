@@ -7,6 +7,7 @@
 
 use std::borrow::Borrow;
 
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -95,14 +96,23 @@ impl Hashes {
         Self { h_p, h_m, h_b }
     }
 
-    /// Returns a pretty JSON `String` representation of the `Hashes`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
+    /// Reads a `Hashes` from a `std::io::Write`.
+    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let hashes: Self =
+            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
+
+        Ok(hashes)
+    }
+
+    /// Writes a `Hashes` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser).context("Error writing hashes")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing hashes file")
     }
 }
 

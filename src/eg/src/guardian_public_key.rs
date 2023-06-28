@@ -8,12 +8,18 @@
 use std::borrow::Borrow;
 use std::num::NonZeroU16;
 
+use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use util::integer_util::to_be_bytes_left_pad;
 
-use crate::{fixed_parameters::FixedParameters, guardian_secret_key::CoefficientCommitments};
+use crate::{
+    election_parameters::ElectionParameters,
+    fixed_parameters::FixedParameters,
+    guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
+    guardian_secret_key::CoefficientCommitments,
+};
 
 /// Public key for a guardian.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -29,9 +35,24 @@ pub struct GuardianPublicKey {
     pub coefficient_commitments: CoefficientCommitments,
 }
 
-impl GuardianPublicKey {
-    pub fn coefficient_commitments(&self) -> &CoefficientCommitments {
+impl GuardianPublicKeyInfo for GuardianPublicKey {
+    fn i(&self) -> NonZeroU16 {
+        self.i
+    }
+    fn opt_name(&self) -> &Option<String> {
+        &self.opt_name
+    }
+    fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
+    }
+}
+
+impl GuardianPublicKey {
+    /// Verifies that the `GuardianPublicKey` is well-formed
+    /// and conforms to the election parameters.
+    /// Useful after deserialization.
+    pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
+        validate_guardian_public_key_info(self, election_parameters)
     }
 
     /// "commitment K_i,0 will serve as the public key for guardian G_i"
@@ -54,6 +75,31 @@ impl GuardianPublicKey {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
+    }
+
+    /// Reads a `GuardianPublicKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let guardian_public_key: GuardianPublicKey =
+            serde_json::from_reader(stdioread).context("Reading GuardianPublicKey")?;
+
+        guardian_public_key.validate(election_parameters)?;
+
+        Ok(guardian_public_key)
+    }
+
+    /// Writes a `GuardianPublicKey` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error writing guardian public key")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing guardian public key file")
     }
 }
 

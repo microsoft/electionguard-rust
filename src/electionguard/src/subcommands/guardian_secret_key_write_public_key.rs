@@ -7,11 +7,13 @@
 
 use std::{num::NonZeroU16, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::{
-    artifacts_dir::ArtifactFile, common_utils::load_guardian_secret_key,
-    subcommand_helper::SubcommandHelper, subcommands::Subcommand,
+    artifacts_dir::ArtifactFile,
+    common_utils::{load_election_parameters, load_guardian_secret_key},
+    subcommand_helper::SubcommandHelper,
+    subcommands::Subcommand,
 };
 
 /// A subcommand that does nothing. For a default value.
@@ -35,27 +37,47 @@ pub(crate) struct GuardianSecretKeyWritePublicKey {
 
 impl Subcommand for GuardianSecretKeyWritePublicKey {
     fn uses_csprng(&self) -> bool {
-        false
+        true
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let mut csprng = subcommand_helper
+            .get_csprng(format!("GuardianSecretKeyWritePublicKey({:?})", self.i).as_bytes())?;
+
         if self.secret_key_in.is_none() && self.i.is_none() {
             bail!("Specify at least one of --i or --secret-key-in");
         }
+
+        //? TODO: Do we need a command line arg to specify the election parameters source?
+        let election_parameters =
+            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
 
         let guardian_secret_key = load_guardian_secret_key(
             self.i,
             &self.secret_key_in,
             &subcommand_helper.artifacts_dir,
+            &election_parameters,
         )?;
+
+        let i = guardian_secret_key.i;
 
         let public_key = guardian_secret_key.make_public_key();
 
-        subcommand_helper.artifacts_dir.out_file_write(
+        let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
             &self.public_key_out,
-            ArtifactFile::GuardianPublicKey(guardian_secret_key.i),
-            format!("public key for guardian {}", guardian_secret_key.i).as_str(),
-            public_key.to_json().as_bytes(),
-        )
+            Some(ArtifactFile::GuardianPublicKey(i)),
+        )?;
+
+        public_key
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| {
+                format!("Writing public key for guardian {i} to: {}", path.display())
+            })?;
+
+        drop(bx_write);
+
+        eprintln!("Wrote public key for guardian {i} to: {}", path.display());
+
+        Ok(())
     }
 }
