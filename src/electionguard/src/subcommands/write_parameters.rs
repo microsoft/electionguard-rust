@@ -18,9 +18,6 @@ use crate::{
     artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, subcommands::Subcommand,
 };
 
-/// Writes the election parameters to a file.
-/// The fixed parameters are `eg::standard_parameters::STANDARD_PARAMETERS`.
-/// The varying parameters are specified by the user.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct WriteParameters {
     /// Number of guardians.
@@ -68,15 +65,15 @@ impl Subcommand for WriteParameters {
             varying_parameters,
         };
 
-        let (mut bx_write, path) = subcommand_helper
+        let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
             .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::ElectionParameters))?;
 
         election_parameters
-            .to_stdiowrite(bx_write.as_mut())
+            .to_stdiowrite(stdiowrite.as_mut())
             .with_context(|| format!("Writing election parameters to: {}", path.display()))?;
 
-        drop(bx_write);
+        drop(stdiowrite);
 
         eprintln!("Wrote election parameters to: {}", path.display());
 

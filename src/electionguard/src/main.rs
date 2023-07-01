@@ -13,7 +13,7 @@ mod subcommands;
 
 //use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{ensure, Result};
 use clap::Parser;
 
 use artifacts_dir::{ArtifactFile, ArtifactsDir};
@@ -24,30 +24,31 @@ use crate::{clargs::Clargs, subcommands::Subcommand};
 fn main() -> Result<()> {
     let mut clargs = Clargs::parse();
 
-    let insecure_deterministic_flag_passed = clargs.insecure_deterministic;
-
     let artifacts_dir = ArtifactsDir::new(&clargs.artifacts_dir)?;
 
-    // Takes the `Subcommand` out of `clargs`, replacing it with the default `PrintHelp`.
+    // Takes the `Subcommand` out of `clargs`, replacing it with the default `None`.
     // We need it for the `self` parameter to call `do_it()`.
     let mut subcommand = std::mem::take(&mut clargs.subcommand);
+    let subcommand: &mut dyn Subcommand = (&mut subcommand).into();
 
-    // Now we can pass ownership of `clargs` to `SubcommandInfo`.
-    let mut subcommand_info = SubcommandHelper::new(clargs, artifacts_dir)?;
+    let uses_csprng = subcommand.uses_csprng();
 
-    let uses_csprng = Into::<&mut dyn Subcommand>::into(&mut subcommand).uses_csprng();
-    subcommand_info.subcommand_uses_csprng = uses_csprng;
+    if uses_csprng {
+        let no_seed_file = !artifacts_dir.exists(ArtifactFile::PseudorandomSeedDefeatsAllSecrecy);
 
-    if uses_csprng
-        && !insecure_deterministic_flag_passed
-        && subcommand_info
-            .artifacts_dir
-            .exists(ArtifactFile::PseudorandomSeedDefeatsAllSecrecy)
-    {
-        bail!("--insecure-deterministic is not set, but random seed file exists already exists in artifacts dir: {}",
-            subcommand_info.artifacts_dir.path(ArtifactFile::PseudorandomSeedDefeatsAllSecrecy).display()
+        //? TODO BUG TOCTOU
+        ensure!(
+            no_seed_file || clargs.insecure_deterministic,
+            "Pseudorandom seed file ({}) exists, but the --insecure-deterministic command line argument was not specified",
+            artifacts_dir
+                .path(ArtifactFile::PseudorandomSeedDefeatsAllSecrecy)
+                .display()
         );
     }
 
-    Into::<&mut dyn Subcommand>::into(&mut subcommand).do_it(&mut subcommand_info)
+    // Now we can pass ownership of `clargs` to `SubcommandHelper`.
+    let mut subcommand_helper = SubcommandHelper::new(clargs, artifacts_dir, uses_csprng)?;
+
+    // Perform the subcommand.
+    subcommand.do_it(&mut subcommand_helper)
 }

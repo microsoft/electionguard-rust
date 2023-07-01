@@ -22,6 +22,7 @@ pub(crate) enum ArtifactFile {
     GuardianSecretKey(NonZeroU16),
     GuardianPublicKey(NonZeroU16),
     JointElectionPublicKey,
+    HashesExt,
 }
 
 impl std::fmt::Display for ArtifactFile {
@@ -49,6 +50,7 @@ impl From<ArtifactFile> for PathBuf {
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.public_key.json")),
             JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
+            HashesExt => PathBuf::from("hashes_ext.json"),
         }
     }
 }

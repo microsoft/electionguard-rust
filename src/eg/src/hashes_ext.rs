@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -23,7 +24,7 @@ pub struct HashesExt {
 }
 
 impl HashesExt {
-    pub fn new(
+    pub fn compute(
         election_parameters: &ElectionParameters,
         hashes: &Hashes,
         joint_election_public_key: &JointElectionPublicKey,
@@ -66,14 +67,30 @@ impl HashesExt {
         Self { h_e }
     }
 
-    /// Returns a pretty JSON `String` representation of the `Hashes`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
+    /// Reads a `HashesExt` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let self_: Self = serde_json::from_reader(stdioread).context("Reading HashesExt")?;
+
+        self_.validate()?;
+
+        Ok(self_)
+    }
+
+    /// Validates that the `HashesExt` is well-formed.
+    /// Useful after deserialization.
+    pub fn validate(&self) -> Result<()> {
+        // We currently have no validation rules for this type.
+        Ok(())
+    }
+
+    /// Writes a `HashesExt` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .map_err(Into::<anyhow::Error>::into)
+            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
+            .context("Writing HashesExt")
     }
 }
 
@@ -98,12 +115,13 @@ mod test {
         example_election_parameters::example_election_parameters,
         guardian_secret_key::GuardianSecretKey, joint_election_public_key::JointElectionPublicKey,
     };
+    use anyhow::Result;
     use hex_literal::hex;
     use std::borrow::Borrow;
     use util::csprng::Csprng;
 
     #[test]
-    fn test_hashes_ext() {
+    fn test_hashes_ext() -> Result<()> {
         let mut csprng = Csprng::new(b"test_hashes_ext");
 
         let election_manifest = example_election_manifest();
@@ -112,7 +130,7 @@ mod test {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let hashes = Hashes::new(&election_parameters, &election_manifest);
+        let hashes = Hashes::compute(&election_parameters, &election_manifest)?;
 
         let guardian_secret_keys = varying_parameters
             .each_guardian_i()
@@ -129,7 +147,7 @@ mod test {
 
         assert!(&joint_election_public_key.0 < fixed_parameters.p.borrow());
 
-        let hashes_ext = HashesExt::new(
+        let hashes_ext = HashesExt::compute(
             &election_parameters,
             &hashes,
             &joint_election_public_key,
@@ -140,5 +158,7 @@ mod test {
             "06538A5C900569D65474908D57E084F432CCCB69674A694DAD30200F0E4B10B8"
         ));
         assert_eq!(hashes_ext.h_e, expected_h_e);
+
+        Ok(())
     }
 }

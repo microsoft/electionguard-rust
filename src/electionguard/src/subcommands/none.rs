@@ -9,7 +9,7 @@ use anyhow::Result;
 
 use crate::{subcommand_helper::SubcommandHelper, subcommands::Subcommand};
 
-/// A subcommand that does nothing. For a default value.
+// A subcommand that does nothing. For a default value.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct None {}
 

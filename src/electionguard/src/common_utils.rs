@@ -5,18 +5,17 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::fs::OpenOptions;
-use std::io::Read;
 use std::num::NonZeroU16;
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{ensure, Context, Result};
 use rand_core::{OsRng, RngCore};
 
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
     example_election_manifest::example_election_manifest, guardian_public_key::GuardianPublicKey,
-    guardian_secret_key::GuardianSecretKey,
+    guardian_secret_key::GuardianSecretKey, hashes::Hashes,
+    joint_election_public_key::JointElectionPublicKey,
 };
 use util::csprng::Csprng;
 
@@ -34,37 +33,28 @@ impl ElectionManifestSource {
         &self,
         artifacts_dir: &ArtifactsDir,
     ) -> Result<ElectionManifest> {
-        let mut open_options = OpenOptions::new();
-        open_options.read(true);
-
-        let (mut file, path) = match self {
+        let (opt_path, opt_artifact_file): (Option<PathBuf>, Option<ArtifactFile>) = match self {
             ElectionManifestSource::ArtifactFileElectionManifestPretty => {
-                artifacts_dir.open(ArtifactFile::ElectionManifestPretty, &open_options)?
+                (None, Some(ArtifactFile::ElectionManifestPretty))
             }
             ElectionManifestSource::ArtifactFileElectionManifestCanonical => {
-                artifacts_dir.open(ArtifactFile::ElectionManifestCanonical, &open_options)?
+                (None, Some(ArtifactFile::ElectionManifestCanonical))
             }
-            ElectionManifestSource::SpecificFile(path) => {
-                let file = open_options
-                    .open(path)
-                    .with_context(|| format!("Couldn't open manifest file: {}", path.display()))?;
-                (file, path.clone())
-            }
+            ElectionManifestSource::SpecificFile(path) => (Some(path.clone()), None),
             ElectionManifestSource::Example => {
-                return Ok(example_election_manifest());
+                return Ok(example_election_manifest()); //------- inner return
             }
         };
 
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes).with_context(|| {
-            format!(
-                "Couldn't read from election manifest file: {}",
-                path.display()
-            )
-        })?;
+        let (mut stdioread, actual_path) =
+            artifacts_dir.in_file_stdioread(&opt_path, opt_artifact_file)?;
 
-        let election_manifest = ElectionManifest::from_bytes(&bytes)?;
-        eprintln!("Election manifest loaded from: {}", path.display());
+        let election_manifest = ElectionManifest::from_stdioread_validated(&mut stdioread)
+            .with_context(|| {
+                format!("Loading election manifest from: {}", actual_path.display())
+            })?;
+
+        eprintln!("Election manifest loaded from: {}", actual_path.display());
 
         Ok(election_manifest)
     }
@@ -74,24 +64,12 @@ pub(crate) fn load_election_parameters(
     artifacts_dir: &ArtifactsDir,
     csprng: &mut Csprng,
 ) -> Result<ElectionParameters> {
-    artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::ElectionParameters))?;
-    let mut open_options = OpenOptions::new();
-    open_options.read(true);
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::ElectionParameters))?;
 
-    let (mut file, path) = artifacts_dir.open(ArtifactFile::ElectionParameters, &open_options)?;
+    let election_parameters = ElectionParameters::from_stdioread_validated(&mut stdioread, csprng)?;
 
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).with_context(|| {
-        format!(
-            "Couldn't read from election parameters file: {}",
-            path.display()
-        )
-    })?;
-
-    let election_parameters = ElectionParameters::from_bytes(&bytes)?;
     eprintln!("Election parameters loaded from: {}", path.display());
-
-    election_parameters.validate(csprng)?;
 
     Ok(election_parameters)
 }
@@ -102,9 +80,10 @@ pub(crate) fn load_guardian_secret_key(
     artifacts_dir: &ArtifactsDir,
     election_parameters: &ElectionParameters,
 ) -> Result<GuardianSecretKey> {
-    if opt_secret_key_path.is_none() && opt_i.is_none() {
-        bail!("Need at least one of the guardian `i` or secret key file path");
-    }
+    ensure!(
+        opt_i.is_some() || opt_secret_key_path.is_some(),
+        "Need the guardian number 'i' or secret key file path"
+    );
 
     let (mut stdioread, path) = artifacts_dir.in_file_stdioread(
         opt_secret_key_path,
@@ -115,13 +94,11 @@ pub(crate) fn load_guardian_secret_key(
         GuardianSecretKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
 
     if let Some(i) = opt_i {
-        if i != guardian_secret_key.i {
-            bail!(
-                "Guardian number specified by --i {i} does not match the guardian number {} in the secret key file: {}",
+        ensure!(i == guardian_secret_key.i,
+            "Guardian number specified by --i {i} does not match the guardian number {} in the secret key file: {}",
                 guardian_secret_key.i,
                 path.display()
             );
-        }
     }
 
     if let Some(name) = &guardian_secret_key.opt_name {
@@ -148,9 +125,10 @@ pub(crate) fn load_guardian_public_key(
     artifacts_dir: &ArtifactsDir,
     election_parameters: &ElectionParameters,
 ) -> Result<GuardianPublicKey> {
-    if opt_public_key_path.is_none() && opt_i.is_none() {
-        bail!("Need at least one of the guardian `i` or public key file path");
-    }
+    ensure!(
+        opt_i.is_some() || opt_public_key_path.is_some(),
+        "Need the guardian number 'i' or public key file path"
+    );
 
     let (mut stdioread, path) = artifacts_dir.in_file_stdioread(
         opt_public_key_path,
@@ -161,14 +139,12 @@ pub(crate) fn load_guardian_public_key(
         GuardianPublicKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
 
     if let Some(i) = opt_i {
-        if i != guardian_public_key.i {
-            bail!(
+        ensure!(i == guardian_public_key.i,
                 "Guardian number specified by --i {} does not match the guardian number {} in the public key file: {}",
                 i,
                 guardian_public_key.i,
                 path.display()
             );
-        }
     }
 
     if let Some(name) = &guardian_public_key.opt_name {
@@ -204,4 +180,45 @@ pub(crate) fn osrng_seed_data_for_csprng() -> [u8; Csprng::recommended_max_seed_
     let mut seed_bytes = core::array::from_fn(|_i| 0);
     OsRng.fill_bytes(&mut seed_bytes);
     seed_bytes
+}
+
+pub(crate) fn load_all_guardian_public_keys(
+    artifacts_dir: &ArtifactsDir,
+    election_parameters: &ElectionParameters,
+) -> Result<Vec<GuardianPublicKey>> {
+    let mut guardian_public_keys = Vec::<GuardianPublicKey>::new();
+
+    for i in election_parameters.varying_parameters.each_guardian_i() {
+        let gpk = load_guardian_public_key(Some(i), &None, artifacts_dir, election_parameters)?;
+
+        guardian_public_keys.push(gpk);
+    }
+
+    Ok(guardian_public_keys)
+}
+
+pub(crate) fn load_hashes(artifacts_dir: &ArtifactsDir) -> Result<Hashes> {
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::Hashes))?;
+
+    let hashes = Hashes::from_stdioread_validated(&mut stdioread)?;
+
+    eprintln!("Hashes loaded from: {}", path.display());
+
+    Ok(hashes)
+}
+
+pub(crate) fn load_joint_election_public_key(
+    artifacts_dir: &ArtifactsDir,
+    election_parameters: &ElectionParameters,
+) -> Result<JointElectionPublicKey> {
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::JointElectionPublicKey))?;
+
+    let joint_election_public_key =
+        JointElectionPublicKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
+
+    eprintln!("Joint election public key loaded from: {}", path.display());
+
+    Ok(joint_election_public_key)
 }

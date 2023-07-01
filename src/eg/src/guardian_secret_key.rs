@@ -8,7 +8,7 @@
 use std::borrow::Borrow;
 use std::num::NonZeroU16;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{ensure, Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
@@ -72,9 +72,10 @@ impl CoefficientCommitment {
     /// Verifies that `CoefficientCommitment` is well-formed and conforms
     /// to the election parameters. Useful after deserialization.
     pub(crate) fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
-        if !election_parameters.fixed_parameters.is_valid_modp(&self.0) {
-            bail!("Coefficient commitment is not a valid mod p value");
-        }
+        ensure!(
+            election_parameters.fixed_parameters.is_valid_modp(&self.0),
+            "Coefficient commitment is not a valid mod p value"
+        );
 
         Ok(())
     }
@@ -162,12 +163,17 @@ impl GuardianSecretKey {
         }
     }
 
-    pub fn secret_coefficients(&self) -> &SecretCoefficients {
-        &self.secret_coefficients
-    }
+    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let self_: Self =
+            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
 
-    pub fn secret_s(&self) -> &BigUint {
-        &self.secret_coefficients.0[0].0
+        self_.validate(election_parameters)?;
+
+        Ok(self_)
     }
 
     /// Verifies that the `GuardianSecretKey` is well-formed
@@ -175,6 +181,14 @@ impl GuardianSecretKey {
     /// Useful after deserialization.
     pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
         validate_guardian_public_key_info(self, election_parameters)
+    }
+
+    pub fn secret_coefficients(&self) -> &SecretCoefficients {
+        &self.secret_coefficients
+    }
+
+    pub fn secret_s(&self) -> &BigUint {
+        &self.secret_coefficients.0[0].0
     }
 
     pub fn make_public_key(&self) -> GuardianPublicKey {
@@ -185,28 +199,13 @@ impl GuardianSecretKey {
         }
     }
 
-    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
-    pub fn from_stdioread_validated(
-        stdioread: &mut dyn std::io::Read,
-        election_parameters: &ElectionParameters,
-    ) -> Result<Self> {
-        let guardian_secret_key: GuardianSecretKey =
-            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
-
-        guardian_secret_key.validate(election_parameters)?;
-
-        Ok(guardian_secret_key)
-    }
-
     /// Writes a `GuardianSecretKey` to a `std::io::Write`.
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 
         self.serialize(&mut ser)
-            .context("Error writing guardian secret key")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing guardian secret key file")
+            .map_err(Into::<anyhow::Error>::into)
+            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
+            .context("Writing GuardianSecretKey")
     }
 }

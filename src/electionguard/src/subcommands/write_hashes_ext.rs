@@ -9,56 +9,68 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::joint_election_public_key::JointElectionPublicKey;
+use eg::hashes_ext::HashesExt;
 
 use crate::{
     artifacts_dir::ArtifactFile,
-    common_utils::{load_all_guardian_public_keys, load_election_parameters},
+    common_utils::{
+        load_all_guardian_public_keys, load_election_parameters, load_hashes,
+        load_joint_election_public_key,
+    },
     subcommand_helper::SubcommandHelper,
     subcommands::Subcommand,
 };
 
 #[derive(clap::Args, Debug, Default)]
-pub(crate) struct WriteJointElectionPublicKey {
-    //? TODO do we need to be able to specify a file for every guardian public key?
-    /* */
-    /// File to which to write the election public key.
+pub(crate) struct WriteHashesExt {
+    /// File to which to write the extended.
     /// Default is in the artifacts dir.
     /// If "-", write to stdout.
     #[arg(long)]
     out_file: Option<PathBuf>,
 }
 
-impl Subcommand for WriteJointElectionPublicKey {
+impl Subcommand for WriteHashesExt {
     fn uses_csprng(&self) -> bool {
         true
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng(b"WriteHashes")?;
+        let mut csprng = subcommand_helper.get_csprng(b"WriteHashesExt")?;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let election_parameters =
             load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
 
+        //? TODO: Do we need a command line arg to specify the hashes source?
+        let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
+
+        //? TODO: Do we need a command line arg to specify the joint election public key source?
+        let joint_election_public_key =
+            load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
+
         //? TODO: Do we need a command line arg to specify all the guardian public key source files?
         let guardian_public_keys =
             load_all_guardian_public_keys(&subcommand_helper.artifacts_dir, &election_parameters)?;
 
-        let joint_election_public_key =
-            JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())?;
+        let hashes_ext = HashesExt::compute(
+            &election_parameters,
+            &hashes,
+            &joint_election_public_key,
+            guardian_public_keys.as_slice(),
+        );
 
         let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
-            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::JointElectionPublicKey))?;
+            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::HashesExt))?;
 
-        joint_election_public_key
+        hashes_ext
             .to_stdiowrite(stdiowrite.as_mut())
-            .with_context(|| format!("Writing joint election public key to: {}", path.display()))?;
+            .with_context(|| format!("Writing hashes ext to: {}", path.display()))?;
 
         drop(stdiowrite);
 
-        eprintln!("Wrote joint election public key to: {}", path.display());
+        eprintln!("Wrote hashes ext to: {}", path.display());
 
         Ok(())
     }

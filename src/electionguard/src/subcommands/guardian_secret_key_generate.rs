@@ -17,7 +17,6 @@ use crate::{
     subcommand_helper::SubcommandHelper, subcommands::Subcommand,
 };
 
-/// Generate a guardian secret key and public key.
 #[derive(clap::Args, Debug)]
 pub(crate) struct GuardianSecretKeyGenerate {
     /// Guardian number, 1 <= i <= n.
@@ -41,8 +40,8 @@ impl Subcommand for GuardianSecretKeyGenerate {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng =
-            subcommand_helper.get_csprng(format!("GuardianKeyGenerate({})", self.i).as_bytes())?;
+        let mut csprng = subcommand_helper
+            .get_csprng(format!("GuardianSecretKeyGenerate({})", self.i).as_bytes())?;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let election_parameters =
@@ -66,7 +65,7 @@ impl Subcommand for GuardianSecretKeyGenerate {
             self.name.clone(),
         );
 
-        let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+        let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
             &self.secret_key_out_file,
             Some(ArtifactFile::GuardianSecretKey(self.i)),
         )?;
@@ -74,10 +73,10 @@ impl Subcommand for GuardianSecretKeyGenerate {
         let description = format!("secret key for guardian {} to: {}", self.i, path.display());
 
         secret_key
-            .to_stdiowrite(bx_write.as_mut())
+            .to_stdiowrite(stdiowrite.as_mut())
             .with_context(|| format!("Writing {description}"))?;
 
-        drop(bx_write);
+        drop(stdiowrite);
 
         eprintln!("Wrote {description}");
 

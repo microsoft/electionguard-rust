@@ -25,20 +25,19 @@ pub(crate) struct SubcommandHelper {
     /// Note that the `subcommand` member will just be a default.
     pub clargs: Clargs,
 
-    #[allow(dead_code)] //? TODO: Remove this
     pub artifacts_dir: ArtifactsDir,
 
-    pub subcommand_uses_csprng: bool,
+    pub uses_csprng: bool,
 
     csprng_initialized: bool,
 }
 
 impl SubcommandHelper {
-    pub fn new(clargs: Clargs, artifacts_dir: ArtifactsDir) -> Result<Self> {
+    pub fn new(clargs: Clargs, artifacts_dir: ArtifactsDir, uses_csprng: bool) -> Result<Self> {
         Ok(Self {
             clargs,
             artifacts_dir,
-            subcommand_uses_csprng: true,
+            uses_csprng,
             csprng_initialized: false,
         })
     }
@@ -48,7 +47,7 @@ impl SubcommandHelper {
     /// But only once, ever, for this subcommand.
     /// We don't allow the Csprng to be initialized multiple times.
     pub fn get_csprng(&mut self, customization_data: &[u8]) -> Result<Csprng> {
-        if !self.subcommand_uses_csprng {
+        if !self.uses_csprng {
             bail!("This subcommand is not supposed to use the Csprng");
         }
 

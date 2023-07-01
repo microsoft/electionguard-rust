@@ -7,7 +7,7 @@
 
 use std::borrow::Borrow;
 
-use anyhow::{bail, Result};
+use anyhow::{ensure, Result};
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
@@ -118,46 +118,47 @@ impl FixedParameters {
         //TODO verify p_bits_lsb_fixed_1
 
         // p is a prime of the requested number of bits
-        if !is_prime(p, csprng) {
-            bail!("Fixed parameters: p is not prime");
-        }
+        ensure!(is_prime(p, csprng), "Fixed parameters: p is not prime");
 
-        if cnt_bits_repr(p) != self.generation_parameters.p_bits_total {
-            bail!("Fixed parameters: p wrong number of bits");
-        }
+        ensure!(
+            cnt_bits_repr(p) == self.generation_parameters.p_bits_total,
+            "Fixed parameters: p wrong number of bits"
+        );
 
         // q is a prime of the requested number of bits
-        if !is_prime(q, csprng) {
-            bail!("Fixed parameters: q is not prime");
-        }
-        if cnt_bits_repr(q) != self.generation_parameters.q_bits_total {
-            bail!("Fixed parameters: q wrong number of bits");
-        }
+        ensure!(is_prime(q, csprng), "Fixed parameters: q is not prime");
+
+        ensure!(
+            cnt_bits_repr(q) == self.generation_parameters.q_bits_total,
+            "Fixed parameters: q wrong number of bits"
+        );
 
         // q < (p - 1)
-        if !(q < &(p - 1_u8)) {
-            bail!("Fixed parameters failed check: q < (p - 1)");
-        }
+        ensure!(
+            q < &(p - 1_u8),
+            "Fixed parameters failed check: q < (p - 1)"
+        );
 
         // r = (p − 1)/q
-        if !(self.r == ((p - 1_u8) / q)) {
-            bail!("Fixed parameters failed check: r = (p − 1)/q");
-        }
+        ensure!(
+            self.r == ((p - 1_u8) / q),
+            "Fixed parameters failed check: r = (p − 1)/q"
+        );
 
         // q is not a divisor of r = (p − 1)/q
         let r: &BigUint = self.r.borrow();
-        if (r % q).is_zero() {
-            bail!("Fixed parameters failed check: q is not a divisor of r = (p − 1)/q");
-        }
+        ensure!(
+            !(r % q).is_zero(),
+            "Fixed parameters failed check: q is not a divisor of r = (p − 1)/q"
+        );
 
         // g is in Zmodp and not 0 or 1
         let g: &BigUint = self.g.borrow();
-        if !(&BigUint::one() < g && g < p) {
-            bail!("Fixed parameters failed check: g is in Zmodp and not 0 or 1");
-        }
-        if !(g < p) {
-            bail!("Fixed parameters failed check: g < p");
-        }
+        ensure!(
+            &BigUint::one() < g && g < p,
+            "Fixed parameters failed check: g is in Zmodp and not 0 or 1"
+        );
+        ensure!(g < p, "Fixed parameters failed check: g < p");
 
         Ok(())
     }

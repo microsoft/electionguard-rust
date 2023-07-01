@@ -7,7 +7,7 @@
 
 use std::num::NonZeroU16;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{ensure, Context, Result};
 
 use crate::{election_parameters::ElectionParameters, guardian_secret_key::CoefficientCommitments};
 
@@ -35,25 +35,24 @@ pub(crate) fn validate_guardian_public_key_info(
     let n: usize = varying_parameters.n.into();
     let k: usize = varying_parameters.k.into();
 
-    if !(varying_parameters.is_valid_guardian_i(gpki.i().get())) {
-        bail!(
-            "Guardian number i={} is not in the range 1 <= i <= n={n}",
-            gpki.i()
-        );
-    }
+    ensure!(
+        varying_parameters.is_valid_guardian_i(gpki.i().get()),
+        "Guardian number i={} is not in the range 1 <= i <= n={n}",
+        gpki.i()
+    );
 
     if let Some(name) = &gpki.opt_name() {
-        if name.contains('\n') {
-            bail!("Guardian name must not contain a newline");
-        }
-    }
-
-    if gpki.coefficient_commitments().0.len() != k {
-        bail!(
-            "Expected k={k} coefficient commitments, found {}",
-            gpki.coefficient_commitments().0.len()
+        ensure!(
+            !name.contains('\n'),
+            "Guardian name must not contain a newline"
         );
     }
+
+    ensure!(
+        gpki.coefficient_commitments().0.len() == k,
+        "Expected k={k} coefficient commitments, found {}",
+        gpki.coefficient_commitments().0.len()
+    );
 
     for (ix, coefficient_commitment) in gpki.coefficient_commitments().0.iter().enumerate() {
         coefficient_commitment

@@ -48,6 +48,19 @@ impl GuardianPublicKeyInfo for GuardianPublicKey {
 }
 
 impl GuardianPublicKey {
+    /// Reads a `GuardianPublicKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let self_: Self =
+            serde_json::from_reader(stdioread).context("Reading GuardianPublicKey")?;
+
+        self_.validate(election_parameters)?;
+
+        Ok(self_)
+    }
+
     /// Verifies that the `GuardianPublicKey` is well-formed
     /// and conforms to the election parameters.
     /// Useful after deserialization.
@@ -77,29 +90,14 @@ impl GuardianPublicKey {
         s
     }
 
-    /// Reads a `GuardianPublicKey` from a `std::io::Read` and validates it.
-    pub fn from_stdioread_validated(
-        stdioread: &mut dyn std::io::Read,
-        election_parameters: &ElectionParameters,
-    ) -> Result<Self> {
-        let guardian_public_key: GuardianPublicKey =
-            serde_json::from_reader(stdioread).context("Reading GuardianPublicKey")?;
-
-        guardian_public_key.validate(election_parameters)?;
-
-        Ok(guardian_public_key)
-    }
-
     /// Writes a `GuardianPublicKey` to a `std::io::Write`.
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 
         self.serialize(&mut ser)
-            .context("Error writing guardian public key")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing guardian public key file")
+            .map_err(Into::<anyhow::Error>::into)
+            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
+            .context("Writing GuardianPublicKey")
     }
 }
 

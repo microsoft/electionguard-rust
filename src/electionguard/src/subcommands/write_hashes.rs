@@ -18,8 +18,6 @@ use crate::{
     subcommands::Subcommand,
 };
 
-/// Writes the hashes to a file.
-/// The election parameters and election manifest are read from the artifacts dir.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct WriteHashes {
     /// File to which to write the hashes.
@@ -47,17 +45,17 @@ impl Subcommand for WriteHashes {
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        let hashes = Hashes::new(&election_parameters, &election_manifest);
+        let hashes = Hashes::compute(&election_parameters, &election_manifest)?;
 
-        let (mut bx_write, path) = subcommand_helper
+        let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
             .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::Hashes))?;
 
         hashes
-            .to_stdiowrite(bx_write.as_mut())
+            .to_stdiowrite(stdiowrite.as_mut())
             .with_context(|| format!("Writing hashes to: {}", path.display()))?;
 
-        drop(bx_write);
+        drop(stdiowrite);
 
         eprintln!("Wrote hashes to: {}", path.display());
 
