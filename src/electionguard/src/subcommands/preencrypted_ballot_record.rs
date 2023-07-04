@@ -7,9 +7,11 @@
 
 use anyhow::Result;
 
-use eg::{device::Device, election_record::ElectionRecordHeader, hash::HValue};
+use eg::{
+    ballot::BallotStyle, device::Device, election_record::ElectionRecordHeader, hash::HValue,
+};
 use preencrypted::{ballot::BallotPreEncrypted, ballot_recording_tool::BallotRecordingTool};
-use voter::ballot::BallotSelections;
+use voter::{ballot::BallotSelections, verifier::Verifier};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -62,42 +64,55 @@ impl Subcommand for PreEncryptedBallotRecord {
             jepk,
         );
         let device = Device::new(&"Ballot Recording Tool".to_string(), record_header.clone());
+        let tool = BallotRecordingTool::new(record_header.clone(), BallotStyle(vec![]));
+        let verifier = Verifier::new(record_header.clone());
 
-        for b_idx in 1..self.num_ballots {
-            let mut pre_encrypted_ballot = {
-                let (mut stdioread, path) = subcommand_helper.artifacts_dir.in_file_stdioread(
+        let codes = {
+            let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
+                &None,
+                Some(ArtifactFile::PreEncryptedBallotMetadata(self.tag)),
+            )?;
+            tool.metadata_from_stdioread(&mut stdioread)?
+        };
+
+        for b_idx in 1..codes.len() {
+            let pre_encrypted_ballot = {
+                let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
-                    Some(ArtifactFile::PreEncryptedBallots(self.tag, b_idx as u128)),
+                    Some(ArtifactFile::PreEncryptedBallots(self.tag, codes[b_idx])),
                 )?;
-                BallotPreEncrypted::from_stdioread_validated(&mut stdioread, &election_parameters)?
+                BallotPreEncrypted::from_stdioread(&mut stdioread)?
             };
 
             let nonce = {
-                let (mut stdioread, path) = subcommand_helper.artifacts_dir.in_file_stdioread(
+                let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
                     Some(ArtifactFile::PreEncryptedBallotNonces(
                         self.tag,
-                        b_idx as u128,
+                        codes[b_idx],
                     )),
                 )?;
                 HValue::from_stdioread(&mut stdioread)?
             };
 
-            // let pre_encrypted_ballot = &mut ballots.ballots[b_idx];
-            assert!(BallotRecordingTool::verify_ballot(
-                &device.header,
-                &pre_encrypted_ballot,
-                &nonce
-            ));
+            let (regenerated_ballot, matched) =
+                tool.regenerate_and_match(&pre_encrypted_ballot, &nonce);
+            assert!(matched);
 
-            BallotRecordingTool::regenerate_nonces(&device, &mut pre_encrypted_ballot, &nonce);
+            if matched {
+                let regenerated_ballot = regenerated_ballot.unwrap();
+                let voter_ballot =
+                    BallotSelections::new_pick_random(&record_header.manifest, &mut csprng);
+                let encrypted_ballot =
+                    regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot);
 
-            let voter_ballot =
-                BallotSelections::new_pick_random(&device.header.manifest, &mut csprng);
-
-            let encrypted_ballot =
-                pre_encrypted_ballot.finalize(&device, &mut csprng, &voter_ballot);
-
+                assert!(verifier.verify_ballot_validity(&encrypted_ballot));
+            } else {
+                eprintln!(
+                    "Regenerated ballot with nonce {} does not match ballot {}",
+                    nonce, b_idx
+                );
+            }
             // encrypted_ballot.confirmation_code_qr(&path.join(self.tag.as_str()));
 
             // encrypted_ballot.verification_code_qr(
@@ -105,8 +120,6 @@ impl Subcommand for PreEncryptedBallotRecord {
             //     ballots.primary_nonces[b_idx].as_ref(),
             //     &path.join(self.tag.as_str()),
             // );
-
-            BallotRecordingTool::verify_ballot_proofs(&device, &encrypted_ballot);
         }
 
         Ok(())

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -15,13 +15,13 @@ pub struct ElectionRecordHeader {
     /// The election manifest.
     pub manifest: ElectionManifest,
 
-    /// Baseline election and cryptographic parameters
+    /// Baseline election and cryptographic parameters.
     pub parameters: ElectionParameters,
 
     /// Hashes H_P, H_M, H_B.
     pub hashes: Hashes,
 
-    /// Hash H_E
+    /// Hash H_E.
     pub hashes_ext: HashesExt,
 
     /// The joint election public key.
@@ -67,6 +67,14 @@ impl ElectionRecordHeader {
         }
     }
 
+    pub fn set_manifest(&mut self, manifest: ElectionManifest) {
+        self.manifest = manifest;
+    }
+
+    pub fn set_parameters(&mut self, parameters: ElectionParameters) {
+        self.parameters = parameters;
+    }
+
     /// Reads an `ElectionRecordHeader` from any `&str` JSON representation.
     pub fn from_json_str(json: &str) -> Result<ElectionRecordHeader> {
         serde_json::from_str(json).map_err(|e| anyhow!("Error parsing JSON: {}", e))
@@ -94,5 +102,17 @@ impl ElectionRecordHeader {
         // `unwrap()` is justified here because why would JSON serialization fail?
         #[allow(clippy::unwrap_used)]
         serde_json::to_vec(self).unwrap()
+    }
+
+    /// Writes a `ElectionRecordHeader` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error writing ElectionRecordHeader")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing election record header file")
     }
 }

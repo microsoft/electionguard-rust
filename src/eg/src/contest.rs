@@ -30,7 +30,7 @@ pub struct ContestOption {
 }
 
 /// A contest in an encrypted ballot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContestEncrypted {
     /// The label.
     pub label: String,

@@ -117,6 +117,11 @@ impl HValue {
             .write_all(b"\n")
             .context("Error writing HValue file")
     }
+
+    pub fn to_string_hex_no_prefix_suffix(&self) -> String {
+        let s = serde_json::to_string_pretty(self).unwrap();
+        s[3..s.len() - 2].to_string()
+    }
 }
 
 impl From<HValueByteArray> for HValue {

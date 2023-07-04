@@ -1,13 +1,10 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
     election_record::ElectionRecordHeader, joint_election_public_key::Ciphertext, zk::ProofRange,
 };
-
-/// A plaintext vote for an option in a contest.
-pub type ContestSelectionPlaintext = u8;
 
 // An encrypted option in a contest.
 // #[derive(Debug, Clone)]
@@ -19,8 +16,10 @@ pub type ContestSelectionPlaintext = u8;
 //     // pub nonce: BigUint,
 // }
 
+pub type ContestSelectionPlaintext = u8;
+
 /// A contest selection by a voter.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ContestSelection {
     /// Vector used to represent the selection
     pub vote: Vec<ContestSelectionPlaintext>,

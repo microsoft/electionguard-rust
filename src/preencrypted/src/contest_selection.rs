@@ -23,6 +23,14 @@ pub struct ContestSelectionPreEncrypted {
     pub selection_hash: HValue,
 }
 
+impl PartialEq for ContestSelectionPreEncrypted {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+            && self.selection_hash == other.selection_hash
+            && self.selections.as_slice() == other.selections.as_slice()
+    }
+}
+
 impl ContestSelectionPreEncrypted {
     pub fn regenerate_nonces(
         &mut self,
@@ -46,6 +54,7 @@ impl ContestSelectionPreEncrypted {
     pub fn new(
         header: &ElectionRecordHeader,
         primary_nonce: &[u8],
+        store_nonces: bool,
         selection: &ContestOption,
         contest_label: &String,
         selection_labels: &Vec<String>,
@@ -67,7 +76,7 @@ impl ContestSelectionPreEncrypted {
                     &header.parameters.fixed_parameters,
                     &nonce,
                     (j == k) as usize,
-                    false,
+                    store_nonces,
                 )
             })
             .collect::<Vec<Ciphertext>>();
@@ -85,6 +94,7 @@ impl ContestSelectionPreEncrypted {
     pub fn new_null(
         header: &ElectionRecordHeader,
         primary_nonce: &[u8],
+        store_nonces: bool,
         contest_label: &str,
         selection_labels: &Vec<String>,
         null_label: &str,
@@ -102,7 +112,7 @@ impl ContestSelectionPreEncrypted {
                     &header.parameters.fixed_parameters,
                     &nonce,
                     0,
-                    false,
+                    store_nonces,
                 )
             })
             .collect::<Vec<Ciphertext>>();

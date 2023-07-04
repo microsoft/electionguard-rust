@@ -3,7 +3,7 @@
 use std::{borrow::Borrow, rc::Rc};
 
 use num_bigint::BigUint;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use util::{
     csprng::Csprng,
     z_mul_prime::{ZMulPrime, ZMulPrimeElem},
@@ -13,41 +13,22 @@ use crate::{
     election_record::ElectionRecordHeader, hash::eg_h, joint_election_public_key::Ciphertext,
 };
 
-#[derive(Debug, Clone)]
-pub struct ProofRange {
-    pub c: Vec<BigUint>,
-    pub v: Vec<BigUint>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofRangeSingle {
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub c: BigUint,
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub v: BigUint,
 }
 
-// #[derive(Debug, Clone)]
-// pub struct ProofGuardian {
-//     pub c: Vec<BigUint>,
-//     pub v: Vec<BigUint>,
-//     pub capital_k: Vec<BigUint>,
-// }
-
-pub struct ProofCorrectDecryption {}
-
-/// Serialize for ProofRange
-
-impl Serialize for ProofRange {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        (
-            self.c
-                .iter()
-                .map(|c| c.to_str_radix(16))
-                .collect::<Vec<String>>(),
-            self.v
-                .iter()
-                .map(|v| v.to_str_radix(16))
-                .collect::<Vec<String>>(),
-        )
-            .serialize(serializer)
-    }
-}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofRange(Vec<ProofRangeSingle>);
 
 impl ProofRange {
     pub fn challenge(
@@ -133,10 +114,14 @@ impl ProofRange {
             None => panic!("challenge is not in ZmulPrime"),
         }
 
-        ProofRange {
-            c: c.iter().map(|x| x.elem.clone()).collect(),
-            v: v.iter().map(|x| x.elem.clone()).collect(),
-        }
+        ProofRange(
+            (0..big_l + 1)
+                .map(|j| ProofRangeSingle {
+                    c: c[j].elem.clone(),
+                    v: v[j].elem.clone(),
+                })
+                .collect(),
+        )
     }
 
     /// Verification 4 (TODO: Complete)
@@ -150,21 +135,21 @@ impl ProofRange {
                     .parameters
                     .fixed_parameters
                     .g
-                    .modpow(&self.v[j], header.parameters.fixed_parameters.p.borrow())
+                    .modpow(&self.0[j].v, header.parameters.fixed_parameters.p.borrow())
                     * ct.alpha
-                        .modpow(&self.c[j], header.parameters.fixed_parameters.p.borrow()))
+                        .modpow(&self.0[j].c, header.parameters.fixed_parameters.p.borrow()))
                     % header.parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
         let mut w = <Vec<ZMulPrimeElem>>::with_capacity(big_l + 1);
         for j in 0..big_l + 1 {
-            match ZMulPrimeElem::try_new(zmulq.clone(), self.v[j].clone()) {
+            match ZMulPrimeElem::try_new(zmulq.clone(), self.0[j].v.clone()) {
                 Some(v_j) => w.push(v_j),
                 None => panic!("w[j] is not in ZmulPrime"),
             };
 
-            match ZMulPrimeElem::try_new(zmulq.clone(), self.c[j].clone()) {
+            match ZMulPrimeElem::try_new(zmulq.clone(), self.0[j].c.clone()) {
                 Some(c_j) => w[j] = &w[j] - &(&c_j * &BigUint::from(j)),
                 None => panic!("c[j] is not in ZmulPrime"),
             };
@@ -177,7 +162,7 @@ impl ProofRange {
                     .0
                     .modpow(&w[j].elem, header.parameters.fixed_parameters.p.borrow())
                     * ct.beta
-                        .modpow(&self.c[j], header.parameters.fixed_parameters.p.borrow()))
+                        .modpow(&self.0[j].c, header.parameters.fixed_parameters.p.borrow()))
                     % header.parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
@@ -185,8 +170,8 @@ impl ProofRange {
         match ZMulPrimeElem::try_new(zmulq.clone(), Self::challenge(header, ct, &a, &b)) {
             Some(c) => {
                 let mut rhs = BigUint::from(0u8);
-                for c_i in self.c.iter() {
-                    rhs += c_i;
+                for e in self.0.iter() {
+                    rhs += &e.c;
                 }
 
                 rhs = rhs % header.parameters.fixed_parameters.q.as_ref();
@@ -212,6 +197,15 @@ impl ProofRange {
         // 4.C
     }
 }
+
+// #[derive(Debug, Clone)]
+// pub struct ProofGuardian {
+//     pub c: Vec<BigUint>,
+//     pub v: Vec<BigUint>,
+//     pub capital_k: Vec<BigUint>,
+// }
+
+pub struct ProofCorrectDecryption {}
 
 // Serialize for ProofGuardian
 // impl Serialize for ProofGuardian {

@@ -2,7 +2,6 @@ use std::rc::Rc;
 
 use eg::{
     contest::{Contest, ContestEncrypted},
-    contest_selection::ContestSelectionPlaintext,
     device::Device,
     election_record::ElectionRecordHeader,
     fixed_parameters::FixedParameters,
@@ -28,6 +27,14 @@ pub struct ContestPreEncrypted {
     pub contest_hash: HValue,
 }
 
+impl PartialEq for ContestPreEncrypted {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+            && self.contest_hash == other.contest_hash
+            && self.selections.as_slice() == other.selections.as_slice()
+    }
+}
+
 impl ContestPreEncrypted {
     pub fn regenerate_nonces(
         &mut self,
@@ -49,6 +56,7 @@ impl ContestPreEncrypted {
     pub fn new(
         header: &ElectionRecordHeader,
         primary_nonce: &[u8],
+        store_nonces: bool,
         contest: &Contest,
     ) -> ContestPreEncrypted {
         let mut selections = <Vec<ContestSelectionPreEncrypted>>::new();
@@ -61,6 +69,7 @@ impl ContestPreEncrypted {
             let selection = ContestSelectionPreEncrypted::new(
                 header,
                 primary_nonce,
+                store_nonces,
                 &contest.options[j],
                 &contest.label,
                 &selection_labels,
@@ -74,6 +83,7 @@ impl ContestPreEncrypted {
             let selection = ContestSelectionPreEncrypted::new_null(
                 header,
                 primary_nonce,
+                store_nonces,
                 &contest.label,
                 &selection_labels,
                 &format!("null_{}", j + 1),
@@ -105,7 +115,7 @@ impl ContestPreEncrypted {
     pub fn combine_voter_selections(
         &self,
         fixed_parameters: &FixedParameters,
-        voter_selections: &[ContestSelectionPlaintext],
+        voter_selections: &[u8],
         selection_limit: usize,
     ) -> Vec<Ciphertext> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
@@ -149,7 +159,7 @@ impl ContestPreEncrypted {
         &self,
         device: &Device,
         csprng: &mut Csprng,
-        voter_selections: &Vec<ContestSelectionPlaintext>,
+        voter_selections: &Vec<u8>,
         selection_limit: usize,
     ) -> ContestEncrypted {
         let zmulq = Rc::new(ZMulPrime::new(

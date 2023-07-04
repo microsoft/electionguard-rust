@@ -3,8 +3,11 @@ use std::{fs, path::PathBuf, time::SystemTime};
 use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Context, Result};
 use eg::{
-    ballot::BallotEncrypted, contest::ContestEncrypted, device::Device,
-    election_parameters::ElectionParameters, election_record::ElectionRecordHeader, hash::HValue,
+    ballot::{BallotEncrypted, BallotState},
+    contest::ContestEncrypted,
+    device::Device,
+    election_record::ElectionRecordHeader,
+    hash::HValue,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, logging::Logging};
@@ -20,8 +23,19 @@ pub struct BallotPreEncrypted {
     pub confirmation_code: HValue,
 }
 
+impl PartialEq for BallotPreEncrypted {
+    fn eq(&self, other: &Self) -> bool {
+        self.confirmation_code == other.confirmation_code
+            && self.contests.as_slice() == other.contests.as_slice()
+    }
+}
+
 impl BallotPreEncrypted {
-    pub fn new_with(header: &ElectionRecordHeader, primary_nonce: &[u8]) -> BallotPreEncrypted {
+    pub fn new_with(
+        header: &ElectionRecordHeader,
+        primary_nonce: &[u8],
+        store_nonces: bool,
+    ) -> BallotPreEncrypted {
         // TODO: Find contests in manifest corresponding to requested ballot style
 
         let b_aux = "Sample Aux Info".as_bytes();
@@ -30,7 +44,7 @@ impl BallotPreEncrypted {
             .manifest
             .contests
             .iter()
-            .map(|c| ContestPreEncrypted::new(header, primary_nonce.as_ref(), c))
+            .map(|c| ContestPreEncrypted::new(header, primary_nonce.as_ref(), store_nonces, c))
             .collect();
         let confirmation_code = confirmation_code(&header.hashes_ext.h_e, &contests, b_aux);
 
@@ -40,12 +54,16 @@ impl BallotPreEncrypted {
         }
     }
 
-    pub fn new(header: &ElectionRecordHeader, csprng: &mut Csprng) -> (BallotPreEncrypted, HValue) {
+    pub fn new(
+        header: &ElectionRecordHeader,
+        csprng: &mut Csprng,
+        store_nonces: bool,
+    ) -> (BallotPreEncrypted, HValue) {
         let mut primary_nonce = [0u8; 32];
         (0..32).for_each(|i| primary_nonce[i] = csprng.next_u8());
 
         (
-            BallotPreEncrypted::new_with(header, &primary_nonce),
+            BallotPreEncrypted::new_with(header, &primary_nonce, store_nonces),
             HValue(primary_nonce),
         )
     }
@@ -92,6 +110,7 @@ impl BallotPreEncrypted {
 
         BallotEncrypted::new(
             contests.as_slice(),
+            BallotState::Cast,
             self.confirmation_code,
             Self::unix_timestamp().to_string().as_str(),
             device.get_uuid(),
@@ -115,14 +134,11 @@ impl BallotPreEncrypted {
     }
 
     /// Reads a `BallotPreEncrypted` from a `std::io::Write`.
-    pub fn from_stdioread_validated(
-        stdioread: &mut dyn std::io::Read,
-        election_parameters: &ElectionParameters,
-    ) -> Result<Self> {
-        let hashes: Self =
+    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let ballot: Self =
             serde_json::from_reader(stdioread).context("Reading BallotPreEncrypted")?;
 
-        Ok(hashes)
+        Ok(ballot)
     }
 
     /// Writes a `BallotPreEncrypted` to a `std::io::Write`.

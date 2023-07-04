@@ -1,5 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+use anyhow::Result;
 use eg::ballot::BallotStyle;
 use eg::election_record::ElectionRecordHeader;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
@@ -10,8 +11,13 @@ use util::logging::Logging;
 use crate::ballot::BallotPreEncrypted;
 
 pub struct BallotEncryptingTool {
+    /// The election record header.
     pub header: ElectionRecordHeader,
+
+    /// The ballot style to generate a ballot for.
     pub ballot_style: BallotStyle,
+
+    /// Encryption key used to encrypt the primary nonce.
     pub encryption_key: Option<JointElectionPublicKey>,
 }
 
@@ -59,12 +65,29 @@ impl BallotEncryptingTool {
         let mut primary_nonces = Vec::new();
 
         for _ in 0..num_ballots {
-            let (ballot, nonce) = BallotPreEncrypted::new(&self.header, csprng);
+            let (ballot, nonce) = BallotPreEncrypted::new(&self.header, csprng, false);
             ballots.push(ballot);
             primary_nonces.push(nonce);
         }
 
         (ballots, primary_nonces)
+    }
+
+    /// Writes a list of confirmation codes to a file.
+    pub fn metadata_to_stdiowrite(
+        &self,
+        codes: &Vec<HValue>,
+        stdiowrite: &mut dyn std::io::Write,
+    ) -> Result<()> {
+        stdiowrite.write_fmt(format_args!(
+            "{}\n",
+            codes
+                .iter()
+                .map(|cc| cc.to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+        ))?;
+        Ok(())
     }
 }
 

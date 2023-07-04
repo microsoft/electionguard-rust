@@ -7,17 +7,27 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BallotState {
+    Uncast,
+    Cast,
+    Challenged,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// A ballot style is an ordered list of contest labels.
 pub struct BallotStyle(pub Vec<String>);
 
 /// An encrypted ballot.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BallotEncrypted {
     /// Contests in this ballot
     contests: Vec<ContestEncrypted>,
 
     /// Confirmation code
     confirmation_code: HValue,
+
+    /// State of the ballot
+    state: BallotState,
 
     /// Date (and time) of ballot generation
     date: String,
@@ -29,12 +39,14 @@ pub struct BallotEncrypted {
 impl BallotEncrypted {
     pub fn new(
         contests: &[ContestEncrypted],
+        state: BallotState,
         confirmation_code: HValue,
         date: &str,
         device: &str,
     ) -> BallotEncrypted {
         BallotEncrypted {
             contests: contests.to_vec(),
+            state,
             confirmation_code,
             date: date.to_string(),
             device: device.to_string(),
@@ -63,6 +75,7 @@ impl BallotEncrypted {
             confirmation_code(&device.header.hashes_ext.h_e, &contests, &vec![0u8; 32]);
         BallotEncrypted {
             contests,
+            state: BallotState::Uncast,
             confirmation_code,
             date: device.header.parameters.varying_parameters.date.clone(),
             device: device.uuid.clone(),

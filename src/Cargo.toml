@@ -5,7 +5,7 @@
   "util",
   "preencrypted",
   "voter",
-  "study"
+  "server",
 ]
 
 [profile.release]

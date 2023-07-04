@@ -26,7 +26,7 @@ pub struct JointElectionPublicKey(
 );
 
 /// The ciphertext used to store a vote value corresponding to one option.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ciphertext {
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
@@ -38,33 +38,21 @@ pub struct Ciphertext {
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
     pub beta: BigUint,
+    #[serde(skip)]
     pub nonce: Option<BigUint>,
 }
 
-// /// Serialize for Ciphertext
-// impl Serialize for Ciphertext {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::ser::Serializer,
-//     {
-//         (self.alpha.to_str_radix(16), self.beta.to_str_radix(16)).serialize(serializer)
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for Ciphertext {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         match <(String, String)>::deserialize(deserializer) {
-//             Ok((alpha, beta)) => Ok(Ciphertext {
-//                 alpha: BigUint::from_str_radix(&alpha, 16).unwrap(),
-//                 beta: BigUint::from_str_radix(&beta, 16).unwrap(),
-//             }),
-//             Err(e) => Err(e),
-//         }
-//     }
-// }
+/// Does not match nonces if either nonce is None.
+impl PartialEq for Ciphertext {
+    fn eq(&self, other: &Self) -> bool {
+        if self.nonce.is_some() && other.nonce.is_some() {
+            return self.alpha == other.alpha
+                && self.beta == other.beta
+                && self.nonce == other.nonce;
+        }
+        self.alpha == other.alpha && self.beta == other.beta
+    }
+}
 
 impl JointElectionPublicKey {
     pub fn compute(
@@ -117,13 +105,13 @@ impl JointElectionPublicKey {
             bail!("Guardian(s) {iter:?} are not represented in the guardian public keys");
         }
 
-        Ok(Self(guardian_public_keys.iter().fold(
-            BigUint::one(),
-            |acc, public_key| {
-                let k0 = public_key.public_key_k0();
-                acc.modpow(k0, fixed_parameters.p.as_ref())
-            },
-        )))
+        Ok(Self(
+            guardian_public_keys
+                .iter()
+                .fold(BigUint::one(), |acc, public_key| {
+                    acc * public_key.public_key_k0() % fixed_parameters.p.as_ref()
+                }),
+        ))
     }
 
     pub fn encrypt_with(

@@ -26,13 +26,17 @@ use crate::{
 /// Generate a guardian secret key and public key.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct PreEncryptedBallotGenerate {
-    /// Number of ballots to generate
+    /// Number of ballots to generate.
     #[arg(short, long, default_value_t = 1)]
     num_ballots: usize,
 
-    /// Whether to encrypt the nonce with the election public key
+    /// If true, encrypt primary nonce(s) with the election public key.
     #[arg(short, long, default_value_t = false)]
     encrypt_nonce: bool,
+
+    /// The ballot style to generate.
+    #[arg(short, long)]
+    ballot_style: Option<String>,
 }
 
 impl Subcommand for PreEncryptedBallotGenerate {
@@ -64,16 +68,15 @@ impl Subcommand for PreEncryptedBallotGenerate {
             jepk,
         );
 
-        // Write election record header to file
-        // subcommand_helper
-        //     .artifacts_dir
-        //     .out_file_stdiowrite(
-        //         &None,
-        //         ArtifactFile::ElectionRecordHeader,
-        //         "Election Record Header",
-        //         record_header.to_canonical_bytes().as_slice(),
-        //     )
-        //     .unwrap();
+        let (mut bx_write, path) = subcommand_helper
+            .artifacts_dir
+            .out_file_stdiowrite(&None, Some(ArtifactFile::ElectionRecordHeader))?;
+
+        record_header
+            .to_stdiowrite(bx_write.as_mut())
+            .with_context(|| format!("Writing record header to: {}", path.display()))?;
+
+        drop(bx_write);
 
         let device = Device::new(&"Ballot Encrypting Tool".to_string(), record_header.clone());
 
@@ -98,7 +101,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
                 &None,
                 Some(ArtifactFile::PreEncryptedBallots(
                     label as u128,
-                    b_idx as u128 + 1,
+                    ballots[b_idx].confirmation_code,
                 )),
             )?;
 
@@ -112,7 +115,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
                 &None,
                 Some(ArtifactFile::PreEncryptedBallotNonces(
                     label as u128,
-                    b_idx as u128 + 1,
+                    ballots[b_idx].confirmation_code,
                 )),
             )?;
 
@@ -124,6 +127,21 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
             drop(bx_write);
         }
+
+        let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+            &None,
+            Some(ArtifactFile::PreEncryptedBallotMetadata(label as u128)),
+        )?;
+
+        tool.metadata_to_stdiowrite(&confirmation_codes, bx_write.as_mut())
+            .with_context(|| {
+                format!(
+                    "Writing pre-encrypted ballot metadata to: {}",
+                    path.display()
+                )
+            })?;
+
+        drop(bx_write);
 
         Ok(())
 

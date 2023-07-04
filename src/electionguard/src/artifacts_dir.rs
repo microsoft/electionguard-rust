@@ -10,6 +10,7 @@ use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
+use eg::hash::HValue;
 
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19,11 +20,12 @@ pub(crate) enum ArtifactFile {
     ElectionManifestCanonical,
     ElectionParameters,
     ElectionRecordHeader,
-    PreEncryptedBallots(u128, u128),
-    PreEncryptedBallotNonces(u128, u128),
+    PreEncryptedBallotMetadata(u128),
+    PreEncryptedBallots(u128, HValue),
+    PreEncryptedBallotNonces(u128, HValue),
     Hashes,
     HashesExt,
-    VoterConfirmationCode,
+    VoterConfirmationCode(HValue),
     GuardianSecretKey(NonZeroU16),
     GuardianPublicKey(NonZeroU16),
     JointElectionPublicKey,
@@ -55,15 +57,25 @@ impl From<ArtifactFile> for PathBuf {
             GuardianPublicKey(i) => Path::new("guardians")
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.public_key.json")),
+            PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted_ballots")
+                .join(format!("{ts}"))
+                .join(format!("metadata.{ts}.dat")),
             PreEncryptedBallots(ts, i) => Path::new("pre_encrypted_ballots")
                 .join(format!("{ts}"))
-                .join(format!("ballot_{i}.json")),
+                .join(format!(
+                    "ballot.{}.json",
+                    i.to_string_hex_no_prefix_suffix()
+                )),
             PreEncryptedBallotNonces(ts, i) => Path::new("pre_encrypted_ballots")
                 .join(format!("{ts}"))
-                .join(format!("ballot_{i}_primary_nonce.json")),
-            VoterConfirmationCode => {
-                Path::new("pre_encrypted_ballots").join(format!("confirmation_code.svg"))
-            }
+                .join(format!(
+                    "ballot.SECRET.{}.json",
+                    i.to_string_hex_no_prefix_suffix()
+                )),
+            VoterConfirmationCode(i) => Path::new("pre_encrypted_ballots").join(format!(
+                "confirmation_code.{}.svg",
+                i.to_string_hex_no_prefix_suffix()
+            )),
             JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
         }
     }
