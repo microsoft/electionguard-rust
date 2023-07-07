@@ -77,6 +77,7 @@ impl From<ArtifactFile> for PathBuf {
                 i.to_string_hex_no_prefix_suffix()
             )),
             JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
+            HashesExt => PathBuf::from("hashes_ext.json"),
         }
     }
 }

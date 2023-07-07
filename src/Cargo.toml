@@ -4,8 +4,7 @@
   "eg",
   "util",
   "preencrypted",
-  "voter",
-  "server",
+  "verifier"
 ]
 
 [profile.release]

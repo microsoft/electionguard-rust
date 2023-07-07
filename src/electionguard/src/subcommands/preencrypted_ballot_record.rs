@@ -10,13 +10,17 @@ use anyhow::Result;
 use eg::{
     ballot::BallotStyle, device::Device, election_record::ElectionRecordHeader, hash::HValue,
 };
-use preencrypted::{ballot::BallotPreEncrypted, ballot_recording_tool::BallotRecordingTool};
-use voter::{ballot::BallotSelections, verifier::Verifier};
+use preencrypted::{
+    ballot::{BallotPreEncrypted, BallotSelections},
+    ballot_recording_tool::BallotRecordingTool,
+};
+use verifier::Verifier;
+// use voter::{ballot::BallotSelections, verifier::Verifier};
 
 use crate::{
     artifacts_dir::ArtifactFile,
     common_utils::{
-        load_election_parameters, load_hashes, load_joint_election_public_key,
+        load_election_parameters, load_hashes, load_hashes_ext, load_joint_election_public_key,
         ElectionManifestSource,
     },
     subcommand_helper::SubcommandHelper,
@@ -53,8 +57,10 @@ impl Subcommand for PreEncryptedBallotRecord {
             ElectionManifestSource::ArtifactFileElectionManifestCanonical;
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
-        let (hashes, hashes_ext) = load_hashes(&None, &None, &subcommand_helper.artifacts_dir)?;
-        let jepk = load_joint_election_public_key(&None, &subcommand_helper.artifacts_dir)?;
+        let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
+        let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;
+        let jepk =
+            load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
 
         let record_header = ElectionRecordHeader::new(
             election_manifest,

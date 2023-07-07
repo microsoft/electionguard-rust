@@ -5,13 +5,15 @@ use anyhow::{anyhow, Context, Result};
 use eg::{
     ballot::{BallotEncrypted, BallotState},
     contest::ContestEncrypted,
+    contest_selection::ContestSelection,
     device::Device,
+    election_manifest::ElectionManifest,
     election_record::ElectionRecordHeader,
     hash::HValue,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, logging::Logging};
-use voter::ballot::BallotSelections;
+// use voter::ballot::BallotSelections;
 
 /// A pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,6 +23,29 @@ pub struct BallotPreEncrypted {
 
     /// Confirmation code
     pub confirmation_code: HValue,
+}
+
+/// A decrypted ballot.
+#[derive(Debug)]
+pub struct BallotSelections {
+    /// Decrypted selections made by the voter
+    pub decrypted_selections: Vec<ContestSelection>,
+}
+
+impl BallotSelections {
+    pub fn new_pick_random(manifest: &ElectionManifest, csprng: &mut Csprng) -> Self {
+        let mut contests = Vec::new();
+        for contest in &manifest.contests {
+            contests.push(ContestSelection::new_pick_random(
+                csprng,
+                contest.selection_limit,
+                contest.options.len(),
+            ));
+        }
+        Self {
+            decrypted_selections: contests,
+        }
+    }
 }
 
 impl PartialEq for BallotPreEncrypted {

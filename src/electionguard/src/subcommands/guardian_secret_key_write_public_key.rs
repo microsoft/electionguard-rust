@@ -16,7 +16,6 @@ use crate::{
     subcommands::Subcommand,
 };
 
-/// A subcommand that does nothing. For a default value.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct GuardianSecretKeyWritePublicKey {
     /// Guardian number, 1 <= i <= n.
@@ -63,18 +62,18 @@ impl Subcommand for GuardianSecretKeyWritePublicKey {
 
         let public_key = guardian_secret_key.make_public_key();
 
-        let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+        let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
             &self.public_key_out,
             Some(ArtifactFile::GuardianPublicKey(i)),
         )?;
 
         public_key
-            .to_stdiowrite(bx_write.as_mut())
+            .to_stdiowrite(stdiowrite.as_mut())
             .with_context(|| {
                 format!("Writing public key for guardian {i} to: {}", path.display())
             })?;
 
-        drop(bx_write);
+        drop(stdiowrite);
 
         eprintln!("Wrote public key for guardian {i} to: {}", path.display());
 

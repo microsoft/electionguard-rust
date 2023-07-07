@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use num_bigint::BigUint;
 use num_traits::One;
 use serde::{Deserialize, Serialize};
@@ -74,31 +74,31 @@ impl JointElectionPublicKey {
             // Convert from 1-based indexing to 0-based.
             let seen_ix = guardian_public_key.i.get() as usize - 1;
 
-            if seen[seen_ix] {
-                bail!(
-                    "Guardian {} is represented more than once in the guardian public keys",
-                    guardian_public_key.i
-                );
-            }
+            ensure!(
+                !seen[seen_ix],
+                "Guardian {} is represented more than once in the guardian public keys",
+                guardian_public_key.i
+            );
 
             seen[seen_ix] = true;
         }
 
-        let missing_ix: Vec<usize> = seen
+        let missing_guardian_ixs: Vec<usize> = seen
             .iter()
             .enumerate()
             .filter(|&(_ix, &seen)| !seen)
             .map(|(ix, _)| ix)
             .collect();
 
-        if !missing_ix.is_empty() {
+        if !missing_guardian_ixs.is_empty() {
             //? TODO Consider using `.intersperse(", ")` when it's stable.
             // https://github.com/rust-lang/rust/issues/79524
-            let iter = missing_ix.iter().enumerate().map(|(n, ix)| {
+            let iter = missing_guardian_ixs.iter().enumerate().map(|(n, ix)| {
+                let guardian_i = ix + 1;
                 if 0 == n {
-                    format!("{}", ix + 1)
+                    format!("{guardian_i}")
                 } else {
-                    format!(", {}", ix + 1)
+                    format!(", {guardian_i}")
                 }
             });
 
@@ -139,6 +139,36 @@ impl JointElectionPublicKey {
                 nonce: None,
             }
         }
+        // let joint_public_key = guardian_public_keys
+        //     .iter()
+        //     .fold(BigUint::one(), |acc, public_key| {
+        //         acc.modpow(public_key.public_key_k0(), fixed_parameters.p.as_ref())
+        //     });
+
+        // Ok(Self(joint_public_key))
+    }
+
+    /// Reads a `JointElectionPublicKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let self_: Self =
+            serde_json::from_reader(stdioread).context("Reading JointElectionPublicKey")?;
+
+        self_.validate(election_parameters)?;
+
+        Ok(self_)
+    }
+
+    /// Verifies that the `JointElectionPublicKey` conforms to the election parameters.
+    /// Useful after deserialization.
+    pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
+        ensure!(
+            election_parameters.fixed_parameters.is_valid_modp(&self.0),
+            "JointElectionPublicKey is not valid mod p"
+        );
+        Ok(())
     }
 
     /// Returns the `JointElectionPublicKey` as a big-endian byte array of the correct length for `mod p`.
@@ -146,32 +176,13 @@ impl JointElectionPublicKey {
         fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
     }
 
-    /// Returns a pretty JSON `String` representation of the `JointElectionPublicKey`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
-
-    /// Reads an `JointElectionPublicKey` from a `std::io::Read`.
-    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<JointElectionPublicKey> {
-        serde_json::from_reader(io_read)
-            .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
-    }
-
-    //? TODO from_stdioread_validated
-
+    /// Writes a `JointElectionPublicKey` to a `std::io::Write`.
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 
         self.serialize(&mut ser)
-            .context("Error writing joint election public key")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing joint election public key file")
+            .map_err(Into::<anyhow::Error>::into)
+            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
+            .context("Writing JointElectionPublicKey")
     }
 }

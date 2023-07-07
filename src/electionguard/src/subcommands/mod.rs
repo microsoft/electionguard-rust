@@ -14,6 +14,7 @@ mod preencrypted_ballot_record;
 mod verify_standard_parameters;
 mod voter_write_confirmation_code;
 mod write_hashes;
+mod write_hashes_ext;
 mod write_joint_election_public_key;
 mod write_manifest;
 mod write_parameters;
@@ -78,10 +79,13 @@ pub(crate) enum Subcommands {
     /// Write the confirmation QR code for a voter.
     VoterWriteConfirmationCode(crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode),
     
-    /// Write the joint election public key from guardian public keys.
+    /// Compute the joint election public key from the guardian public keys and write it to a file.
     WriteJointElectionPublicKey(
         crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
     ),
+
+    /// Write the extended hash to a file.
+    WriteHashesExt(crate::subcommands::write_hashes_ext::WriteHashesExt),
 }
 
 impl Default for Subcommands {
@@ -107,6 +111,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             PreEncryptedBallotRecord(a) => a,
             VoterWriteConfirmationCode(a) => a,
             WriteJointElectionPublicKey(a) => a,
+            WriteHashesExt(a) => a,
         }
     }
 }

@@ -4,7 +4,7 @@ use crate::{artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, Su
 use anyhow::{Context, Result};
 use clap::Args;
 use eg::hash::HValue;
-use voter::ballot::VoterConfirmationQRCode;
+// use voter::ballot::VoterConfirmationQRCode;
 
 #[derive(Args, Debug)]
 pub(crate) struct VoterWriteConfirmationCode {
@@ -24,23 +24,23 @@ impl Subcommand for VoterWriteConfirmationCode {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        match VoterConfirmationQRCode::new(&self.code) {
-            Some(qr_code) => {
-                let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
-                    &self.out_file,
-                    Some(ArtifactFile::VoterConfirmationCode(
-                        HValue::from_str(&self.code).unwrap(),
-                    )),
-                )?;
+        // match VoterConfirmationQRCode::new(&self.code) {
+        //     Some(qr_code) => {
+        //         let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+        //             &self.out_file,
+        //             Some(ArtifactFile::VoterConfirmationCode(
+        //                 HValue::from_str(&self.code).unwrap(),
+        //             )),
+        //         )?;
 
-                qr_code.to_stdiowrite(bx_write.as_mut()).with_context(|| {
-                    format!("Writing voter confirmation QR code to: {}", path.display())
-                })?;
+        //         qr_code.to_stdiowrite(bx_write.as_mut()).with_context(|| {
+        //             format!("Writing voter confirmation QR code to: {}", path.display())
+        //         })?;
 
-                drop(bx_write);
-            }
-            None => {}
-        }
+        //         drop(bx_write);
+        //     }
+        //     None => {}
+        // }
 
         // subcommand_helper
         // .artifacts_dir

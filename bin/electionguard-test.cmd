@@ -295,13 +295,12 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Write HashesExt
 
+if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\hashes_ext.json" goto :skip_write_hashes_ext
 echo.
-echo TODO: Write HashesExt
-
-rem ---- Write election public key
-
-echo.
-echo TODO: Write election public key
+echo %electionguard_exe% --insecure-deterministic write-hashes-ext
+%electionguard_exe% --insecure-deterministic write-hashes-ext
+if "%ERRORLEVEL%" NEQ "0" exit /b
+:skip_write_hashes_ext
 
 rem ---- XXXX
 

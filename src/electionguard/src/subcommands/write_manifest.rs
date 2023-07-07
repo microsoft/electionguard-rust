@@ -21,7 +21,6 @@ pub(crate) enum ElectionManifestFormat {
     Pretty,
 }
 
-/// Write the manifest to a file.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct WriteManifest {
     /// Use the pretty JSON election manifest file in the artifacts dir..
@@ -81,30 +80,32 @@ impl Subcommand for WriteManifest {
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        let (artifact_file, description, bytes) = match self.out_format {
-            ElectionManifestFormat::Canonical => (
-                ArtifactFile::ElectionManifestCanonical,
-                "election manifest canonical bytes",
-                election_manifest.to_canonical_bytes(),
-            ),
-            ElectionManifestFormat::Pretty => (
-                ArtifactFile::ElectionManifestPretty,
-                "election manifest pretty JSON",
-                election_manifest.to_json_pretty().as_bytes().to_vec(),
-            ),
+        use ElectionManifestFormat::*;
+        let (artifact_file, description) = match self.out_format {
+            Canonical => (ArtifactFile::ElectionManifestCanonical, "canonical bytes"),
+            Pretty => (ArtifactFile::ElectionManifestPretty, "pretty JSON"),
         };
 
-        let (mut bx_write, path) = subcommand_helper
+        let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
             .out_file_stdiowrite(&self.out_file, Some(artifact_file))?;
 
-        bx_write
-            .write_all(bytes.as_slice())
-            .with_context(|| format!("Writing {description} to: {}", path.display()))?;
+        let write_result = match self.out_format {
+            Canonical => election_manifest.to_stdiowrite_canonical(&mut stdiowrite),
+            Pretty => election_manifest.to_stdiowrite_pretty(&mut stdiowrite),
+        };
 
-        drop(bx_write);
+        write_result.with_context(|| {
+            format!(
+                "Writing election manifest {description} to: {}",
+                path.display()
+            )
+        })?;
 
-        eprintln!("Wrote {description} to: {}", path.display());
+        eprintln!(
+            "Wrote election manifest {description} to: {}",
+            path.display()
+        );
 
         Ok(())
     }

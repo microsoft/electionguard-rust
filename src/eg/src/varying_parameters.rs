@@ -7,7 +7,7 @@
 
 use std::num::NonZeroU16;
 
-use anyhow::{bail, Result};
+use anyhow::{ensure, Result};
 use serde::{Deserialize, Serialize};
 
 /// The parameters for a specific election.
@@ -31,19 +31,13 @@ impl VaryingParameters {
     #[allow(clippy::nonminimal_bool)]
     pub fn validate(&self) -> Result<()> {
         // `n` must be greater than or equal to 1
-        if !(1 <= self.n) {
-            bail!("Varying parameters failed check: 1 <= n");
-        }
+        ensure!(1 <= self.n, "Varying parameters failed check: 1 <= n");
 
         // `k` must be greater than or equal to 1
-        if !(1 <= self.k) {
-            bail!("Varying parameters failed check: 1 <= k");
-        }
+        ensure!(1 <= self.k, "Varying parameters failed check: 1 <= k");
 
         // `k` must be less than or equal to `n`
-        if !(self.k <= self.n) {
-            bail!("Varying parameters failed check: k <= n");
-        }
+        ensure!(self.k <= self.n, "Varying parameters failed check: k <= n");
 
         Ok(())
     }

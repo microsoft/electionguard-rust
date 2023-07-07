@@ -29,10 +29,10 @@ pub struct Hashes {
 }
 
 impl Hashes {
-    pub fn new(
+    pub fn compute(
         election_parameters: &ElectionParameters,
         election_manifest: &ElectionManifest,
-    ) -> Self {
+    ) -> Result<Self> {
         // H_V = 322E302E30 ∥ b(0, 27)
         let h_v: HValue = [
             0x32, 0x2E, 0x30, 0x2E, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -63,7 +63,7 @@ impl Hashes {
         let h_m = {
             let mut v = vec![0x01];
 
-            let mut v_manifest_bytes = election_manifest.to_canonical_bytes();
+            let mut v_manifest_bytes = election_manifest.to_canonical_bytes()?;
             v.append(&mut v_manifest_bytes);
 
             eg_h(&h_p, &v)
@@ -93,25 +93,34 @@ impl Hashes {
             eg_h(&h_p, &v)
         };
 
-        Self { h_p, h_m, h_b }
+        Ok(Self { h_p, h_m, h_b })
     }
 
-    /// Reads a `Hashes` from a `std::io::Write`.
-    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
-        let hashes: Self = serde_json::from_reader(stdioread).context("Reading Hashes")?;
+    /// Reads a `Hashes` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let self_: Self =
+            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
 
-        Ok(hashes)
+        self_.validate()?;
+
+        Ok(self_)
+    }
+
+    /// Validates that the `Hashes` is well-formed.
+    /// Useful after deserialization.
+    pub fn validate(&self) -> Result<()> {
+        // We currently have no validation rules for this type.
+        Ok(())
     }
 
     /// Writes a `Hashes` to a `std::io::Write`.
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 
-        self.serialize(&mut ser).context("Error writing hashes")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing hashes file")
+        self.serialize(&mut ser)
+            .map_err(Into::<anyhow::Error>::into)
+            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
+            .context("Writing Hashes")
     }
 
     /// Reads `Hashes` from a `std::io::Read`.
@@ -149,11 +158,11 @@ mod test {
     use hex_literal::hex;
 
     #[test]
-    fn test_hashes() {
+    fn test_hashes() -> Result<()> {
         let election_parameters = example_election_parameters();
         let election_manifest = example_election_manifest();
 
-        let hashes = Hashes::new(&election_parameters, &election_manifest);
+        let hashes = Hashes::compute(&election_parameters, &election_manifest)?;
 
         let expected_h_p = HValue::from(hex!(
             "BAD5EEBFE2C98C9031BA8C36E7E4FB76DAC20665FD3621DF33F3F666BEC9AC0D"
@@ -168,5 +177,7 @@ mod test {
         assert_eq!(hashes.h_p, expected_h_p);
         assert_eq!(hashes.h_m, expected_h_m);
         assert_eq!(hashes.h_b, expected_h_b);
+
+        Ok(())
     }
 }
