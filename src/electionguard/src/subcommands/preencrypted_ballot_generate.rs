@@ -7,9 +7,9 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
-use eg::{ballot::BallotStyle, device::Device, election_record::ElectionRecordHeader};
+use eg::{ballot_style::BallotStyle, device::Device, election_record::ElectionRecordHeader};
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
 use util::file::create_path;
 
@@ -57,6 +57,20 @@ impl Subcommand for PreEncryptedBallotGenerate {
             ElectionManifestSource::ArtifactFileElectionManifestCanonical;
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
+
+        let mut ballot_style = BallotStyle::empty();
+        match &self.ballot_style {
+            None => bail!("Ballot style is required to generate pre-encrypted ballots."),
+            Some(bs) => {
+                for i in 0..election_manifest.ballot_styles.len() {
+                    if election_manifest.ballot_styles[i].label == *bs {
+                        ballot_style = election_manifest.ballot_styles[i].clone();
+                        break;
+                    }
+                }
+            }
+        }
+
         let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
         let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;
         let jepk =
@@ -82,8 +96,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
         let device = Device::new(&"Ballot Encrypting Tool".to_string(), record_header.clone());
 
-        let tool =
-            BallotEncryptingTool::new(device.header, BallotStyle(vec!["".to_string()]), None);
+        let tool = BallotEncryptingTool::new(device.header, ballot_style, None);
 
         let (ballots, primary_nonces) = tool.generate_ballots(&mut csprng, self.num_ballots);
 
@@ -92,7 +105,13 @@ impl Subcommand for PreEncryptedBallotGenerate {
             &subcommand_helper
                 .artifacts_dir
                 .dir_path
-                .join(format!("pre_encrypted_ballots/{label}")),
+                .join(format!("pre_encrypted/ballots/{label}")),
+        );
+        create_path(
+            &subcommand_helper
+                .artifacts_dir
+                .dir_path
+                .join(format!("pre_encrypted/nonces/{label}")),
         );
 
         let mut confirmation_codes = Vec::with_capacity(self.num_ballots);
@@ -110,6 +129,8 @@ impl Subcommand for PreEncryptedBallotGenerate {
             ballots[b_idx]
                 .to_stdiowrite(bx_write.as_mut())
                 .with_context(|| format!("Writing pre-encrypted ballot to: {}", path.display()))?;
+
+            eprintln!("Wrote pre-encrypted ballot to: {}", path.display());
 
             drop(bx_write);
 

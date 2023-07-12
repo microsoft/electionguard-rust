@@ -17,8 +17,8 @@ pub fn example_election_parameters() -> ElectionParameters {
     let varying_parameters = VaryingParameters {
         n: 5,
         k: 3,
-        date: "2023-05-02".to_string(),
-        info: "The United Realms of Imaginaria, General Election".to_string(),
+        date: "2022-11-08".to_string(),
+        info: "General Election 2022".to_string(),
     };
 
     ElectionParameters {

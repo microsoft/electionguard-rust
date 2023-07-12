@@ -1,7 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 use anyhow::Result;
-use eg::ballot::BallotStyle;
+use eg::ballot_style::BallotStyle;
 use eg::election_record::ElectionRecordHeader;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
@@ -65,7 +65,8 @@ impl BallotEncryptingTool {
         let mut primary_nonces = Vec::new();
 
         for _ in 0..num_ballots {
-            let (ballot, nonce) = BallotPreEncrypted::new(&self.header, csprng, false);
+            let (ballot, nonce) =
+                BallotPreEncrypted::new(&self.header, &self.ballot_style, csprng, false);
             ballots.push(ballot);
             primary_nonces.push(nonce);
         }

@@ -6,3 +6,4 @@ pub mod contest;
 pub mod contest_hash;
 pub mod contest_selection;
 pub mod nonce;
+pub mod utils;

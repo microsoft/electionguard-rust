@@ -26,6 +26,7 @@ pub(crate) enum ArtifactFile {
     Hashes,
     HashesExt,
     VoterConfirmationCode(HValue),
+    VoterSelection(u128, u64),
     GuardianSecretKey(NonZeroU16),
     GuardianPublicKey(NonZeroU16),
     JointElectionPublicKey,
@@ -57,27 +58,29 @@ impl From<ArtifactFile> for PathBuf {
             GuardianPublicKey(i) => Path::new("guardians")
                 .join(format!("{i}"))
                 .join(format!("guardian_{i}.public_key.json")),
-            PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted_ballots")
+            PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted/ballots/")
                 .join(format!("{ts}"))
                 .join(format!("metadata.{ts}.dat")),
-            PreEncryptedBallots(ts, i) => Path::new("pre_encrypted_ballots")
+            PreEncryptedBallots(ts, i) => Path::new("pre_encrypted/ballots/")
                 .join(format!("{ts}"))
                 .join(format!(
                     "ballot.{}.json",
                     i.to_string_hex_no_prefix_suffix()
                 )),
-            PreEncryptedBallotNonces(ts, i) => Path::new("pre_encrypted_ballots")
+            PreEncryptedBallotNonces(ts, i) => Path::new("pre_encrypted/nonces/")
                 .join(format!("{ts}"))
                 .join(format!(
-                    "ballot.SECRET.{}.json",
+                    "nonce.SECRET.{}.json",
                     i.to_string_hex_no_prefix_suffix()
                 )),
-            VoterConfirmationCode(i) => Path::new("pre_encrypted_ballots").join(format!(
+            VoterSelection(ts, i) => Path::new("pre_encrypted/selections/")
+                .join(format!("{ts}"))
+                .join(format!("selection.SECRET.{}.json", i)),
+            VoterConfirmationCode(i) => Path::new("pre_encrypted").join(format!(
                 "confirmation_code.{}.svg",
                 i.to_string_hex_no_prefix_suffix()
             )),
             JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
-            HashesExt => PathBuf::from("hashes_ext.json"),
         }
     }
 }

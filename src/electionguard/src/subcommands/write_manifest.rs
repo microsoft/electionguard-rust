@@ -70,7 +70,7 @@ impl Subcommand for WriteManifest {
         let election_manifest_source = if self.in_pretty {
             ElectionManifestSource::ArtifactFileElectionManifestPretty
         } else if self.in_example {
-            ElectionManifestSource::Example
+            ElectionManifestSource::ExampleKingCounty2022
         } else if let Some(path) = self.in_file.as_ref() {
             ElectionManifestSource::SpecificFile(path.clone())
         } else {

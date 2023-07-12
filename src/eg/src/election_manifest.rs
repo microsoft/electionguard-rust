@@ -10,11 +10,12 @@ use std::io::Cursor;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::contest::Contest;
+use crate::{ballot_style::BallotStyle, contest::Contest};
 
 /// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElectionManifest {
+    pub ballot_styles: Vec<BallotStyle>,
     /// All the contests in the election.
     pub contests: Vec<Contest>,
 }

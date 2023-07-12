@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::ballot::BallotPreEncrypted;
 use anyhow::Result;
-use eg::{ballot::BallotStyle, election_record::ElectionRecordHeader, hash::HValue};
+use eg::{ballot_style::BallotStyle, election_record::ElectionRecordHeader, hash::HValue};
 
 pub struct BallotRecordingTool {
     /// The election record header.
@@ -25,14 +25,17 @@ impl BallotRecordingTool {
     pub fn regenerate_and_match(
         &self,
         ballot: &BallotPreEncrypted,
+        ballot_style: &BallotStyle,
         primary_nonce: &HValue,
     ) -> (Option<BallotPreEncrypted>, bool) {
-        let regenerated_ballot = BallotPreEncrypted::new_with(&self.header, &primary_nonce.0, true);
+        let regenerated_ballot =
+            BallotPreEncrypted::new_with(&self.header, ballot_style, &primary_nonce.0, true);
         if *ballot != regenerated_ballot {
             eprintln!("Ballot mismatch: {:?} != {:?}.", ballot, regenerated_ballot);
             return (None, false);
         }
 
+        eprintln!("Ballot matched");
         (Some(regenerated_ballot), true)
     }
 

@@ -13,10 +13,6 @@ pub enum BallotState {
     Challenged,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-/// A ballot style is an ordered list of contest labels.
-pub struct BallotStyle(pub Vec<String>);
-
 /// An encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BallotEncrypted {

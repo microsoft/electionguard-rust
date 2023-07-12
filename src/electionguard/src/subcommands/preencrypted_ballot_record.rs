@@ -5,13 +5,13 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 use eg::{
-    ballot::BallotStyle, device::Device, election_record::ElectionRecordHeader, hash::HValue,
+    ballot_style::BallotStyle, device::Device, election_record::ElectionRecordHeader, hash::HValue,
 };
 use preencrypted::{
-    ballot::{BallotPreEncrypted, BallotSelections},
+    ballot::{BallotPreEncrypted, VoterSelection},
     ballot_recording_tool::BallotRecordingTool,
 };
 use verifier::Verifier;
@@ -30,13 +30,21 @@ use crate::{
 /// Generate a guardian secret key and public key.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct PreEncryptedBallotRecord {
-    /// Number of ballots to generate
+    /// Number of ballots to verify.
     #[arg(short, long, default_value_t = 1)]
     num_ballots: usize,
 
-    // Tag for ballot verification
+    /// Tag for voter selections.
     #[arg(short, long, default_value_t = 0)]
-    tag: u128,
+    selection_tag: u128,
+
+    /// Tag for ballots.
+    #[arg(short, long, default_value_t = 0)]
+    ballot_tag: u128,
+
+    /// The ballot style to verify.
+    #[arg(short, long)]
+    ballot_style: Option<String>,
 }
 
 impl Subcommand for PreEncryptedBallotRecord {
@@ -57,6 +65,20 @@ impl Subcommand for PreEncryptedBallotRecord {
             ElectionManifestSource::ArtifactFileElectionManifestCanonical;
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
+
+        let mut ballot_style = BallotStyle::empty();
+        match &self.ballot_style {
+            None => bail!("Ballot style is required to verify pre-encrypted ballots."),
+            Some(bs) => {
+                for i in 0..election_manifest.ballot_styles.len() {
+                    if election_manifest.ballot_styles[i].label == *bs {
+                        ballot_style = election_manifest.ballot_styles[i].clone();
+                        break;
+                    }
+                }
+            }
+        }
+
         let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
         let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;
         let jepk =
@@ -70,22 +92,25 @@ impl Subcommand for PreEncryptedBallotRecord {
             jepk,
         );
         let device = Device::new(&"Ballot Recording Tool".to_string(), record_header.clone());
-        let tool = BallotRecordingTool::new(record_header.clone(), BallotStyle(vec![]));
+        let tool = BallotRecordingTool::new(record_header.clone(), ballot_style.clone());
         let verifier = Verifier::new(record_header.clone());
 
         let codes = {
             let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                 &None,
-                Some(ArtifactFile::PreEncryptedBallotMetadata(self.tag)),
+                Some(ArtifactFile::PreEncryptedBallotMetadata(self.ballot_tag)),
             )?;
             tool.metadata_from_stdioread(&mut stdioread)?
         };
 
-        for b_idx in 1..codes.len() {
+        for b_idx in 1..codes.len() + 1 {
             let pre_encrypted_ballot = {
                 let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
-                    Some(ArtifactFile::PreEncryptedBallots(self.tag, codes[b_idx])),
+                    Some(ArtifactFile::PreEncryptedBallots(
+                        self.ballot_tag,
+                        codes[b_idx - 1],
+                    )),
                 )?;
                 BallotPreEncrypted::from_stdioread(&mut stdioread)?
             };
@@ -94,21 +119,30 @@ impl Subcommand for PreEncryptedBallotRecord {
                 let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
                     Some(ArtifactFile::PreEncryptedBallotNonces(
-                        self.tag,
-                        codes[b_idx],
+                        self.ballot_tag,
+                        codes[b_idx - 1],
                     )),
                 )?;
                 HValue::from_stdioread(&mut stdioread)?
             };
 
             let (regenerated_ballot, matched) =
-                tool.regenerate_and_match(&pre_encrypted_ballot, &nonce);
+                tool.regenerate_and_match(&pre_encrypted_ballot, &ballot_style, &nonce);
             assert!(matched);
 
             if matched {
                 let regenerated_ballot = regenerated_ballot.unwrap();
-                let voter_ballot =
-                    BallotSelections::new_pick_random(&record_header.manifest, &mut csprng);
+                let voter_ballot = {
+                    let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
+                        &None,
+                        Some(ArtifactFile::VoterSelection(
+                            self.selection_tag,
+                            b_idx as u64,
+                        )),
+                    )?;
+
+                    VoterSelection::from_stdioread(&mut stdioread)?
+                };
                 let encrypted_ballot =
                     regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot);
 
