@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context, Result};
 
-use eg::{ballot_style::BallotStyle, device::Device, election_record::ElectionRecordHeader};
+use eg::{ballot_style::BallotStyle, device::Device, election_record::PreVotingData};
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
 use util::file::create_path;
 
@@ -76,7 +76,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
         let jepk =
             load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
 
-        let record_header = ElectionRecordHeader::new(
+        let pv_data = PreVotingData::new(
             election_manifest,
             election_parameters,
             hashes,
@@ -88,13 +88,13 @@ impl Subcommand for PreEncryptedBallotGenerate {
             .artifacts_dir
             .out_file_stdiowrite(&None, Some(ArtifactFile::ElectionRecordHeader))?;
 
-        record_header
+        pv_data
             .to_stdiowrite(bx_write.as_mut())
             .with_context(|| format!("Writing record header to: {}", path.display()))?;
 
         drop(bx_write);
 
-        let device = Device::new(&"Ballot Encrypting Tool".to_string(), record_header.clone());
+        let device = Device::new(&"Ballot Encrypting Tool".to_string(), pv_data.clone());
 
         let tool = BallotEncryptingTool::new(device.header, ballot_style, None);
 

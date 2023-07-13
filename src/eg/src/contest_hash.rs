@@ -1,6 +1,6 @@
 use crate::{
     // contest_selection::ContestSelectionCiphertext,
-    election_record::ElectionRecordHeader,
+    election_record::PreVotingData,
     hash::{eg_h, HValue},
     joint_election_public_key::Ciphertext,
 };
@@ -10,7 +10,7 @@ use crate::{
 /// χl = H(H_E;23,Λ_l,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
 pub fn contest_hash(
-    header: &ElectionRecordHeader,
+    header: &PreVotingData,
     contest_label: &String,
     vote: &Vec<Ciphertext>,
 ) -> HValue {

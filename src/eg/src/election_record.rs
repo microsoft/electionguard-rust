@@ -11,7 +11,7 @@ use crate::{
 
 /// The header of the election record, generated before the election begins.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ElectionRecordHeader {
+pub struct PreVotingData {
     /// The election manifest.
     pub manifest: ElectionManifest,
 
@@ -27,7 +27,7 @@ pub struct ElectionRecordHeader {
     /// The joint election public key.
     pub public_key: JointElectionPublicKey,
 }
-
+#[allow(dead_code)]
 /// The body of the election record, generated after the election is complete.
 #[derive(Debug)]
 pub struct ElectionRecordBody {
@@ -42,23 +42,23 @@ pub struct ElectionRecordBody {
     /// Ordered lists of ballots encrypted by each device
     ballots_by_device: HashMap<String, String>,
 }
-
+#[allow(dead_code)]
 /// The election record.
 #[derive(Debug)]
 pub struct ElectionRecord {
-    header: ElectionRecordHeader,
+    prevoting: PreVotingData,
     body: ElectionRecordBody,
 }
 
-impl ElectionRecordHeader {
+impl PreVotingData {
     pub fn new(
         manifest: ElectionManifest,
         parameters: ElectionParameters,
         hashes: Hashes,
         hashes_ext: HashesExt,
         public_key: JointElectionPublicKey,
-    ) -> ElectionRecordHeader {
-        ElectionRecordHeader {
+    ) -> PreVotingData {
+        PreVotingData {
             manifest,
             parameters,
             hashes,
@@ -76,13 +76,13 @@ impl ElectionRecordHeader {
     }
 
     /// Reads an `ElectionRecordHeader` from any `&str` JSON representation.
-    pub fn from_json_str(json: &str) -> Result<ElectionRecordHeader> {
+    pub fn from_json_str(json: &str) -> Result<PreVotingData> {
         serde_json::from_str(json).map_err(|e| anyhow!("Error parsing JSON: {}", e))
     }
 
     /// Reads an `ElectionRecordHeader` from a byte sequence.
     /// Does NOT verify that it is *the* canonical byte sequence.
-    pub fn from_bytes(bytes: &[u8]) -> Result<ElectionRecordHeader> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<PreVotingData> {
         serde_json::from_slice(bytes).map_err(|e| anyhow!("Error parsing canonical bytes: {}", e))
     }
 

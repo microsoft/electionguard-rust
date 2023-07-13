@@ -1,18 +1,21 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+use std::collections::HashSet;
+
 use anyhow::Result;
 use eg::ballot_style::BallotStyle;
-use eg::election_record::ElectionRecordHeader;
+use eg::election_record::PreVotingData;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
 use util::csprng::Csprng;
 use util::logging::Logging;
 
 use crate::ballot::BallotPreEncrypted;
+use crate::contest::ContestPreEncrypted;
 
 pub struct BallotEncryptingTool {
-    /// The election record header.
-    pub header: ElectionRecordHeader,
+    /// The pre-voting data.
+    pub pv_data: PreVotingData,
 
     /// The ballot style to generate a ballot for.
     pub ballot_style: BallotStyle,
@@ -27,12 +30,12 @@ pub struct EncryptedNonce {
 
 impl BallotEncryptingTool {
     pub fn new(
-        header: ElectionRecordHeader,
+        header: PreVotingData,
         ballot_style: BallotStyle,
         encryption_key: Option<JointElectionPublicKey>,
     ) -> Self {
         Self {
-            header,
+            pv_data: header,
             ballot_style,
             encryption_key,
         }
@@ -52,7 +55,7 @@ impl BallotEncryptingTool {
         );
         Logging::log(tag, "  Contests", line!(), file!());
         ballot.contests.iter().for_each(|c| {
-            Logging::log(tag, &format!("    {}", c.contest_hash), line!(), file!());
+            Logging::log(tag, &format!("    {:?}", c.contest_hash), line!(), file!());
         });
     }
 
@@ -64,11 +67,13 @@ impl BallotEncryptingTool {
         let mut ballots = Vec::new();
         let mut primary_nonces = Vec::new();
 
-        for _ in 0..num_ballots {
+        while ballots.len() < num_ballots {
             let (ballot, nonce) =
-                BallotPreEncrypted::new(&self.header, &self.ballot_style, csprng, false);
-            ballots.push(ballot);
-            primary_nonces.push(nonce);
+                BallotPreEncrypted::new(&self.pv_data, &self.ballot_style, csprng, false);
+            if Self::are_unique_shortcodes(&ballot.contests) {
+                ballots.push(ballot);
+                primary_nonces.push(nonce);
+            }
         }
 
         (ballots, primary_nonces)
@@ -90,42 +95,41 @@ impl BallotEncryptingTool {
         ))?;
         Ok(())
     }
-}
 
-/// Returns the last byte of the hash value
-pub fn generate_short_code(full_hash: &HValue) -> String {
-    String::from(full_hash.0[HVALUE_BYTE_LEN - 1] as char)
-}
+    /// Returns the last byte of the hash value as a two digit hex.
+    pub fn short_code_last_byte(full_hash: &HValue) -> String {
+        format!("{:02x}", full_hash.0[HVALUE_BYTE_LEN - 1])
+    }
 
-/// Checks whether previous selections contain the same short code
-// pub fn check_shortcode(
-//     previous: &Vec<ContestSelectionPreEncrypted>,
-//     current: &ContestSelectionPreEncrypted,
-// ) -> bool {
-//     for other in previous.iter() {
-//         if other.shortcode == current.shortcode {
-//             return false;
-//         }
-//     }
-//     true
-// }
+    /// Generates a selection hash (Equation 93/94)
+    ///
+    /// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
+    ///
+    /// TODO: Remove label from the hash (equation 93)
+    pub fn selection_hash(header: &PreVotingData, selections: &Vec<Ciphertext>) -> HValue {
+        let mut v = vec![0x40];
 
-/// Generates a selection hash (Equation 93/94)
-///
-/// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
-///
-/// TODO: Remove label from the hash (equation 93)
-pub fn selection_hash(header: &ElectionRecordHeader, selections: &Vec<Ciphertext>) -> HValue {
-    let mut v = vec![0x40];
+        v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
 
-    v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
+        selections.iter().for_each(|s| {
+            v.extend_from_slice(s.alpha.to_bytes_be().as_slice());
+            v.extend_from_slice(s.beta.to_bytes_be().as_slice());
+        });
 
-    selections.iter().for_each(|s| {
-        v.extend_from_slice(s.alpha.to_bytes_be().as_slice());
-        v.extend_from_slice(s.beta.to_bytes_be().as_slice());
-    });
+        eg_h(&header.hashes_ext.h_e, &v)
+    }
 
-    eg_h(&header.hashes_ext.h_e, &v)
+    /// Returns true iff all shortcodes within each preencrypted contest on a ballot are unique
+    pub fn are_unique_shortcodes(contests: &Vec<ContestPreEncrypted>) -> bool {
+        contests
+            .iter()
+            .map(|c| {
+                let shortcodes: HashSet<String> =
+                    HashSet::from_iter(c.selections.iter().map(|s| s.shortcode.clone()));
+                shortcodes.len() == c.selections.len()
+            })
+            .all(|x| x)
+    }
 }
 
 // // Unit tests for pre-encrypted ballots.

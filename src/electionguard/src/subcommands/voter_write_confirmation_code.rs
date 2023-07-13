@@ -1,9 +1,8 @@
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
-use crate::{artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, Subcommand};
-use anyhow::{Context, Result};
+use crate::{subcommand_helper::SubcommandHelper, Subcommand};
+use anyhow::Result;
 use clap::Args;
-use eg::hash::HValue;
 // use voter::ballot::VoterConfirmationQRCode;
 
 #[derive(Args, Debug)]
@@ -22,7 +21,7 @@ impl Subcommand for VoterWriteConfirmationCode {
     fn uses_csprng(&self) -> bool {
         false
     }
-
+    #[allow(unused_variables)]
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         // match VoterConfirmationQRCode::new(&self.code) {
         //     Some(qr_code) => {

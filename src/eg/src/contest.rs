@@ -5,7 +5,7 @@ use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
     contest_hash, contest_selection::ContestSelection, device::Device,
-    election_record::ElectionRecordHeader, fixed_parameters::FixedParameters, hash::HValue,
+    election_record::PreVotingData, fixed_parameters::FixedParameters, hash::HValue,
     joint_election_public_key::Ciphertext, nonce::encrypted as nonce, zk::ProofRange,
 };
 
@@ -50,7 +50,7 @@ pub struct ContestEncrypted {
 
 impl ContestEncrypted {
     fn encrypt_selection(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         primary_nonce: &[u8],
         contest: &Contest,
         pt_vote: &ContestSelection,
@@ -126,7 +126,7 @@ impl ContestEncrypted {
     }
 
     pub fn proof_selection_limit(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
         selection: &Vec<Ciphertext>,

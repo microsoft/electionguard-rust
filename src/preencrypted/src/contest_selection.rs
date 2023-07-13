@@ -1,33 +1,36 @@
 use std::rc::Rc;
 
 use eg::{
-    contest::ContestOption, device::Device, election_record::ElectionRecordHeader, hash::HValue,
+    contest::ContestOption, device::Device, election_record::PreVotingData, hash::HValue,
     joint_election_public_key::Ciphertext, zk::ProofRange,
 };
 
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
-use crate::{ballot_encrypting_tool::selection_hash, nonce::option_nonce};
+use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
 
 /// A contest option in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ContestSelectionPreEncrypted {
-    /// Label
+    /// Label.
     pub label: String,
 
-    /// Vector of ciphertexts used to represent the selection
+    /// Vector of ciphertexts used to represent the selection.
+    #[serde(skip)]
     pub selections: Vec<Ciphertext>,
 
-    /// Selection hash
+    /// Selection hash.
+    #[serde(skip)]
     pub selection_hash: HValue,
+
+    /// Shortcode for this selection.
+    pub shortcode: String,
 }
 
 impl PartialEq for ContestSelectionPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label
-            && self.selection_hash == other.selection_hash
-            && self.selections.as_slice() == other.selections.as_slice()
+        self.label == other.label && self.shortcode == other.shortcode
     }
 }
 
@@ -52,7 +55,7 @@ impl ContestSelectionPreEncrypted {
     }
 
     pub fn new(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
         selection: &ContestOption,
@@ -81,18 +84,19 @@ impl ContestSelectionPreEncrypted {
             })
             .collect::<Vec<Ciphertext>>();
 
-        let selection_hash = selection_hash(&header, selections.as_ref());
+        let selection_hash = BallotEncryptingTool::selection_hash(&header, selections.as_ref());
 
         // Generate pre-encrypted votes for each possible (single) choice
         ContestSelectionPreEncrypted {
             label,
             selections,
             selection_hash,
+            shortcode: BallotEncryptingTool::short_code_last_byte(&selection_hash),
         }
     }
 
     pub fn new_null(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
         contest_label: &str,
@@ -117,18 +121,19 @@ impl ContestSelectionPreEncrypted {
             })
             .collect::<Vec<Ciphertext>>();
 
-        let crypto_hash = selection_hash(header, selections.as_ref());
-        // let shortcode = generate_short_code(&crypto_hash);
+        let selection_hash = BallotEncryptingTool::selection_hash(header, selections.as_ref());
+        let shortcode = BallotEncryptingTool::short_code_last_byte(&selection_hash);
         ContestSelectionPreEncrypted {
             label: null_label.to_string(),
             selections,
-            selection_hash: crypto_hash,
+            selection_hash,
+            shortcode,
         }
     }
 
     pub fn proof_ballot_correctness(
         &self,
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         csprng: &mut Csprng,
         sequence_order: usize,
         zmulq: Rc<ZMulPrime>,

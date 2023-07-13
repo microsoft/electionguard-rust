@@ -9,9 +9,7 @@ use util::{
     z_mul_prime::{ZMulPrime, ZMulPrimeElem},
 };
 
-use crate::{
-    election_record::ElectionRecordHeader, hash::eg_h, joint_election_public_key::Ciphertext,
-};
+use crate::{election_record::PreVotingData, hash::eg_h, joint_election_public_key::Ciphertext};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRangeSingle {
@@ -32,7 +30,7 @@ pub struct ProofRange(Vec<ProofRangeSingle>);
 
 impl ProofRange {
     pub fn challenge(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         ct: &Ciphertext,
         a: &Vec<BigUint>,
         b: &Vec<BigUint>,
@@ -56,7 +54,7 @@ impl ProofRange {
     }
 
     pub fn new(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
         ct: &Ciphertext,
@@ -125,7 +123,7 @@ impl ProofRange {
     }
 
     /// Verification 4 (TODO: Complete)
-    pub fn verify(&self, header: &ElectionRecordHeader, ct: &Ciphertext, big_l: usize) -> bool {
+    pub fn verify(&self, header: &PreVotingData, ct: &Ciphertext, big_l: usize) -> bool {
         let zmulq = ZMulPrime::new(header.parameters.fixed_parameters.q.clone());
         let zmulq = Rc::new(zmulq);
 

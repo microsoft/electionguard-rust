@@ -1,5 +1,5 @@
 use eg::{
-    election_record::ElectionRecordHeader,
+    election_record::PreVotingData,
     hash::{eg_h, HValue},
 };
 
@@ -10,7 +10,7 @@ use crate::contest_selection::ContestSelectionPreEncrypted;
 /// ψ_i = H(H_E;40,λ_i,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
 pub fn contest_hash(
-    header: &ElectionRecordHeader,
+    header: &PreVotingData,
     contest_label: &String,
     selections: &Vec<ContestSelectionPreEncrypted>,
 ) -> HValue {

@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, time::SystemTime};
+use std::{fs, path::PathBuf};
 
 use crate::{
     confirmation_code::confirmation_code, contest::ContestPreEncrypted, utils::unix_timestamp,
@@ -11,7 +11,7 @@ use eg::{
     contest_selection::ContestSelection,
     device::Device,
     election_manifest::ElectionManifest,
-    election_record::ElectionRecordHeader,
+    election_record::PreVotingData,
     hash::HValue,
 };
 use serde::{Deserialize, Serialize};
@@ -94,7 +94,7 @@ impl PartialEq for BallotPreEncrypted {
 
 impl BallotPreEncrypted {
     pub fn new_with(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         ballot_style: &BallotStyle,
         primary_nonce: &[u8],
         store_nonces: bool,
@@ -122,7 +122,7 @@ impl BallotPreEncrypted {
     }
 
     pub fn new(
-        header: &ElectionRecordHeader,
+        pv_data: &PreVotingData,
         ballot_style: &BallotStyle,
         csprng: &mut Csprng,
         store_nonces: bool,
@@ -131,7 +131,7 @@ impl BallotPreEncrypted {
         (0..32).for_each(|i| primary_nonce[i] = csprng.next_u8());
 
         (
-            BallotPreEncrypted::new_with(header, ballot_style, &primary_nonce, store_nonces),
+            BallotPreEncrypted::new_with(pv_data, ballot_style, &primary_nonce, store_nonces),
             HValue(primary_nonce),
         )
     }

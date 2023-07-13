@@ -5,18 +5,15 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::{num::NonZeroU16, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::{hashes::Hashes, hashes_ext::HashesExt};
+use eg::hashes::Hashes;
 
 use crate::{
     artifacts_dir::ArtifactFile,
-    common_utils::{
-        load_election_parameters, load_guardian_public_key, load_joint_election_public_key,
-        ElectionManifestSource,
-    },
+    common_utils::{load_election_parameters, ElectionManifestSource},
     subcommand_helper::SubcommandHelper,
     subcommands::Subcommand,
 };

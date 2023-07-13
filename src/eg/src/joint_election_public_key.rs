@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use num_bigint::BigUint;
 use num_traits::One;
 use serde::{Deserialize, Serialize};

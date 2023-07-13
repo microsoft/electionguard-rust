@@ -26,7 +26,7 @@ use eg::{
 use util::csprng::Csprng;
 
 use crate::artifacts_dir::{ArtifactFile, ArtifactsDir};
-
+#[allow(dead_code)]
 pub(crate) enum ElectionManifestSource {
     ArtifactFileElectionManifestPretty,
     ArtifactFileElectionManifestCanonical,

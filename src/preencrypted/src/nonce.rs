@@ -1,4 +1,4 @@
-use eg::{election_record::ElectionRecordHeader, hash::eg_h};
+use eg::{election_record::PreVotingData, hash::eg_h};
 use num_bigint::BigUint;
 
 // impl Nonce {
@@ -7,7 +7,7 @@ use num_bigint::BigUint;
 /// ξ_(i,j,k) = H(H_E;43,ξ,Λ_i,λ_j,λ_k) mod q
 ///
 pub fn option_nonce(
-    header: &ElectionRecordHeader,
+    header: &PreVotingData,
     primary_nonce: &[u8],
     label_i: &[u8],
     label_j: &[u8],

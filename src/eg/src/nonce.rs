@@ -1,6 +1,6 @@
 use num_bigint::BigUint;
 
-use crate::{election_record::ElectionRecordHeader, hash::eg_h};
+use crate::{election_record::PreVotingData, hash::eg_h};
 
 /// Generates a nonce for encrypted ballots (Equation 22)
 ///
@@ -8,7 +8,7 @@ use crate::{election_record::ElectionRecordHeader, hash::eg_h};
 /// TODO: Check if mod q?
 ///
 pub fn encrypted(
-    header: &ElectionRecordHeader,
+    header: &PreVotingData,
     primary_nonce: &[u8],
     label_i: &[u8],
     label_j: &[u8],

@@ -2,18 +2,18 @@ use std::str::FromStr;
 
 use crate::ballot::BallotPreEncrypted;
 use anyhow::Result;
-use eg::{ballot_style::BallotStyle, election_record::ElectionRecordHeader, hash::HValue};
+use eg::{ballot_style::BallotStyle, election_record::PreVotingData, hash::HValue};
 
 pub struct BallotRecordingTool {
     /// The election record header.
-    pub header: ElectionRecordHeader,
+    pub header: PreVotingData,
 
     /// The ballot style to generate a ballot for.
     pub ballot_style: BallotStyle,
 }
 
 impl BallotRecordingTool {
-    pub fn new(header: ElectionRecordHeader, ballot_style: BallotStyle) -> BallotRecordingTool {
+    pub fn new(header: PreVotingData, ballot_style: BallotStyle) -> BallotRecordingTool {
         BallotRecordingTool {
             header: header,
             ballot_style: ballot_style,

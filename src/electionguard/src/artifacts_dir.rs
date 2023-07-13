@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use eg::hash::HValue;
-
+#[allow(dead_code)]
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ArtifactFile {

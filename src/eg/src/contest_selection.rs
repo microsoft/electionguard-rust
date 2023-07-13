@@ -3,7 +3,7 @@ use std::rc::Rc;
 use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
-    election_record::ElectionRecordHeader, joint_election_public_key::Ciphertext, zk::ProofRange,
+    election_record::PreVotingData, joint_election_public_key::Ciphertext, zk::ProofRange,
 };
 
 // An encrypted option in a contest.
@@ -51,7 +51,7 @@ impl ContestSelection {
 impl Ciphertext {
     pub fn proof_ballot_correctness(
         &self,
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         csprng: &mut Csprng,
         selected: bool,
         zmulq: Rc<ZMulPrime>,

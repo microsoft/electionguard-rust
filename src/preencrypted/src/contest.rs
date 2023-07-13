@@ -3,7 +3,7 @@ use std::rc::Rc;
 use eg::{
     contest::{Contest, ContestEncrypted},
     device::Device,
-    election_record::ElectionRecordHeader,
+    election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
     joint_election_public_key::Ciphertext,
@@ -24,14 +24,13 @@ pub struct ContestPreEncrypted {
     pub selections: Vec<ContestSelectionPreEncrypted>,
 
     /// Contest hash
+    #[serde(skip)]
     pub contest_hash: HValue,
 }
 
 impl PartialEq for ContestPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label
-            && self.contest_hash == other.contest_hash
-            && self.selections.as_slice() == other.selections.as_slice()
+        self.label == other.label && self.selections.as_slice() == other.selections.as_slice()
     }
 }
 
@@ -54,7 +53,7 @@ impl ContestPreEncrypted {
     }
 
     pub fn new(
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
         contest: &Contest,
@@ -95,13 +94,13 @@ impl ContestPreEncrypted {
         ContestPreEncrypted {
             label: contest.label.clone(),
             selections,
-            contest_hash,
+            contest_hash: contest_hash,
         }
     }
 
     pub fn proof_ballot_correctness(
         &self,
-        header: &ElectionRecordHeader,
+        header: &PreVotingData,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
     ) -> Vec<Vec<ProofRange>> {

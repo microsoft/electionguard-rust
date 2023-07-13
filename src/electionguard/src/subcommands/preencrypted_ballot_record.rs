@@ -7,9 +7,7 @@
 
 use anyhow::{bail, Result};
 
-use eg::{
-    ballot_style::BallotStyle, device::Device, election_record::ElectionRecordHeader, hash::HValue,
-};
+use eg::{ballot_style::BallotStyle, device::Device, election_record::PreVotingData, hash::HValue};
 use preencrypted::{
     ballot::{BallotPreEncrypted, VoterSelection},
     ballot_recording_tool::BallotRecordingTool,
@@ -84,7 +82,7 @@ impl Subcommand for PreEncryptedBallotRecord {
         let jepk =
             load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
 
-        let record_header = ElectionRecordHeader::new(
+        let record_header = PreVotingData::new(
             election_manifest,
             election_parameters.clone(),
             hashes,
