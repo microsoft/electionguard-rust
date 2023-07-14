@@ -1,8 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use crate::{
-    confirmation_code::confirmation_code, contest::ContestPreEncrypted, utils::unix_timestamp,
-};
+use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Context, Result};
 use eg::{
     ballot::{BallotEncrypted, BallotState},
@@ -173,7 +171,7 @@ impl BallotPreEncrypted {
             contests.as_slice(),
             BallotState::Cast,
             self.confirmation_code,
-            unix_timestamp().to_string().as_str(),
+            &device.header.parameters.varying_parameters.date,
             device.get_uuid(),
         )
     }

@@ -5,13 +5,14 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use eg::{ballot_style::BallotStyle, device::Device, election_record::PreVotingData, hash::HValue};
 use preencrypted::{
     ballot::{BallotPreEncrypted, VoterSelection},
     ballot_recording_tool::BallotRecordingTool,
 };
+use util::file::create_path;
 use verifier::Verifier;
 // use voter::{ballot::BallotSelections, verifier::Verifier};
 
@@ -25,20 +26,20 @@ use crate::{
     subcommands::Subcommand,
 };
 
-/// Generate a guardian secret key and public key.
+/// Record voter selections on a pre-encrypted ballot.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct PreEncryptedBallotRecord {
     /// Number of ballots to verify.
     #[arg(short, long, default_value_t = 1)]
     num_ballots: usize,
 
-    /// Tag for voter selections.
-    #[arg(short, long, default_value_t = 0)]
-    selection_tag: u128,
+    /// Path for voter selections.
+    #[arg(short, long)]
+    selections_in: u128,
 
-    /// Tag for ballots.
-    #[arg(short, long, default_value_t = 0)]
-    ballot_tag: u128,
+    /// Path for pre-encrypted ballots.
+    #[arg(short, long)]
+    ballots_in: u128,
 
     /// The ballot style to verify.
     #[arg(short, long)]
@@ -96,17 +97,24 @@ impl Subcommand for PreEncryptedBallotRecord {
         let codes = {
             let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                 &None,
-                Some(ArtifactFile::PreEncryptedBallotMetadata(self.ballot_tag)),
+                Some(ArtifactFile::PreEncryptedBallotMetadata(self.ballots_in)),
             )?;
             tool.metadata_from_stdioread(&mut stdioread)?
         };
+
+        create_path(
+            &subcommand_helper
+                .artifacts_dir
+                .dir_path
+                .join(format!("record/ballots/{}", self.ballots_in)),
+        );
 
         for b_idx in 1..codes.len() + 1 {
             let pre_encrypted_ballot = {
                 let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
-                    Some(ArtifactFile::PreEncryptedBallots(
-                        self.ballot_tag,
+                    Some(ArtifactFile::PreEncryptedBallot(
+                        self.ballots_in,
                         codes[b_idx - 1],
                     )),
                 )?;
@@ -116,8 +124,8 @@ impl Subcommand for PreEncryptedBallotRecord {
             let nonce = {
                 let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
-                    Some(ArtifactFile::PreEncryptedBallotNonces(
-                        self.ballot_tag,
+                    Some(ArtifactFile::PreEncryptedBallotNonce(
+                        self.ballots_in,
                         codes[b_idx - 1],
                     )),
                 )?;
@@ -134,7 +142,7 @@ impl Subcommand for PreEncryptedBallotRecord {
                     let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                         &None,
                         Some(ArtifactFile::VoterSelection(
-                            self.selection_tag,
+                            self.selections_in,
                             b_idx as u64,
                         )),
                     )?;
@@ -145,6 +153,19 @@ impl Subcommand for PreEncryptedBallotRecord {
                     regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot);
 
                 assert!(verifier.verify_ballot_validity(&encrypted_ballot));
+
+                let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+                    &None,
+                    Some(ArtifactFile::EncryptedBallot(
+                        self.ballots_in,
+                        encrypted_ballot.confirmation_code,
+                    )),
+                )?;
+
+                encrypted_ballot
+                    .to_stdiowrite(bx_write.as_mut())
+                    .with_context(|| format!("Writing encrypted ballot to: {}", path.display()))?;
+                drop(bx_write);
             } else {
                 eprintln!(
                     "Regenerated ballot with nonce {} does not match ballot {}",

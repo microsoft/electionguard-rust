@@ -73,7 +73,6 @@ impl ContestPreEncrypted {
                 &contest.label,
                 &selection_labels,
                 j,
-                selection_labels.len(),
             );
             selections.push(selection);
         }

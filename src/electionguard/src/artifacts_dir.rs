@@ -19,10 +19,11 @@ pub(crate) enum ArtifactFile {
     ElectionManifestPretty,
     ElectionManifestCanonical,
     ElectionParameters,
-    ElectionRecordHeader,
+    ElectionPreVotingData,
+    EncryptedBallot(u128, HValue),
     PreEncryptedBallotMetadata(u128),
-    PreEncryptedBallots(u128, HValue),
-    PreEncryptedBallotNonces(u128, HValue),
+    PreEncryptedBallot(u128, HValue),
+    PreEncryptedBallotNonce(u128, HValue),
     Hashes,
     HashesExt,
     VoterConfirmationCode(HValue),
@@ -49,7 +50,7 @@ impl From<ArtifactFile> for PathBuf {
             ElectionManifestPretty => PathBuf::from("election_manifest_pretty.json"),
             ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
             ElectionParameters => PathBuf::from("election_parameters.json"),
-            ElectionRecordHeader => PathBuf::from("election_record_header.json"),
+            ElectionPreVotingData => PathBuf::from("election_record_header.json"),
             Hashes => PathBuf::from("hashes.json"),
             HashesExt => PathBuf::from("hashes_ext.json"),
             GuardianSecretKey(i) => Path::new("guardians")
@@ -61,13 +62,21 @@ impl From<ArtifactFile> for PathBuf {
             PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted/ballots/")
                 .join(format!("{ts}"))
                 .join(format!("metadata.{ts}.dat")),
-            PreEncryptedBallots(ts, i) => Path::new("pre_encrypted/ballots/")
+            EncryptedBallot(ts, i) => {
+                Path::new("record/ballots/")
+                    .join(format!("{ts}"))
+                    .join(format!(
+                        "ballot.{}.json",
+                        i.to_string_hex_no_prefix_suffix()
+                    ))
+            }
+            PreEncryptedBallot(ts, i) => Path::new("pre_encrypted/ballots/")
                 .join(format!("{ts}"))
                 .join(format!(
                     "ballot.{}.json",
                     i.to_string_hex_no_prefix_suffix()
                 )),
-            PreEncryptedBallotNonces(ts, i) => Path::new("pre_encrypted/nonces/")
+            PreEncryptedBallotNonce(ts, i) => Path::new("pre_encrypted/nonces/")
                 .join(format!("{ts}"))
                 .join(format!(
                     "nonce.SECRET.{}.json",

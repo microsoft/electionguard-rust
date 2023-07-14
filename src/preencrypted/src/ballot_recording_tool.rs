@@ -35,7 +35,7 @@ impl BallotRecordingTool {
             return (None, false);
         }
 
-        eprintln!("Ballot matched");
+        // eprintln!("Ballot matched");
         (Some(regenerated_ballot), true)
     }
 

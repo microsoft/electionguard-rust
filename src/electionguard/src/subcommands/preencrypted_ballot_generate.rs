@@ -23,7 +23,7 @@ use crate::{
     subcommands::Subcommand,
 };
 
-/// Generate a guardian secret key and public key.
+/// Generate a pre-encrypted ballot.
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct PreEncryptedBallotGenerate {
     /// Number of ballots to generate.
@@ -86,7 +86,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
         let (mut bx_write, path) = subcommand_helper
             .artifacts_dir
-            .out_file_stdiowrite(&None, Some(ArtifactFile::ElectionRecordHeader))?;
+            .out_file_stdiowrite(&None, Some(ArtifactFile::ElectionPreVotingData))?;
 
         pv_data
             .to_stdiowrite(bx_write.as_mut())
@@ -120,7 +120,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
             let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                 &None,
-                Some(ArtifactFile::PreEncryptedBallots(
+                Some(ArtifactFile::PreEncryptedBallot(
                     label as u128,
                     ballots[b_idx].confirmation_code,
                 )),
@@ -136,7 +136,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
             let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                 &None,
-                Some(ArtifactFile::PreEncryptedBallotNonces(
+                Some(ArtifactFile::PreEncryptedBallotNonce(
                     label as u128,
                     ballots[b_idx].confirmation_code,
                 )),

@@ -62,8 +62,8 @@ impl ContestSelectionPreEncrypted {
         contest_label: &String,
         selection_labels: &Vec<String>,
         j: usize,
-        length: usize,
     ) -> ContestSelectionPreEncrypted {
+        let length = selection_labels.len();
         assert!(selection_labels.len() == length);
         let label = selection.label.clone();
         let selections = (0..length)

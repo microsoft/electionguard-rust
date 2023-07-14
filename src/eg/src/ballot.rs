@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
@@ -17,19 +18,19 @@ pub enum BallotState {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BallotEncrypted {
     /// Contests in this ballot
-    contests: Vec<ContestEncrypted>,
+    pub contests: Vec<ContestEncrypted>,
 
     /// Confirmation code
-    confirmation_code: HValue,
+    pub confirmation_code: HValue,
 
     /// State of the ballot
-    state: BallotState,
+    pub state: BallotState,
 
     /// Date (and time) of ballot generation
-    date: String,
+    pub date: String,
 
     /// Device that generated this ballot
-    device: String,
+    pub device: String,
 }
 
 impl BallotEncrypted {
@@ -92,5 +93,17 @@ impl BallotEncrypted {
 
     pub fn device(&self) -> &String {
         &self.device
+    }
+
+    /// Writes a `BallotEncrypted` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .context("Error serializing voter selection")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing serialized voter selection to file")
     }
 }
