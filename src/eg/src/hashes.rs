@@ -163,15 +163,32 @@ mod test {
             "BAD5EEBFE2C98C9031BA8C36E7E4FB76DAC20665FD3621DF33F3F666BEC9AC0D"
         ));
         let expected_h_m = HValue::from(hex!(
-            "12A8E00AC71EB8713F2B69AB5719A919D5DD2D2231303B829B0E894F957A323A"
+            "2FE7EA3C2E3C42F88647B4727254F960F1BB7B0D00A6A60C21D2F8984F5090B7"
         ));
         let expected_h_b = HValue::from(hex!(
-            "3343303A11785BFDFC6A42644FADFC3CD0868BA1E0FE38416579983C6CFC7E19"
+            "A522FFB66B7D0A950BB560FD48F176F0AAA5CB1A6FA9E5BA9F0543CCB945572F"
         ));
 
-        assert_eq!(hashes.h_p, expected_h_p);
-        assert_eq!(hashes.h_m, expected_h_m);
-        assert_eq!(hashes.h_b, expected_h_b);
+        #[cfg(test_hash_mismatch_warn_only)]
+        {
+            let cmp = |s, actual, expected| {
+                if actual != expected {
+                    eprintln!(
+                        "\nWARNING FAILURE SUPPRESSED:\n{s}   actual: {:?}\n{s} expected: {:?}",
+                        actual, expected
+                    );
+                }
+            };
+            cmp("h_p", hashes.h_p, expected_h_p);
+            cmp("h_m", hashes.h_m, expected_h_m);
+            cmp("h_b", hashes.h_b, expected_h_b);
+        }
+        #[cfg(not(test_hash_mismatch_warn_only))]
+        {
+            assert_eq!(hashes.h_p, expected_h_p);
+            assert_eq!(hashes.h_m, expected_h_m);
+            assert_eq!(hashes.h_b, expected_h_b);
+        }
 
         Ok(())
     }

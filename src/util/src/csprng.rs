@@ -13,10 +13,10 @@ use num_traits::{CheckedSub, Zero};
 /// CSPRNG based on the SHA-3 extendable output function SHAKE256.
 /// Defined By
 /// NIST FIPS Pub 202 SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions
-/// https://dx.doi.org/10.6028/NIST.FIPS.202
+/// <https://dx.doi.org/10.6028/NIST.FIPS.202>
 ///
-/// SHAKE256(M, d) = KECCAK[512] (M || 1111, d)
-/// KECCAK[c] = SPONGE[KECCAK-p[1600, 24], pad10*1, 1600–c]
+/// SHAKE256(M, d) = KECCAK\[512\] (M || 1111, d)
+/// KECCAK\[c\] = SPONGE\[KECCAK-p\[1600, 24\], pad10*1, 1600–c\]
 /// Capacity `c` = 512 bits
 /// Rate `r` = 1088 bits
 pub struct Csprng(Box<dyn sha3::digest::XofReader>);

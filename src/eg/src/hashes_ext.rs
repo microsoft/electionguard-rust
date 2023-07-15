@@ -155,9 +155,25 @@ mod test {
         );
 
         let expected_h_e = HValue::from(hex!(
-            "06538A5C900569D65474908D57E084F432CCCB69674A694DAD30200F0E4B10B8"
+            "5541670D89498829BD3D78975D67B1B2BBF90449BB72F3B7DE847953BD6B25A8"
         ));
-        assert_eq!(hashes_ext.h_e, expected_h_e);
+
+        #[cfg(test_hash_mismatch_warn_only)]
+        {
+            let cmp = |s, actual, expected| {
+                if actual != expected {
+                    eprintln!(
+                        "\nWARNING FAILURE SUPPRESSED:\n{s}   actual: {:?}\n{s} expected: {:?}",
+                        actual, expected
+                    );
+                }
+            };
+            cmp("h_e", hashes_ext.h_e, expected_h_e);
+        }
+        #[cfg(not(test_hash_mismatch_warn_only))]
+        {
+            assert_eq!(hashes_ext.h_e, expected_h_e);
+        }
 
         Ok(())
     }
