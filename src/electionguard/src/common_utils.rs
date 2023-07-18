@@ -12,15 +12,9 @@ use anyhow::{ensure, Context, Result};
 use rand_core::{OsRng, RngCore};
 
 use eg::{
-    election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters,
-    example_election_manifest::{
-        example_election_manifest, example_election_manifest_2022_king_county,
-    },
-    guardian_public_key::GuardianPublicKey,
-    guardian_secret_key::GuardianSecretKey,
-    hashes::Hashes,
-    hashes_ext::HashesExt,
+    election_manifest::ElectionManifest, election_parameters::ElectionParameters,
+    example_election_manifest::example_election_manifest, guardian_public_key::GuardianPublicKey,
+    guardian_secret_key::GuardianSecretKey, hashes::Hashes, hashes_ext::HashesExt,
     joint_election_public_key::JointElectionPublicKey,
 };
 use util::csprng::Csprng;
@@ -52,7 +46,7 @@ impl ElectionManifestSource {
                 return Ok(example_election_manifest()); //------- inner return
             }
             ElectionManifestSource::ExampleKingCounty2022 => {
-                return Ok(example_election_manifest_2022_king_county()); //------- inner return
+                return Ok(example_election_manifest()); //------- inner return
             }
         };
 

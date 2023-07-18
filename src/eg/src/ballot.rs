@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::{
-    confirmation_code::confirmation_code, contest::ContestEncrypted,
-    contest_selection::ContestSelection, device::Device, hash::HValue,
+    confirmation_code::confirmation_code, contest_encrypted::ContestEncrypted,
+    contest_selection::ContestSelection, device::Device, election_manifest::Contest, hash::HValue,
+    index::GenericIndex, vec1::Vec1,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,7 +19,7 @@ pub enum BallotState {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BallotEncrypted {
     /// Contests in this ballot
-    pub contests: Vec<ContestEncrypted>,
+    pub contests: Vec1<ContestEncrypted>,
 
     /// Confirmation code
     pub confirmation_code: HValue,
@@ -35,14 +36,14 @@ pub struct BallotEncrypted {
 
 impl BallotEncrypted {
     pub fn new(
-        contests: &[ContestEncrypted],
+        contests: &Vec1<ContestEncrypted>,
         state: BallotState,
         confirmation_code: HValue,
         date: &str,
         device: &str,
     ) -> BallotEncrypted {
         BallotEncrypted {
-            contests: contests.to_vec(),
+            contests: contests.clone(),
             state,
             confirmation_code,
             date: date.to_string(),
@@ -54,19 +55,33 @@ impl BallotEncrypted {
         device: &Device,
         csprng: &mut Csprng,
         primary_nonce: &[u8],
-        selections: &Vec<ContestSelection>,
+        ctest_selections: &Vec1<ContestSelection>,
     ) -> BallotEncrypted {
-        let mut contests = Vec::with_capacity(selections.len());
+        let mut contests = Vec1::with_capacity(ctest_selections.len());
 
-        for (i, selection) in selections.iter().enumerate() {
-            contests.push(ContestEncrypted::new(
-                device,
-                csprng,
-                primary_nonce,
-                &device.header.manifest.contests[i],
-                selection,
-            ));
+        for i in 1..ctest_selections.len() + 1 {
+            let c_idx = <GenericIndex<Contest>>::from_one_based_index(i as u32).unwrap();
+            let s_idx = <GenericIndex<ContestSelection>>::from_one_based_index(i as u32).unwrap();
+            contests
+                .try_push(ContestEncrypted::new(
+                    device,
+                    csprng,
+                    primary_nonce,
+                    &device.header.manifest.contests.get(c_idx).unwrap(),
+                    &ctest_selections.get(s_idx).unwrap(),
+                ))
+                .unwrap();
         }
+
+        // for (i, selection) in selections.iter().enumerate() {
+        //     contests.push(ContestEncrypted::new(
+        //         device,
+        //         csprng,
+        //         primary_nonce,
+        //         &device.header.manifest.contests.get(i).unwrap(),
+        //         selection,
+        //     ));
+        // }
 
         let confirmation_code =
             confirmation_code(&device.header.hashes_ext.h_e, &contests, &vec![0u8; 32]);
@@ -79,7 +94,7 @@ impl BallotEncrypted {
         }
     }
 
-    pub fn contests(&self) -> &Vec<ContestEncrypted> {
+    pub fn contests(&self) -> &Vec1<ContestEncrypted> {
         &self.contests
     }
 

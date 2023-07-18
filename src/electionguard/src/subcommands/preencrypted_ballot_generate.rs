@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context, Result};
 
-use eg::{ballot_style::BallotStyle, device::Device, election_record::PreVotingData};
+use eg::{ballot_style::find_ballot_style, device::Device, election_record::PreVotingData};
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
 use util::file::create_path;
 
@@ -58,18 +58,19 @@ impl Subcommand for PreEncryptedBallotGenerate {
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        let mut ballot_style = BallotStyle::empty();
-        match &self.ballot_style {
-            None => bail!("Ballot style is required to generate pre-encrypted ballots."),
-            Some(bs) => {
-                for i in 0..election_manifest.ballot_styles.len() {
-                    if election_manifest.ballot_styles[i].label == *bs {
-                        ballot_style = election_manifest.ballot_styles[i].clone();
-                        break;
-                    }
-                }
-            }
+        if self.ballot_style.is_none() {
+            bail!("Ballot style is required to generate pre-encrypted ballots.");
         }
+        let ballot_style = {
+            let bs = find_ballot_style(
+                &self.ballot_style.as_ref().unwrap().as_str(),
+                &election_manifest.ballot_styles,
+            );
+            if bs.is_none() {
+                bail!("Ballot style not found.");
+            }
+            bs.unwrap()
+        };
 
         let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
         let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;

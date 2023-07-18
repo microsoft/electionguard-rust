@@ -1,6 +1,7 @@
 use eg::{
     election_record::PreVotingData,
     hash::{eg_h, HValue},
+    vec1::Vec1,
 };
 
 use crate::contest_selection::ContestSelectionPreEncrypted;
@@ -12,7 +13,7 @@ use crate::contest_selection::ContestSelectionPreEncrypted;
 pub fn contest_hash(
     header: &PreVotingData,
     contest_label: &String,
-    selections: &Vec<ContestSelectionPreEncrypted>,
+    selections: &Vec1<ContestSelectionPreEncrypted>,
 ) -> HValue {
     let mut v = vec![0x41];
 
@@ -21,8 +22,8 @@ pub fn contest_hash(
 
     // TODO: Check if this sorting works
     let mut sorted_selection_hashes = selections
-        .iter()
-        .map(|s| s.selection_hash)
+        .indices()
+        .map(|i| selections.get(i).unwrap().selection_hash)
         .collect::<Vec<HValue>>();
     sorted_selection_hashes.sort();
 

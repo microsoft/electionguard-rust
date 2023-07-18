@@ -7,6 +7,7 @@ use eg::ballot_style::BallotStyle;
 use eg::election_record::PreVotingData;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
+use eg::vec1::Vec1;
 use util::csprng::Csprng;
 use util::logging::Logging;
 
@@ -54,8 +55,13 @@ impl BallotEncryptingTool {
             file!(),
         );
         Logging::log(tag, "  Contests", line!(), file!());
-        ballot.contests.iter().for_each(|c| {
-            Logging::log(tag, &format!("    {:?}", c.contest_hash), line!(), file!());
+        ballot.contests.indices().for_each(|i| {
+            Logging::log(
+                tag,
+                &format!("    {:?}", ballot.contests.get(i).unwrap().contest_hash),
+                line!(),
+                file!(),
+            );
         });
     }
 
@@ -106,12 +112,13 @@ impl BallotEncryptingTool {
     /// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
     ///
     /// TODO: Remove label from the hash (equation 93)
-    pub fn selection_hash(header: &PreVotingData, selections: &Vec<Ciphertext>) -> HValue {
+    pub fn selection_hash(header: &PreVotingData, selections: &Vec1<Ciphertext>) -> HValue {
         let mut v = vec![0x40];
 
         v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
 
-        selections.iter().for_each(|s| {
+        selections.indices().for_each(|i| {
+            let s = selections.get(i).unwrap();
             v.extend_from_slice(s.alpha.to_bytes_be().as_slice());
             v.extend_from_slice(s.beta.to_bytes_be().as_slice());
         });
@@ -120,13 +127,17 @@ impl BallotEncryptingTool {
     }
 
     /// Returns true iff all shortcodes within each preencrypted contest on a ballot are unique
-    pub fn are_unique_shortcodes(contests: &Vec<ContestPreEncrypted>) -> bool {
+    pub fn are_unique_shortcodes(contests: &Vec1<ContestPreEncrypted>) -> bool {
         contests
-            .iter()
-            .map(|c| {
-                let shortcodes: HashSet<String> =
-                    HashSet::from_iter(c.selections.iter().map(|s| s.shortcode.clone()));
-                shortcodes.len() == c.selections.len()
+            .indices()
+            .map(|i| {
+                let c = contests.get(i).unwrap();
+                let shortcodes: HashSet<String> = HashSet::from_iter(
+                    c.selections
+                        .indices()
+                        .map(|j| c.selections.get(j).unwrap().shortcode.clone()),
+                );
+                shortcodes.len() == contests.get(i).unwrap().selections.len()
             })
             .all(|x| x)
     }

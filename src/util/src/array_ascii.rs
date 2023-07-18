@@ -46,7 +46,7 @@ impl<const N: usize> ArrayAscii<N> {
 
     /// Returns `true` iff the instance of `ArrayAscii` has 0 elements.
     /// This exists to make clippy happy:
-    /// https://rust-lang.github.io/rust-clippy/master/index.html#/len_without_is_empty
+    /// <https://rust-lang.github.io/rust-clippy/master/index.html#/len_without_is_empty>
     #[must_use]
     #[inline(always)]
     pub const fn is_empty(&self) -> bool {

@@ -9,7 +9,10 @@ use util::{
     z_mul_prime::{ZMulPrime, ZMulPrimeElem},
 };
 
-use crate::{election_record::PreVotingData, hash::eg_h, joint_election_public_key::Ciphertext};
+use crate::{
+    election_record::PreVotingData, hash::eg_h, index::GenericIndex,
+    joint_election_public_key::Ciphertext,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRangeSingle {
@@ -24,6 +27,9 @@ pub struct ProofRangeSingle {
     )]
     pub v: BigUint,
 }
+
+/// A 1-based index of a [`ProofRange`] in the order it is stored in the [`ContestEncrypted`].
+pub type ProofRangeIndex = GenericIndex<ProofRange>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRange(Vec<ProofRangeSingle>);

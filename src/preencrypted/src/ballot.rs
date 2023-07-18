@@ -1,16 +1,19 @@
 use std::{fs, path::PathBuf};
 
-use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
+use crate::{
+    confirmation_code::confirmation_code,
+    contest::{ContestPreEncrypted, ContestPreEncryptedIndex},
+};
 use anyhow::{anyhow, Context, Result};
 use eg::{
     ballot::{BallotEncrypted, BallotState},
     ballot_style::BallotStyle,
-    contest::{Contest, ContestEncrypted},
-    contest_selection::ContestSelection,
+    contest_selection::{ContestSelection, ContestSelectionIndex},
     device::Device,
-    election_manifest::ElectionManifest,
+    election_manifest::{Contest, ContestIndex, ElectionManifest},
     election_record::PreVotingData,
     hash::HValue,
+    vec1::Vec1,
 };
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, logging::Logging};
@@ -23,7 +26,7 @@ pub struct BallotPreEncrypted {
     pub ballot_style: String,
 
     /// Contests in this ballot
-    pub contests: Vec<ContestPreEncrypted>,
+    pub contests: Vec1<ContestPreEncrypted>,
 
     /// Confirmation code
     pub confirmation_code: HValue,
@@ -36,7 +39,7 @@ pub struct VoterSelection {
     pub ballot_style: String,
 
     /// Plaintext selections made by the voter.
-    pub selections: Vec<ContestSelection>,
+    pub selections: Vec1<ContestSelection>,
 }
 
 impl VoterSelection {
@@ -45,20 +48,21 @@ impl VoterSelection {
         ballot_style: &BallotStyle,
         csprng: &mut Csprng,
     ) -> Self {
+        let mut selections = Vec1::new();
+        ballot_style.contests.iter().for_each(|i| {
+            let contest = manifest.contests.get(*i).unwrap();
+            selections
+                .try_push(ContestSelection::new_pick_random(
+                    csprng,
+                    contest.selection_limit,
+                    contest.options.len(),
+                ))
+                .unwrap();
+        });
+
         Self {
             ballot_style: ballot_style.label.clone(),
-            selections: ballot_style
-                .contests
-                .iter()
-                .map(|i| {
-                    let contest = &manifest.contests[*i as usize - 1];
-                    ContestSelection::new_pick_random(
-                        csprng,
-                        contest.selection_limit,
-                        contest.options.len(),
-                    )
-                })
-                .collect(),
+            selections,
         }
     }
 
@@ -85,8 +89,7 @@ impl VoterSelection {
 
 impl PartialEq for BallotPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
-        self.confirmation_code == other.confirmation_code
-            && self.contests.as_slice() == other.contests.as_slice()
+        self.confirmation_code == other.confirmation_code && self.contests == other.contests
     }
 }
 
@@ -103,13 +106,25 @@ impl BallotPreEncrypted {
         let contests_to_encrypt = ballot_style
             .contests
             .iter()
-            .map(|i| header.manifest.contests[*i as usize - 1].clone())
+            .map(|i| header.manifest.contests.get(*i).unwrap().clone())
             .collect::<Vec<Contest>>();
 
-        let contests = contests_to_encrypt
-            .iter()
-            .map(|c| ContestPreEncrypted::new(header, primary_nonce.as_ref(), store_nonces, c))
-            .collect();
+        let mut contests = Vec1::new();
+        contests_to_encrypt.iter().for_each(|c| {
+            contests
+                .try_push(ContestPreEncrypted::new(
+                    header,
+                    primary_nonce.as_ref(),
+                    store_nonces,
+                    c,
+                ))
+                .unwrap();
+        });
+
+        // let contests = contests_to_encrypt
+        //     .iter()
+        //     .map(|c| ContestPreEncrypted::new(header, primary_nonce.as_ref(), store_nonces, c))
+        //     .collect();
         let confirmation_code = confirmation_code(&header.hashes_ext.h_e, &contests, b_aux);
 
         BallotPreEncrypted {
@@ -156,19 +171,33 @@ impl BallotPreEncrypted {
         csprng: &mut Csprng,
         voter_ballot: &VoterSelection,
     ) -> BallotEncrypted {
-        let contests = (0..self.contests.len())
-            .map(|i| {
-                self.contests[i].finalize(
-                    device,
-                    csprng,
-                    &voter_ballot.selections[i].vote,
-                    device.header.manifest.contests[i].selection_limit,
+        let mut contests = Vec1::new();
+
+        (1..self.contests.len() + 1).for_each(|i| {
+            let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
+            let vs_idx = ContestSelectionIndex::from_one_based_index(i as u32).unwrap();
+            let cp_idx = ContestPreEncryptedIndex::from_one_based_index(i as u32).unwrap();
+
+            contests
+                .try_push(
+                    self.contests.get(cp_idx).unwrap().finalize(
+                        device,
+                        csprng,
+                        &voter_ballot.selections.get(vs_idx).unwrap().vote,
+                        device
+                            .header
+                            .manifest
+                            .contests
+                            .get(c_idx)
+                            .unwrap()
+                            .selection_limit,
+                    ),
                 )
-            })
-            .collect::<Vec<ContestEncrypted>>();
+                .unwrap()
+        });
 
         BallotEncrypted::new(
-            contests.as_slice(),
+            &contests,
             BallotState::Cast,
             self.confirmation_code,
             &device.header.parameters.varying_parameters.date,

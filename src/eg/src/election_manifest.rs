@@ -10,18 +10,29 @@ use std::io::Cursor;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{ballot_style::BallotStyle, contest::Contest};
+use crate::ballot_style::BallotStyle;
+use crate::index::GenericIndex;
+use crate::vec1::Vec1;
 
 /// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElectionManifest {
-    pub ballot_styles: Vec<BallotStyle>,
+    /// A descriptive label for this `Election`.
+    pub label: String,
+
     /// All the contests in the election.
-    pub contests: Vec<Contest>,
+    pub contests: Vec1<Contest>,
+
+    // / Additional data pertaining to the election.
+    // / This is opaque to ElectionGuard.
+    //pub additional_data: Vec<u8>,
+    //? TODO
+    /// All the [`BallotStyle`]s of the election.
+    pub ballot_styles: Vec1<BallotStyle>,
 }
 
 impl ElectionManifest {
-    /// Reads a `ElectionManifest` from a `std::io::Read` and validates it.
+    /// Reads an [`ElectionManifest`] from a [`std::io::Read`] and validates it.
     /// It can be either the canonical or pretty JSON representation.
     pub fn from_stdioread_validated(stdioread: &mut dyn std::io::Read) -> Result<Self> {
         let self_: Self = serde_json::from_reader(stdioread).context("Reading ElectionManifest")?;
@@ -31,20 +42,20 @@ impl ElectionManifest {
         Ok(self_)
     }
 
-    /// Validates that the `ElectionManifest` is well-formed.
+    /// Validates that the [`ElectionManifest`] is well-formed.
     /// Useful after deserialization.
     pub fn validate(&self) -> Result<()> {
         // We currently have no validation rules for this type.
         Ok(())
     }
 
-    /// Writes an `ElectionManifest` to a `std::io::Write` as canonical bytes.
+    /// Writes an [`ElectionManifest`] to a [`std::io::Write`] as canonical bytes.
     /// This uses a more compact JSON format.
     pub fn to_stdiowrite_canonical(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         serde_json::ser::to_writer(stdiowrite, self).context("Writing ElectionManifest canonical")
     }
 
-    /// Returns the canonical byte sequence representation of the `ElectionManifest`.
+    /// Returns the canonical byte sequence representation of the [`ElectionManifest`].
     /// This uses a more compact JSON format.
     pub fn to_canonical_bytes(&self) -> Result<Vec<u8>> {
         let mut buf = Cursor::new(Vec::new());
@@ -53,7 +64,7 @@ impl ElectionManifest {
         Ok(buf.into_inner())
     }
 
-    /// Writes an `ElectionManifest` to a `std::io::Write` as pretty JSON.
+    /// Writes an [`ElectionManifest`] to a [`std::io::Write`] as pretty JSON.
     pub fn to_stdiowrite_pretty(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 
@@ -63,6 +74,41 @@ impl ElectionManifest {
             .context("Writing ElectionManifest pretty")
     }
 }
+
+/// A contest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Contest {
+    /// The label for this `Contest`.
+    pub label: String,
+
+    /// The maximum count of [`ContestOption`]s that a voter may select.
+    pub selection_limit: usize, //? TODO NonZeroU32,
+
+    /// The candidates/options.
+    /// The order of options matches the virtual ballot.
+    pub options: Vec1<ContestOption>,
+}
+
+/// A 1-based index of a [`Contest`] in the order it is defined in the [`ElectionManifest`].
+pub type ContestIndex = GenericIndex<Contest>;
+
+/// An option in a contest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContestOption {
+    /// The label for this `ContestOption`.
+    pub label: String,
+    /*
+    /// The maximum count of votes that a voter can apply to this option.
+    /// In the traditional election style, will use `Some(1)` to indicate that a voter may select the option 0 or 1 times.
+    /// `None` indicates that there is no limit.
+    /// In all cases, the [`Contest::selection_limit`] will still apply.
+    //pub opt_vote_limit: Option<NonZeroU32>,
+    */
+}
+
+/// A 1-based index of a [`ContestOption`] in the order it is defined within its
+/// [`Contest`], in the order it is defined in the [`ElectionManifest`].
+pub type ContestOptionIndex = GenericIndex<ContestOption>;
 
 // Unit tests for the election manifest.
 #[cfg(test)]

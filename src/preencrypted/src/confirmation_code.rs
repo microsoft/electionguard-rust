@@ -1,4 +1,7 @@
-use eg::hash::{eg_h, HValue};
+use eg::{
+    hash::{eg_h, HValue},
+    vec1::Vec1,
+};
 
 use crate::contest::ContestPreEncrypted;
 
@@ -8,13 +11,13 @@ use crate::contest::ContestPreEncrypted;
 ///
 pub fn confirmation_code(
     h_e: &HValue,
-    contests: &Vec<ContestPreEncrypted>,
+    contests: &Vec1<ContestPreEncrypted>,
     b_aux: &[u8],
 ) -> HValue {
     let mut v = vec![0x42];
 
-    contests.iter().for_each(|c| {
-        v.extend(c.contest_hash.as_ref());
+    contests.indices().for_each(|i| {
+        v.extend(contests.get(i).unwrap().contest_hash.as_ref());
     });
 
     v.extend_from_slice(b_aux);

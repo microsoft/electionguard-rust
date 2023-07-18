@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian_public_key::GuardianPublicKey,
+    guardian_public_key::GuardianPublicKey, index::GenericIndex,
 };
 
 /// The joint election public key.
@@ -24,6 +24,9 @@ pub struct JointElectionPublicKey(
     )]
     pub BigUint,
 );
+
+/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`ContestEncrypted`].
+pub type CiphertextIndex = GenericIndex<Ciphertext>;
 
 /// The ciphertext used to store a vote value corresponding to one option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
