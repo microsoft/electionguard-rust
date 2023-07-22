@@ -5,9 +5,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
-use std::num::NonZeroU16;
-
 use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -17,6 +14,7 @@ use util::integer_util::to_be_bytes_left_pad;
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
+    guardian::GuardianIndex,
     guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
     guardian_secret_key::CoefficientCommitments,
 };
@@ -25,10 +23,10 @@ use crate::{
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianPublicKey {
     /// Guardian number, 1 <= i <= n.
-    pub i: NonZeroU16,
+    pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
-    #[serde(rename = "name")]
+    #[serde(rename = "name", skip_serializing_if = "Option::is_none")]
     pub opt_name: Option<String>,
 
     /// "Published" polynomial coefficient commitments.
@@ -36,12 +34,14 @@ pub struct GuardianPublicKey {
 }
 
 impl GuardianPublicKeyInfo for GuardianPublicKey {
-    fn i(&self) -> NonZeroU16 {
+    fn i(&self) -> GuardianIndex {
         self.i
     }
+
     fn opt_name(&self) -> &Option<String> {
         &self.opt_name
     }
+
     fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
     }
@@ -69,15 +69,15 @@ impl GuardianPublicKey {
     }
 
     /// "commitment K_i,0 will serve as the public key for guardian G_i"
-    pub fn public_key_k0(&self) -> &BigUint {
-        self.coefficient_commitments.0[0].0.borrow()
+    pub fn public_key_k_i_0(&self) -> &BigUint {
+        &self.coefficient_commitments.0[0].0
     }
 
     /// Returns the public key `K_i,0` as a big-endian byte vector of length l_p_bytes.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         //? TODO: Sure would be nice if we could avoid this allocation, but since we
         // store a BigUint representation, its length in bytes may be less than `l_p_bytes`.
-        to_be_bytes_left_pad(&self.public_key_k0(), fixed_parameters.l_p_bytes())
+        to_be_bytes_left_pad(&self.public_key_k_i_0(), fixed_parameters.l_p_bytes())
     }
 
     /// Returns a pretty JSON `String` representation of the `SecretKey`.
@@ -103,11 +103,12 @@ impl GuardianPublicKey {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    //use super::*;
     use crate::{
         example_election_parameters::example_election_parameters,
         guardian_secret_key::GuardianSecretKey,
     };
+    use std::borrow::Borrow;
     use util::csprng::Csprng;
 
     #[test]
@@ -118,7 +119,7 @@ mod test {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let k: usize = varying_parameters.k.into();
+        let k = varying_parameters.k.get_one_based_usize();
 
         let guardian_secret_keys = varying_parameters
             .each_guardian_i()
@@ -159,7 +160,7 @@ mod test {
             }
 
             assert_eq!(
-                guardian_public_key.public_key_k0(),
+                guardian_public_key.public_key_k_i_0(),
                 &guardian_public_key.coefficient_commitments.0[0].0
             );
         }

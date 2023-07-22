@@ -5,17 +5,18 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::num::NonZeroU16;
-
 use anyhow::{ensure, Context, Result};
 
-use crate::{election_parameters::ElectionParameters, guardian_secret_key::CoefficientCommitments};
+use crate::{
+    election_parameters::ElectionParameters, guardian::GuardianIndex,
+    guardian_secret_key::CoefficientCommitments,
+};
 
 /// Trait for read access to data from a `GuardianPublicKey`, which is common to
 /// both `GuardianPublicKey` and `GuardianSecretKey`.
 pub trait GuardianPublicKeyInfo {
     /// Guardian number, 1 <= i <= n.
-    fn i(&self) -> NonZeroU16;
+    fn i(&self) -> GuardianIndex;
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
     fn opt_name(&self) -> &Option<String>;
@@ -32,13 +33,13 @@ pub(crate) fn validate_guardian_public_key_info(
     election_parameters: &ElectionParameters,
 ) -> Result<()> {
     let varying_parameters = &election_parameters.varying_parameters;
-    let n: usize = varying_parameters.n.into();
-    let k: usize = varying_parameters.k.into();
+    let n = varying_parameters.n.get_one_based_usize();
+    let k = varying_parameters.k.get_one_based_usize();
 
+    let i = gpki.i().get_one_based_usize();
     ensure!(
-        varying_parameters.is_valid_guardian_i(gpki.i().get()),
-        "Guardian number i={} is not in the range 1 <= i <= n={n}",
-        gpki.i()
+        1 <= i && i <= n,
+        "Guardian number i={i} is not in the range 1 <= i <= n={n}"
     );
 
     if let Some(name) = &gpki.opt_name() {
@@ -48,10 +49,10 @@ pub(crate) fn validate_guardian_public_key_info(
         );
     }
 
+    let coefficient_commitments_len = gpki.coefficient_commitments().0.len();
     ensure!(
-        gpki.coefficient_commitments().0.len() == k,
-        "Expected k={k} coefficient commitments, found {}",
-        gpki.coefficient_commitments().0.len()
+        coefficient_commitments_len == k,
+        "Expected k={k} coefficient commitments, found {coefficient_commitments_len}"
     );
 
     for (ix, coefficient_commitment) in gpki.coefficient_commitments().0.iter().enumerate() {

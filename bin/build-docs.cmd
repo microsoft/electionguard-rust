@@ -97,6 +97,12 @@ robocopy "%source_doc_reldir%\specs" "%target_docs_reldir%\specs" *.pdf /ns /nc 
     @exit /b 1
 )
 
+robocopy .. "%target_docs_reldir%" LICENSE /ns /nc /nfl /ndl /np /njh /njs
+@if "%ERRORLEVEL%" NEQ "1" (
+    @echo errorlevel is !ERRORLEVEL!. A value other than 1 here indicates robocopy error.
+    @exit /b 1
+)
+
 @echo off
 
 rem ----- Success!

@@ -21,7 +21,7 @@ lazy_static! {
 /// Standard parameters, ElectionGuard v2.0.
 pub fn make_standard_parameters_v2_0() -> FixedParameters {
     FixedParameters {
-        opt_version: Some([2, 0]),
+        opt_electionguard_design_specification_version: Some([2, 0]),
         generation_parameters: FixedParameterGenerationParameters {
             q_bits_total: 256,
             p_bits_total: 4096,
@@ -100,7 +100,7 @@ pub fn make_standard_parameters_v2_0() -> FixedParameters {
 /// Standard parameters, ElectionGuard v1.54.
 pub fn make_standard_parameters_v1_54() -> FixedParameters {
     FixedParameters {
-        opt_version: Some([1, 54]),
+        opt_electionguard_design_specification_version: Some([1, 54]),
         generation_parameters: FixedParameterGenerationParameters {
             q_bits_total: 256,
             p_bits_total: 4096,
@@ -195,7 +195,10 @@ mod test {
         let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v1_54");
 
         let standard_parameters_v1_54 = make_standard_parameters_v1_54();
-        assert_eq!(standard_parameters_v1_54.opt_version, Some([1, 54]));
+        assert_eq!(
+            standard_parameters_v1_54.opt_electionguard_design_specification_version,
+            Some([1, 54])
+        );
         assert!(standard_parameters_v1_54.validate(&mut csprng).is_ok());
     }
 
@@ -206,7 +209,10 @@ mod test {
         let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v2_0");
 
         let standard_parameters_v2_0 = make_standard_parameters_v2_0();
-        assert_eq!(standard_parameters_v2_0.opt_version, Some([2, 0]));
+        assert_eq!(
+            standard_parameters_v2_0.opt_electionguard_design_specification_version,
+            Some([2, 0])
+        );
         assert!(standard_parameters_v2_0.validate(&mut csprng).is_ok());
     }
 

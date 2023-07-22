@@ -109,8 +109,7 @@ if "_%ELECTIONGUARD_ARTIFACTS_DIR%" EQU "_" (
     echo ERROR: ELECTIONGUARD_ARTIFACTS_DIR is not set.
     exit /b 1
 )
-
-(set guardians_dir=%ELECTIONGUARD_ARTIFACTS_DIR%\guardians)
+(set ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR=%ELECTIONGUARD_ARTIFACTS_DIR%\public)
 
 rem ----- Change to the electionguard_src_dir from which we should run cargo.
 
@@ -212,19 +211,23 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 rem ---- Run ElectionGuard tests
 
 if "%clarg_egtest%" NEQ "0" call :sub_egtests
+if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Success!
 
+echo ERRORLEVEL=%ERRORLEVEL%
+
+echo Success!
 exit /b 0
 
 rem ======================================================= Subroutine: Ensure artifacts dir
 :sub_ensure_artifacts_dir
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%" goto :skip_create_artifacts_dir
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%" goto :skip_create_artifacts_dir
 echo.
 echo Creating artifacts directory.
 echo on
-mkdir "%ELECTIONGUARD_ARTIFACTS_DIR%"
+mkdir "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%"
 @echo off
 if "%ERRORLEVEL%" NEQ "0" exit /b
 :skip_create_artifacts_dir
@@ -252,7 +255,7 @@ call :sub_ensure_artifacts_dir
 
 rem ---- Write random seed
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\pseudorandom_seed_defeats_all_secrecy.bin" goto :skip_write_random_seed
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\pseudorandom_seed_defeats_all_secrecy.bin" goto :skip_write_random_seed
 echo on
 %electionguard_exe% write-random-seed
 @echo off
@@ -261,7 +264,7 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Verify standard parameters
 
-(set standard_parameters_verified_file="%ELECTIONGUARD_ARTIFACTS_DIR%\standard_parameters_verified.txt")
+(set standard_parameters_verified_file="%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\standard_parameters_verified.txt")
 
 if exist "%standard_parameters_verified_file%" goto :skip_verify_standard_parameters
 echo on
@@ -275,7 +278,7 @@ echo Standard parameters: Verified! >"%standard_parameters_verified_file%"
 
 rem ---- Write election manifest (canonical)
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\election_manifest_canonical.bin" goto :skip_write_manifest_canonical
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_manifest_canonical.bin" goto :skip_write_manifest_canonical
 echo on
 %electionguard_exe% write-manifest --in-example --out-format canonical
 @echo off
@@ -284,7 +287,7 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Write election manifest (pretty)
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\election_manifest_pretty.json" goto :skip_write_manifest_pretty
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_manifest_pretty.json" goto :skip_write_manifest_pretty
 echo on
 %electionguard_exe% write-manifest --out-format pretty
 @echo off
@@ -293,7 +296,7 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Write election parameters
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\election_parameters.json" goto :skip_write_parameters
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_parameters.json" goto :skip_write_parameters
 echo on
 %electionguard_exe% write-parameters --n %eg_n% --k %eg_k% --date "%eg_date%" --info "%eg_info%"
 @echo off
@@ -302,21 +305,12 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Write hashes
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\hashes.json" goto :skip_write_hashes
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\hashes.json" goto :skip_write_hashes
 echo on
 %electionguard_exe% --insecure-deterministic write-hashes
 @echo off
 if "%ERRORLEVEL%" NEQ "0" exit /b
 :skip_write_hashes
-
-rem ---- Create the guardians directory
-
-if exist "%guardians_dir%" goto :skip_create_guardians_dir
-echo on
-mkdir "%guardians_dir%"
-@echo off
-if "%ERRORLEVEL%" NEQ "0" exit /b
-:skip_create_guardians_dir
 
 rem ---- For each guardian
 
@@ -326,7 +320,7 @@ echo ---- All guardians done.
 
 rem ---- Write joint election public key
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\joint_election_public_key.json" goto :skip_write_joint_election_public_key
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\joint_election_public_key.json" goto :skip_write_joint_election_public_key
 echo on
 %electionguard_exe% --insecure-deterministic write-joint-election-public-key
 @echo off
@@ -335,22 +329,20 @@ if "%ERRORLEVEL%" NEQ "0" exit /b
 
 rem ---- Write HashesExt
 
-if exist "%ELECTIONGUARD_ARTIFACTS_DIR%\hashes_ext.json" goto :skip_write_hashes_ext
+if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\hashes_ext.json" goto :skip_write_hashes_ext
 echo on
 %electionguard_exe% --insecure-deterministic write-hashes-ext
 @echo off
 if "%ERRORLEVEL%" NEQ "0" exit /b
 :skip_write_hashes_ext
 
-rem ---- XXXX
-
-rem echo.
-rem echo XXXX
-
-rem ---- Success!
+rem ---- Tests success!
 
 echo.
 echo ElectionGuard tests successful!
+echo.
+echo Resulting artifact files:
+dir "%ELECTIONGUARD_ARTIFACTS_DIR%" /s /b
 
 exit /b 0 & rem ------- end of :sub_egtests
 
@@ -359,17 +351,17 @@ rem ======================================================= Subroutine: Election
 
 set /a "i=%1"
 
-(set guardian_dir=%guardians_dir%\%i%)
+(set guardian_secret_dir=%ELECTIONGUARD_ARTIFACTS_DIR%\SECRET_for_guardian_%i%)
 
-if exist "%guardian_dir%" goto :skip_create_guardian_dir
+if exist "%guardian_secret_dir%" goto :skip_create_guardian_secret_dir
 echo on
-mkdir "%guardian_dir%"
+mkdir "%guardian_secret_dir%"
 @echo off
 if "%ERRORLEVEL%" NEQ "0" exit /b
-:skip_create_guardian_dir
+:skip_create_guardian_secret_dir
 
-(set guardian_secret_key_file=%guardian_dir%\guardian_%i%.SECRET_key.json)
-(set guardian_public_key_file=%guardian_dir%\guardian_%i%.public_key.json)
+(set guardian_secret_key_file=%guardian_secret_dir%\guardian_%i%.SECRET_key.json)
+(set guardian_public_key_file=%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\guardian_%i%.public_key.json)
 (set guardian_name=Guardian %i%)
 
 echo.

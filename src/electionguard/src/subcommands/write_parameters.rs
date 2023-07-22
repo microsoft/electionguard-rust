@@ -10,23 +10,23 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 
 use eg::{
-    election_parameters::ElectionParameters, standard_parameters::STANDARD_PARAMETERS,
-    varying_parameters::VaryingParameters,
+    election_parameters::ElectionParameters, guardian::GuardianIndex,
+    standard_parameters::STANDARD_PARAMETERS, varying_parameters::VaryingParameters,
 };
 
 use crate::{
     artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, subcommands::Subcommand,
 };
 
-#[derive(clap::Args, Debug, Default)]
+#[derive(clap::Args, Debug)]
 pub(crate) struct WriteParameters {
     /// Number of guardians.
     #[arg(long)]
-    n: u16,
+    n: GuardianIndex,
 
     /// Decryption quorum threshold value.
     #[arg(long)]
-    k: u16,
+    k: GuardianIndex,
 
     /// Date string.
     #[arg(long)]

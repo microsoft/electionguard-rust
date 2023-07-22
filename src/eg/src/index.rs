@@ -6,47 +6,51 @@
 #![deny(clippy::manual_assert)]
 #![allow(unused_imports)] //? TODO remove
 
-use std::alloc::LayoutError;
 use std::collections::TryReserveError;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
+use std::{alloc::LayoutError, ffi::c_char};
 
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Context, Error, Result};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use static_assertions::const_assert;
+use static_assertions::{assert_eq_size, assert_impl_all, const_assert};
 
-// We may not actually need Serialize, Deserialize for this type.
-pub struct GenericIndex<T>(u32, PhantomData<*const T>);
+/// A 1-based ordinal type that enforces a range 1 <= i < 2^31.
+///
+/// `T` is a tag for disambiguation. It can be any type.
+pub struct Index<T>(u32, PhantomData<fn(T) -> T>)
+where
+    T: ?Sized;
 
 // Copy trait must be implmented manually because of the PhantomData.
-impl<T> std::marker::Copy for GenericIndex<T> {}
+impl<T> std::marker::Copy for Index<T> {}
 
 // Clone trait must be implmented manually because of the PhantomData.
-impl<T> std::clone::Clone for GenericIndex<T> {
+impl<T> std::clone::Clone for Index<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
 // PartialEq trait must be implmented manually because of the PhantomData.
-impl<T> std::cmp::PartialEq for GenericIndex<T> {
+impl<T> std::cmp::PartialEq for Index<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
 // PartialOrd trait must be implmented manually because of the PhantomData.
-impl<T> std::cmp::PartialOrd for GenericIndex<T> {
+impl<T> std::cmp::PartialOrd for Index<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.0.cmp(&other.0))
     }
 }
 
 // Eq trait must be implmented manually because of the PhantomData.
-impl<T> std::cmp::Eq for GenericIndex<T> {}
+impl<T> std::cmp::Eq for Index<T> {}
 
 // Ord trait must be implmented manually because of the PhantomData.
-impl<T> std::cmp::Ord for GenericIndex<T> {
+impl<T> std::cmp::Ord for Index<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
     }
@@ -59,56 +63,113 @@ const INDEX_MAX_U32: u32 = (1u32 << 31) - 1;
 static_assertions::const_assert!(INDEX_MAX_U32 as u64 <= (usize::MAX as u64));
 static_assertions::const_assert!(INDEX_MAX_U32 as usize <= usize::MAX);
 
-impl<T> GenericIndex<T> {
-    // Valid ranges of `GenericIndex` values are naturally expressed as u32.
+impl<T> Index<T> {
+    /// Minimum valid value as a `u32`.
     pub const VALID_MIN_U32: u32 = 1;
+
+    /// Maximum valid value as a `u32`.
     pub const VALID_MAX_U32: u32 = INDEX_MAX_U32;
+
+    /// Minimum value.
+    pub const MIN: Self = Self(Self::VALID_MIN_U32, PhantomData);
+
+    /// Maximum value.
+    pub const MAX: Self = Self(Self::VALID_MAX_U32, PhantomData);
+
+    /// Valid [`RangeInclusive`]`<u32>`.
     pub const VALID_RANGEINCLUSIVE_U32: RangeInclusive<u32> =
         Self::VALID_MIN_U32..=Self::VALID_MAX_U32;
 
-    // Defining ranges as `usize` is useful for code that needs to compare with collection lengths.
+    /// Minimum valid value as a `usize`.
     pub const VALID_MIN_USIZE: usize = Self::VALID_MIN_U32 as usize;
+
+    /// Maximum valid value as a `usize`.
     pub const VALID_MAX_USIZE: usize = Self::VALID_MAX_U32 as usize;
+
+    /// Valid [`RangeInclusive`]`<usize>`.
     pub const VALID_RANGEINCLUSIVE_USIZE: RangeInclusive<usize> =
         Self::VALID_MIN_USIZE..=Self::VALID_MAX_USIZE;
 
-    pub fn from_one_based_index(ix1: u32) -> Result<Self> {
-        ensure!(
-            Self::VALID_RANGEINCLUSIVE_U32.contains(&ix1),
-            "Index value out of range: {ix1}"
-        );
-
-        Ok(Self(ix1, PhantomData))
+    /// An iterator over `Index` values over the inclusive range defined by [start, last].
+    ///
+    /// This is useful because `Index` cannot (yet) implement
+    /// the `Step` trait necessary for iteration over a [`RangeInclusive`]
+    /// because it's marked nightly-only.
+    ///
+    /// See rust issue 73121 "\[ER\] NonZeroX Step and better constructors"
+    /// <https://github.com/rust-lang/rust/issues/73121>
+    /// and libs-team issue 130 "Implement Step for NonZeroUxx"
+    /// <https://github.com/rust-lang/libs-team/issues/130>
+    pub fn iter_range_inclusive(start: Index<T>, last: Index<T>) -> impl Iterator<Item = Index<T>> {
+        (start.0..=last.0).map(|i| Self(i, PhantomData))
     }
 
-    /// Obtains the 1-based index value as a usize.
-    pub fn get_one_based_usize(&self) -> usize {
-        debug_assert!(Self::VALID_RANGEINCLUSIVE_U32.contains(&self.0));
+    pub const fn is_valid_one_based_index(ix1: u32) -> bool {
+        // RangeInclusive::<Idx>::contains` is not yet stable as a const fn
+        //Self::VALID_RANGEINCLUSIVE_U32.contains(&ix1)
+        Self::VALID_MIN_U32 <= ix1 && ix1 <= Self::VALID_MAX_U32
+    }
 
+    /// Creates a new `Index` from a 1-based index value.
+    pub const fn from_one_based_index_const(ix1: u32) -> Option<Self> {
+        // _core::bool::<impl bool>::then_some` is not yet stable as a const fn
+        // Self::is_valid_one_based_index(ix1).then_some(Self(ix1, PhantomData))
+
+        if Self::is_valid_one_based_index(ix1) {
+            Some(Self(ix1, PhantomData))
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new `Index` from a 1-based index value.
+    pub fn from_one_based_index(ix1: u32) -> Result<Self> {
+        Self::from_one_based_index_const(ix1)
+            .ok_or_else(|| anyhow!("Index value {ix1} out of range"))
+    }
+
+    /// Obtains the 1-based index value as a `u32`.
+    pub const fn get_one_based_u32(&self) -> u32 {
+        debug_assert!(Self::is_valid_one_based_index(self.0));
+        self.0
+    }
+
+    /// Obtains the 1-based index value as a `usize`.
+    pub const fn get_one_based_usize(&self) -> usize {
+        debug_assert!(Self::is_valid_one_based_index(self.0));
         self.0 as usize
     }
 
-    /// Converts the 1-based index into a 0-based index suitable for indexing into a `std::Vec`.
-    pub fn get_zero_based_usize(&self) -> usize {
+    /// Converts the 1-based index into a 0-based index as a `usize`.
+    /// Suitable for indexing into a `std::Vec`.
+    pub const fn get_zero_based_usize(&self) -> usize {
         self.get_one_based_usize() - 1
     }
 }
 
-impl<T> std::fmt::Display for GenericIndex<T> {
+impl<T> std::fmt::Display for Index<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.0)
     }
 }
 
-impl<T> std::fmt::Debug for GenericIndex<T> {
+impl<T> std::fmt::Debug for Index<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         std::fmt::Display::fmt(self, f)
     }
 }
 
-impl<T> Serialize for GenericIndex<T> {
+impl<T> std::str::FromStr for Index<T> {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_one_based_index(s.parse()?)
+    }
+}
+
+impl<T> Serialize for Index<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -117,7 +178,7 @@ impl<T> Serialize for GenericIndex<T> {
     }
 }
 
-impl<'de, T> Deserialize<'de> for GenericIndex<T> {
+impl<'de, T> Deserialize<'de> for Index<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -126,7 +187,7 @@ impl<'de, T> Deserialize<'de> for GenericIndex<T> {
 
         let ix1 = u32::deserialize(deserializer)?;
 
-        GenericIndex::from_one_based_index(ix1).map_err(D::Error::custom)
+        Index::from_one_based_index(ix1).map_err(D::Error::custom)
     }
 }
 
@@ -140,8 +201,12 @@ mod test_index {
     #[allow(dead_code)]
     struct Bar;
 
-    type FooIndex = GenericIndex<Foo>;
-    type BarIndex = GenericIndex<Bar>;
+    type FooIndex = Index<Foo>;
+    type BarIndex = Index<Bar>;
+
+    // Checks on size and traits.
+    assert_eq_size!(FooIndex, u32);
+    assert_impl_all!(BarIndex: Clone, Copy, Send, Sync);
 
     #[test]
     fn test_range() {
@@ -203,7 +268,7 @@ mod test_index {
         assert!(FooIndex::from_one_based_index(FooIndex::VALID_MAX_U32 + 1).is_err());
 
         // Verify that we can't mix up indices of different kinds.
-        // Expected `GenericIndex<Foo>`, found `GenericIndex<Bar>`
+        // Expected `Index<Foo>`, found `Index<Bar>`
         //let foo_index: FooIndex = bar_index;
     }
 }

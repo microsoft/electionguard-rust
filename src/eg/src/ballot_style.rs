@@ -11,10 +11,10 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::election_manifest::ContestIndex;
-use crate::index::GenericIndex;
+use crate::index::Index;
 
 /// A 1-based index of a `BallotStyle` in the order it is defined in the `ElectionManifest`.
-pub type BallotStyleIndex = GenericIndex<BallotStyle>;
+pub type BallotStyleIndex = Index<BallotStyle>;
 
 /// A ballot style.
 /// TODO: write more?

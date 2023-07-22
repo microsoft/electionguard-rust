@@ -5,12 +5,11 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::num::NonZeroU16;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
-use eg::guardian_secret_key::GuardianSecretKey;
+use eg::{guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::load_election_parameters,
@@ -19,9 +18,9 @@ use crate::{
 
 #[derive(clap::Args, Debug)]
 pub(crate) struct GuardianSecretKeyGenerate {
-    /// Guardian number, 1 <= i <= n.
+    /// Guardian number, 1 <= i <= [`VaryingParameters::n`].
     #[arg(long)]
-    i: NonZeroU16,
+    i: GuardianIndex,
 
     /// Guardian's name or other short description.
     #[arg(long)]
@@ -50,7 +49,7 @@ impl Subcommand for GuardianSecretKeyGenerate {
         let varying_parameters = &election_parameters.varying_parameters;
 
         #[allow(clippy::nonminimal_bool)]
-        if !(self.i.get() <= varying_parameters.n) {
+        if !(self.i <= varying_parameters.n) {
             bail!(
                 "Guardian number {} must be less than or equal to n = {} from election parameters",
                 self.i,

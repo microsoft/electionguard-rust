@@ -17,13 +17,13 @@ use crate::{
 
 /// The joint election public key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JointElectionPublicKey(
+pub struct JointElectionPublicKey {
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
-    pub BigUint,
-);
+    pub joint_election_public_key: BigUint,
+}
 
 impl JointElectionPublicKey {
     pub fn compute(
@@ -32,7 +32,7 @@ impl JointElectionPublicKey {
     ) -> Result<Self> {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
-        let n: usize = varying_parameters.n.into();
+        let n = varying_parameters.n.get_one_based_usize();
 
         // Validate every supplied guardian public key.
         for guardian_public_key in guardian_public_keys {
@@ -42,8 +42,7 @@ impl JointElectionPublicKey {
         // Verify that every guardian is represented exactly once.
         let mut seen = vec![false; n];
         for guardian_public_key in guardian_public_keys {
-            // Convert from 1-based indexing to 0-based.
-            let seen_ix = guardian_public_key.i.get() as usize - 1;
+            let seen_ix = guardian_public_key.i.get_zero_based_usize();
 
             ensure!(
                 !seen[seen_ix],
@@ -76,13 +75,17 @@ impl JointElectionPublicKey {
             bail!("Guardian(s) {iter:?} are not represented in the guardian public keys");
         }
 
-        let joint_public_key = guardian_public_keys
-            .iter()
-            .fold(BigUint::one(), |acc, public_key| {
-                acc.modpow(public_key.public_key_k0(), fixed_parameters.p.as_ref())
-            });
+        let joint_election_public_key = guardian_public_keys.iter().fold(
+            BigUint::one(),
+            |mut acc, guardian_public_key| -> BigUint {
+                acc *= guardian_public_key.public_key_k_i_0();
+                acc % fixed_parameters.p.as_ref()
+            },
+        );
 
-        Ok(Self(joint_public_key))
+        Ok(Self {
+            joint_election_public_key,
+        })
     }
 
     /// Reads a `JointElectionPublicKey` from a `std::io::Read` and validates it.
@@ -102,7 +105,9 @@ impl JointElectionPublicKey {
     /// Useful after deserialization.
     pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
         ensure!(
-            election_parameters.fixed_parameters.is_valid_modp(&self.0),
+            election_parameters
+                .fixed_parameters
+                .is_valid_modp(&self.joint_election_public_key),
             "JointElectionPublicKey is not valid mod p"
         );
         Ok(())
@@ -110,7 +115,7 @@ impl JointElectionPublicKey {
 
     /// Returns the `JointElectionPublicKey` as a big-endian byte array of the correct length for `mod p`.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
-        fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
+        fixed_parameters.biguint_to_be_bytes_len_p(&self.joint_election_public_key)
     }
 
     /// Writes a `JointElectionPublicKey` to a `std::io::Write`.
@@ -121,5 +126,12 @@ impl JointElectionPublicKey {
             .map_err(Into::<anyhow::Error>::into)
             .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
             .context("Writing JointElectionPublicKey")
+    }
+}
+
+impl AsRef<BigUint> for JointElectionPublicKey {
+    #[inline]
+    fn as_ref(&self) -> &BigUint {
+        &self.joint_election_public_key
     }
 }

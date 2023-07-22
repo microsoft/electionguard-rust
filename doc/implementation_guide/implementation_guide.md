@@ -85,7 +85,11 @@ SHOULD not have leading or trailing whitespace characters
 
 ## Integers
 The byte sequence representation of 'mod p' and 'mod q' values is already defined in the spec to be fixed length of the minimum number of bytes required to represent p or q.
-Any base64 representation of these quantities is the base64 of this byte sequence.
+
+For serialization in ASCII string-based formats (such as JSON), implementations SHOULD encode this byte sequence
+using base64 as defined by [RFC 4648](https://www.rfc-editor.org/rfc/rfc4648.html).
+
+This RFC states that: "Implementations MUST include appropriate pad characters at the end of encoded data unless the specification referring to this document explicitly states otherwise." So, insofar as there is no official specification for serialization beyond these guidelines, you SHOULD include the padding in the base64.
 
 ## Guardian secrets
 
@@ -99,3 +103,31 @@ Guardians may re-use the same key for multiple elections. Perhaps this should be
 
 Rust has native support for defining `extern "C"` functions and data, so wrappers should it should be straightforward
 to create them for almost any runtime environment. However, this package does not supply them.
+
+## Structure of an election
+
+### Roles
+
+TODO
+
+#### Election Administrator
+
+TODO
+
+#### Election Guardian
+
+TODO
+
+#### Voter
+
+TODO
+
+### Hardware requirements
+
+Gurardian secret key storage TODO
+
+Gurardian secret key operations TODO
+
+Mixing TODO
+
+

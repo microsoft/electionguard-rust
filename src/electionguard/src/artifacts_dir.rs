@@ -6,10 +6,11 @@
 #![deny(clippy::manual_assert)]
 
 use std::fs::{File, OpenOptions};
-use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
+
+use eg::guardian::GuardianIndex;
 
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19,8 +20,8 @@ pub(crate) enum ArtifactFile {
     ElectionManifestCanonical,
     ElectionParameters,
     Hashes,
-    GuardianSecretKey(NonZeroU16),
-    GuardianPublicKey(NonZeroU16),
+    GuardianSecretKey(GuardianIndex),
+    GuardianPublicKey(GuardianIndex),
     JointElectionPublicKey,
     HashesExt,
 }
@@ -32,25 +33,35 @@ impl std::fmt::Display for ArtifactFile {
     }
 }
 
+fn election_public_dir() -> PathBuf {
+    "public".into()
+}
+
+fn guardian_secret_dir(i: GuardianIndex) -> PathBuf {
+    format!("SECRET_for_guardian_{i}").into()
+}
+
 impl From<ArtifactFile> for PathBuf {
     fn from(artifact_file: ArtifactFile) -> PathBuf {
         use ArtifactFile::*;
         match artifact_file {
             PseudorandomSeedDefeatsAllSecrecy => {
-                PathBuf::from("pseudorandom_seed_defeats_all_secrecy.bin")
+                election_public_dir().join("pseudorandom_seed_defeats_all_secrecy.bin")
             }
-            ElectionManifestPretty => PathBuf::from("election_manifest_pretty.json"),
-            ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
-            ElectionParameters => PathBuf::from("election_parameters.json"),
-            Hashes => PathBuf::from("hashes.json"),
-            GuardianSecretKey(i) => Path::new("guardians")
-                .join(format!("{i}"))
-                .join(format!("guardian_{i}.SECRET_key.json")),
-            GuardianPublicKey(i) => Path::new("guardians")
-                .join(format!("{i}"))
-                .join(format!("guardian_{i}.public_key.json")),
-            JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
-            HashesExt => PathBuf::from("hashes_ext.json"),
+            ElectionManifestPretty => election_public_dir().join("election_manifest_pretty.json"),
+            ElectionManifestCanonical => {
+                election_public_dir().join("election_manifest_canonical.bin")
+            }
+            ElectionParameters => election_public_dir().join("election_parameters.json"),
+            Hashes => election_public_dir().join("hashes.json"),
+            GuardianSecretKey(i) => {
+                guardian_secret_dir(i).join(format!("guardian_{i}.SECRET_key.json"))
+            }
+            GuardianPublicKey(i) => {
+                election_public_dir().join(format!("guardian_{i}.public_key.json"))
+            }
+            JointElectionPublicKey => election_public_dir().join("joint_election_public_key.json"),
+            HashesExt => election_public_dir().join("hashes_ext.json"),
         }
     }
 }
