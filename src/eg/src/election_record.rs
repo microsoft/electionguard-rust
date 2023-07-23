@@ -1,14 +1,12 @@
-use std::{collections::HashMap, num::NonZeroU16};
+use std::collections::HashMap;
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use util::csprng::Csprng;
 
 use crate::{
     ballot::BallotEncrypted, election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters, example_election_manifest::user_study_manifest,
-    example_election_parameters::user_study_parameters, guardian_secret_key::GuardianSecretKey,
-    hashes::Hashes, hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey,
+    election_parameters::ElectionParameters, hashes::Hashes, hashes_ext::HashesExt,
+    joint_election_public_key::JointElectionPublicKey,
 };
 
 /// The header of the election record, generated before the election begins.

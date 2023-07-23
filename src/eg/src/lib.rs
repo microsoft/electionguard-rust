@@ -80,6 +80,7 @@ pub mod index;
 pub mod joint_election_public_key;
 pub mod nonce;
 pub mod standard_parameters;
+pub mod user_study;
 pub mod varying_parameters;
 pub mod vec1;
 pub mod zk;

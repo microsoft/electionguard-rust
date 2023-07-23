@@ -17,68 +17,6 @@ use crate::{
     vec1::Vec1,
 };
 
-pub fn user_study_manifest() -> ElectionManifest {
-    let contests = [
-        // Context index 1:
-        Contest {
-            label: "Vote for a gift voucher.".to_string(),
-            selection_limit: 1,
-            options: [
-                ContestOption {
-                    label: "Amazon".to_string(),
-                },
-                ContestOption {
-                    label: "Starbucks".to_string(),
-                },
-            ]
-            .try_into()
-            .unwrap(),
-        },
-        // Context index 2:
-        Contest {
-            label: "Vote for a gift voucher.".to_string(),
-            selection_limit: 1,
-            options: [
-                ContestOption {
-                    label: "Starbucks".to_string(),
-                },
-                ContestOption {
-                    label: "Amazon".to_string(),
-                },
-            ]
-            .try_into()
-            .unwrap(),
-        },
-    ]
-    .try_into()
-    .unwrap();
-
-    let ballot_styles = [
-        // Ballot style index 1:
-        BallotStyle {
-            label: "Amazon / Starbucks".to_string(),
-            contests: BTreeSet::from(
-                [1].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-            ),
-        },
-        // Ballot style index 2:
-        BallotStyle {
-            label: "Starbucks / Amazon".to_string(),
-            contests: BTreeSet::from(
-                [2].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-            ),
-        },
-    ]
-    .try_into()
-    .unwrap();
-
-    ElectionManifest {
-        label: "User Study Redmond - ElectionGuard".to_string(),
-        contests,
-        ballot_styles,
-    }
-}
-
 pub fn example_election_manifest() -> ElectionManifest {
     let referendum_options: Vec1<ContestOption> = [
         ContestOption {
