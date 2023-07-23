@@ -80,9 +80,9 @@ impl PreVotingData {
             NonZeroU16::new(1).unwrap(),
             Some("User Study Guardian".to_string()),
         );
-        let gpk = gsk.make_public_key();
-        let public_key = JointElectionPublicKey::compute(&parameters, &[gpk]).unwrap();
-        let hashes_ext = HashesExt::compute(&parameters, &hashes, &public_key, &[gpk]);
+        let gpk = [gsk.make_public_key()];
+        let public_key = JointElectionPublicKey::compute(&parameters, &gpk).unwrap();
+        let hashes_ext = HashesExt::compute(&parameters, &hashes, &public_key, &gpk);
 
         PreVotingData {
             manifest,
