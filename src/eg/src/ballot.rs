@@ -83,11 +83,11 @@ impl BallotEncrypted {
         //         selection,
         //     ));
         // }
-
         let confirmation_code =
             confirmation_code(&device.header.hashes_ext.h_e, &contests, &vec![0u8; 32]);
+
         BallotEncrypted {
-            contests,
+            contests: contests,
             state: BallotState::Uncast,
             confirmation_code,
             date: device.header.parameters.varying_parameters.date.clone(),

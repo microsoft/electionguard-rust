@@ -69,30 +69,6 @@ impl PreVotingData {
         }
     }
 
-    pub fn user_study() -> PreVotingData {
-        let manifest = user_study_manifest();
-        let parameters = user_study_parameters();
-        let hashes = Hashes::compute(&parameters, &manifest).unwrap();
-        let mut csprng = Csprng::new(&[42u8]);
-        let gsk = GuardianSecretKey::generate(
-            &mut csprng,
-            &parameters,
-            NonZeroU16::new(1).unwrap(),
-            Some("User Study Guardian".to_string()),
-        );
-        let gpk = [gsk.make_public_key()];
-        let public_key = JointElectionPublicKey::compute(&parameters, &gpk).unwrap();
-        let hashes_ext = HashesExt::compute(&parameters, &hashes, &public_key, &gpk);
-
-        PreVotingData {
-            manifest,
-            parameters,
-            hashes,
-            hashes_ext,
-            public_key,
-        }
-    }
-
     pub fn set_manifest(&mut self, manifest: ElectionManifest) {
         self.manifest = manifest;
     }
