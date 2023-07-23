@@ -26,3 +26,19 @@ pub fn example_election_parameters() -> ElectionParameters {
         varying_parameters,
     }
 }
+
+pub fn user_study_parameters() -> ElectionParameters {
+    let fixed_parameters: FixedParameters = (*STANDARD_PARAMETERS).clone();
+
+    let varying_parameters = VaryingParameters {
+        n: 1,
+        k: 1,
+        date: "2023-08-01".to_string(),
+        info: "ElectionGuard User Study".to_string(),
+    };
+
+    ElectionParameters {
+        fixed_parameters,
+        varying_parameters,
+    }
+}
