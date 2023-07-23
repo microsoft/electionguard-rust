@@ -32,6 +32,7 @@ pub struct BallotEncrypted {
 
     /// Device that generated this ballot
     pub device: String,
+    // TODO: Have an optional field to store election record data for pre-encrypted ballots
 }
 
 impl BallotEncrypted {

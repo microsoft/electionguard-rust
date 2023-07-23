@@ -21,7 +21,7 @@ pub fn user_study_manifest() -> ElectionManifest {
     let contests = [
         // Context index 1:
         Contest {
-            label: "Please choose your desired gift voucher.".to_string(),
+            label: "Vote for a gift voucher.".to_string(),
             selection_limit: 1,
             options: [
                 ContestOption {
@@ -36,7 +36,7 @@ pub fn user_study_manifest() -> ElectionManifest {
         },
         // Context index 2:
         Contest {
-            label: "Please choose your desired gift voucher.".to_string(),
+            label: "Vote for a gift voucher.".to_string(),
             selection_limit: 1,
             options: [
                 ContestOption {
