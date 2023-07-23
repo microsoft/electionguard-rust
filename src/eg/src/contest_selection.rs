@@ -59,6 +59,21 @@ impl ContestSelection {
 
         Self { vote }
     }
+
+    // Choices are 1-indexed
+    pub fn new_unchecked(choices: Vec<u32>, num_options: usize) -> Self {
+        let mut vote = Vec1::new();
+        for _ in 0..num_options {
+            vote.try_push(0).unwrap();
+        }
+
+        for choice in choices {
+            let idx = <GenericIndex<u8>>::from_one_based_index(choice).unwrap();
+            *vote.get_mut(idx).unwrap() = 1u8;
+        }
+
+        Self { vote }
+    }
 }
 
 impl Ciphertext {
