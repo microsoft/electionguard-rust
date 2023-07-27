@@ -2,21 +2,24 @@ use std::str::FromStr;
 
 use crate::ballot::BallotPreEncrypted;
 use anyhow::Result;
-use eg::{ballot_style::BallotStyle, election_record::PreVotingData, hash::HValue};
+use eg::{ballot_style::BallotStyleIndex, election_record::PreVotingData, hash::HValue};
 
 pub struct BallotRecordingTool {
     /// The election record header.
-    pub header: PreVotingData,
+    pub pre_voting_data: PreVotingData,
 
-    /// The ballot style to generate a ballot for.
-    pub ballot_style: BallotStyle,
+    /// The ballot style to record a ballot for.
+    pub ballot_style_index: BallotStyleIndex,
 }
 
 impl BallotRecordingTool {
-    pub fn new(header: PreVotingData, ballot_style: BallotStyle) -> BallotRecordingTool {
+    pub fn new(
+        pre_voting_data: PreVotingData,
+        ballot_style_index: BallotStyleIndex,
+    ) -> BallotRecordingTool {
         BallotRecordingTool {
-            header: header,
-            ballot_style: ballot_style,
+            pre_voting_data,
+            ballot_style_index,
         }
     }
 
@@ -25,11 +28,15 @@ impl BallotRecordingTool {
     pub fn regenerate_and_match(
         &self,
         ballot: &BallotPreEncrypted,
-        ballot_style: &BallotStyle,
+        ballot_style_index: BallotStyleIndex,
         primary_nonce: &HValue,
     ) -> (Option<BallotPreEncrypted>, bool) {
-        let regenerated_ballot =
-            BallotPreEncrypted::new_with(&self.header, ballot_style, &primary_nonce.0, true);
+        let regenerated_ballot = BallotPreEncrypted::new_with(
+            &self.pre_voting_data,
+            ballot_style_index,
+            &primary_nonce.0,
+            true,
+        );
         if *ballot != regenerated_ballot {
             eprintln!("Ballot mismatch: {:?} != {:?}.", ballot, regenerated_ballot);
             return (None, false);

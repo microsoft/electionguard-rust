@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, num::NonZeroU16};
+use std::collections::BTreeSet;
 
 use util::csprng::Csprng;
 
@@ -8,6 +8,7 @@ use crate::{
     election_parameters::ElectionParameters,
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
+    guardian::GuardianIndex,
     guardian_secret_key::GuardianSecretKey,
     hashes::Hashes,
     hashes_ext::HashesExt,
@@ -82,8 +83,8 @@ pub fn user_study_parameters() -> ElectionParameters {
     let fixed_parameters: FixedParameters = (*STANDARD_PARAMETERS).clone();
 
     let varying_parameters = VaryingParameters {
-        n: 1,
-        k: 1,
+        n: GuardianIndex::from_one_based_index(1).unwrap(),
+        k: GuardianIndex::from_one_based_index(1).unwrap(),
         date: "2023-08-01".to_string(),
         info: "ElectionGuard User Study".to_string(),
     };
@@ -102,7 +103,7 @@ pub fn pre_voting_data(seed: &[u8]) -> PreVotingData {
     let gsk = GuardianSecretKey::generate(
         &mut csprng,
         &parameters,
-        NonZeroU16::new(1).unwrap(),
+        GuardianIndex::from_one_based_index(1).unwrap(),
         Some("User Study Guardian".to_string()),
     );
     let gpk = [gsk.make_public_key()];

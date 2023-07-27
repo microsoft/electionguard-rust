@@ -1,9 +1,11 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-//! The ElectionGuard 2.0 Rust Reference Implenentation -- Core Library
+//! The ElectionGuard 2.0 Reference Implenentation in Rust -- Core Library
 //!
 //! This library provides the core types and functions needed to use ElectionGuard 2.0 as part of
 //! an actual system.
+//!
+//! Here are some links to some of the more central types.
 //!
 //! - [ElectionManifest](crate::election_manifest::ElectionManifest) The election manifest defines
 //!   the basic parameters of the election, the contests, and the ballot styles.
@@ -70,6 +72,7 @@ pub mod election_record;
 pub mod example_election_manifest;
 pub mod example_election_parameters;
 pub mod fixed_parameters;
+pub mod guardian;
 pub mod guardian_public_key;
 pub mod guardian_public_key_info;
 pub mod guardian_secret_key;

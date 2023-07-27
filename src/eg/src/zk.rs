@@ -10,8 +10,7 @@ use util::{
 };
 
 use crate::{
-    election_record::PreVotingData, hash::eg_h, index::GenericIndex,
-    joint_election_public_key::Ciphertext,
+    election_record::PreVotingData, hash::eg_h, index::Index, joint_election_public_key::Ciphertext,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,7 +28,7 @@ pub struct ProofRangeSingle {
 }
 
 /// A 1-based index of a [`ProofRange`] in the order it is stored in the [`ContestEncrypted`].
-pub type ProofRangeIndex = GenericIndex<ProofRange>;
+pub type ProofRangeIndex = Index<ProofRange>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRange(Vec<ProofRangeSingle>);
@@ -43,7 +42,13 @@ impl ProofRange {
     ) -> BigUint {
         let mut v = vec![0x21];
 
-        v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
+        v.extend_from_slice(
+            header
+                .public_key
+                .joint_election_public_key
+                .to_bytes_be()
+                .as_slice(),
+        );
         v.extend_from_slice(ct.alpha.to_bytes_be().as_slice());
         v.extend_from_slice(ct.beta.to_bytes_be().as_slice());
 
@@ -98,7 +103,7 @@ impl ProofRange {
             .map(|j| {
                 header
                     .public_key
-                    .0
+                    .joint_election_public_key
                     .modpow(&t[j].elem, header.parameters.fixed_parameters.p.borrow())
             })
             .collect();
@@ -163,7 +168,7 @@ impl ProofRange {
             .map(|j| {
                 (header
                     .public_key
-                    .0
+                    .joint_election_public_key
                     .modpow(&w[j].elem, header.parameters.fixed_parameters.p.borrow())
                     * ct.beta
                         .modpow(&self.0[j].c, header.parameters.fixed_parameters.p.borrow()))

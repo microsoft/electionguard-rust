@@ -3,9 +3,13 @@ use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::{
-    confirmation_code::confirmation_code, contest_encrypted::ContestEncrypted,
-    contest_selection::ContestSelection, device::Device, election_manifest::Contest, hash::HValue,
-    index::GenericIndex, vec1::Vec1,
+    confirmation_code::confirmation_code,
+    contest_encrypted::ContestEncrypted,
+    contest_selection::{ContestSelection, ContestSelectionIndex},
+    device::Device,
+    election_manifest::ContestIndex,
+    hash::HValue,
+    vec1::Vec1,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,8 +65,8 @@ impl BallotEncrypted {
         let mut contests = Vec1::with_capacity(ctest_selections.len());
 
         for i in 1..ctest_selections.len() + 1 {
-            let c_idx = <GenericIndex<Contest>>::from_one_based_index(i as u32).unwrap();
-            let s_idx = <GenericIndex<ContestSelection>>::from_one_based_index(i as u32).unwrap();
+            let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
+            let s_idx = ContestSelectionIndex::from_one_based_index(i as u32).unwrap();
             contests
                 .try_push(ContestEncrypted::new(
                     device,

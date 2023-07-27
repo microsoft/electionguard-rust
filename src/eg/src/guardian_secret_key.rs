@@ -6,7 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
-use std::num::NonZeroU16;
 
 use anyhow::{ensure, Context, Result};
 use num_bigint::BigUint;
@@ -17,6 +16,7 @@ use util::csprng::Csprng;
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
+    guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey,
     guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
 };
@@ -52,8 +52,8 @@ impl SecretCoefficients {
         let k = varying_parameters.k;
 
         SecretCoefficients(
-            (0..k)
-                .map(|_i| SecretCoefficient(csprng.next_biguint_lt(fixed_parameters.q.borrow())))
+            (0..k.get_one_based_u32())
+                .map(|_j| SecretCoefficient(csprng.next_biguint_lt(fixed_parameters.q.borrow())))
                 .collect(),
         )
     }
@@ -113,11 +113,11 @@ impl CoefficientCommitments {
 /// Secret key for a guardian.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianSecretKey {
-    /// Guardian number, 1 <= i <= n.
-    pub i: NonZeroU16,
+    /// Guardian number, 1 <= i <= [`crate::varying_parameters::VaryingParameters::n`].
+    pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
-    #[serde(rename = "name")]
+    #[serde(rename = "name", skip_serializing_if = "Option::is_none")]
     pub opt_name: Option<String>,
 
     /// Secret polynomial coefficients.
@@ -128,12 +128,14 @@ pub struct GuardianSecretKey {
 }
 
 impl GuardianPublicKeyInfo for GuardianSecretKey {
-    fn i(&self) -> NonZeroU16 {
+    fn i(&self) -> GuardianIndex {
         self.i
     }
+
     fn opt_name(&self) -> &Option<String> {
         &self.opt_name
     }
+
     fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
     }
@@ -143,7 +145,7 @@ impl GuardianSecretKey {
     pub fn generate(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
-        i: NonZeroU16,
+        i: GuardianIndex,
         opt_name: Option<String>,
     ) -> Self {
         let secret_coefficients = SecretCoefficients::generate(csprng, election_parameters);

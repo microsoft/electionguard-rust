@@ -50,7 +50,7 @@ impl Hashes {
             for biguint in [
                 election_parameters.fixed_parameters.p.borrow(),
                 election_parameters.fixed_parameters.q.borrow(),
-                election_parameters.fixed_parameters.g.borrow(),
+                &election_parameters.fixed_parameters.g,
             ] {
                 v_pqg.append(&mut biguint.to_bytes_be());
             }
@@ -78,7 +78,7 @@ impl Hashes {
                 election_parameters.varying_parameters.n,
                 election_parameters.varying_parameters.k,
             ] {
-                v.extend_from_slice(&u.to_be_bytes());
+                v.extend_from_slice(&u.get_one_based_u32().to_be_bytes());
             }
 
             for u in [

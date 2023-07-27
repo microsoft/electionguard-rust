@@ -33,8 +33,8 @@ impl HashesExt {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let n: usize = varying_parameters.n.into();
-        let k: usize = varying_parameters.k.into();
+        let n = varying_parameters.n.get_one_based_usize();
+        let k = varying_parameters.k.get_one_based_usize();
 
         assert_eq!(guardian_public_keys.len(), n);
 
@@ -163,7 +163,7 @@ mod test {
         let joint_election_public_key =
             JointElectionPublicKey::compute(&election_parameters, &guardian_public_keys).unwrap();
 
-        assert!(&joint_election_public_key.0 < fixed_parameters.p.borrow());
+        assert!(joint_election_public_key.as_ref() < fixed_parameters.p.borrow());
 
         let hashes_ext = HashesExt::compute(
             &election_parameters,

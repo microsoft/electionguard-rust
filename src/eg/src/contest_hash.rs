@@ -3,7 +3,6 @@ use crate::{
     election_record::PreVotingData,
     hash::{eg_h, HValue},
     joint_election_public_key::Ciphertext,
-    vec1::Vec1,
 };
 
 /// Contest hash for encrypted ballots (Equation 58)
@@ -13,16 +12,22 @@ use crate::{
 pub fn contest_hash(
     header: &PreVotingData,
     contest_label: &String,
-    vote: &Vec1<Ciphertext>,
+    vote: &Vec<Ciphertext>,
 ) -> HValue {
     let mut v = vec![0x23];
 
     v.extend_from_slice(contest_label.as_bytes());
-    v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
+    v.extend_from_slice(
+        header
+            .public_key
+            .joint_election_public_key
+            .to_bytes_be()
+            .as_slice(),
+    );
 
-    vote.indices().for_each(|i| {
-        v.extend_from_slice(vote.get(i).unwrap().alpha.to_bytes_be().as_slice());
-        v.extend_from_slice(vote.get(i).unwrap().beta.to_bytes_be().as_slice());
+    vote.iter().for_each(|vote_i| {
+        v.extend_from_slice(vote_i.alpha.to_bytes_be().as_slice());
+        v.extend_from_slice(vote_i.beta.to_bytes_be().as_slice());
     });
 
     eg_h(&header.hashes_ext.h_e, &v)

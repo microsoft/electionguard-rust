@@ -12,7 +12,6 @@ use eg::{
     contest_encrypted::{ContestEncrypted, ContestEncryptedIndex},
     election_manifest::ContestIndex,
     election_record::PreVotingData,
-    joint_election_public_key::CiphertextIndex,
 };
 
 pub struct Verifier {
@@ -49,13 +48,7 @@ impl Verifier {
             proofs_ballot_correctness.indices().for_each(|j| {
                 valid &= proofs_ballot_correctness.get(j).unwrap().verify(
                     &self.header,
-                    &contest
-                        .selection
-                        .get(
-                            CiphertextIndex::from_one_based_index(j.get_one_based_usize() as u32)
-                                .unwrap(),
-                        )
-                        .unwrap(),
+                    &contest.selection[j.get_zero_based_usize()],
                     1 as usize,
                 );
             });

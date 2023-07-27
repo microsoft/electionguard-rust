@@ -5,7 +5,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::num::NonZeroU16;
 use std::path::PathBuf;
 
 use anyhow::{ensure, Context, Result};
@@ -13,9 +12,9 @@ use rand_core::{OsRng, RngCore};
 
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
-    example_election_manifest::example_election_manifest, guardian_public_key::GuardianPublicKey,
-    guardian_secret_key::GuardianSecretKey, hashes::Hashes, hashes_ext::HashesExt,
-    joint_election_public_key::JointElectionPublicKey,
+    example_election_manifest::example_election_manifest, guardian::GuardianIndex,
+    guardian_public_key::GuardianPublicKey, guardian_secret_key::GuardianSecretKey, hashes::Hashes,
+    hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey,
 };
 use util::csprng::Csprng;
 
@@ -79,7 +78,7 @@ pub(crate) fn load_election_parameters(
 }
 
 pub(crate) fn load_guardian_secret_key(
-    opt_i: Option<NonZeroU16>,
+    opt_i: Option<GuardianIndex>,
     opt_secret_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
     election_parameters: &ElectionParameters,
@@ -124,7 +123,7 @@ pub(crate) fn load_guardian_secret_key(
 }
 
 pub(crate) fn load_guardian_public_key(
-    opt_i: Option<NonZeroU16>,
+    opt_i: Option<GuardianIndex>,
     opt_public_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
     election_parameters: &ElectionParameters,

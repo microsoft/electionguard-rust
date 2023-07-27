@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use eg::ballot_style::BallotStyle;
+use eg::ballot_style::BallotStyleIndex;
 use eg::election_record::PreVotingData;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
 use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
@@ -19,7 +19,7 @@ pub struct BallotEncryptingTool {
     pub pv_data: PreVotingData,
 
     /// The ballot style to generate a ballot for.
-    pub ballot_style: BallotStyle,
+    pub ballot_style_index: BallotStyleIndex,
 
     /// Encryption key used to encrypt the primary nonce.
     pub encryption_key: Option<JointElectionPublicKey>,
@@ -31,13 +31,13 @@ pub struct EncryptedNonce {
 
 impl BallotEncryptingTool {
     pub fn new(
-        header: PreVotingData,
-        ballot_style: BallotStyle,
+        pvd: PreVotingData,
+        ballot_style_index: BallotStyleIndex,
         encryption_key: Option<JointElectionPublicKey>,
     ) -> Self {
         Self {
-            pv_data: header,
-            ballot_style,
+            pv_data: pvd,
+            ballot_style_index,
             encryption_key,
         }
     }
@@ -75,7 +75,7 @@ impl BallotEncryptingTool {
 
         while ballots.len() < num_ballots {
             let (ballot, nonce) =
-                BallotPreEncrypted::new(&self.pv_data, &self.ballot_style, csprng, false);
+                BallotPreEncrypted::new(&self.pv_data, self.ballot_style_index, csprng, false);
             if Self::are_unique_shortcodes(&ballot.contests) {
                 ballots.push(ballot);
                 primary_nonces.push(nonce);
@@ -109,16 +109,19 @@ impl BallotEncryptingTool {
 
     /// Generates a selection hash (Equation 93/94)
     ///
-    /// ψ_i = H(H_E;40,[λ_i],K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
-    ///
-    /// TODO: Remove label from the hash (equation 93)
-    pub fn selection_hash(header: &PreVotingData, selections: &Vec1<Ciphertext>) -> HValue {
+    /// ψ_i = H(H_E;40,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
+    pub fn selection_hash(header: &PreVotingData, selections: &Vec<Ciphertext>) -> HValue {
         let mut v = vec![0x40];
 
-        v.extend_from_slice(header.public_key.0.to_bytes_be().as_slice());
+        v.extend_from_slice(
+            header
+                .public_key
+                .joint_election_public_key
+                .to_bytes_be()
+                .as_slice(),
+        );
 
-        selections.indices().for_each(|i| {
-            let s = selections.get(i).unwrap();
+        selections.iter().for_each(|s| {
             v.extend_from_slice(s.alpha.to_bytes_be().as_slice());
             v.extend_from_slice(s.beta.to_bytes_be().as_slice());
         });

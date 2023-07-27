@@ -10,7 +10,7 @@ use std::collections::TryReserveError;
 use anyhow::{ensure, Error, Result};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::index::GenericIndex;
+use crate::index::Index;
 
 /// A `Vec`-like container intended to be used when 1-based indexing is required.
 /// It is missing many of the methods of `std::vec::Vec`, and not intended to be a general-purpose
@@ -23,7 +23,7 @@ pub struct Vec1<T>(Vec<T>);
 impl<T> Vec1<T> {
     // error[E0658]: inherent associated types are unstable
     // see issue #8995 <https://github.com/rust-lang/rust/issues/8995> for more information
-    //pub type IndexType = GenericIndex<K>;
+    //pub type IndexType = Index<K>;
 
     /// Creates a new, empty `Vec1<T>`.
     pub fn new() -> Self {
@@ -76,13 +76,10 @@ impl<T> Vec1<T> {
     }
 
     /// Pushes an additional element onto the end of the Vec1, unless
-    /// doing so would exceed the size of a `GenericIndex<T>`.
+    /// doing so would exceed the size of a `Index<T>`.
     /// Compare to: [`Vec::push`].
     pub fn try_push(&mut self, value: T) -> Result<()> {
-        ensure!(
-            self.len() < GenericIndex::<T>::VALID_MAX_USIZE,
-            "Vec1 is full"
-        );
+        ensure!(self.len() < Index::<T>::VALID_MAX_USIZE, "Vec1 is full");
 
         self.0.try_reserve(1)?;
         self.0.push(value);
@@ -103,27 +100,27 @@ impl<T> Vec1<T> {
 
     /// Returns a ref to a contained element, if one exists at the supplied index.
     /// Compare to: [`slice::get`].
-    pub fn get(&self, index: GenericIndex<T>) -> Option<&T> {
+    pub fn get(&self, index: Index<T>) -> Option<&T> {
         self.0.get(index.get_zero_based_usize())
     }
 
     /// Returns a mut ref to a contained element, if one exists at the supplied index.
     /// Compare to: [`slice::get_mut`].
-    pub fn get_mut(&mut self, index: GenericIndex<T>) -> Option<&mut T> {
+    pub fn get_mut(&mut self, index: Index<T>) -> Option<&mut T> {
         self.0.get_mut(index.get_zero_based_usize())
     }
 
     /// Returns an iterator over the 1-based indices of any contained elements.
     #[allow(clippy::reversed_empty_ranges)]
-    pub fn indices(&self) -> impl Iterator<Item = GenericIndex<T>> {
+    pub fn indices(&self) -> impl Iterator<Item = Index<T>> {
         let n = self.0.len();
-        let ri = if GenericIndex::<T>::VALID_RANGEINCLUSIVE_USIZE.contains(&n) {
+        let ri = if Index::<T>::VALID_RANGEINCLUSIVE_USIZE.contains(&n) {
             // Iterate 1 through n.
             1u32..=(n as u32)
         } else {
             // It should not have been possible to construct a Vec1 with a length that exceeds
             // the valid max.
-            assert!(n <= GenericIndex::<T>::VALID_MAX_USIZE);
+            assert!(n <= Index::<T>::VALID_MAX_USIZE);
 
             // Empty range, no iteration.
             1u32..=0
@@ -133,7 +130,7 @@ impl<T> Vec1<T> {
             // `unwrap()` is justified here because `unwrap_or` ensures it is only called when
             // ix1 is known to be in range.
             #[allow(clippy::unwrap_used)]
-            GenericIndex::from_one_based_index(ix1).unwrap()
+            Index::from_one_based_index(ix1).unwrap()
         })
     }
 
@@ -153,7 +150,7 @@ impl<T> std::convert::TryFrom<std::vec::Vec<T>> for Vec1<T> {
     type Error = Error;
     fn try_from(v: std::vec::Vec<T>) -> Result<Self> {
         ensure!(
-            v.len() <= GenericIndex::<T>::VALID_MAX_USIZE,
+            v.len() <= Index::<T>::VALID_MAX_USIZE,
             "Source Vec is too large for Vec1"
         );
         Ok(Self(v))
@@ -205,7 +202,7 @@ where
 mod test_vec1 {
     use super::*;
 
-    type CharIndex = GenericIndex<char>;
+    type CharIndex = Index<char>;
 
     #[test]
     fn test() {

@@ -11,22 +11,23 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::ballot_style::BallotStyle;
-use crate::index::GenericIndex;
+use crate::index::Index;
 use crate::vec1::Vec1;
 
 /// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ElectionManifest {
-    /// A descriptive label for this `Election`.
+    /// A descriptive label for this election.
     pub label: String,
 
-    /// All the contests in the election.
+    /// All the [`Contest`]s in the election.
     pub contests: Vec1<Contest>,
 
     // / Additional data pertaining to the election.
     // / This is opaque to ElectionGuard.
     //pub additional_data: Vec<u8>,
     //? TODO
+    //
     /// All the [`BallotStyle`]s of the election.
     pub ballot_styles: Vec1<BallotStyle>,
 }
@@ -90,7 +91,7 @@ pub struct Contest {
 }
 
 /// A 1-based index of a [`Contest`] in the order it is defined in the [`ElectionManifest`].
-pub type ContestIndex = GenericIndex<Contest>;
+pub type ContestIndex = Index<Contest>;
 
 /// An option in a contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,13 +103,18 @@ pub struct ContestOption {
     /// In the traditional election style, will use `Some(1)` to indicate that a voter may select the option 0 or 1 times.
     /// `None` indicates that there is no limit.
     /// In all cases, the [`Contest::selection_limit`] will still apply.
-    //pub opt_vote_limit: Option<NonZeroU32>,
-    */
+    ///
+    #[serde(
+        rename = "",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub opt_vote_limit: Option<NonZeroU32>,
+     */
 }
 
 /// A 1-based index of a [`ContestOption`] in the order it is defined within its
 /// [`Contest`], in the order it is defined in the [`ElectionManifest`].
-pub type ContestOptionIndex = GenericIndex<ContestOption>;
+pub type ContestOptionIndex = Index<ContestOption>;
 
 // Unit tests for the election manifest.
 #[cfg(test)]

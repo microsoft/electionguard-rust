@@ -44,10 +44,14 @@ pub struct FixedParameterGenerationParameters {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
-    /// Version of the ElectionGuard to which these parameters conform.
+    /// Version of the ElectionGuard Design Specification to which these parameters conform.
     /// E.g., `Some([2, 0])` for v2.0 and `Some([1, 55])` for v1.55.
     /// `None` means the parameters may not conform to any version of the ElectionGuard spec.
-    pub opt_version: Option<[usize; 2]>,
+    #[serde(
+        rename = "electionguard_design_specification_version",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub opt_electionguard_design_specification_version: Option<[usize; 2]>,
 
     /// Parameters used to generate the parameters.
     pub generation_parameters: FixedParameterGenerationParameters,
@@ -146,14 +150,14 @@ impl FixedParameters {
         );
 
         // q is not a divisor of r = (p − 1)/q
-        let r: &BigUint = self.r.borrow();
+        let r: &BigUint = &self.r;
         ensure!(
             !(r % q).is_zero(),
             "Fixed parameters failed check: q is not a divisor of r = (p − 1)/q"
         );
 
         // g is in Zmodp and not 0 or 1
-        let g: &BigUint = self.g.borrow();
+        let g: &BigUint = &self.g;
         ensure!(
             &BigUint::one() < g && g < p,
             "Fixed parameters failed check: g is in Zmodp and not 0 or 1"

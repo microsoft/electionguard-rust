@@ -8,7 +8,7 @@
 use anyhow::{bail, Context, Result};
 
 use eg::{
-    ballot_style::find_ballot_style, device::Device, election_record::PreVotingData, hash::HValue,
+    ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData, hash::HValue,
 };
 use preencrypted::{
     ballot::{BallotPreEncrypted, VoterSelection},
@@ -44,8 +44,8 @@ pub(crate) struct PreEncryptedBallotRecord {
     ballots_in: u128,
 
     /// The ballot style to verify.
-    #[arg(short, long)]
-    ballot_style: Option<String>,
+    #[arg(short, long, default_value_t = 0)]
+    ballot_style_index: u32,
 }
 
 impl Subcommand for PreEncryptedBallotRecord {
@@ -67,19 +67,12 @@ impl Subcommand for PreEncryptedBallotRecord {
         let election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        if self.ballot_style.is_none() {
-            bail!("Ballot style is required to generate pre-encrypted ballots.");
+        if self.ballot_style_index == 0 {
+            bail!("Ballot style is required to record pre-encrypted ballots.");
         }
-        let ballot_style = {
-            let bs = find_ballot_style(
-                &self.ballot_style.as_ref().unwrap().as_str(),
-                &election_manifest.ballot_styles,
-            );
-            if bs.is_none() {
-                bail!("Ballot style not found.");
-            }
-            bs.unwrap()
-        };
+
+        let ballot_style_index =
+            BallotStyleIndex::from_one_based_index(self.ballot_style_index).unwrap();
 
         let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
         let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;
@@ -94,7 +87,7 @@ impl Subcommand for PreEncryptedBallotRecord {
             jepk,
         );
         let device = Device::new(&"Ballot Recording Tool".to_string(), record_header.clone());
-        let tool = BallotRecordingTool::new(record_header.clone(), ballot_style.clone());
+        let tool = BallotRecordingTool::new(record_header.clone(), ballot_style_index);
         let verifier = Verifier::new(record_header.clone());
 
         let codes = {
@@ -136,7 +129,7 @@ impl Subcommand for PreEncryptedBallotRecord {
             };
 
             let (regenerated_ballot, matched) =
-                tool.regenerate_and_match(&pre_encrypted_ballot, &ballot_style, &nonce);
+                tool.regenerate_and_match(&pre_encrypted_ballot, ballot_style_index, &nonce);
             assert!(matched);
 
             if matched {

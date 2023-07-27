@@ -4,12 +4,12 @@ use eg::{
     contest_encrypted::ContestEncrypted,
     contest_selection::ContestSelectionPlaintext,
     device::Device,
-    election_manifest::{Contest, ContestOptionIndex},
+    election_manifest::{Contest, ContestIndex, ContestOptionIndex},
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    index::GenericIndex,
-    joint_election_public_key::{Ciphertext, CiphertextIndex},
+    index::Index,
+    joint_election_public_key::Ciphertext,
     vec1::Vec1,
     zk::ProofRange,
 };
@@ -22,15 +22,15 @@ use crate::{
 };
 
 /// A 1-based index of a [`ContestPreEncrypted`] in the order it is defined in the [`BallotPreEncrypted`].
-pub type ContestPreEncryptedIndex = GenericIndex<ContestPreEncrypted>;
+pub type ContestPreEncryptedIndex = Index<ContestPreEncrypted>;
 
 /// A contest in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ContestPreEncrypted {
-    /// Label
-    pub label: String,
+    /// Index of the contest in the election manifest.
+    pub contest_index: ContestIndex,
 
-    /// Selections in this contest
+    /// Selections in this contest.
     pub selections: Vec1<ContestSelectionPreEncrypted>,
 
     /// Contest hash
@@ -40,25 +40,18 @@ pub struct ContestPreEncrypted {
 
 impl PartialEq for ContestPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label && self.selections == other.selections
+        self.contest_index == other.contest_index && self.selections == other.selections
     }
 }
 
 impl ContestPreEncrypted {
-    pub fn regenerate_nonces(
-        &mut self,
-        device: &Device,
-        primary_nonce: &[u8],
-        selection_labels: &Vec1<String>,
-    ) {
+    pub fn regenerate_nonces(&mut self, device: &Device, primary_nonce: &[u8]) {
         self.selections.indices().for_each(|j| {
             self.selections.get_mut(j).unwrap().regenerate_nonces(
                 device,
                 primary_nonce,
-                &self.label,
-                selection_labels,
-                <GenericIndex<String>>::from_one_based_index(j.get_one_based_usize() as u32)
-                    .unwrap(),
+                self.contest_index,
+                ContestOptionIndex::from_one_based_index(j.get_one_based_usize() as u32).unwrap(),
             );
         });
     }
@@ -68,24 +61,19 @@ impl ContestPreEncrypted {
         primary_nonce: &[u8],
         store_nonces: bool,
         contest: &Contest,
+        contest_index: ContestIndex,
     ) -> ContestPreEncrypted {
         let mut selections = <Vec1<ContestSelectionPreEncrypted>>::new();
-        let mut selection_labels = Vec1::new();
-        contest.options.indices().for_each(|i| {
-            selection_labels
-                .try_push(contest.options.get(i).unwrap().label.clone())
-                .unwrap();
-        });
+        let num_selections = contest.options.len() + contest.selection_limit;
+
         for j in 1..contest.options.len() + 1 {
-            let co_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
             let selection = ContestSelectionPreEncrypted::new(
                 pvd,
                 primary_nonce,
                 store_nonces,
-                &contest.options.get(co_idx).unwrap(),
-                &contest.label,
-                &selection_labels,
-                <GenericIndex<String>>::from_one_based_index(j as u32).unwrap(),
+                contest_index,
+                ContestOptionIndex::from_one_based_index(j as u32).unwrap(),
+                num_selections,
             );
             selections.try_push(selection).unwrap();
         }
@@ -95,16 +83,17 @@ impl ContestPreEncrypted {
                 pvd,
                 primary_nonce,
                 store_nonces,
-                &contest.label,
-                &selection_labels,
-                &format!("null_{}", j + 1),
+                contest_index,
+                ContestOptionIndex::from_one_based_index((contest.options.len() + j + 1) as u32)
+                    .unwrap(),
+                num_selections,
             );
             selections.try_push(selection).unwrap();
         }
 
-        let contest_hash = contest_hash(pvd, &contest.label, &selections);
+        let contest_hash = contest_hash(pvd, contest_index, &selections);
         ContestPreEncrypted {
-            label: contest.label.clone(),
+            contest_index,
             selections,
             contest_hash: contest_hash,
         }
@@ -134,19 +123,16 @@ impl ContestPreEncrypted {
     pub fn combine_voter_selections(
         &self,
         fixed_parameters: &FixedParameters,
-        voter_selections: &Vec1<ContestSelectionPlaintext>,
+        voter_selections: &Vec<ContestSelectionPlaintext>,
         selection_limit: usize,
-    ) -> Vec1<Ciphertext> {
+    ) -> Vec<Ciphertext> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
 
-        let mut selections = <Vec<&Vec1<Ciphertext>>>::new();
+        let mut selections = <Vec<&Vec<Ciphertext>>>::new();
 
-        voter_selections.indices().for_each(|i| {
-            let v = voter_selections.get(i).unwrap();
-            let i = ContestSelectionPreEncryptedIndex::from_one_based_index(
-                i.get_one_based_usize() as u32,
-            )
-            .unwrap();
+        voter_selections.iter().enumerate().for_each(|(i, v)| {
+            let i =
+                ContestSelectionPreEncryptedIndex::from_one_based_index((i + 1) as u32).unwrap();
             if *v == 1 {
                 selections.push(&self.selections.get(i).unwrap().selections);
             }
@@ -164,10 +150,9 @@ impl ContestPreEncrypted {
         let mut combined_selection = selections[0].clone();
 
         for i in 1..selections.len() {
-            for j in 1..combined_selection.len() + 1 {
-                let j = CiphertextIndex::from_one_based_index(j as u32).unwrap();
-                let combined_selection_j = combined_selection.get_mut(j).unwrap();
-                let selections_i_j = selections[i].get(j).unwrap();
+            for j in 0..combined_selection.len() {
+                let mut combined_selection_j = &mut combined_selection[j];
+                let selections_i_j = &selections[i][j];
 
                 combined_selection_j.alpha = (&combined_selection_j.alpha * &selections_i_j.alpha)
                     % fixed_parameters.p.as_ref();
@@ -187,8 +172,9 @@ impl ContestPreEncrypted {
         &self,
         device: &Device,
         csprng: &mut Csprng,
-        voter_selections: &Vec1<u8>,
+        voter_selections: &Vec<u8>,
         selection_limit: usize,
+        num_options: usize,
     ) -> ContestEncrypted {
         let zmulq = Rc::new(ZMulPrime::new(
             device.header.parameters.fixed_parameters.q.clone(),
@@ -201,32 +187,21 @@ impl ContestPreEncrypted {
         );
 
         let mut proof_ballot_correctness = Vec1::new();
-        selection.indices().for_each(|i| {
+        assert!(num_options == voter_selections.len());
+
+        for i in 0..num_options {
             proof_ballot_correctness
-                .try_push(
-                    selection.get(i).unwrap().proof_ballot_correctness(
-                        &device.header,
-                        csprng,
-                        *voter_selections
-                            .get(
-                                <GenericIndex<u8>>::from_one_based_index(
-                                    i.get_one_based_usize() as u32
-                                )
-                                .unwrap(),
-                            )
-                            .unwrap()
-                            == 1u8,
-                        zmulq.clone(),
-                    ),
-                )
+                .try_push(selection[i].proof_ballot_correctness(
+                    &device.header,
+                    csprng,
+                    voter_selections[i] == 1u8,
+                    zmulq.clone(),
+                ))
                 .unwrap();
-        });
-        // let num_selections: u8 = voter_selections.iter().sum();
+        }
 
         let mut num_selections = 0;
-        voter_selections
-            .indices()
-            .for_each(|i| num_selections += voter_selections.get(i).unwrap());
+        voter_selections.iter().for_each(|v| num_selections += v);
 
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
@@ -239,7 +214,6 @@ impl ContestPreEncrypted {
 
         // TODO: Change crypto hash
         ContestEncrypted {
-            label: self.label.clone(),
             selection,
             contest_hash: self.contest_hash,
             proof_ballot_correctness,

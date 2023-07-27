@@ -5,14 +5,14 @@ use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 
 use crate::{
     contest_hash,
-    contest_selection::{ContestSelection, ContestSelectionPlaintextIndex},
+    contest_selection::ContestSelection,
     device::Device,
     election_manifest::{Contest, ContestOptionIndex},
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    index::GenericIndex,
-    joint_election_public_key::{Ciphertext, CiphertextIndex},
+    index::Index,
+    joint_election_public_key::Ciphertext,
     nonce::encrypted as nonce,
     vec1::Vec1,
     zk::ProofRange,
@@ -39,16 +39,13 @@ use crate::{
 // }
 
 /// A 1-based index of a [`ContestEncrypted`] in the order it is defined in the [`BallotEncrypted`].
-pub type ContestEncryptedIndex = GenericIndex<ContestEncrypted>;
+pub type ContestEncryptedIndex = Index<ContestEncrypted>;
 
 /// A contest in an encrypted ballot.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContestEncrypted {
-    /// The label.
-    pub label: String,
-
     /// Encrypted voter selection vector.
-    pub selection: Vec1<Ciphertext>,
+    pub selection: Vec<Ciphertext>,
 
     /// Contest hash.
     pub contest_hash: HValue,
@@ -66,26 +63,24 @@ impl ContestEncrypted {
         primary_nonce: &[u8],
         contest: &Contest,
         pt_vote: &ContestSelection,
-    ) -> Vec1<Ciphertext> {
+    ) -> Vec<Ciphertext> {
         // TODO: Check if selection limit is satisfied
 
-        let mut vote: Vec1<Ciphertext> = Vec1::new();
+        let mut vote: Vec<Ciphertext> = Vec::new();
         for j in 1..pt_vote.vote.len() + 1 {
             let o_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
-            let v_idx = ContestSelectionPlaintextIndex::from_one_based_index(j as u32).unwrap();
             let nonce = nonce(
                 header,
                 primary_nonce,
                 contest.label.as_bytes(),
                 contest.options.get(o_idx).unwrap().label.as_bytes(),
             );
-            vote.try_push(header.public_key.encrypt_with(
+            vote.push(header.public_key.encrypt_with(
                 &header.parameters.fixed_parameters,
                 &nonce,
-                *pt_vote.vote.get(v_idx).unwrap() as usize,
+                pt_vote.vote[j] as usize,
                 true,
-            ))
-            .unwrap();
+            ));
         }
         vote
     }
@@ -103,14 +98,12 @@ impl ContestEncrypted {
             device.header.parameters.fixed_parameters.q.clone(),
         ));
         let mut proof_ballot_correctness = Vec1::new();
-        for i in 1..selection.len() + 1 {
-            let s_idx = CiphertextIndex::from_one_based_index(i as u32).unwrap();
-            let v_idx = ContestSelectionPlaintextIndex::from_one_based_index(i as u32).unwrap();
+        for i in 0..selection.len() {
             proof_ballot_correctness
-                .try_push(selection.get(s_idx).unwrap().proof_ballot_correctness(
+                .try_push(selection[i].proof_ballot_correctness(
                     &device.header,
                     csprng,
-                    *pt_vote.vote.get(v_idx).unwrap() == 1u8,
+                    pt_vote.vote[i] == 1u8,
                     zmulq.clone(),
                 ))
                 .unwrap();
@@ -130,11 +123,7 @@ impl ContestEncrypted {
         // });
 
         let mut num_selections = 0;
-
-        pt_vote
-            .vote
-            .indices()
-            .for_each(|i| num_selections += pt_vote.vote.get(i).unwrap());
+        pt_vote.vote.iter().for_each(|v| num_selections += v);
 
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
@@ -145,7 +134,6 @@ impl ContestEncrypted {
             contest.selection_limit,
         );
         ContestEncrypted {
-            label: contest.label.clone(),
             selection,
             contest_hash,
             proof_ballot_correctness,
@@ -165,7 +153,7 @@ impl ContestEncrypted {
         header: &PreVotingData,
         csprng: &mut Csprng,
         zmulq: Rc<ZMulPrime>,
-        selection: &Vec1<Ciphertext>,
+        selection: &Vec<Ciphertext>,
         num_selections: usize,
         selection_limit: usize,
     ) -> ProofRange {
@@ -183,20 +171,15 @@ impl ContestEncrypted {
 
     pub fn sum_selection_vector(
         fixed_parameters: &FixedParameters,
-        selection: &Vec1<Ciphertext>,
+        selection: &Vec<Ciphertext>,
     ) -> Ciphertext {
         // let mut sum_ct = selection[0].clone();
-        let mut sum_ct = selection
-            .get(CiphertextIndex::from_one_based_index(1 as u32).unwrap())
-            .unwrap()
-            .clone();
+        let mut sum_ct = selection[0].clone();
         assert!(sum_ct.nonce.is_some());
         let mut sum_nonce = sum_ct.nonce.as_ref().unwrap().clone();
 
-        for i in 2..selection.len() + 1 {
-            let selection_i = selection
-                .get(CiphertextIndex::from_one_based_index(i as u32).unwrap())
-                .unwrap();
+        for i in 1..selection.len() {
+            let selection_i = &selection[i];
 
             sum_ct.alpha = (&sum_ct.alpha * &selection_i.alpha) % fixed_parameters.p.as_ref();
             sum_ct.beta = (&sum_ct.beta * &selection_i.beta) % fixed_parameters.p.as_ref();

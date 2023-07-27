@@ -2,11 +2,11 @@ use std::rc::Rc;
 
 use eg::{
     device::Device,
-    election_manifest::ContestOption,
+    election_manifest::{ContestIndex, ContestOptionIndex},
     election_record::PreVotingData,
     hash::HValue,
-    index::GenericIndex,
-    joint_election_public_key::{Ciphertext, CiphertextIndex},
+    index::Index,
+    joint_election_public_key::Ciphertext,
     vec1::Vec1,
     zk::ProofRange,
 };
@@ -17,17 +17,17 @@ use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
 use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
 
 /// A 1-based index of a [`ContestSelectionPreEncrypted`] in the order it is defined in the [`ContestPreEncrypted`].
-pub type ContestSelectionPreEncryptedIndex = GenericIndex<ContestSelectionPreEncrypted>;
+pub type ContestSelectionPreEncryptedIndex = Index<ContestSelectionPreEncrypted>;
 
 /// A contest option in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ContestSelectionPreEncrypted {
-    /// Label.
-    pub label: String,
+    /// The index of this pre-encrypted contest selection in the pre-encrypted contest.
+    pub index: ContestSelectionPreEncryptedIndex,
 
     /// Vector of ciphertexts used to represent the selection.
     #[serde(skip)]
-    pub selections: Vec1<Ciphertext>,
+    pub selections: Vec<Ciphertext>,
 
     /// Selection hash.
     #[serde(skip)]
@@ -39,7 +39,7 @@ pub struct ContestSelectionPreEncrypted {
 
 impl PartialEq for ContestSelectionPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
-        self.label == other.label && self.shortcode == other.shortcode
+        self.index == other.index && self.shortcode == other.shortcode
     }
 }
 
@@ -48,19 +48,16 @@ impl ContestSelectionPreEncrypted {
         &mut self,
         device: &Device,
         primary_nonce: &[u8],
-        contest_label: &String,
-        selection_labels: &Vec1<String>,
-        j: GenericIndex<String>,
+        contest_index: ContestIndex,
+        j: ContestOptionIndex,
     ) {
         for k in 1..self.selections.len() + 1 {
-            let c_idx = CiphertextIndex::from_one_based_index(k as u32).unwrap();
-            let s_idx = <GenericIndex<String>>::from_one_based_index(k as u32).unwrap();
-            self.selections.get_mut(c_idx).unwrap().nonce = Some(option_nonce(
+            self.selections[k].nonce = Some(option_nonce(
                 &device.header,
                 primary_nonce,
-                contest_label.as_bytes(),
-                selection_labels.get(j).unwrap().as_bytes(),
-                selection_labels.get(s_idx).unwrap().as_bytes(),
+                contest_index,
+                j,
+                ContestOptionIndex::from_one_based_index(k as u32).unwrap(),
             ));
         }
     }
@@ -69,40 +66,30 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
-        selection: &ContestOption,
-        contest_label: &String,
-        selection_labels: &Vec1<String>,
-        j: GenericIndex<String>,
+        contest_index: ContestIndex,
+        j: ContestOptionIndex,
+        num_selections: usize,
     ) -> ContestSelectionPreEncrypted {
-        let length = selection_labels.len();
-        assert!(selection_labels.len() == length);
-        let label = selection.label.clone();
+        let index =
+            ContestSelectionPreEncryptedIndex::from_one_based_index(j.get_one_based_u32()).unwrap();
 
-        let mut selections = Vec1::new();
-        for k in 1..length + 1 {
-            let k = <GenericIndex<String>>::from_one_based_index(k as u32).unwrap();
-            let nonce = option_nonce(
-                pvd,
-                primary_nonce,
-                contest_label.as_bytes(),
-                selection_labels.get(j).unwrap().as_bytes(),
-                selection_labels.get(k).unwrap().as_bytes(),
-            );
-            selections
-                .try_push(pvd.public_key.encrypt_with(
-                    &pvd.parameters.fixed_parameters,
-                    &nonce,
-                    (j.get_one_based_usize() == k.get_one_based_usize()) as usize,
-                    store_nonces,
-                ))
-                .unwrap();
+        let mut selections = Vec::new();
+        for k in 1..num_selections + 1 {
+            let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
+            let nonce = option_nonce(pvd, primary_nonce, contest_index, j, k);
+            selections.push(pvd.public_key.encrypt_with(
+                &pvd.parameters.fixed_parameters,
+                &nonce,
+                (j == k) as usize,
+                store_nonces,
+            ))
         }
 
         let selection_hash = BallotEncryptingTool::selection_hash(&pvd, &selections);
 
         // Generate pre-encrypted votes for each possible (single) choice
         ContestSelectionPreEncrypted {
-            label,
+            index,
             selections,
             selection_hash,
             shortcode: BallotEncryptingTool::short_code_last_byte(&selection_hash),
@@ -113,34 +100,29 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
-        contest_label: &str,
-        selection_labels: &Vec1<String>,
-        null_label: &str,
+        contest_index: ContestIndex,
+        null_index: ContestOptionIndex,
+        num_selections: usize,
     ) -> ContestSelectionPreEncrypted {
-        let mut selections = Vec1::new();
-        for k in 1..selection_labels.len() + 1 {
-            let k = <GenericIndex<String>>::from_one_based_index(k as u32).unwrap();
-            let nonce = option_nonce(
-                pvd,
-                primary_nonce,
-                contest_label.as_bytes(),
-                null_label.as_bytes(),
-                selection_labels.get(k).unwrap().as_bytes(),
-            );
-            selections
-                .try_push(pvd.public_key.encrypt_with(
-                    &pvd.parameters.fixed_parameters,
-                    &nonce,
-                    0,
-                    store_nonces,
-                ))
+        let mut selections = Vec::new();
+        let index =
+            ContestSelectionPreEncryptedIndex::from_one_based_index(null_index.get_one_based_u32())
                 .unwrap();
+        for k in 1..num_selections + 1 {
+            let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
+            let nonce = option_nonce(pvd, primary_nonce, contest_index, null_index, k);
+            selections.push(pvd.public_key.encrypt_with(
+                &pvd.parameters.fixed_parameters,
+                &nonce,
+                0,
+                store_nonces,
+            ));
         }
 
         let selection_hash = BallotEncryptingTool::selection_hash(pvd, &selections);
         let shortcode = BallotEncryptingTool::short_code_last_byte(&selection_hash);
         ContestSelectionPreEncrypted {
-            label: null_label.to_string(),
+            index,
             selections,
             selection_hash,
             shortcode,
@@ -157,12 +139,12 @@ impl ContestSelectionPreEncrypted {
     ) -> Vec1<ProofRange> {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
-        self.selections.indices().for_each(|i| {
+        self.selections.iter().enumerate().for_each(|(i, c)| {
             proofs
-                .try_push(self.selections.get(i).unwrap().proof_ballot_correctness(
+                .try_push(c.proof_ballot_correctness(
                     header,
                     csprng,
-                    sequence_order == i.get_zero_based_usize(),
+                    sequence_order == i,
                     zmulq.clone(),
                 ))
                 .unwrap();
