@@ -1,7 +1,5 @@
-use std::rc::Rc;
-
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
+use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
     contest_hash,
@@ -94,9 +92,7 @@ impl ContestEncrypted {
     ) -> ContestEncrypted {
         let selection = Self::encrypt_selection(&device.header, primary_nonce, contest, pt_vote);
         let contest_hash = contest_hash::contest_hash(&device.header, &contest.label, &selection);
-        let zmulq = Rc::new(ZMulPrime::new(
-            device.header.parameters.fixed_parameters.q.clone(),
-        ));
+
         let mut proof_ballot_correctness = Vec1::new();
         for i in 0..selection.len() {
             proof_ballot_correctness
@@ -104,23 +100,10 @@ impl ContestEncrypted {
                     &device.header,
                     csprng,
                     pt_vote.vote[i] == 1u8,
-                    zmulq.clone(),
+                    &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         }
-
-        // selection.indices().for_each(|i| {
-        //     let v_idx = ContestSelectionPlaintextIndex::from_one_based_index(
-        //         i.get_zero_based_usize() as u32,
-        //     )
-        //     .unwrap();
-        //     selection.get(i).unwrap().proof_ballot_correctness(
-        //         &device.header,
-        //         csprng,
-        //         *pt_vote.vote.get(v_idx).unwrap() == 1u8,
-        //         zmulq.clone(),
-        //     )
-        // });
 
         let mut num_selections = 0;
         pt_vote.vote.iter().for_each(|v| num_selections += v);
@@ -128,7 +111,7 @@ impl ContestEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            zmulq.clone(),
+            &device.header.parameters.fixed_parameters.q,
             &selection,
             num_selections as usize,
             contest.selection_limit,
@@ -152,7 +135,7 @@ impl ContestEncrypted {
     pub fn proof_selection_limit(
         header: &PreVotingData,
         csprng: &mut Csprng,
-        zmulq: Rc<ZMulPrime>,
+        q: &BigUintPrime,
         selection: &Vec<Ciphertext>,
         num_selections: usize,
         selection_limit: usize,
@@ -162,7 +145,7 @@ impl ContestEncrypted {
         ProofRange::new(
             header,
             csprng,
-            zmulq,
+            q,
             &combined_ct,
             num_selections,
             selection_limit,

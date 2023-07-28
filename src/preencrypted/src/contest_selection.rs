@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use eg::{
     device::Device,
     election_manifest::{ContestIndex, ContestOptionIndex},
@@ -12,7 +10,7 @@ use eg::{
 };
 
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
+use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
 
@@ -132,21 +130,16 @@ impl ContestSelectionPreEncrypted {
     // TODO: Fix type of sequence_order
     pub fn proof_ballot_correctness(
         &self,
-        header: &PreVotingData,
+        pvd: &PreVotingData,
         csprng: &mut Csprng,
         sequence_order: usize,
-        zmulq: Rc<ZMulPrime>,
+        q: &BigUintPrime,
     ) -> Vec1<ProofRange> {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
         self.selections.iter().enumerate().for_each(|(i, c)| {
             proofs
-                .try_push(c.proof_ballot_correctness(
-                    header,
-                    csprng,
-                    sequence_order == i,
-                    zmulq.clone(),
-                ))
+                .try_push(c.proof_ballot_correctness(pvd, csprng, sequence_order == i, q))
                 .unwrap();
         });
         proofs

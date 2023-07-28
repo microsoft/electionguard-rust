@@ -228,6 +228,30 @@ impl BigUintPrime {
             todo!("implement BigUintPrime::new_random_prime for bits > PRIMES_TABLE_U8_BITS_RANGE")
         }
     }
+
+    // Returns a random number chosen uniformly from 0 <= n < p.
+    pub fn random_group_elem(&self, csprng: &mut Csprng) -> BigUint {
+        csprng.next_biguint_lt(&self.0)
+    }
+
+    // Performs addition modulo prime p.
+    pub fn add_group_elem(&self, a: &BigUint, b: &BigUint) -> BigUint {
+        (a + b) % &self.0
+    }
+
+    // Performs subtraction modulo prime.
+    pub fn subtract_group_elem(&self, a: &BigUint, b: &BigUint) -> BigUint {
+        if a > b {
+            (a - b) % &self.0
+        } else {
+            &self.0 - ((b - a) % &self.0)
+        }
+    }
+
+    // Performs multiplication modulo prime.
+    pub fn multiply_group_elem(&self, a: &BigUint, b: &BigUint) -> BigUint {
+        (a * b) % &self.0
+    }
 }
 
 impl Serialize for BigUintPrime {

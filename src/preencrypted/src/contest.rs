@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use eg::{
     contest_encrypted::ContestEncrypted,
     contest_selection::ContestSelectionPlaintext,
@@ -14,7 +12,7 @@ use eg::{
     zk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
+use util::csprng::Csprng;
 
 use crate::{
     contest_hash::contest_hash,
@@ -103,7 +101,6 @@ impl ContestPreEncrypted {
         &self,
         pvd: &PreVotingData,
         csprng: &mut Csprng,
-        zmulq: Rc<ZMulPrime>,
     ) -> Vec1<Vec1<ProofRange>> {
         let mut proofs = Vec1::new();
         self.selections.indices().for_each(|i| {
@@ -113,7 +110,7 @@ impl ContestPreEncrypted {
                     pvd,
                     csprng,
                     i.get_one_based_usize(),
-                    zmulq.clone(),
+                    &pvd.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         });
@@ -176,10 +173,6 @@ impl ContestPreEncrypted {
         selection_limit: usize,
         num_options: usize,
     ) -> ContestEncrypted {
-        let zmulq = Rc::new(ZMulPrime::new(
-            device.header.parameters.fixed_parameters.q.clone(),
-        ));
-
         let selection = self.combine_voter_selections(
             &device.header.parameters.fixed_parameters,
             voter_selections,
@@ -195,7 +188,7 @@ impl ContestPreEncrypted {
                     &device.header,
                     csprng,
                     voter_selections[i] == 1u8,
-                    zmulq.clone(),
+                    &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         }
@@ -206,7 +199,7 @@ impl ContestPreEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            zmulq.clone(),
+            &device.header.parameters.fixed_parameters.q,
             &selection,
             num_selections as usize,
             selection_limit,

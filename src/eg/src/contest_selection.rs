@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
-use util::{csprng::Csprng, z_mul_prime::ZMulPrime};
+
+use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
     election_record::PreVotingData, index::Index, joint_election_public_key::Ciphertext,
@@ -79,9 +79,9 @@ impl Ciphertext {
         header: &PreVotingData,
         csprng: &mut Csprng,
         selected: bool,
-        zmulq: Rc<ZMulPrime>,
+        q: &BigUintPrime,
     ) -> ProofRange {
-        ProofRange::new(header, csprng, zmulq, &self, selected as usize, 1)
+        ProofRange::new(header, csprng, q, &self, selected as usize, 1)
     }
 }
 

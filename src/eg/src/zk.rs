@@ -1,13 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-use std::{borrow::Borrow, rc::Rc};
+use std::borrow::Borrow;
 
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::{
-    csprng::Csprng,
-    z_mul_prime::{ZMulPrime, ZMulPrimeElem},
-};
+use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
     election_record::PreVotingData, hash::eg_h, index::Index, joint_election_public_key::Ciphertext,
@@ -35,7 +32,7 @@ pub struct ProofRange(Vec<ProofRangeSingle>);
 
 impl ProofRange {
     pub fn challenge(
-        header: &PreVotingData,
+        pvd: &PreVotingData,
         ct: &Ciphertext,
         a: &Vec<BigUint>,
         b: &Vec<BigUint>,
@@ -43,8 +40,7 @@ impl ProofRange {
         let mut v = vec![0x21];
 
         v.extend_from_slice(
-            header
-                .public_key
+            pvd.public_key
                 .joint_election_public_key
                 .to_bytes_be()
                 .as_slice(),
@@ -60,144 +56,123 @@ impl ProofRange {
         });
 
         // Equation 25
-        let c = eg_h(&header.hashes_ext.h_e, &v);
-        BigUint::from_bytes_be(c.0.as_slice()) % header.parameters.fixed_parameters.q.as_ref()
+        let c = eg_h(&pvd.hashes_ext.h_e, &v);
+        BigUint::from_bytes_be(c.0.as_slice()) % pvd.parameters.fixed_parameters.q.as_ref()
     }
 
     pub fn new(
-        header: &PreVotingData,
+        pvd: &PreVotingData,
         csprng: &mut Csprng,
-        zmulq: Rc<ZMulPrime>,
+        q: &BigUintPrime,
         ct: &Ciphertext,
         small_l: usize,
         big_l: usize,
     ) -> Self {
-        let mut c: Vec<ZMulPrimeElem>;
-        let mut v = <Vec<ZMulPrimeElem>>::new();
+        let mut c: Vec<BigUint>;
+        let mut v = <Vec<BigUint>>::new();
 
         let u = (0..big_l + 1)
-            .map(|_| ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng))
-            .collect::<Vec<ZMulPrimeElem>>();
+            .map(|_| q.random_group_elem(csprng))
+            .collect::<Vec<BigUint>>();
         c = (0..big_l + 1)
-            .map(|_| ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng))
-            .collect::<Vec<ZMulPrimeElem>>();
+            .map(|_| q.random_group_elem(csprng))
+            .collect::<Vec<BigUint>>();
 
         let a = (0..big_l + 1)
             .map(|j| {
-                header
-                    .parameters
+                pvd.parameters
                     .fixed_parameters
                     .g
-                    .modpow(&u[j].elem, header.parameters.fixed_parameters.p.borrow())
+                    .modpow(&u[j], pvd.parameters.fixed_parameters.p.borrow())
             })
             .collect();
 
         let mut t = u.clone();
         for j in 0..big_l + 1 {
             if j != small_l {
-                t[j] = &t[j] + &(&c[j] * &BigUint::from(small_l)) - &(&c[j] * &BigUint::from(j))
+                t[j] = q.subtract_group_elem(
+                    &q.add_group_elem(&t[j], &(&c[j] * &BigUint::from(small_l))),
+                    &(&c[j] * &BigUint::from(j)),
+                );
             }
         }
 
         let b = (0..big_l + 1)
             .map(|j| {
-                header
-                    .public_key
+                pvd.public_key
                     .joint_election_public_key
-                    .modpow(&t[j].elem, header.parameters.fixed_parameters.p.borrow())
+                    .modpow(&t[j], pvd.parameters.fixed_parameters.p.borrow())
             })
             .collect();
 
-        match ZMulPrimeElem::try_new(zmulq.clone(), ProofRange::challenge(header, &ct, &a, &b)) {
-            Some(challenge) => {
-                c[small_l] = challenge;
-                for j in 0..big_l + 1 {
-                    if j != small_l {
-                        c[small_l] = &c[small_l] - &c[j];
-                    }
-                }
-                for j in 0..big_l + 1 {
-                    v.push(&u[j] - &(&c[j] * ct.nonce.as_ref().unwrap()));
-                }
+        let challenge = ProofRange::challenge(pvd, &ct, &a, &b);
+        c[small_l] = challenge;
+        for j in 0..big_l + 1 {
+            if j != small_l {
+                // c[small_l] = &c[small_l] - &c[j];
+                c[small_l] = q.subtract_group_elem(&c[small_l], &c[j]);
             }
-            None => panic!("challenge is not in ZmulPrime"),
+        }
+        for j in 0..big_l + 1 {
+            v.push(q.subtract_group_elem(&u[j], &(&c[j] * ct.nonce.as_ref().unwrap())));
+            // v.push(&u[j] - &(&c[j] * ct.nonce.as_ref().unwrap()));
         }
 
         ProofRange(
             (0..big_l + 1)
                 .map(|j| ProofRangeSingle {
-                    c: c[j].elem.clone(),
-                    v: v[j].elem.clone(),
+                    c: c[j].clone(),
+                    v: v[j].clone(),
                 })
                 .collect(),
         )
     }
 
     /// Verification 4 (TODO: Complete)
-    pub fn verify(&self, header: &PreVotingData, ct: &Ciphertext, big_l: usize) -> bool {
-        let zmulq = ZMulPrime::new(header.parameters.fixed_parameters.q.clone());
-        let zmulq = Rc::new(zmulq);
-
+    pub fn verify(&self, pvd: &PreVotingData, ct: &Ciphertext, big_l: usize) -> bool {
         let a = (0..big_l + 1)
             .map(|j| {
-                (header
-                    .parameters
+                (pvd.parameters
                     .fixed_parameters
                     .g
-                    .modpow(&self.0[j].v, header.parameters.fixed_parameters.p.borrow())
+                    .modpow(&self.0[j].v, pvd.parameters.fixed_parameters.p.borrow())
                     * ct.alpha
-                        .modpow(&self.0[j].c, header.parameters.fixed_parameters.p.borrow()))
-                    % header.parameters.fixed_parameters.p.as_ref()
+                        .modpow(&self.0[j].c, pvd.parameters.fixed_parameters.p.borrow()))
+                    % pvd.parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
-        let mut w = <Vec<ZMulPrimeElem>>::with_capacity(big_l + 1);
+        let mut w = <Vec<BigUint>>::with_capacity(big_l + 1);
         for j in 0..big_l + 1 {
-            match ZMulPrimeElem::try_new(zmulq.clone(), self.0[j].v.clone()) {
-                Some(v_j) => w.push(v_j),
-                None => panic!("w[j] is not in ZmulPrime"),
-            };
-
-            match ZMulPrimeElem::try_new(zmulq.clone(), self.0[j].c.clone()) {
-                Some(c_j) => w[j] = &w[j] - &(&c_j * &BigUint::from(j)),
-                None => panic!("c[j] is not in ZmulPrime"),
-            };
+            w.push(self.0[j].v.clone());
+            w[j] = pvd
+                .parameters
+                .fixed_parameters
+                .q
+                .subtract_group_elem(&w[j], &(&self.0[j].c * &BigUint::from(j)));
         }
 
         let b = (0..big_l + 1)
             .map(|j| {
-                (header
-                    .public_key
+                (pvd.public_key
                     .joint_election_public_key
-                    .modpow(&w[j].elem, header.parameters.fixed_parameters.p.borrow())
+                    .modpow(&w[j], pvd.parameters.fixed_parameters.p.borrow())
                     * ct.beta
-                        .modpow(&self.0[j].c, header.parameters.fixed_parameters.p.borrow()))
-                    % header.parameters.fixed_parameters.p.as_ref()
+                        .modpow(&self.0[j].c, pvd.parameters.fixed_parameters.p.borrow()))
+                    % pvd.parameters.fixed_parameters.p.as_ref()
             })
             .collect::<Vec<_>>();
 
-        match ZMulPrimeElem::try_new(zmulq.clone(), Self::challenge(header, ct, &a, &b)) {
-            Some(c) => {
-                let mut rhs = BigUint::from(0u8);
-                for e in self.0.iter() {
-                    rhs += &e.c;
-                }
+        let c = Self::challenge(pvd, ct, &a, &b);
 
-                rhs = rhs % header.parameters.fixed_parameters.q.as_ref();
-
-                match ZMulPrimeElem::try_new(zmulq.clone(), rhs) {
-                    Some(rhs) => c.elem == rhs.elem,
-                    None => {
-                        println!("rhs is not in ZmulPrime");
-                        false
-                    }
-                }
-            }
-            None => {
-                println!("challenge is not in ZmulPrime");
-                false
-            }
+        let mut rhs = BigUint::from(0u8);
+        for e in self.0.iter() {
+            rhs += &e.c;
         }
+
+        rhs = rhs % pvd.parameters.fixed_parameters.q.as_ref();
+
+        c == rhs
 
         // 4.A
 
