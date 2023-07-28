@@ -21,14 +21,29 @@ pub fn user_study_manifest() -> ElectionManifest {
     let contests = [
         // Context index 1:
         Contest {
-            label: "Vote for a gift voucher.".to_string(),
+            label: "What is your favorite color?".to_string(),
             selection_limit: 1,
             options: [
                 ContestOption {
-                    label: "Amazon".to_string(),
+                    label: "Red".to_string(),
                 },
                 ContestOption {
-                    label: "Starbucks".to_string(),
+                    label: "Yellow".to_string(),
+                },
+                ContestOption {
+                    label: "Blue".to_string(),
+                },
+                ContestOption {
+                    label: "Green".to_string(),
+                },
+                ContestOption {
+                    label: "Black".to_string(),
+                },
+                ContestOption {
+                    label: "White".to_string(),
+                },
+                ContestOption {
+                    label: "None of these".to_string(),
                 },
             ]
             .try_into()
@@ -36,14 +51,44 @@ pub fn user_study_manifest() -> ElectionManifest {
         },
         // Context index 2:
         Contest {
-            label: "Vote for a gift voucher.".to_string(),
+            label: "What is your favorite ice-cream flavor?".to_string(),
             selection_limit: 1,
             options: [
                 ContestOption {
-                    label: "Starbucks".to_string(),
+                    label: "Chocolate Chip".to_string(),
                 },
                 ContestOption {
+                    label: "Strawberry".to_string(),
+                },
+                ContestOption {
+                    label: "Vanilla".to_string(),
+                },
+                ContestOption {
+                    label: "Mint".to_string(),
+                },
+                ContestOption {
+                    label: "Cookies and Cream".to_string(),
+                },
+                ContestOption {
+                    label: "Salted Caramel".to_string(),
+                },
+                ContestOption {
+                    label: "None of these".to_string(),
+                },
+            ]
+            .try_into()
+            .unwrap(),
+        },
+        // Context index 3:
+        Contest {
+            label: "What gift voucher should all study participants receive?".to_string(),
+            selection_limit: 1,
+            options: [
+                ContestOption {
                     label: "Amazon".to_string(),
+                },
+                ContestOption {
+                    label: "Starbucks".to_string(),
                 },
             ]
             .try_into()
@@ -56,16 +101,9 @@ pub fn user_study_manifest() -> ElectionManifest {
     let ballot_styles = [
         // Ballot style index 1:
         BallotStyle {
-            label: "Amazon / Starbucks".to_string(),
+            label: "Default Ballot Style".to_string(),
             contests: BTreeSet::from(
-                [1].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-            ),
-        },
-        // Ballot style index 2:
-        BallotStyle {
-            label: "Starbucks / Amazon".to_string(),
-            contests: BTreeSet::from(
-                [2].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
+                [1, 2, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
             ),
         },
     ]
@@ -73,7 +111,7 @@ pub fn user_study_manifest() -> ElectionManifest {
     .unwrap();
 
     ElectionManifest {
-        label: "User Study Redmond - ElectionGuard".to_string(),
+        label: "ElectionGuard User Study".to_string(),
         contests,
         ballot_styles,
     }
