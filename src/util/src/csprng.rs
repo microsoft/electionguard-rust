@@ -200,6 +200,7 @@ impl rand::RngCore for Csprng {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test_csprng {
     use super::*;
     use num_traits::One;
@@ -224,7 +225,7 @@ mod test_csprng {
         let mut csprng = Csprng::new(b"test_csprng::test_csprng_basics");
         assert_eq!(csprng.next_u64(), 11117081707462498600);
         assert_eq!(csprng.next_u8(), 202);
-        assert_eq!(csprng.next_bool(), true);
+        assert!(csprng.next_bool());
     }
 
     #[test]
@@ -271,7 +272,7 @@ mod test_csprng {
             for end in start_usize + 1..101 {
                 let end: BigUint = end.into();
                 let j = csprng.next_biguint_range(&start, &end);
-                assert!(&start <= &j && &j < &end);
+                assert!(start <= j && j < end);
             }
         }
     }
