@@ -15,6 +15,9 @@ pub const fn is_nonnul_7bit_ascii(by: u8) -> bool {
 /// (i.e., `1 <= b < 128`).
 /// This is similar to the built-in `str` type, but it has a size
 /// known at compile-time, so can be returned directly from functions.
+///
+/// Compare to [`ASCII code point`](https://infra.spec.whatwg.org/#ascii-code-point)
+/// defined by [WHATWG](https://whatwg.org/).
 pub struct ArrayAscii<const N: usize>([u8; N]);
 
 impl<const N: usize> ArrayAscii<N> {

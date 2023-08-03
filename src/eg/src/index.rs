@@ -192,6 +192,7 @@ impl<'de, T> Deserialize<'de> for Index<T> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test_index {
     use super::*;
 
@@ -228,6 +229,7 @@ mod test_index {
     #[test]
     fn test_clone() {
         let foo_index1: FooIndex = FooIndex::from_one_based_index(1).unwrap();
+        #[allow(clippy::clone_on_copy)]
         let foo_index2: FooIndex = foo_index1.clone();
         assert_eq!(
             foo_index1.get_zero_based_usize(),

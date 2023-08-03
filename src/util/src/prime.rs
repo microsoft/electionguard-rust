@@ -272,6 +272,7 @@ impl Borrow<BigUint> for BigUintPrime {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test_primes {
     use num_traits::Num;
 

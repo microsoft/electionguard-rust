@@ -199,6 +199,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test_vec1 {
     use super::*;
 
