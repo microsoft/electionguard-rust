@@ -108,6 +108,7 @@ impl std::fmt::Debug for HashesExt {
 
 // Unit tests for the ElectionGuard extended hash.
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
     use crate::{

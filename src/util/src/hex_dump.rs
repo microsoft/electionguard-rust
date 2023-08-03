@@ -326,6 +326,7 @@ impl<'b, 'f, 'g> HexDumpOperation<'b, 'f, 'g> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -336,20 +337,21 @@ mod tests {
 
         // Show that .dump() takes various types
         assert_eq!(hd.dump(&[0u8, 1, 2]).to_string(), "00 01 02");
-        assert_eq!(hd.dump(&vec![0u8, 1, 2]).to_string(), "00 01 02");
+        let v = vec![0u8, 1, 2];
+        assert_eq!(hd.dump(&v).to_string(), "00 01 02");
     }
 
     #[test]
     fn test_defaults() {
         assert_eq!(
-            HexDump::new().dump(&vec![0u8; 16]).to_string(),
+            HexDump::new().dump(&[0u8; 16]).to_string(),
             "0000  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................"
         );
     }
 
     #[test]
     fn test_empty() {
-        assert_eq!(HexDump::new().dump(&vec![0u8; 0]).to_string(), "");
+        assert_eq!(HexDump::new().dump(&[0u8; 0]).to_string(), "");
     }
 
     #[test]
