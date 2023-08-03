@@ -1,6 +1,6 @@
-# ElectionGuard 2.0 Implementation Guide
+# ElectionGuard 2.0 Reference Implementation in Rust - Implementation Guide
 
-Version 0.0.1, 2023-07-07
+Version 2.0.0, 2023-07-07
 
 ## Key words
 
@@ -11,6 +11,15 @@ interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 ## Scope
 
 TODO
+
+## Rust
+
+### Calling this code from other languages
+
+Rust has native support for defining `extern "C"` functions and data, so wrappers should it should be straightforward
+to create them for almost any runtime environment. However, this package does not supply them.
+
+### Vendor plugin support
 
 ## Text data, strings
 
@@ -25,11 +34,15 @@ to us, software developers tend to underestimate the implementation complexity i
 like 'equality', 'sorting', and 'case insensitivity' for text across languages.
 
 The [Unicode Standard](https://www.unicode.org/versions/latest/) specifies a number of
-[Normalization Forms](https://www.unicode.org/reports/tr15/). Normalization "make[s] it possible to determine
-whether any two Unicode strings are equivalent to each other".
+[Normalization Forms](https://www.unicode.org/reports/tr15/). Normalization "make[s] it possible to
+determine whether any two Unicode strings are equivalent to each other".
 
-[Unicode Technical Standard #10](https://www.unicode.org/reports/tr10/) specifies "how to compare two Unicode strings"
-for sorting and equivalence. Version 15.0.0 is 70 pages long on my default printer.
+[Unicode Technical Standard #10](https://www.unicode.org/reports/tr10/) specifies "how to compare two
+Unicode strings" for sorting and equivalence. Version 15.0.0 is 70 pages long on my default printer.
+
+The Unicode Consortium [provides native Rust](https://github.com/unicode-org/icu4x) crates for
+"Solving i18n for client-side and resource-constrained environments". Specific operations are
+available as [individual crates](https://crates.io/crates/icu/dependencies).
 
 Have a plan for equivalence comparison, normalization, case-folding, sorting, and formatting
 rather than casually adopting functional requirements such as "sorted alphabetically" or "case-insensitive string comparison".
@@ -98,11 +111,6 @@ Guardians may re-use the same key for multiple elections. Perhaps this should be
 # TODO Things yet to discuss
 
 * Most US ballots I've seen do have line breaks in the contest options. Do we need to allow them?
-
-## Calling this code from other languages
-
-Rust has native support for defining `extern "C"` functions and data, so wrappers should it should be straightforward
-to create them for almost any runtime environment. However, this package does not supply them.
 
 ## Structure of an election
 

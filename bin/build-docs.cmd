@@ -91,6 +91,9 @@ robocopy "%cargo_target_doc_reldir%" "%target_docs_reldir%\crates" * /e /move /n
 @call :sub_invoke_rustdoc "apps\electionguard.md" "apps"
 @if "%ERRORLEVEL%" NEQ "0" exit /b
 
+@call :sub_invoke_rustdoc "specs\ElectionGuard_2.0_Serialization_Specification.md" "specs"
+@if "%ERRORLEVEL%" NEQ "0" exit /b
+
 robocopy "%source_doc_reldir%\specs" "%target_docs_reldir%\specs" *.pdf /ns /nc /nfl /ndl /np /njh /njs
 @if "%ERRORLEVEL%" NEQ "1" (
     @echo errorlevel is !ERRORLEVEL!. A value other than 1 here indicates robocopy error.

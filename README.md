@@ -1,5 +1,8 @@
 # ElectionGuard 2.0 Reference Implementation in Rust
 
+[![Repository](https://img.shields.io/badge/repository-GitHub-brightgreen.svg)](
+https://github.com/microsoft/electionguard-rust)
+
 > "ElectionGuard is a way of checking election results are accurate, and that votes have
 > not been altered, suppressed or tampered with in any way. Individual voters can see that
 > their vote has been accurately recorded, and their choice has been correctly added to
