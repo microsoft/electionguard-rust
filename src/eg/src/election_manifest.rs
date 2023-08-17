@@ -118,6 +118,7 @@ pub type ContestOptionIndex = Index<ContestOption>;
 
 // Unit tests for the election manifest.
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 pub mod test {
     use super::*;
     use crate::example_election_manifest::example_election_manifest;
@@ -133,14 +134,14 @@ pub mod test {
 
             let json_pretty = buf.into_inner();
             assert!(json_pretty.len() > 6);
-            assert_eq!(*json_pretty.last().unwrap(), '\n' as u8);
+            assert_eq!(*json_pretty.last().unwrap(), b'\n');
         }
 
         // Canonical
         {
             let canonical_bytes = election_manifest.to_canonical_bytes()?;
             assert!(canonical_bytes.len() > 5);
-            assert_ne!(canonical_bytes[canonical_bytes.len() - 1], '\n' as u8);
+            assert_ne!(canonical_bytes[canonical_bytes.len() - 1], b'\n');
             assert_ne!(canonical_bytes[canonical_bytes.len() - 1], 0x00);
 
             let election_manifest_from_canonical_bytes =

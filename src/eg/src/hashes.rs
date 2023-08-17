@@ -149,6 +149,7 @@ impl std::fmt::Display for Hashes {
 
 // Unit tests for the ElectionGuard hashes.
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
     use crate::{

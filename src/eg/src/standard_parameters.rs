@@ -185,6 +185,7 @@ fn hex_to_biguint(s: &str) -> BigUint {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
 

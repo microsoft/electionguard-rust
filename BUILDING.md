@@ -1,10 +1,11 @@
 # Building
 
-Building the core components of this reference implementation requires only
-the basic toolchain for the Rust language.
+Building the core components of this reference implementation requires only:
 
-[Nushell](https://nushell.sh) is used for some tasks such as integration tests
-and building the API documentation. It is *not* a software dependency of the
+* The Rust language basic toolchain, and
+
+* [Nushell](https://nushell.sh) for some tasks such as integration tests
+and building the documentation. It is *not* a software dependency of the
 actual ElectionGuard reference implementation.
 
 ## Terminology

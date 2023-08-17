@@ -261,6 +261,7 @@ pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test_eg_h {
     use super::*;
     use std::str::FromStr;
