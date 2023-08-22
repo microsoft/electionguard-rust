@@ -114,6 +114,15 @@ Guardians may re-use the same key for multiple elections. Perhaps this should be
 
 ## Structure of an election
 
+Some sources:
+
+[NIST SP 1500-100r2 Election Results Common Data Format 
+Specification](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.1500-100r2.pdf)
+
+Google [Civics Common Standard Data Specification](https://developers.google.com/civics-data)
+
+TODO
+
 ### Roles
 
 TODO

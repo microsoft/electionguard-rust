@@ -2,8 +2,13 @@
 
 ## Documentation
 
+- [README](README.html)
+
+- [BUILDING](BUILDING.html)
+
 - [Specifications](specs)/
-    - [ElectionGuard Design Specification v2.0.0-beta 2023-07-21](specs/ElectionGuard%20Design%20Specification%20v2.0.0-beta%202023-07-21.pdf) The primary specification.
+    - [ElectionGuard Design Specification v2.0.0 2023-08-16](specs/ElectionGuard%20Design%20Specification%20v2.0.0%202023-08-16.pdf)
+      The primary specification.
     - [ElectionGuard 2.0 Serialization Specification](specs/ElectionGuard_2.0_Serialization_Specification.html)
       Specifies the format of ElectionGuard structures used for persistence and transfer.
 
@@ -26,8 +31,7 @@
 ## Misc
 
 - [Table of Contents](index.html) This document
-- [CODE_OF_CONDUCT](CODE_OF_CONDUCT.html)
 - [LICENSE](LICENSE)
-- [README](README.html)
+- [CODE_OF_CONDUCT](CODE_OF_CONDUCT.html)
 - [SECURITY](SECURITY.html)
 - [SUPPORT](SECURITY.html)
