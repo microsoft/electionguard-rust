@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 digest = "0.10"
 hmac = "0.12"
@@ -19,8 +16,6 @@ sha2 = "0.10"
 static_assertions = "1.1.0"
 util = { path = "../util" }
 base64 = "0.21.2"
-getrandom = { version = "0.2.10", features = ["js"] }
-wasm-bindgen = "0.2.63"
 
 # For testing
 anyhow = "1.0"

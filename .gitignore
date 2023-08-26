@@ -3,12 +3,8 @@
 **/.cargo
 **/.vscode
 
-data
-run_demo.sh
 **/pkg
 **/.DS_Store
 **/local.settings.json
 
-**/temp
-**/db
 **/artifacts

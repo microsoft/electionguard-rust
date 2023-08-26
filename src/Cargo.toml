@@ -6,6 +6,3 @@ members = [
   "util",
   "preencrypted",
 ]
-
-[profile.release]
-opt-level = "s"     # optimize for small code size
