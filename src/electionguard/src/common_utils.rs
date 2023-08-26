@@ -25,7 +25,6 @@ pub(crate) enum ElectionManifestSource {
     ArtifactFileElectionManifestCanonical,
     SpecificFile(PathBuf),
     Example,
-    ExampleKingCounty2022,
 }
 
 impl ElectionManifestSource {
@@ -42,9 +41,6 @@ impl ElectionManifestSource {
             }
             ElectionManifestSource::SpecificFile(path) => (Some(path.clone()), None),
             ElectionManifestSource::Example => {
-                return Ok(example_election_manifest()); //------- inner return
-            }
-            ElectionManifestSource::ExampleKingCounty2022 => {
                 return Ok(example_election_manifest()); //------- inner return
             }
         };
