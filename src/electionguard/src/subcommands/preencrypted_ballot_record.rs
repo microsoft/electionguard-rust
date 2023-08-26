@@ -15,8 +15,6 @@ use preencrypted::{
     ballot_recording_tool::BallotRecordingTool,
 };
 use util::file::create_path;
-use verifier::Verifier;
-// use voter::{ballot::BallotSelections, verifier::Verifier};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -88,7 +86,6 @@ impl Subcommand for PreEncryptedBallotRecord {
         );
         let device = Device::new(&"Ballot Recording Tool".to_string(), record_header.clone());
         let tool = BallotRecordingTool::new(record_header.clone(), ballot_style_index);
-        let verifier = Verifier::new(record_header.clone());
 
         let codes = {
             let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
@@ -148,8 +145,6 @@ impl Subcommand for PreEncryptedBallotRecord {
                 let encrypted_ballot =
                     regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot);
 
-                assert!(verifier.verify_ballot_validity(&encrypted_ballot));
-
                 let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                     &None,
                     Some(ArtifactFile::EncryptedBallot(
@@ -168,13 +163,6 @@ impl Subcommand for PreEncryptedBallotRecord {
                     nonce, b_idx
                 );
             }
-            // encrypted_ballot.confirmation_code_qr(&path.join(self.tag.as_str()));
-
-            // encrypted_ballot.verification_code_qr(
-            //     &voter_ballot,
-            //     ballots.primary_nonces[b_idx].as_ref(),
-            //     &path.join(self.tag.as_str()),
-            // );
         }
 
         Ok(())

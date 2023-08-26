@@ -5,8 +5,6 @@ members = [
   "eg",
   "util",
   "preencrypted",
-  "verifier",
-  "study",
 ]
 
 [profile.release]
