@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HashesExt {
     /// Extended base hash.
-    h_e: HValue,
+    pub h_e: HValue,
 }
 
 impl HashesExt {
@@ -92,6 +92,24 @@ impl HashesExt {
             .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
             .context("Writing HashesExt")
     }
+
+    /// Reads `HashesExt` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HashesExt> {
+        serde_json::from_reader(io_read)
+            .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
+    }
+
+    // /// Writes a `HashesExt` to a `std::io::Write`.
+    // pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+    //     let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+    //     self.serialize(&mut ser)
+    //         .context("Error writing hashes (extended)")?;
+
+    //     ser.into_inner()
+    //         .write_all(b"\n")
+    //         .context("Error writing hashes (extended) file")
+    // }
 }
 
 impl std::fmt::Display for HashesExt {

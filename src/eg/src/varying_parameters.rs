@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::guardian::GuardianIndex;
 
 /// The parameters for a specific election.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaryingParameters {
     /// Number of guardians.
     pub n: GuardianIndex,

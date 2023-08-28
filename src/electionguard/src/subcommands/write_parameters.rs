@@ -49,9 +49,9 @@ impl Subcommand for WriteParameters {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        eprint!("Initializing standard parameters...");
+        // eprint!("Initializing standard parameters...");
         let fixed_parameters = STANDARD_PARAMETERS.clone();
-        eprintln!("Done.");
+        // eprintln!("Done.");
 
         let varying_parameters = VaryingParameters {
             n: self.n,
