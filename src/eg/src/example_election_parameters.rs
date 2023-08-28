@@ -6,9 +6,11 @@
 #![deny(clippy::manual_assert)]
 
 use crate::{
-    election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian::GuardianIndex, standard_parameters::STANDARD_PARAMETERS,
-    varying_parameters::VaryingParameters,
+    election_parameters::ElectionParameters,
+    fixed_parameters::FixedParameters,
+    guardian::GuardianIndex,
+    standard_parameters::STANDARD_PARAMETERS,
+    varying_parameters::{BallotChaining, VaryingParameters},
 };
 
 /// An example ElectionParameters object, based on the standard parameters.
@@ -29,6 +31,7 @@ pub fn example_election_parameters() -> ElectionParameters {
         k,
         date: "2023-05-02".to_string(),
         info: "The United Realms of Imaginaria, General Election".to_string(),
+        ballot_chaining: BallotChaining::Prohibited,
     };
 
     ElectionParameters {

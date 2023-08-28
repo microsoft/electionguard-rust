@@ -10,13 +10,33 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 
 use eg::{
-    election_parameters::ElectionParameters, guardian::GuardianIndex,
-    standard_parameters::STANDARD_PARAMETERS, varying_parameters::VaryingParameters,
+    election_parameters::ElectionParameters,
+    guardian::GuardianIndex,
+    standard_parameters::STANDARD_PARAMETERS,
+    varying_parameters::VaryingParameters,
 };
 
 use crate::{
     artifacts_dir::ArtifactFile, subcommand_helper::SubcommandHelper, subcommands::Subcommand,
 };
+
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BallotChaining {
+    Prohibited,
+    Allowed,
+    Required,
+}
+
+impl std::convert::From<BallotChaining> for eg::varying_parameters::BallotChaining {
+    fn from(value: BallotChaining) -> Self {
+        use eg::varying_parameters::BallotChaining as EgBallotChaining;
+        match value {
+            BallotChaining::Prohibited => EgBallotChaining::Prohibited,
+            BallotChaining::Allowed => EgBallotChaining::Allowed,
+            BallotChaining::Required => EgBallotChaining::Required,
+        }
+    }
+}
 
 #[derive(clap::Args, Debug)]
 pub(crate) struct WriteParameters {
@@ -35,6 +55,10 @@ pub(crate) struct WriteParameters {
     // Jurisdictional information string.
     #[arg(long)]
     info: String,
+
+    // Ballot chaining.
+    #[arg(long)]
+    ballot_chaining: BallotChaining,
 
     /// File to which to write the election parameters.
     /// Default is the election parameters file in the artifacts dir.
@@ -58,6 +82,7 @@ impl Subcommand for WriteParameters {
             k: self.k,
             date: self.date.clone(),
             info: self.info.clone(),
+            ballot_chaining: self.ballot_chaining.into(),
         };
 
         let election_parameters = ElectionParameters {
