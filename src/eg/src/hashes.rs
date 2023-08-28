@@ -7,7 +7,7 @@
 
 use std::borrow::Borrow;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -121,6 +121,11 @@ impl Hashes {
             .map_err(Into::<anyhow::Error>::into)
             .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
             .context("Writing Hashes")
+    }
+
+    /// Reads `Hashes` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<Hashes> {
+        serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing Hashes: {}", e))
     }
 }
 

@@ -19,7 +19,7 @@ pub enum BallotChaining {
 }
 
 /// The parameters for a specific election.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaryingParameters {
     /// Number of guardians.
     pub n: GuardianIndex,

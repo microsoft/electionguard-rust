@@ -5,7 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context, Result};
+use base64::{engine::general_purpose, Engine as _};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -82,6 +83,44 @@ impl HValue {
                 b' '
             }
         })
+    }
+
+    /// Reads `HValue` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HValue> {
+        serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing HValue: {}", e))
+    }
+
+    /// Returns a pretty JSON `String` representation of the `HValue`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
+    }
+
+    /// Reads a `HValue` from a `std::io::Write`.
+    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let hashes: Self = serde_json::from_reader(stdioread).context("Reading HValue")?;
+
+        Ok(hashes)
+    }
+
+    /// Writes a `HValue` to a `std::io::Write`.
+    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser).context("Error writing HValue")?;
+
+        ser.into_inner()
+            .write_all(b"\n")
+            .context("Error writing HValue file")
+    }
+
+    pub fn to_string_hex_no_prefix_suffix(&self) -> String {
+        let s = serde_json::to_string_pretty(self).unwrap();
+        s[3..s.len() - 2].to_string()
     }
 }
 
@@ -264,4 +303,16 @@ mod test_eg_h {
 
         assert_eq!(actual, expected);
     }
+}
+
+// ElectionGuard "H" function (for WebAssembly)
+pub fn eg_h_js(key: &[u8], data: &[u8]) -> String {
+    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` only fails on slice of
+    // incorrect size.
+    #[allow(clippy::unwrap_used)]
+    let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
+
+    general_purpose::URL_SAFE_NO_PAD.encode(AsRef::<[u8; 32]>::as_ref(
+        &hmac_sha256.chain(data).finalize_fixed(),
+    ))
 }

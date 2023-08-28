@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian_public_key::GuardianPublicKey,
+    guardian_public_key::GuardianPublicKey, index::Index,
 };
 
 /// The joint election public key.
@@ -23,6 +23,38 @@ pub struct JointElectionPublicKey {
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
     pub joint_election_public_key: BigUint,
+}
+
+/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`ContestEncrypted`].
+pub type CiphertextIndex = Index<Ciphertext>;
+
+/// The ciphertext used to store a vote value corresponding to one option.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Ciphertext {
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub alpha: BigUint,
+    #[serde(
+        serialize_with = "util::biguint_serde::biguint_serialize",
+        deserialize_with = "util::biguint_serde::biguint_deserialize"
+    )]
+    pub beta: BigUint,
+    #[serde(skip)]
+    pub nonce: Option<BigUint>,
+}
+
+/// Does not match nonces if either nonce is None.
+impl PartialEq for Ciphertext {
+    fn eq(&self, other: &Self) -> bool {
+        if self.nonce.is_some() && other.nonce.is_some() {
+            return self.alpha == other.alpha
+                && self.beta == other.beta
+                && self.nonce == other.nonce;
+        }
+        self.alpha == other.alpha && self.beta == other.beta
+    }
 }
 
 impl JointElectionPublicKey {
@@ -86,6 +118,42 @@ impl JointElectionPublicKey {
         Ok(Self {
             joint_election_public_key,
         })
+    }
+
+    pub fn encrypt_with(
+        &self,
+        fixed_parameters: &FixedParameters,
+        nonce: &BigUint,
+        vote: usize,
+        store_nonce: bool,
+    ) -> Ciphertext {
+        let alpha = fixed_parameters
+            .g
+            .modpow(&nonce, fixed_parameters.p.as_ref());
+        let beta = self
+            .joint_election_public_key
+            .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
+
+        if store_nonce {
+            Ciphertext {
+                alpha,
+                beta,
+                nonce: Some(nonce.clone()),
+            }
+        } else {
+            Ciphertext {
+                alpha,
+                beta,
+                nonce: None,
+            }
+        }
+        // let joint_public_key = guardian_public_keys
+        //     .iter()
+        //     .fold(BigUint::one(), |acc, public_key| {
+        //         acc.modpow(public_key.public_key_k0(), fixed_parameters.p.as_ref())
+        //     });
+
+        // Ok(Self(joint_public_key))
     }
 
     /// Reads a `JointElectionPublicKey` from a `std::io::Read` and validates it.

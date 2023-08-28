@@ -80,7 +80,7 @@ impl GuardianPublicKey {
         to_be_bytes_left_pad(&self.public_key_k_i_0(), fixed_parameters.l_p_bytes())
     }
 
-    /// Returns a pretty JSON `String` representation of the `SecretKey`.
+    /// Returns a pretty JSON `String` representation of the `GuardianPublicKey`.
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?

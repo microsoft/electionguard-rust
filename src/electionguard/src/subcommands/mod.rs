@@ -6,9 +6,14 @@
 #![deny(clippy::manual_assert)]
 
 mod guardian_secret_key_generate;
+mod guardian_secret_key_write_encrypted_share;
 mod guardian_secret_key_write_public_key;
 mod none;
+mod preencrypted_ballot_generate;
+mod preencrypted_ballot_record;
 mod verify_standard_parameters;
+mod voter_write_random_selections;
+mod voter_write_confirmation_code;
 mod write_hashes;
 mod write_hashes_ext;
 mod write_joint_election_public_key;
@@ -53,6 +58,15 @@ pub(crate) enum Subcommands {
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 
+    /// Generate an encrypted share of the guardian secret key.
+    GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
+
+    /// Generate pre-encrypted ballots.
+    PreEncryptedBallotGenerate(crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate),
+
+    /// Record voter selections for pre-encrypted ballots.
+    PreEncryptedBallotRecord(crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord),
+
     /// Generate a guardian secret key.
     GuardianSecretKeyGenerate(
         crate::subcommands::guardian_secret_key_generate::GuardianSecretKeyGenerate,
@@ -63,6 +77,12 @@ pub(crate) enum Subcommands {
         crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
     ),
 
+    /// Write the confirmation QR code for a voter.
+    VoterWriteConfirmationCode(crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode),
+
+    /// Write random ballot selections to a file for testing.
+    VoterWriteRandomSelections(crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection),
+    
     /// Compute the joint election public key from the guardian public keys and write it to a file.
     WriteJointElectionPublicKey(
         crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
@@ -90,6 +110,11 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteHashes(a) => a,
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
+            GuardianSecretKeyWriteEncryptedShare(a) => a,
+            PreEncryptedBallotGenerate(a) => a,
+            PreEncryptedBallotRecord(a) => a,
+            VoterWriteRandomSelections(a) => a,
+            VoterWriteConfirmationCode(a) => a,
             WriteJointElectionPublicKey(a) => a,
             WriteHashesExt(a) => a,
         }
