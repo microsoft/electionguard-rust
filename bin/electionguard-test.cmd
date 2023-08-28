@@ -298,7 +298,7 @@ rem ---- Write election parameters
 
 if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_parameters.json" goto :skip_write_parameters
 echo on
-%electionguard_exe% write-parameters --n %eg_n% --k %eg_k% --date "%eg_date%" --info "%eg_info%"
+%electionguard_exe% write-parameters --n %eg_n% --k %eg_k% --date "%eg_date%" --info "%eg_info%" --ballot-chaining prohibited
 @echo off
 if "%ERRORLEVEL%" NEQ "0" exit /b
 :skip_write_parameters

@@ -10,6 +10,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::guardian::GuardianIndex;
 
+/// Ballot chaining.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BallotChaining {
+    Prohibited,
+    Allowed,
+    Required,
+}
+
 /// The parameters for a specific election.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VaryingParameters {
@@ -24,6 +32,9 @@ pub struct VaryingParameters {
 
     // Jurisdictional information string.
     pub info: String,
+
+    /// Ballot chaining.
+    pub ballot_chaining: BallotChaining,
 }
 
 impl VaryingParameters {
