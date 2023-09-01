@@ -23,8 +23,6 @@ this group are public. To subscribe, simply send an email requesting to be added
 
 * [opensource.microsoft.com](https://opensource.microsoft.com/) Microsoft Open Source
 
-* [aka.ms/opensource](https://aka.ms/opensource) Docs - Microsoft Open Source
-
 ## Microsoft Support Policy  
 
 Support for this project is limited to the resources listed above.
