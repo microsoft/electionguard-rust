@@ -33,8 +33,8 @@ pub(crate) fn validate_guardian_public_key_info(
     election_parameters: &ElectionParameters,
 ) -> Result<()> {
     let varying_parameters = &election_parameters.varying_parameters;
-    let n = varying_parameters.n.get_one_based_usize();
-    let k = varying_parameters.k.get_one_based_usize();
+    let n = varying_parameters.n.as_quantity();
+    let k = varying_parameters.k.as_quantity();
 
     let i = gpki.i().get_one_based_usize();
     ensure!(

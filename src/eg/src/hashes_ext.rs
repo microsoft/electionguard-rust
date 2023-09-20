@@ -33,8 +33,8 @@ impl HashesExt {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let n = varying_parameters.n.get_one_based_usize();
-        let k = varying_parameters.k.get_one_based_usize();
+        let n = varying_parameters.n.as_quantity();
+        let k = varying_parameters.k.as_quantity();
 
         assert_eq!(guardian_public_keys.len(), n);
 

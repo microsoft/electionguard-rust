@@ -18,38 +18,40 @@ use static_assertions::{assert_eq_size, assert_impl_all, const_assert};
 /// A 1-based ordinal type that enforces a range 1 <= i < 2^31.
 ///
 /// `T` is a tag for disambiguation. It can be any type.
+///
+/// This type can also be used represent cardinal numbers using the [`.as_quantity()`] method.
 pub struct Index<T>(u32, PhantomData<fn(T) -> T>)
 where
     T: ?Sized;
 
-// Copy trait must be implmented manually because of the PhantomData.
+// Copy trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::marker::Copy for Index<T> {}
 
-// Clone trait must be implmented manually because of the PhantomData.
+// Clone trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::clone::Clone for Index<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-// PartialEq trait must be implmented manually because of the PhantomData.
+// PartialEq trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::cmp::PartialEq for Index<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-// PartialOrd trait must be implmented manually because of the PhantomData.
+// PartialOrd trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::cmp::PartialOrd for Index<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.0.cmp(&other.0))
     }
 }
 
-// Eq trait must be implmented manually because of the PhantomData.
+// Eq trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::cmp::Eq for Index<T> {}
 
-// Ord trait must be implmented manually because of the PhantomData.
+// Ord trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::cmp::Ord for Index<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
@@ -138,6 +140,13 @@ impl<T> Index<T> {
     pub const fn get_one_based_usize(&self) -> usize {
         debug_assert!(Self::is_valid_one_based_index(self.0));
         self.0 as usize
+    }
+
+    /// Size of a container needed for this to be the highest index.
+    /// Actually, this is just the same as [`Self::get_one_based_usize()`] but it
+    /// reads more clearly when a cardinal number is needed.
+    pub const fn as_quantity(&self) -> usize {
+        self.get_one_based_usize()
     }
 
     /// Converts the 1-based index into a 0-based index as a `usize`.

@@ -10,10 +10,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 
 use eg::{
-    election_parameters::ElectionParameters,
-    guardian::GuardianIndex,
-    standard_parameters::STANDARD_PARAMETERS,
-    varying_parameters::VaryingParameters,
+    election_parameters::ElectionParameters, guardian::GuardianIndex,
+    standard_parameters::STANDARD_PARAMETERS, varying_parameters::VaryingParameters,
 };
 
 use crate::{

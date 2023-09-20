@@ -120,7 +120,7 @@ mod test {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let k = varying_parameters.k.get_one_based_usize();
+        let k = varying_parameters.k.as_quantity();
 
         let guardian_secret_keys = varying_parameters
             .each_guardian_i()

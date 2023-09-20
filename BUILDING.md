@@ -26,15 +26,15 @@ it makes complete sense from a compiler writer's perspective.
 The Rust toolchain comes in two flavors: `stable` and `nightly`. For production use,
 you probably want to stick with `stable`.
 
-All supported functionality requires only the `stable` toolchain.
-
-But it may be that some tests and experimental features might require `nightly`.
+All supported functionality requires only the `stable` toolchain, but it may be that
+some tests and experimental features might require `nightly`.
 
 ### Windows targets
 
 When targeting Windows (e.g., a developer on Windows building to run locally) there
 are multiple options of ABI: `MSVC` and `MinGW`. The native, Visual Studio-based, `MSVC`
-ABI is recommended, if for no reason other than it is likely to have been tested more.
+ABI is recommended, if for no reason other than it is likely to have been tested more
+with this codebase.
 
 See [Windows - The rustup book](https://rust-lang.github.io/rustup/installation/windows.html)
 for more information.
@@ -46,8 +46,9 @@ for more information.
 The Rust build system relies on having a C language compiler (or at least the linker
 and libraries) appropriate for the target platform.
 
-If you're targeting MS Windows, 
-https://rust-lang.github.io/rustup/installation/windows.html
+Again, if you're targeting MS Windows, see
+[Windows - The rustup book](https://rust-lang.github.io/rustup/installation/windows.html)
+for more information.
 
 ### Rust language build environment
 
@@ -60,13 +61,30 @@ https://rust-lang.github.io/rustup/installation/index.html
 [Nushell](https://nushell.sh) is a Rust-based scripting environment used for orchestrating multi-step tests, building the
 API documentation, etc. It is *not* a software dependency of ElectionGuard reference implementation.
 
-[Documentation](https://nushell.sh)
+Main site: [nushell.sh](https://nushell.sh)
 
-[Documentation](https://github.com/nushell/nushell)
+[Github](https://github.com/nushell/nushell)
 
-There are several ways to install it from pre-built packages.
-
-However, 
+There are several ways to install it from pre-built packages, but one reason it was chosen was
+for the simple installation process for those who already have a Rust toolchain:
+```
+cargo install nu
+```
 
 ## Configuration
 
+TODO
+
+## Build with cargo
+
+```
+cd src
+cargo build
+```
+
+## Integration test 
+
+```
+cd src
+..\bin\electionguard-test.cmd --release --test-hash-mismatch-warn-only --erase-artifacts --clean
+```
