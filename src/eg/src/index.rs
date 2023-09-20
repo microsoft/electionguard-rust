@@ -18,7 +18,7 @@ use static_assertions::{assert_eq_size, assert_impl_all, const_assert};
 /// A 1-based ordinal type that enforces a range 1 <= i < 2^31.
 ///
 /// `T` is a tag for disambiguation. It can be any type.
-/// 
+///
 /// This type can also be used represent cardinal numbers using the [`.as_quantity()`] method.
 pub struct Index<T>(u32, PhantomData<fn(T) -> T>)
 where

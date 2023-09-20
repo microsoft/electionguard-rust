@@ -25,15 +25,15 @@ pub enum NumsNumber {
     /// The Euler-Mascheroni constant γ =~ 0.577215664901532...
     /// Binary expansion: (0.)1001001111000100011001111110...
     /// <https://oeis.org/A104015>
-    /// 
+    ///
     /// This was used in versions of the spec prior to v2.0.
     Euler_Mascheroni_constant,
-    
+
     /// The natural logarithm of 2.
     /// Binary expansion: (0.)1011000101110010000101111111...
     ///                          B   1   7   2   1   7   F...
     /// <https://oeis.org/A068426>
-    /// 
+    ///
     /// This is used in spec version to v2.0.
     ln_2,
 }
@@ -67,7 +67,7 @@ pub enum ElectionGuardDesignSpecificationVersion {
     /// Officially-released "ElectionGuard Design Specification" version.
     /// Which may be an official pre-release.
     Official(OfficialVersion),
-    
+
     /// Some other specification and version.
     Other(String),
 }

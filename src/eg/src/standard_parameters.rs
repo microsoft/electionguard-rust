@@ -13,7 +13,7 @@ use util::prime::BigUintPrime;
 
 use crate::fixed_parameters::{
     ElectionGuardDesignSpecificationVersion, FixedParameterGenerationParameters, FixedParameters,
-    NumsNumber, OfficialVersion, OfficialReleaseKind,
+    NumsNumber, OfficialReleaseKind, OfficialVersion,
 };
 
 lazy_static! {
@@ -24,8 +24,10 @@ lazy_static! {
 /// Standard parameters, "MSR ElectionGuard Design Specification 2.0 of 2023-08-16"
 #[allow(non_snake_case)]
 pub fn make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0() -> FixedParameters {
-    let egds_ver =
-        ElectionGuardDesignSpecificationVersion::Official(OfficialVersion { version: [2, 0], release: OfficialReleaseKind::Release });
+    let egds_ver = ElectionGuardDesignSpecificationVersion::Official(OfficialVersion {
+        version: [2, 0],
+        release: OfficialReleaseKind::Release,
+    });
 
     FixedParameters {
         opt_ElectionGuard_Design_Specification: Some(egds_ver),
@@ -127,7 +129,13 @@ mod test {
         let fixed_params = make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0();
         assert!(matches!(
             fixed_params.opt_ElectionGuard_Design_Specification,
-            Some(ElectionGuardDesignSpecificationVersion::Official(OfficialVersion { version: [2, 0], release: OfficialReleaseKind::Release })) ));
+            Some(ElectionGuardDesignSpecificationVersion::Official(
+                OfficialVersion {
+                    version: [2, 0],
+                    release: OfficialReleaseKind::Release
+                }
+            ))
+        ));
         assert!(fixed_params.validate(&mut csprng).is_ok());
     }
 
