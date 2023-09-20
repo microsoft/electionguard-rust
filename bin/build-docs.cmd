@@ -4,11 +4,16 @@ setlocal enableextensions enabledelayedexpansion
 
 rem ----- Figure the full path to directory containing this script.
 
-echo.
+echo cwd=[%cd%]
 
-(set this_script_dir=%~dp0)
-(set this_script_dir=%this_script_dir:~0,-1%)
-echo this_script_dir=%this_script_dir%
+(set this_script=%~dpnx0)
+echo this_script=[%this_script%]
+
+for %%D in ("%~dp0.") do (set this_script_dir=%%~fD)
+echo this_script_dir=[%this_script_dir%]
+
+(set this_script_file=%~nx0)
+echo this_script_file=[%this_script_file%]
 
 rem ----- Change to the electionguard_src_dir from which we should run cargo.
 
@@ -82,6 +87,12 @@ robocopy "%cargo_target_doc_reldir%" "%target_docs_reldir%\crates" * /e /move /n
     @exit /b 1
 )
 
+@call :sub_invoke_rustdoc "..\README.md"
+@if "%ERRORLEVEL%" NEQ "0" exit /b
+
+@call :sub_invoke_rustdoc "..\BUILDING.md"
+@if "%ERRORLEVEL%" NEQ "0" exit /b
+
 @call :sub_invoke_rustdoc "index.md"
 @if "%ERRORLEVEL%" NEQ "0" exit /b
 
@@ -138,7 +149,7 @@ rem ======================================================= Subroutine: invoke r
 @(set out_dir_flag=--out-dir "%target_docs_reldir%\%target_reldir%")
 :blank_target_reldir
 
-rustdoc %out_dir_flag% "%source_doc_reldir%\%source_relfile%"
+rustdoc --edition 2021 %out_dir_flag% "%source_doc_reldir%\%source_relfile%"
 @if "%ERRORLEVEL%" NEQ "0" (endlocal & exit /b)
 
 @REM --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat

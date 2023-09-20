@@ -11,22 +11,30 @@ use num_traits::Num;
 
 use util::prime::BigUintPrime;
 
-use crate::fixed_parameters::{FixedParameterGenerationParameters, FixedParameters, NumsNumber};
+use crate::fixed_parameters::{
+    ElectionGuardDesignSpecificationVersion, FixedParameterGenerationParameters, FixedParameters,
+    NumsNumber, OfficialVersion, OfficialReleaseKind,
+};
 
 lazy_static! {
     /// Standard parameters, ElectionGuard latest (currently v2.0).
-    pub static ref STANDARD_PARAMETERS: FixedParameters = make_standard_parameters_v2_0();
+    pub static ref STANDARD_PARAMETERS: FixedParameters = make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0();
 }
 
-/// Standard parameters, ElectionGuard v2.0.
-pub fn make_standard_parameters_v2_0() -> FixedParameters {
+/// Standard parameters, "MSR ElectionGuard Design Specification 2.0 of 2023-08-16"
+#[allow(non_snake_case)]
+pub fn make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0() -> FixedParameters {
+    let egds_ver =
+        ElectionGuardDesignSpecificationVersion::Official(OfficialVersion { version: [2, 0], release: OfficialReleaseKind::Release });
+
     FixedParameters {
-        opt_electionguard_design_specification_version: Some([2, 0]),
+        opt_ElectionGuard_Design_Specification: Some(egds_ver),
+
         generation_parameters: FixedParameterGenerationParameters {
             q_bits_total: 256,
             p_bits_total: 4096,
             p_bits_msb_fixed_1: 256,
-            p_middle_bits_source: NumsNumber::Ln2,
+            p_middle_bits_source: NumsNumber::ln_2,
             p_bits_lsb_fixed_1: 256,
         },
         p: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
@@ -97,85 +105,6 @@ pub fn make_standard_parameters_v2_0() -> FixedParameters {
     }
 }
 
-/// Standard parameters, ElectionGuard v1.54.
-pub fn make_standard_parameters_v1_54() -> FixedParameters {
-    FixedParameters {
-        opt_electionguard_design_specification_version: Some([1, 54]),
-        generation_parameters: FixedParameterGenerationParameters {
-            q_bits_total: 256,
-            p_bits_total: 4096,
-            p_bits_msb_fixed_1: 256,
-            p_middle_bits_source: NumsNumber::EulerMascheroniConstant,
-            p_bits_lsb_fixed_1: 256,
-        },
-        p: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
-            hex_to_biguint(
-                "
-                FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF
-                93C467E3 7DB0C7A4 D1BE3F81 0152CB56 A1CECC3A F65CC019 0C03DF34 709AFFBD
-                8E4B59FA 03A9F0EE D0649CCB 621057D1 1056AE91 32135A08 E43B4673 D74BAFEA
-                58DEB878 CC86D733 DBE7BF38 154B36CF 8A96D156 7899AAAE 0C09D4C8 B6B7B86F
-                D2A1EA1D E62FF864 3EC7C271 82797722 5E6AC2F0 BD61C746 961542A3 CE3BEA5D
-                B54FE70E 63E6D09F 8FC28658 E80567A4 7CFDE60E E741E5D8 5A7BD469 31CED822
-                03655949 64B83989 6FCAABCC C9B31959 C083F22A D3EE591C 32FAB2C7 448F2A05
-                7DB2DB49 EE52E018 2741E538 65F004CC 8E704B7C 5C40BF30 4C4D8C4F 13EDF604
-                7C555302 D2238D8C E11DF242 4F1B66C2 C5D238D0 744DB679 AF289048 7031F9C0
-                AEA1C4BB 6FE9554E E528FDF1 B05E5B25 6223B2F0 9215F371 9F9C7CCC 69DDF172
-                D0D62342 17FCC003 7F18B93E F5389130 B7A661E5 C26E5421 4068BBCA FEA32A67
-                818BD307 5AD1F5C7 E9CC3D17 37FB2817 1BAF84DB B6612B78 81C1A48E 439CD03A
-                92BF5222 5A2B38E6 542E9F72 2BCE15A3 81B5753E A8427633 81CCAE83 512B3051
-                1B32E5E8 D8036214 9AD030AA BA5F3A57 98BB22AA 7EC1B6D0 F17903F4 E22D8407
-                34AA8597 3F79A93F FB82A75C 47C03D43 D2F9CA02 D03199BA CEDDD453 3A52566A
-                FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF",
-            ),
-        ),
-        q: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
-            hex_to_biguint(
-                "
-                FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFF43",
-            ),
-        ),
-        r: hex_to_biguint(
-            "
-            1
-            00000000 00000000 00000000 00000000 00000000 00000000 00000000 000000BC
-            93C467E3 7DB0C7A4 D1BE3F81 0152CB56 A1CECC3A F65CC019 0C03DF34 709B8AF6
-            A64C0CED CF2D559D A9D97F09 5C3076C6 86037619 148D2C86 C317102A FA214803
-            1F04440A C0FF0C9A 417A8921 2512E760 7B2501DA A4D38A2C 1410C483 6149E2BD
-            B8C8260E 627C4646 963EFFE9 E16E495D 48BD215C 6D8EC9D1 667657A2 A1C8506F
-            2113FFAD 19A6B2BC 7C457604 56719183 309F874B C9ACE570 FFDA877A A2B23A2D
-            6F291C15 54CA2EB1 2F12CD00 9B8B8734 A64AD51E B893BD89 1750B851 62241D90
-            8F0C9709 879758E7 E8233EAB 3BF2D6AB 53AFA32A A153AD66 82E5A064 8897C9BE
-            18A0D50B ECE030C3 432336AD 9163E33F 8E7DAF49 8F14BB28 52AFFA81 4841EB18
-            DD5F0E89 516D5577 76285C16 071D2111 94EE1C3F 34642036 AB886E3E C28882CE
-            4003DEA3 35B4D935 BAE4B582 35B9FB2B AB713C8F 705A1C7D E4222020 9D6BBCAC
-            C4673186 01565272 E4A63E38 E2499754 AE493AC1 A8E83469 EEF35CA2 7C271BC7
-            92EEE211 56E617B9 22EA8F71 3C22CF28 2DC5D638 5BB12868 EB781278 FA0AB2A8
-            958FCCB5 FFE2E5C3 61FC1744 20122B01 63CA4A46 308C8C46 C91EA745 7C136A7D
-            9FD4A7F5 29FD4A7F 529FD4A7 F529FD4A 7F529FD4 A7F529FD 4A7F529F D4A7F52A",
-        ),
-        g: hex_to_biguint(
-            "
-            1D41E49C 477E15EA EEF0C5E4 AC08D4A4 6C268CD3 424FC01D 13769BDB 43673218
-            587BC86C 4C1448D0 06A03699 F3ABAE5F EB19E296 F5D143CC 5E4A3FC8 9088C9F4
-            523D166E E3AE9D5F B03C0BDD 77ADD5C0 17F6C55E 2EC92C22 6FEF5C6C 1DF2E7C3
-            6D90E7EA ADE09824 1D340998 3BCCD2B5 379E9391 FBC62F9F 8D939D12 08B16036
-            7C134264 12218959 5EC85C8C DBE5F9D3 07F46912 C04932F8 C16815A7 6B4682BD
-            6BDC0ED5 2B00D8D3 0F59C731 D5A7FFAE 8165D53C F96649AA C2B743DA 56F14F19
-            DACC5236 F29B1AB9 F9BEFC69 697293D5 DEAD8B5B F5DE9BAB 6DE67C45 719E5634
-            4A3CBDF3 609824B1 B578E34E AEB6DD31 90AB3571 D6D671C5 12282C1D A7BD36B4
-            251D2584 FADEA80B 9E141423 074DD9B5 FB83ACBD EAD4C87A 58FFF517 F977A830
-            80370A3B 0CF98A1B C2978C47 AAC29611 FD6C40E2 F9875C35 D50443A9 AA3F4961
-            1DCD3A0D 6FF3CB3F ACF31471 BDB61860 B92C594D 4E46569B B39FEEAD FF1FD64C
-            836A6D6D B85C6BA7 241766B7 AB56BF73 9633B054 147F7170 921412E9 48D9E474
-            02D15BB1 C2573186 12C121C3 6B80EB84 33C08E7D 0B7149E3 AB0A8735 A92EDCE8
-            FF943E28 A2DCEACF CC69EC31 8909CB04 7BE1C585 8844B5AD 44F22EEB 289E4CC5
-            54F7A5E2 F3DEA026 877FF928 51816071 CE028EB8 68D965CC B2D2295A 8C55BD1C
-            070B39B0 9AE06B37 D29343B9 D8997DC2 44C468B9 80970731 736EE018 BBADB987",
-        ),
-    }
-}
-
 fn hex_to_biguint(s: &str) -> BigUint {
     let s = s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
 
@@ -189,38 +118,26 @@ fn hex_to_biguint(s: &str) -> BigUint {
 mod test {
     use super::*;
 
-    /// Validate the standard parameters v1.54.
-    #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
-    #[test]
-    fn standard_parameters_v1_54() {
-        let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v1_54");
-
-        let standard_parameters_v1_54 = make_standard_parameters_v1_54();
-        assert_eq!(
-            standard_parameters_v1_54.opt_electionguard_design_specification_version,
-            Some([1, 54])
-        );
-        assert!(standard_parameters_v1_54.validate(&mut csprng).is_ok());
-    }
-
     /// Validate the standard parameters v2.0.
     #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
     #[test]
     fn standard_parameters_v2_0() {
         let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v2_0");
 
-        let standard_parameters_v2_0 = make_standard_parameters_v2_0();
-        assert_eq!(
-            standard_parameters_v2_0.opt_electionguard_design_specification_version,
-            Some([2, 0])
-        );
-        assert!(standard_parameters_v2_0.validate(&mut csprng).is_ok());
+        let fixed_params = make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0();
+        assert!(matches!(
+            fixed_params.opt_ElectionGuard_Design_Specification,
+            Some(ElectionGuardDesignSpecificationVersion::Official(OfficialVersion { version: [2, 0], release: OfficialReleaseKind::Release })) ));
+        assert!(fixed_params.validate(&mut csprng).is_ok());
     }
 
     /// Verify that `pub static STANDARD_PARAMETERS` reflect the latest version (currently v2.0).
     #[test]
     fn standard_parameters_pub_static() {
         // Latest standard parameters are v2.0.
-        assert_eq!(&*STANDARD_PARAMETERS, &make_standard_parameters_v2_0());
+        assert_eq!(
+            &*STANDARD_PARAMETERS,
+            &make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0()
+        );
     }
 }

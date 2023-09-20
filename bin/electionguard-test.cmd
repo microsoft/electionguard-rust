@@ -99,9 +99,16 @@ if "%clarg_help%" NEQ "0" (
 
 rem ----- Figure the full path to directory containing this script.
 
-(set this_script_dir=%~dp0)
-(set this_script_dir=%this_script_dir:~0,-1%)
-echo this_script_dir=%this_script_dir%
+echo cwd=[%cd%]
+
+(set this_script=%~dpnx0)
+echo this_script=[%this_script%]
+
+for %%D in ("%~dp0.") do (set this_script_dir=%%~fD)
+echo this_script_dir=[%this_script_dir%]
+
+(set this_script_file=%~nx0)
+echo this_script_file=[%this_script_file%]
 
 rem ----- Check the ELECTIONGUARD_ARTIFACTS_DIR
 

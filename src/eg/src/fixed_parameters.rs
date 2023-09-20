@@ -19,18 +19,23 @@ use util::{
 };
 
 // "Nothing up my sleeve" numbers for use in fixed parameters.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NumsNumber {
-    // The Euler-Mascheroni constant γ =~ 0.577215664901532...
-    // Binary expansion: (0.)1001001111000100011001111110...
-    // https://oeis.org/A104015
-    EulerMascheroniConstant,
-
-    // The natural logarithm of 2.
-    // Binary expansion: (0.)1011000101110010000101111111...
-    //                          B   1   7   2   1   7   F...
-    // https://oeis.org/A068426
-    Ln2,
+    /// The Euler-Mascheroni constant γ =~ 0.577215664901532...
+    /// Binary expansion: (0.)1001001111000100011001111110...
+    /// <https://oeis.org/A104015>
+    /// 
+    /// This was used in versions of the spec prior to v2.0.
+    Euler_Mascheroni_constant,
+    
+    /// The natural logarithm of 2.
+    /// Binary expansion: (0.)1011000101110010000101111111...
+    ///                          B   1   7   2   1   7   F...
+    /// <https://oeis.org/A068426>
+    /// 
+    /// This is used in spec version to v2.0.
+    ln_2,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,16 +47,42 @@ pub struct FixedParameterGenerationParameters {
     pub p_bits_lsb_fixed_1: usize,
 }
 
+// Released prereleased.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OfficialReleaseKind {
+    Release,
+    Prerelease,
+}
+
+// Released prereleased.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OfficialVersion {
+    pub version: [usize; 2],
+    pub release: OfficialReleaseKind,
+}
+
+// Design specification version.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ElectionGuardDesignSpecificationVersion {
+    /// Officially-released "ElectionGuard Design Specification" version.
+    /// Which may be an official pre-release.
+    Official(OfficialVersion),
+    
+    /// Some other specification and version.
+    Other(String),
+}
+
+#[allow(non_snake_case)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
     /// Version of the ElectionGuard Design Specification to which these parameters conform.
     /// E.g., `Some([2, 0])` for v2.0 and `Some([1, 55])` for v1.55.
     /// `None` means the parameters may not conform to any version of the ElectionGuard spec.
     #[serde(
-        rename = "electionguard_design_specification_version",
+        rename = "ElectionGuard_Design_Specification",
         skip_serializing_if = "Option::is_none"
     )]
-    pub opt_electionguard_design_specification_version: Option<[usize; 2]>,
+    pub opt_ElectionGuard_Design_Specification: Option<ElectionGuardDesignSpecificationVersion>,
 
     /// Parameters used to generate the parameters.
     pub generation_parameters: FixedParameterGenerationParameters,
