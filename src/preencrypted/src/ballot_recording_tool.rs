@@ -1,8 +1,17 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use std::str::FromStr;
 
-use crate::ballot::BallotPreEncrypted;
 use anyhow::Result;
+
 use eg::{ballot_style::BallotStyleIndex, election_record::PreVotingData, hash::HValue};
+
+use crate::ballot::BallotPreEncrypted;
 
 pub struct BallotRecordingTool {
     /// The election record header.
@@ -52,12 +61,17 @@ impl BallotRecordingTool {
         stdioread: &mut dyn std::io::Read,
     ) -> Result<Vec<HValue>> {
         let mut buffer = String::new();
+
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         stdioread.read_to_string(&mut buffer).unwrap();
         let codes: Vec<&str> = buffer.trim().split('\n').collect();
 
         Ok(codes
             .iter()
-            .map(|cc| HValue::from_str(cc).unwrap())
+            .map(|cc| {
+                #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
+                HValue::from_str(cc).unwrap()
+            })
             .collect())
     }
 }

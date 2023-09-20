@@ -25,7 +25,7 @@ pub struct JointElectionPublicKey {
     pub joint_election_public_key: BigUint,
 }
 
-/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`ContestEncrypted`].
+/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`crate::contest_encrypted::ContestEncrypted`].
 pub type CiphertextIndex = Index<Ciphertext>;
 
 /// The ciphertext used to store a vote value corresponding to one option.
@@ -129,7 +129,7 @@ impl JointElectionPublicKey {
     ) -> Ciphertext {
         let alpha = fixed_parameters
             .g
-            .modpow(&nonce, fixed_parameters.p.as_ref());
+            .modpow(nonce, fixed_parameters.p.as_ref());
         let beta = self
             .joint_election_public_key
             .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
@@ -147,13 +147,6 @@ impl JointElectionPublicKey {
                 nonce: None,
             }
         }
-        // let joint_public_key = guardian_public_keys
-        //     .iter()
-        //     .fold(BigUint::one(), |acc, public_key| {
-        //         acc.modpow(public_key.public_key_k0(), fixed_parameters.p.as_ref())
-        //     });
-
-        // Ok(Self(joint_public_key))
     }
 
     /// Reads a `JointElectionPublicKey` from a `std::io::Read` and validates it.

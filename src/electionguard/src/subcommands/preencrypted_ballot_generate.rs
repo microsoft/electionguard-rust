@@ -46,7 +46,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         let mut csprng =
-            subcommand_helper.get_csprng(format!("PreEncryptedBallotGenerate").as_bytes())?;
+            subcommand_helper.get_csprng("PreEncryptedBallotGenerate".as_bytes())?;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let election_parameters =
@@ -62,6 +62,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
             bail!("Ballot style is required to generate pre-encrypted ballots.");
         }
 
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         let ballot_style_index =
             BallotStyleIndex::from_one_based_index(self.ballot_style_index).unwrap();
 
@@ -88,7 +89,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
         drop(bx_write);
 
-        let device = Device::new(&"Ballot Encrypting Tool".to_string(), pv_data.clone());
+        let device = Device::new("Ballot Encrypting Tool", pv_data.clone());
 
         let tool = BallotEncryptingTool::new(device.header, ballot_style_index, None);
 

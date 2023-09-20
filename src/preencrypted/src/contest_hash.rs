@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use eg::{
     election_manifest::ContestIndex,
     election_record::PreVotingData,
@@ -30,7 +37,10 @@ pub fn contest_hash(
     // TODO: Check if this sorting works
     let mut sorted_selection_hashes = selections
         .indices()
-        .map(|i| selections.get(i).unwrap().selection_hash)
+        .map(|i| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
+            selections.get(i).unwrap().selection_hash
+        })
         .collect::<Vec<HValue>>();
     sorted_selection_hashes.sort();
 

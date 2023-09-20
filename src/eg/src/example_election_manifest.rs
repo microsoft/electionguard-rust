@@ -4,6 +4,7 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+
 // `unwrap()` is justified here because these values are fixed at compile time.
 // It is hoped that someday Rust's const generics feature will have improved to
 // the point that we can prove this at compile time, and implement `From` instead.

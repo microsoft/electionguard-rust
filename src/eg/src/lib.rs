@@ -53,7 +53,7 @@
 //!
 //! - [HashesExt](crate::hashes_ext::HashesExt) The extended base hash. This can only be computed
 //!   after the joint election public key is known.
-//!
+
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]

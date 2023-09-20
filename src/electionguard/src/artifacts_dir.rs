@@ -9,7 +9,6 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-#[allow(dead_code)]
 use eg::guardian::GuardianIndex;
 use eg::hash::HValue;
 

@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use eg::{
     contest_encrypted::ContestEncrypted,
     contest_selection::ContestSelectionPlaintext,
@@ -44,7 +51,9 @@ impl PartialEq for ContestPreEncrypted {
 
 impl ContestPreEncrypted {
     pub fn regenerate_nonces(&mut self, device: &Device, primary_nonce: &[u8]) {
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         self.selections.indices().for_each(|j| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             self.selections.get_mut(j).unwrap().regenerate_nonces(
                 device,
                 primary_nonce,
@@ -65,6 +74,7 @@ impl ContestPreEncrypted {
         let num_selections = contest.options.len() + contest.selection_limit;
 
         for j in 1..contest.options.len() + 1 {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let selection = ContestSelectionPreEncrypted::new(
                 pvd,
                 primary_nonce,
@@ -73,10 +83,12 @@ impl ContestPreEncrypted {
                 ContestOptionIndex::from_one_based_index(j as u32).unwrap(),
                 num_selections,
             );
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             selections.try_push(selection).unwrap();
         }
 
         for j in 0..contest.selection_limit {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let selection = ContestSelectionPreEncrypted::new_null(
                 pvd,
                 primary_nonce,
@@ -86,6 +98,7 @@ impl ContestPreEncrypted {
                     .unwrap(),
                 num_selections,
             );
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             selections.try_push(selection).unwrap();
         }
 
@@ -93,7 +106,7 @@ impl ContestPreEncrypted {
         ContestPreEncrypted {
             contest_index,
             selections,
-            contest_hash: contest_hash,
+            contest_hash,
         }
     }
 
@@ -104,7 +117,9 @@ impl ContestPreEncrypted {
     ) -> Vec1<Vec1<ProofRange>> {
         let mut proofs = Vec1::new();
         self.selections.indices().for_each(|i| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let selection = self.selections.get(i).unwrap();
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
                 .try_push(selection.proof_ballot_correctness(
                     pvd,
@@ -128,16 +143,20 @@ impl ContestPreEncrypted {
         let mut selections = <Vec<&Vec<Ciphertext>>>::new();
 
         voter_selections.iter().enumerate().for_each(|(i, v)| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let i =
                 ContestSelectionPreEncryptedIndex::from_one_based_index((i + 1) as u32).unwrap();
             if *v == 1 {
+                #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
                 selections.push(&self.selections.get(i).unwrap().selections);
             }
         });
 
         let mut i = self.selections.len();
         while selections.len() < selection_limit {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let idx = ContestSelectionPreEncryptedIndex::from_one_based_index(i as u32).unwrap();
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             selections.push(&self.selections.get(idx).unwrap().selections);
             i -= 1;
         }
@@ -146,20 +165,24 @@ impl ContestPreEncrypted {
 
         let mut combined_selection = selections[0].clone();
 
+        #[allow(clippy::needless_range_loop)]
         for i in 1..selections.len() {
             for j in 0..combined_selection.len() {
-                let mut combined_selection_j = &mut combined_selection[j];
+                let combined_selection_j = &mut combined_selection[j];
                 let selections_i_j = &selections[i][j];
 
                 combined_selection_j.alpha = (&combined_selection_j.alpha * &selections_i_j.alpha)
                     % fixed_parameters.p.as_ref();
+
                 combined_selection_j.beta = (&combined_selection_j.beta * &selections_i_j.beta)
                     % fixed_parameters.p.as_ref();
-                combined_selection_j.nonce = Some(
+
+                #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
+                let cs_j_nonce =
                     (combined_selection_j.nonce.as_ref().unwrap()
                         + selections_i_j.nonce.as_ref().unwrap())
-                        % fixed_parameters.q.as_ref(),
-                );
+                        % fixed_parameters.q.as_ref();
+                combined_selection_j.nonce = Some(cs_j_nonce);
             }
         }
         combined_selection
@@ -183,6 +206,7 @@ impl ContestPreEncrypted {
         assert!(num_options == voter_selections.len());
 
         for i in 0..num_options {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proof_ballot_correctness
                 .try_push(selection[i].proof_ballot_correctness(
                     &device.header,

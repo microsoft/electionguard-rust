@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use crate::election_record::PreVotingData;
 
 pub struct Device {
@@ -12,7 +19,7 @@ impl Device {
     pub fn new(uuid: &str, header: PreVotingData) -> Self {
         Device {
             uuid: uuid.to_string(),
-            header: header,
+            header,
         }
     }
 
