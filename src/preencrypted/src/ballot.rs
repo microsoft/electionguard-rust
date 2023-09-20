@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use std::{fs, path::PathBuf};
 
 use crate::{
@@ -49,9 +56,12 @@ impl VoterSelection {
         csprng: &mut Csprng,
     ) -> Self {
         let mut selections = Vec1::new();
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         let ballot_style = manifest.ballot_styles.get(ballot_style_index).unwrap();
         ballot_style.contests.iter().for_each(|i| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let contest = manifest.contests.get(*i).unwrap();
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             selections
                 .try_push(ContestSelection::new_pick_random(
                     csprng,
@@ -104,6 +114,7 @@ impl BallotPreEncrypted {
         let b_aux = "Sample aux information.".as_bytes();
 
         // Find contests in manifest corresponding to requested ballot style
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         let ballot_style = header
             .manifest
             .ballot_styles
@@ -112,11 +123,13 @@ impl BallotPreEncrypted {
 
         let mut contests = Vec1::new();
         ballot_style.contests.iter().for_each(|i| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let c = header.manifest.contests.get(*i).unwrap();
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             contests
                 .try_push(ContestPreEncrypted::new(
                     header,
-                    primary_nonce.as_ref(),
+                    primary_nonce,
                     store_nonces,
                     c,
                     *i,
@@ -171,6 +184,7 @@ impl BallotPreEncrypted {
     ) -> BallotEncrypted {
         let mut contests = Vec1::new();
 
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         (1..self.contests.len() + 1).for_each(|i| {
             let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
             let vs_idx = ContestSelectionIndex::from_one_based_index(i as u32).unwrap();

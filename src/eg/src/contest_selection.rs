@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use serde::{Deserialize, Serialize};
 
 use util::{csprng::Csprng, prime::BigUintPrime};
@@ -19,10 +26,10 @@ use crate::{
 
 pub type ContestSelectionPlaintext = u8;
 
-/// A 1-based index of a [`ContestSelection`] in the order it is defined in the [`BallotPlaintext`].
-pub type ContestSelectionPlaintextIndex = Index<ContestSelectionPlaintext>;
+// /// A 1-based index of a [`ContestSelectionPlaintext`] in the order it is defined in the [`crate::election_manifest::ElectionManifest`].
+// pub type ContestSelectionPlaintextIndex = Index<ContestSelectionPlaintext>;
 
-/// A 1-based index of a [`ContestSelection`] in the order it is defined in the [`BallotPlaintext`].
+/// A 1-based index of a [`ContestSelection`].
 pub type ContestSelectionIndex = Index<ContestSelection>;
 
 /// A contest selection by a voter.
@@ -38,16 +45,15 @@ impl ContestSelection {
         selection_limit: usize,
         num_options: usize,
     ) -> Self {
-        let mut vote = Vec::new();
-        for _ in 0..num_options {
-            vote.push(0);
-        }
+        let mut vote = vec![0; num_options];
 
         let selection_limit = csprng.next_u64() as usize % (selection_limit + 1);
         let mut changed = 0;
 
         while changed < selection_limit {
+            //TODO: a tiny bit of bias in this selection method. Better to put a proper `next_u64_lt()` on csprng.
             let idx = csprng.next_u64() as usize % vote.len();
+
             if vote[idx] == 0u8 {
                 vote[idx] = 1u8;
                 changed += 1;
@@ -81,7 +87,7 @@ impl Ciphertext {
         selected: bool,
         q: &BigUintPrime,
     ) -> ProofRange {
-        ProofRange::new(header, csprng, q, &self, selected as usize, 1)
+        ProofRange::new(header, csprng, q, self, selected as usize, 1)
     }
 }
 

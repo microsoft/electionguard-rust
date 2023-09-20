@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use eg::{
     hash::{eg_h, HValue},
     vec1::Vec1,
@@ -17,9 +24,10 @@ pub fn confirmation_code(
     let mut v = vec![0x42];
 
     contests.indices().for_each(|i| {
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         v.extend(contests.get(i).unwrap().contest_hash.as_ref());
     });
 
     v.extend_from_slice(b_aux);
-    eg_h(&h_e, &v)
+    eg_h(h_e, &v)
 }

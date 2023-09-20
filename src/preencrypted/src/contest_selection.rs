@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use eg::{
     device::Device,
     election_manifest::{ContestIndex, ContestOptionIndex},
@@ -49,6 +56,7 @@ impl ContestSelectionPreEncrypted {
         contest_index: ContestIndex,
         j: ContestOptionIndex,
     ) {
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         for k in 1..self.selections.len() + 1 {
             self.selections[k].nonce = Some(option_nonce(
                 &device.header,
@@ -68,11 +76,13 @@ impl ContestSelectionPreEncrypted {
         j: ContestOptionIndex,
         num_selections: usize,
     ) -> ContestSelectionPreEncrypted {
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         let index =
             ContestSelectionPreEncryptedIndex::from_one_based_index(j.get_one_based_u32()).unwrap();
 
         let mut selections = Vec::new();
         for k in 1..num_selections + 1 {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
             let nonce = option_nonce(pvd, primary_nonce, contest_index, j, k);
             selections.push(pvd.public_key.encrypt_with(
@@ -83,7 +93,7 @@ impl ContestSelectionPreEncrypted {
             ))
         }
 
-        let selection_hash = BallotEncryptingTool::selection_hash(&pvd, &selections);
+        let selection_hash = BallotEncryptingTool::selection_hash(pvd, &selections);
 
         // Generate pre-encrypted votes for each possible (single) choice
         ContestSelectionPreEncrypted {
@@ -103,10 +113,12 @@ impl ContestSelectionPreEncrypted {
         num_selections: usize,
     ) -> ContestSelectionPreEncrypted {
         let mut selections = Vec::new();
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         let index =
             ContestSelectionPreEncryptedIndex::from_one_based_index(null_index.get_one_based_u32())
                 .unwrap();
         for k in 1..num_selections + 1 {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
             let nonce = option_nonce(pvd, primary_nonce, contest_index, null_index, k);
             selections.push(pvd.public_key.encrypt_with(
@@ -138,6 +150,7 @@ impl ContestSelectionPreEncrypted {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
         self.selections.iter().enumerate().for_each(|(i, c)| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
                 .try_push(c.proof_ballot_correctness(pvd, csprng, sequence_order == i, q))
                 .unwrap();

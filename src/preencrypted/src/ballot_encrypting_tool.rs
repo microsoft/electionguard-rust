@@ -1,5 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use std::collections::HashSet;
 
 use anyhow::Result;
@@ -56,6 +61,7 @@ impl BallotEncryptingTool {
         );
         Logging::log(tag, "  Contests", line!(), file!());
         ballot.contests.indices().for_each(|i| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             Logging::log(
                 tag,
                 &format!("    {:?}", ballot.contests.get(i).unwrap().contest_hash),
@@ -88,7 +94,7 @@ impl BallotEncryptingTool {
     /// Writes a list of confirmation codes to a file.
     pub fn metadata_to_stdiowrite(
         &self,
-        codes: &Vec<HValue>,
+        codes: &[HValue],
         stdiowrite: &mut dyn std::io::Write,
     ) -> Result<()> {
         stdiowrite.write_fmt(format_args!(
@@ -110,7 +116,7 @@ impl BallotEncryptingTool {
     /// Generates a selection hash (Equation 93/94)
     ///
     /// ψ_i = H(H_E;40,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
-    pub fn selection_hash(header: &PreVotingData, selections: &Vec<Ciphertext>) -> HValue {
+    pub fn selection_hash(header: &PreVotingData, selections: &[Ciphertext]) -> HValue {
         let mut v = vec![0x40];
 
         v.extend_from_slice(
@@ -131,6 +137,7 @@ impl BallotEncryptingTool {
 
     /// Returns true iff all shortcodes within each preencrypted contest on a ballot are unique
     pub fn are_unique_shortcodes(contests: &Vec1<ContestPreEncrypted>) -> bool {
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         contests
             .indices()
             .map(|i| {

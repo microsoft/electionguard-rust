@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
@@ -65,15 +72,20 @@ impl BallotEncrypted {
         let mut contests = Vec1::with_capacity(ctest_selections.len());
 
         for i in 1..ctest_selections.len() + 1 {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
+
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let s_idx = ContestSelectionIndex::from_one_based_index(i as u32).unwrap();
+
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             contests
                 .try_push(ContestEncrypted::new(
                     device,
                     csprng,
                     primary_nonce,
-                    &device.header.manifest.contests.get(c_idx).unwrap(),
-                    &ctest_selections.get(s_idx).unwrap(),
+                    device.header.manifest.contests.get(c_idx).unwrap(),
+                    ctest_selections.get(s_idx).unwrap(),
                 ))
                 .unwrap();
         }
@@ -88,10 +100,10 @@ impl BallotEncrypted {
         //     ));
         // }
         let confirmation_code =
-            confirmation_code(&device.header.hashes_ext.h_e, &contests, &vec![0u8; 32]);
+            confirmation_code(&device.header.hashes_ext.h_e, &contests, &[0u8; 32]);
 
         BallotEncrypted {
-            contests: contests,
+            contests,
             state: BallotState::Uncast,
             confirmation_code,
             date: device.header.parameters.varying_parameters.date.clone(),

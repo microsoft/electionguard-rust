@@ -1,3 +1,10 @@
+// Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use crate::{
     // contest_selection::ContestSelectionCiphertext,
     election_record::PreVotingData,
@@ -12,7 +19,7 @@ use crate::{
 pub fn contest_hash(
     header: &PreVotingData,
     contest_label: &String,
-    vote: &Vec<Ciphertext>,
+    vote: &[Ciphertext],
 ) -> HValue {
     let mut v = vec![0x23];
 
