@@ -178,10 +178,9 @@ impl ContestPreEncrypted {
                     % fixed_parameters.p.as_ref();
 
                 #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-                let cs_j_nonce =
-                    (combined_selection_j.nonce.as_ref().unwrap()
-                        + selections_i_j.nonce.as_ref().unwrap())
-                        % fixed_parameters.q.as_ref();
+                let cs_j_nonce = (combined_selection_j.nonce.as_ref().unwrap()
+                    + selections_i_j.nonce.as_ref().unwrap())
+                    % fixed_parameters.q.as_ref();
                 combined_selection_j.nonce = Some(cs_j_nonce);
             }
         }

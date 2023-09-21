@@ -182,10 +182,10 @@ impl ProofRange {
 
         // 4.A
         // TODO
-        
+
         // 4.B
         // TODO
-        
+
         // 4.C
         // TODO
     }

@@ -58,14 +58,19 @@ pub(crate) enum Subcommands {
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
 
-    //TODO /// Generate an encrypted share of the guardian secret key.    
+    //TODO /// Generate an encrypted share of the guardian secret key.
     //TODO GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
+    //
 
     /// Generate pre-encrypted ballots.
-    PreEncryptedBallotGenerate(crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate),
+    PreEncryptedBallotGenerate(
+        crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate,
+    ),
 
     /// Record voter selections for pre-encrypted ballots.
-    PreEncryptedBallotRecord(crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord),
+    PreEncryptedBallotRecord(
+        crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord,
+    ),
 
     /// Generate a guardian secret key.
     GuardianSecretKeyGenerate(
@@ -78,11 +83,14 @@ pub(crate) enum Subcommands {
     ),
 
     /// Write the confirmation QR code for a voter.
-    VoterWriteConfirmationCode(crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode),
+    VoterWriteConfirmationCode(
+        crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode,
+    ),
 
     //TODO /// Write random ballot selections to a file for testing.
     //TODO VoterWriteRandomSelections(crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection),
-    
+    //
+
     /// Compute the joint election public key from the guardian public keys and write it to a file.
     WriteJointElectionPublicKey(
         crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,

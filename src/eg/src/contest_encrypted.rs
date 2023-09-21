@@ -176,7 +176,7 @@ impl ContestEncrypted {
         let mut sum_nonce = sum_ct.nonce.as_ref().unwrap().clone();
 
         // Subsequent elements in the selection
-        
+
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         for sel in selection.iter().skip(1) {
             sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
