@@ -52,8 +52,7 @@ impl Subcommand for PreEncryptedBallotRecord {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng =
-            subcommand_helper.get_csprng("PreEncryptedBallotGenerate".as_bytes())?;
+        let mut csprng = subcommand_helper.get_csprng("PreEncryptedBallotGenerate".as_bytes())?;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let election_parameters =

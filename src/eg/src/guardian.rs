@@ -22,7 +22,6 @@ pub struct GuardianIndexTag;
 ///
 pub type GuardianIndex = Index<GuardianIndexTag>;
 
-
 // use std::{borrow::Borrow, rc::Rc};
 
 // use num_bigint::BigUint;
