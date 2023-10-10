@@ -2,4 +2,9 @@
 **/target
 **/.cargo
 **/.vscode
+
+**/pkg
+**/.DS_Store
 **/local.settings.json
+
+**/artifacts

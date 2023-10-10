@@ -38,6 +38,15 @@ pub fn largest_integer_a_such_that_2_to_a_divides_even_n(n: &BigUint) -> u64 {
     n.trailing_zeros().unwrap()
 }
 
+// Returns the smallest integer `b` such that `b > a && b | n`.
+pub fn round_to_next_multiple(a: usize, x: usize) -> usize {
+    if a % x == 0 {
+        a
+    } else {
+        a + (x - (a % x))
+    }
+}
+
 pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     let n: &BigUint = n.borrow();
 

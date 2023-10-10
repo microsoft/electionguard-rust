@@ -25,6 +25,10 @@ pub(crate) struct WriteHashes {
     /// If "-", write to stdout.
     #[arg(long)]
     out_file: Option<PathBuf>,
+
+    /// Whether to write extended hashes.
+    #[arg(long, default_value_t = false)]
+    extended: bool,
 }
 
 impl Subcommand for WriteHashes {

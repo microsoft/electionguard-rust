@@ -30,7 +30,7 @@ pub fn example_election_manifest() -> ElectionManifest {
     .unwrap();
 
     let contests = [
-        // Context index 1:
+        // Contest index 1:
         Contest {
             label: "For President and Vice President of The United Realms of Imaginaria"
                 .to_string(),
@@ -46,7 +46,7 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 2:
+        // Contest index 2:
         Contest {
             label: "Minister of Arcane Sciences".to_string(),
             selection_limit: 1,
@@ -65,7 +65,7 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 3:
+        // Contest index 3:
         Contest {
             label: "Minister of Elemental Resources".to_string(),
             selection_limit: 1,
@@ -81,7 +81,7 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 4:
+        // Contest index 4:
         Contest {
             label: "Minister of Dance".to_string(),
             selection_limit: 1,
@@ -97,7 +97,7 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 5:
+        // Contest index 5:
         Contest {
             label: "Gränd Cøuncil of Arcáne and Technomägical Affairs".to_string(),
             selection_limit: 3,
@@ -137,7 +137,7 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 6:
+        // Contest index 6:
         Contest {
             label: "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions".to_string(),
             selection_limit: 1,
@@ -150,25 +150,25 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 7:
+        // Contest index 7:
         Contest {
             label: "Privacy Protection in Techno-Magical Communications Act".to_string(),
             selection_limit: 1,
             options: referendum_options.clone(),
         },
-        // Context index 8:
+        // Contest index 8:
         Contest {
             label: "Public Transport Modernization and Enchantment Proposal".to_string(),
             selection_limit: 1,
             options: referendum_options.clone(),
         },
-        // Context index 9:
+        // Contest index 9:
         Contest {
             label: "Renewable Ætherwind Infrastructure Initiative".to_string(),
             selection_limit: 1,
             options: referendum_options,
         },
-        // Context index 10:
+        // Contest index 10:
         Contest {
             label: "For Librarian-in-Chief of Smoothstone County".to_string(),
             selection_limit: 1,
@@ -181,7 +181,7 @@ pub fn example_election_manifest() -> ElectionManifest {
                 },
             ].try_into().unwrap(),
         },
-        // Context index 11:
+        // Contest index 11:
         Contest {
             label: "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained"
                 .to_string(),

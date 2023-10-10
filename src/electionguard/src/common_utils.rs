@@ -14,12 +14,12 @@ use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
     example_election_manifest::example_election_manifest, guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey, guardian_secret_key::GuardianSecretKey, hashes::Hashes,
-    joint_election_public_key::JointElectionPublicKey,
+    hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey,
 };
 use util::csprng::Csprng;
 
 use crate::artifacts_dir::{ArtifactFile, ArtifactsDir};
-
+#[allow(dead_code)]
 pub(crate) enum ElectionManifestSource {
     ArtifactFileElectionManifestPretty,
     ArtifactFileElectionManifestCanonical,
@@ -164,6 +164,43 @@ pub(crate) fn load_guardian_public_key(
     Ok(guardian_public_key)
 }
 
+pub(crate) fn load_joint_election_public_key(
+    artifacts_dir: &ArtifactsDir,
+    election_parameters: &ElectionParameters,
+) -> Result<JointElectionPublicKey> {
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::JointElectionPublicKey))?;
+
+    let joint_election_public_key =
+        JointElectionPublicKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
+
+    eprintln!("Joint election public key loaded from: {}", path.display());
+
+    Ok(joint_election_public_key)
+}
+
+pub(crate) fn load_hashes(artifacts_dir: &ArtifactsDir) -> Result<Hashes> {
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::Hashes))?;
+
+    let hashes = Hashes::from_stdioread_validated(&mut stdioread)?;
+
+    eprintln!("Hashes loaded from: {}", path.display());
+
+    Ok(hashes)
+}
+
+pub(crate) fn load_hashes_ext(artifacts_dir: &ArtifactsDir) -> Result<HashesExt> {
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::HashesExt))?;
+
+    let hashes = HashesExt::from_stdioread_validated(&mut stdioread)?;
+
+    eprintln!("HashesExt loaded from: {}", path.display());
+
+    Ok(hashes)
+}
+
 /// Read the recommended amount of seed data from the OS RNG.
 ///
 /// `OsRng` is implemented by the `getrandom` crate, which describes itself as an "Interface to
@@ -194,30 +231,4 @@ pub(crate) fn load_all_guardian_public_keys(
     }
 
     Ok(guardian_public_keys)
-}
-
-pub(crate) fn load_hashes(artifacts_dir: &ArtifactsDir) -> Result<Hashes> {
-    let (mut stdioread, path) =
-        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::Hashes))?;
-
-    let hashes = Hashes::from_stdioread_validated(&mut stdioread)?;
-
-    eprintln!("Hashes loaded from: {}", path.display());
-
-    Ok(hashes)
-}
-
-pub(crate) fn load_joint_election_public_key(
-    artifacts_dir: &ArtifactsDir,
-    election_parameters: &ElectionParameters,
-) -> Result<JointElectionPublicKey> {
-    let (mut stdioread, path) =
-        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::JointElectionPublicKey))?;
-
-    let joint_election_public_key =
-        JointElectionPublicKey::from_stdioread_validated(&mut stdioread, election_parameters)?;
-
-    eprintln!("Joint election public key loaded from: {}", path.display());
-
-    Ok(joint_election_public_key)
 }
