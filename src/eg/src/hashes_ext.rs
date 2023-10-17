@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     election_parameters::ElectionParameters,
     guardian_public_key::GuardianPublicKey,
-    guardian_public_key_info::GuardianPublicKeyInfo,
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
@@ -32,35 +31,21 @@ impl HashesExt {
     ) -> Self {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
-
         let n = varying_parameters.n.as_quantity();
-        let k = varying_parameters.k.as_quantity();
 
         assert_eq!(guardian_public_keys.len(), n);
 
         // Computation of the extended base hash H_E.
-
+        // HE = H(HB ; 0x12, K)
+        // B0 = HB
+        // B1 = 0x12 ∥ b(K, 512)
+        // len(B1 ) = 513
         let h_e = {
-            // B1 = 12 ∥ b(K, 512) ∥ b(K1,0, 512) ∥ b(K1,1, 512) ∥ · · · ∥ b(Kn,k−1, 512)
             let mut v = vec![0x12];
 
             // K = election public key
             v.append(&mut joint_election_public_key.to_be_bytes_len_p(fixed_parameters));
 
-            for public_key in guardian_public_keys.iter() {
-                let coefficient_commitments = public_key.coefficient_commitments();
-                for coefficient_commitment in coefficient_commitments.0.iter() {
-                    v.append(&mut coefficient_commitment.to_be_bytes_len_p(fixed_parameters));
-                }
-            }
-
-            // len(B1) = 1 + (n · k + 1) · 512
-            let expected_mod_p_values = 1 + n * k;
-            let expected_len = 1 + expected_mod_p_values * fixed_parameters.l_p_bytes();
-            debug_assert_eq!(v.len(), expected_len);
-
-            // HE = H(HB; 12, K, K1,0, K1,1, . . . , Kn,k−2, Kn,k−1) (20)
-            // B0 = H_B
             eg_h(&hashes.h_b, &v)
         };
 

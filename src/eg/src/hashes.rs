@@ -33,15 +33,20 @@ impl Hashes {
         election_parameters: &ElectionParameters,
         election_manifest: &ElectionManifest,
     ) -> Result<Self> {
-        // H_V = 322E302E30 ∥ b(0, 27)
+        // H_V = 0x76322E302E30 ∥ b(0, 26).
         let h_v: HValue = [
-            0x32, 0x2E, 0x30, 0x2E, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
+            0x76, 0x32, 0x2E, 0x30, 0x2E, 0x30,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ]
         .into();
 
         // Computation of the parameter base hash H_P.
+        // HP = H(ver; 0x00, p, q, g)
+        // B0 = ver = 0x76322E302E30 ∥ b(0, 26).
+        // B1 = 0x00 ∥ b(p, 512) ∥ b(q, 32) ∥ b(g, 512)
+        // len(B1 ) = 1057
         let h_p = {
             // H_P = H(HV ; 00, p, q, g)
 
@@ -59,20 +64,30 @@ impl Hashes {
         };
 
         // Computation of the election manifest hash H_M.
-
+        // HM = H(HP ; 0x01, manifest)
+        // B0 = HP
+        // B1 = 0x01 ∥ b(len(manifest), 4) ∥ b(manifest, len(manifest))
+        // len(B1 ) = 5 + len(manifest)
         let h_m = {
             let mut v = vec![0x01];
 
             let mut v_manifest_bytes = election_manifest.to_canonical_bytes()?;
+            let v_manifest_nbytes = v_manifest_bytes.len() as u32;
+            v.extend_from_slice(&mut v_manifest_nbytes.to_be_bytes());
             v.append(&mut v_manifest_bytes);
 
             eg_h(&h_p, &v)
         };
 
         // Computation of the election base hash H_B.
-
+        // HB = H(HP ; 0x02, HM , n, k)
+        // B0 = HP
+        // B1 = 0x02 ∥ HM ∥ b(n, 4) ∥ b(k, 4)
+        // len(B1 ) = 41
         let h_b = {
             let mut v = vec![0x02];
+
+            v.extend_from_slice(h_m.as_ref());
 
             for u in [
                 election_parameters.varying_parameters.n,
@@ -80,15 +95,6 @@ impl Hashes {
             ] {
                 v.extend_from_slice(&u.get_one_based_u32().to_be_bytes());
             }
-
-            for u in [
-                &election_parameters.varying_parameters.date,
-                &election_parameters.varying_parameters.info,
-            ] {
-                v.extend_from_slice(u.as_bytes());
-            }
-
-            v.extend_from_slice(h_m.as_ref());
 
             eg_h(&h_p, &v)
         };
