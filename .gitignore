@@ -1,10 +1,9 @@
-**/Cargo.lock
-**/target
 **/.cargo
-**/.vscode
-
-**/pkg
 **/.DS_Store
-**/local.settings.json
-
+**/.errorviz-version
+**/.vscode
 **/artifacts
+**/Cargo.lock
+**/local.settings.json
+**/pkg
+**/target
