@@ -108,43 +108,92 @@ This RFC states that: "Implementations MUST include appropriate pad characters a
 
 Guardians may re-use the same key for multiple elections. Perhaps this should be explicitly stated in the EG spec.
 
-# TODO Things yet to discuss
-
-* Most US ballots I've seen do have line breaks in the contest options. Do we need to allow them?
-
 ## Structure of an election
 
-Some sources:
+### References
 
-[NIST SP 1500-100r2 Election Results Common Data Format 
-Specification](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.1500-100r2.pdf)
+***Note*** Neither the ElectionGuard 2.0 Reference Specification nor this
+Reference Implementation claims conformance to any official standards.
+But it attempts to avoid gratuitous incompatibilities in the hope that it
+will be straightforward to integrate within or interoperate with conformant
+election systems.
 
-Google [Civics Common Standard Data Specification](https://developers.google.com/civics-data)
+[ElectionGuard Glossary](https://www.electionguard.vote/overview/Glossary/) at electionguard.vote
+* Explicitly aims to conform with NIST CDF
 
-TODO
+[NIST Election Terminology Glossary](https://pages.nist.gov/ElectionGlossary/)
+* "This glossary contains election terms including those used in the Voluntary Voting System Guidelines 2.0
+(VVSG 2.0) requirements and glossary and in the NIST Common Data Format (CDF)"
 
-### Roles
+[NIST SP 1500-20 Ballot Definition Common Data Format Specification](https://doi.org/10.6028/NIST.SP.1500-20)
+"BD CDF"
+* "This publication describes a ballot definition common data format for the interchange of logical 
+and physical ballot style information. It contains a UML (Unified Modeling Language) model of 
+the election data and a JSON (JavaScript Object Notation) and XML (eXtensible Markup 
+Language) format derived from the UML model. It contains background information regarding 
+how geopolitical geography is structured and used in the model and schemas. It also provides 
+usage examples for anticipated use-cases. The format is comprehensive and at the same time 
+very flexible, able to accommodate election scenarios used throughout the U.S. It is part of a 
+series of common data format specifications for voting equipment."
 
-TODO
+[NIST SP 1500-100r2 Election Results Common Data Format Specification](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.1500-100r2.pdf)
+"CDF"
+* "This publication describes an election results common data format specification for pre-election
+setup information and post-election results reporting. It contains a UML (Unified Modeling 
+Language) model of the election data and an XML (eXtensible Markup Language) and JSON 
+(JavaScript Object Notation) format derived from the UML model. It also contains background 
+information regarding how geopolitical geography is structured and used in the model and 
+schema. The XML format is comprehensive and at the same time very flexible, able to 
+accommodate election scenarios used throughout the U.S. It is part of a series of planned 
+common data format specifications for voting equipment"
+
+[NIST CDF Test Data Sets](https://github.com/usnistgov/cdf-test-method/tree/main/test_data)
+* Six different test elections with completed ballots.
+* Suggested to start with GEN-03, then 02, then 01.
+
+[Voluntary Voting System Guidelines 2.0](https://www.eac.gov/sites/default/files/TestingCertification/Voluntary_Voting_System_Guidelines_Version_2_0.pdf)
+"VVSG"
+* "This document will be used primarily by voting system manufacturers and voting system test 
+laboratories as a baseline set of requirements for voting systems to which states will add their 
+state-specific requirements as necessary. [...] This document, therefore, serves as an important,
+foundational tool that defines a baseline set or requirements necessary for ensuring that the
+voting systems used in U.S. elections will be secure, reliable, and easy for all voters to use accurately."
+
+[Google Civics Common Standard Data Specification](https://developers.google.com/civics-data)
+* Wherever they conflict, the NIST CDF is authoritative.
+
+## Requirements for election systems vendors
+
+## Requirements for verifier app authors
+
+## Roles
 
 #### Election Administrator
 
-TODO
+#### Election Guardians
 
-#### Election Guardian
+#### Voters
 
-TODO
+#### Political parties and voter-interest organizations
 
-#### Voter
+#### Journalists and other media
 
-TODO
+## Hardware requirements
 
-### Hardware requirements
+### Gurardian secret key storage
 
-Gurardian secret key storage TODO
+### Gurardian secret key operations
 
-Gurardian secret key operations TODO
+## Step-by-step Operation
 
-Mixing TODO
+### Advance preparation
 
+### Key ceremony
 
+### Tally ceremony
+
+### Publishing
+
+### Verification
+
+### Reporting

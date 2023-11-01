@@ -6,6 +6,8 @@
 
 - [BUILDING](BUILDING.html)
 
+- [TODO.txt](TODO.txt) A fine-grained snapshot of the current status of the implementation.
+
 - [Specifications](specs)/
     - [ElectionGuard Design Specification v2.0.0 2023-08-18](specs/ElectionGuard%20Design%20Specification%20v2.0.0%202023-08-18.pdf)
       The primary specification.
