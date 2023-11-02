@@ -42,7 +42,7 @@ def main [
     let election_parameters = {
         n: 5
         k: 3
-        date: (date now | date format "%Y-%m-%d")
+        date: (date now | format date "%Y-%m-%d")
         info: $"The United Realms of Imaginaria General Election ((date now | date to-record).year)"
     }
 
