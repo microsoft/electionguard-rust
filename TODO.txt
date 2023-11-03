@@ -186,450 +186,6 @@ docs/api: reference NIST CDF where types clearly correspond. E.g., BallotStyle h
 
 %%%%%%%%%%%%% The plan here is to chop up the specification text and extract statements that can be translate into test cases
 
-\newcommand{\C}{\mathbb{C}}
-\newcommand{\F}{\mathbb{F}}
-\newcommand{\N}{\mathbb{N}}
-\newcommand{\Q}{\mathbb{Q}}
-\newcommand{\R}{\mathbb{R}}
-\newcommand{\Z}{\mathbb{Z}}
-\newcommand{\Bcal}{\mathcal{B}}
-\newcommand{\Ccal}{\mathcal{C}}
-\newcommand{\Ecal}{\mathcal{E}}
-\newcommand{\Ocal}{\mathcal{O}}
-\newcommand{\Scal}{\mathcal{S}}
-\newcommand{\Mbar}{\overline{M}}
-\newcommand{\len}{\mathrm{len}}
-\newcommand{\B}{\mathrm{B}}
-\newcommand{\HH}{\mathrm{H}}
-\newcommand{\VV}{\mathrm{V}}
-
-\newcommand{\styleScheme}[1]{\textsf{\upshape\mdseries #1}\xspace}
-\newcommand{\EG}{\styleScheme{ElectionGuard}}
-\newcommand{\KDF}{\styleScheme{KDF}}
-\newcommand{\MAC}{\styleScheme{MAC}}
-
-\newcommand{\styleAlgorithm}[1]{\textrm{\upshape\mdseries #1}\xspace}
-\newcommand{\HMAC}{\styleAlgorithm{HMAC}}
-\newcommand{\SHA}{\styleAlgorithm{SHA-256}}
-\newcommand{\HMACSHA}{\styleAlgorithm{HMAC-SHA-256}}
-\newcommand{\Enc}{\styleAlgorithm{Enc}}
-
-\newcommand{\byte}{\texttt{byte}}
-\newcommand{\str}{\texttt{string}}
-\newcommand{\Str}[1]{\mathtt{``#1"}}
-\newcommand{\arr}{\texttt{array}}
-\newcommand{\Map}[2]{\texttt{finite map} (#1 $\mapsto$ #2)}
-\newcommand{\map}{\texttt{finite map}}
-\newcommand{\integer}{\texttt{integer}}
-\newcommand{\intp}{\texttt{BigInt4096}}
-\newcommand{\intq}{\texttt{BigInt256}}
-\newcommand{\intr}{\texttt{BigInt3841}}
-\newcommand{\bool}{\texttt{bool}}
-\newcommand{\bytes}{\mathtt{b}}
-\newcommand{\ind}{\mathtt{ind}}
-\newcommand{\indc}{\mathtt{ind}_\mathtt{c}}
-\newcommand{\indo}{\mathtt{ind}_\mathtt{o}}
-\newcommand{\inds}{\mathtt{ind}_\mathtt{s}}
-
-\newcommand\EGverif[2]{
-\vspace{5pt}
-\noindent\hspace{-7pt}\fcolorbox{darkgreen}{eggreen}{
-\begin{minipage}{\textwidth}
-  \vspace{-4pt}
-  \setlength{\leftmargini}{0.38in}
-  \textcolor{egtextgreen}{\begin{verification}[#1] #2 \end{verification}}
-  \vspace{-4pt}
-\end{minipage}
-}\vspace{5pt}}
-
-\newcommand\EGverifrepeat[3]{
-\setcounterref{verification}{#1}
-\addtocounter{verification}{-1}
-\EGverif{#2}{#3}}
-
-\newcommand\EGverifBallot[2]{
-\vspace{5pt}
-\noindent\hspace{-7pt}\fcolorbox{darkblue}{egblue}{
-\begin{minipage}{\textwidth}
-  \vspace{-4pt}
-  \setlength{\leftmargini}{0.38in}
-  \textcolor{egtextblue}{\begin{verification}[#1] #2 \end{verification}}
-  \vspace{-4pt}
-\end{minipage}
-}\vspace{5pt}}
-
-\newcommand\EGverifBallotrepeat[3]{
-\setcounterref{verification}{#1}
-\addtocounter{verification}{-1}
-\EGverifBallot{#2}{#3}}
-
-\newcommand\EGverifExtended[2]{
-\vspace{5pt}
-\noindent\hspace{-7pt}\fcolorbox{black}{egorange}{
-\begin{minipage}{\textwidth}
-  \vspace{-4pt}
-  \setlength{\leftmargini}{0.38in}
-  \textcolor{egtextblue}{\begin{verification}[#1] #2 \end{verification}}
-  \vspace{-4pt}
-\end{minipage}
-}\vspace{5pt}}
-
-\newcommand\EGverifExtendedrepeat[3]{
-\setcounterref{verification}{#1}
-\addtocounter{verification}{-1}
-\EGverifExtended{#2}{#3}}
-
-\newcommand\ertabular[2]{
-\begin{center}
-\renewcommand{\tabcolsep}{8pt}
-\renewcommand{\arraystretch}{1.5}
-\begin{tabularx}{\textwidth}{X|l|l|r}
-\multicolumn{4}{l}{#1} \\
-\toprule
-information & key & value & symbol\\
-\midrule
-#2
-\bottomrule
-\end{tabularx}
-\end{center}}
-
-\newcommand\ertabularnosym[2]{
-\begin{center}
-\renewcommand{\tabcolsep}{8pt}
-\renewcommand{\arraystretch}{1.5}
-\begin{tabularx}{\textwidth}{X|l|X}
-\multicolumn{3}{l}{#1} \\
-\toprule
-information & key & value\\
-\midrule
-#2
-\bottomrule
-\end{tabularx}
-\end{center}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Text for verification boxes is defined here once such that it can be included
-% several times in the document and needs to be changed only once here.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newcommand{\veriftitleParameterValidation}{Parameter validation}
-\newcommand{\veriftextParameterValidation}{
-An \EG election verifier must verify that it uses the correct version of the \EG specification, that it uses the standard baseline parameters, which may be hardcoded, and that the base hash values have been computed correctly. 
-\begin{enumerate}
-\item[(\theverification.A)] The \EG specification version used to generate the election record is the same as the \EG specification version used to verify the election record. 
-\item[(\theverification.B)] The large prime is equal to the large modulus $p$ defined in Section~\ref{sec:parameters}.
-\item[(\theverification.C)] The small prime is equal to the prime $q$ defined in Section~\ref{sec:parameters}.
-\item[(\theverification.D)] The cofactor is equal to the value $r$ defined in Section~\ref{sec:parameters}. 
-\item[(\theverification.E)] The generator is equal to the generator $g$ defined in Section~\ref{sec:parameters}.
-\item[(\theverification.F)] The parameter base hash has been computed correctly as $$\HH_P = H(\mathtt{ver}; \mathtt{0x00}, p, q, g)$$
-using the version byte array $\mathtt{ver} = \mathtt{0x76322E302E30} \parallel \bytes(0, 26)$, which is the UTF-8 encoding of the version string $\Str{v2.0.0}$ padded with $\mathtt{0x00}$-bytes to length $32$ bytes.
-\item[(\theverification.G)] The manifest hash has been computed correctly from the manifest as $$\HH_M = H(\HH_P; \mathtt{0x01}, \mathtt{manifest}).$$
-\item[(\theverification.H)] The base hash has been computed correctly as $$\HH_B = (\HH_P; \mathtt{0x02}, \HH_M, n, k).$$
-\end{enumerate}}
-
-\newcommand{\veriftitleGuardianPublicKeyValidation}{Guardian public-key validation}
-\newcommand{\veriftextGuardianPublicKeyValidation}{
-For each guardian $G_i$, $1\leq i \leq n$, and for each $j\in\Z_k$, an election verifier must compute the value
-\begin{enumerate}
-\item[(\theverification.1)] $h_{i,j} = g^{v_{i,j}} \cdot K_{i,j}^{c_{i,j}} \bmod p$
-\end{enumerate}
-and then must confirm the following.
-\begin{enumerate}
-\item[(\theverification.A)] The value $K_{i,j}$ is in $\Z_p^r$. (A value $x$ is in $\Z_p^r$ if and only if $x$ is an integer such that $0\leq x<p$ and $x^q \bmod p = 1$ is satisfied.)
-\item[(\theverification.B)] The value $v_{i,j}$ is in $\Z_q$. (A value $x$ is in $\Z_q$ if and only if $x$ is an integer such that $0\leq x<q$.) 
-\item[(\theverification.C)] The challenge $c_{i,j}$ is correctly computed as $c_{i,j} = H(\HH_P; \mathtt{0x10}, i, j, K_{i,j}, h_{i,j})$.
-\end{enumerate}}
-
-\newcommand{\veriftitleElectionPublicKeyValidation}{Election public-key validation}
-\newcommand{\veriftextElectionPublicKeyValidation}{
-An election verifier must verify the correct computation of the joint election public key.
-\begin{enumerate}
-\item[(\theverification.A)] The value $K_{i}$ is in $\Z_p^r$ and $K_i \neq 1 \bmod p$ for all $1 \leq i \leq n$.
-\item[(\theverification.B)] $K = \prod_{i=1}^n K_i \bmod p$ and $K \neq 1 \bmod p$.
-\end{enumerate}}
-
-\newcommand{\veriftitleExtendedBaseHashValidation}{Extended base hash validation}
-\newcommand{\veriftextExtendedBaseHashValidation}{
-An election verifier must verify the correct computation of the extended base hash.
-\begin{enumerate}
-\item[(\theverification.A)] $\HH_E = H(\HH_B; \mathtt{0x12},K)$.
-\end{enumerate}}
-
-\newcommand{\veriftitleCorrectnessOfSelectionEncryptions}{Well-formedness of selection encryptions}
-\newcommand{\veriftextCorrectnessOfSelectionEncryptions}{
-For each selectable option on each cast ballot, an election verifier must compute the values
-\begin{enumerate}
-    \item[(\theverification.1)] $a_j = g^{v_j} \cdot \alpha^{c_j} \bmod p$ for all $0\leq j \leq R$,
-    \item[(\theverification.2)] $b_j = K^{w_j} \cdot \beta^{c_j}\bmod p$, where $w_j = (v_j-jc_j) \bmod q$ for all $0\leq j \leq R$,
-    \item[(\theverification.3)] $c = H(\HH_E;\mathtt{0x21},K,\alpha,\beta,a_0,b_0,a_1,b_1,\dots,a_R,b_R)$,
-    \end{enumerate}
-where $R$ is the option selection limit. An election verifier must then confirm the following:
-\begin{enumerate}
-\item[(\theverification.A)] The given values $\alpha$ and $\beta$ are in the set $\Z_p^r$. \\
-(A value $x$ is in $\Z_p^r$ if and only if $x$ is an integer such that $0\leq x<p$ and $x^q \bmod p = 1$.) 
-\item[(\theverification.B)] The given values $c_j$ each satisfy $0\leq c_j < 2^{256}$  for all $0\leq j \leq R$.
-\item[(\theverification.C)] The given values $v_j$ are each in the set $\Z_q$ for all $0\leq j \leq R$. \\(A value $x$ is in $\Z_q$ if and only if $x$ is an integer such that $0\leq x<q$.)
-\item[(\theverification.D)] The equation $c = (c_0+c_1 + \dots + c_R) \bmod q$ is satisfied.
-
-\end{enumerate}}
-
-\newcommand{\veriftitleAdherenceToVoteLimits}{Adherence to vote limits}
-\newcommand{\veriftextAdherenceToVoteLimits}{
-For each contest on each cast ballot, an election verifier must compute the contest totals
-\begin{enumerate}
-\item[(\theverification.1)] $\bar\alpha = \prod_i\alpha_i \bmod p$,
-\item[(\theverification.2)] $\bar\beta = \prod_i\beta_i \bmod p$,
-\end{enumerate}
-where the $(\alpha_i,\beta_i)$ represent all possible selections for the contest, as well as the values
-\begin{enumerate}
-\item[(\theverification.3)] $a_j = g^{v_j} \cdot \bar\alpha^{c_j} \bmod p$ for all $0\leq j \leq L$,
-\item[(\theverification.4)] $b_j = K^{w_j} \cdot \bar\beta^{c_j}\bmod p$, where $w_j = (v_j-jc_j) \bmod q$ for all $0\leq j \leq L$,
-\item[(\theverification.5)] $c = H(\HH_E;\mathtt{0x21},K,\bar\alpha,\bar\beta,a_0,b_0,a_1,b_1,\dots,a_L,b_L)$,
-\end{enumerate}
-where $L$ is the contest selection limit.
-An election verifier must then confirm the following:
-\begin{enumerate}
-  \item[(\theverification.A)] The given values $\alpha_i$ and $\beta_i$ are each in $\Z_p^r$.
-  \item[(\theverification.B)] The given values $c_j$ each satisfy $0 \leq c_j < 2^{256}$.
-  \item[(\theverification.C)] The given values $v_j$ are each in $\Z_q$ for all $0\leq j \leq L$.
-  \item[(\theverification.D)] The equation $c = (c_0 + c_1 + \dots + c_L) \bmod q$ is satisfied.
-\end{enumerate}}
-
-\newcommand{\veriftitleValidationOfTrackingCodes}{Validation of confirmation codes}
-\newcommand{\veriftextValidationOfTrackingCodes}{
-An election verifier must confirm the following for each ballot $B$.
-\begin{enumerate} 
-\item[(\theverification.A)] The contest hash $\chi_l$ for the contest with contest index $l$ for all $1\leq l \leq m_B$ has been correctly computed from the contest selection encryptions $(\alpha_i, \beta_i)$ as
-$$\chi_l = H(\HH_E; \mathtt{0x23}, l, K, \alpha_1, \beta_1, \alpha_2, \beta_2\ldots,\alpha_m, \beta_m).$$
-\item[(\theverification.B)] The ballot confirmation code $\HH(B)$ has been correctly computed from the contest hashes and if specified in the election manifest file from the additional byte array $\B_{\mathrm{aux}}$ as
-$$\HH(B) = H(\HH_E; \mathtt{0x24}, \chi_1, \chi_2, \ldots, \chi_{m_B}, \B_{\mathrm{aux}}).$$
-\end{enumerate}
-An election verifier must also verify the following.
-\begin{enumerate}
-\item[(\theverification.C)] There are no duplicate confirmation codes, i.e.\ among the set of submitted (cast and challenged) ballots, no two have the same confirmation code.
-\end{enumerate}
-Additionally, if the election manifest file specifies a hash chain, an election verifier must confirm the following for each voting device.
-\begin{enumerate}
-\item[(\theverification.D)] The initial hash code $\HH_0$ satisfies $\HH_0 = H(\HH_E;\mathtt{0x24},\B_{\mathrm{aux},0})$ and $\B_{\mathrm{aux},0}$ contains the unique voting device information.
-\item[(\theverification.E)] For all $1\leq j \leq \ell$, the additional input byte array used to compute $\HH_j=\HH(B_j)$ is equal to $\B_{\mathrm{aux},j} = \HH(B_{j-1})\parallel \B_{\mathrm{aux},0}$.
-\item[(\theverification.F)] The final additional input byte array is equal to $\overline\B_{\mathrm{aux}} = \HH(B_\ell)\parallel \B_{\mathrm{aux},0} \parallel \bytes(\Str{CLOSE},5)$ and $\HH(B_\ell)$ is the final confirmation code on this device.
-\item[(\theverification.G)] The closing hash is correctly computed as $\overline{\HH} = H(\HH_E; \mathtt{0x24}, \overline\B_{\mathrm{aux}})$.
-\end{enumerate}
-}
-
-
-
-\newcommand{\veriftitleCorrectnessOfBallotAggregation}{Correctness of ballot aggregation}
-\newcommand{\veriftextCorrectnessOfBallotAggregation}{
-An election verifier must confirm for each option in each contest in the election manifest that the aggregate encryption $(A,B)$ satisfies 
-\begin{enumerate}
-    \item[(\theverification.A)] $A=(\prod_j\alpha_j) \bmod p$,
-    \item[(\theverification.B)] $B = (\prod_j \beta_j) \bmod p$,
-\end{enumerate} 
-where the $(\alpha_j,\beta_j)$ are the corresponding encryptions on all cast ballots in the election record.}
-
-\newcommand{\veriftitleCorrectnessOfDecryptions}{Correctness of tally decryptions}
-\newcommand{\veriftextCorrectnessOfDecryptions}{
-For each option in each contest on each tally, an election verifier must compute the values
-\begin{enumerate}
-  \item[(\theverification.1)] $M = B \cdot T^{-1} \bmod p$,
-  \item[(\theverification.2)] $a = g^{v} \cdot K^{c} \bmod p$,
-  \item[(\theverification.3)] $b = A^{v} \cdot M^{c} \bmod p$.
-\end{enumerate}
-An election verifier must then confirm the following:
-\begin{enumerate}
-    \item[(\theverification.A)] The given value $v$ is in the set $\Z_q$.
-    \item[(\theverification.B)] The challenge value $c$ satisfies $c = H(\HH_E;\mathtt{0x30},K,A,B,a,b,M)$.
-\end{enumerate}}
-
-\newcommand{\veriftitleValidationOfCorrectDecryptionOfTallies}{Validation of correct decryption of tallies}
-\newcommand{\veriftextValidationOfCorrectDecryptionOfTallies}{
-An election verifier must confirm the following equations for each option in each contest in the election manifest.
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate}
-\item[(\theverification.A)] $T = K^t \bmod p$.
-\end{enumerate}
-An election verifier must also confirm that the text labels listed in the election record tallies match the corresponding text labels in the election manifest. For each contest in a decrypted tally, an election verifier must confirm the following.
-\begin{enumerate}
-\item[(\theverification.B)] The contest text label occurs as a contest label in the list of contests in the election manifest. 
-\item[(\theverification.C)] For each option in the contest, the option text label occurs as an option label for the contest in the election manifest.
-\item[(\theverification.D)] For each option text label listed for this contest in the election manifest, the option label occurs for a option in the decrypted tally contest.
-\end{enumerate}
-An election verifier must also confirm the following.
-\begin{enumerate}
-\item[(\theverification.E)] For each contest text label that occurs in at least one submitted ballot, that contest text label occurs in the list of contests in the corresponding tally.  
-\end{enumerate}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%% Contest data
-\newcommand{\veriftitleCorrectnessOfDecryptionsOfContestData}{Correctness of decryptions of contest data}
-\newcommand{\veriftextCorrectnessOfDecryptionsOfContestData}{
-An election verifier must confirm the correct decryption of the contest data field for each contest by verifying the conditions analogous to Verification~\ref{verif:decryption} for the corresponding NIZK proof with $(A,B)$ replaced by $(C_0,C_1,C_2)$ and $M_i$ by $m_i$ as follows. An election verifier must compute the following values.
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate}
-\item[(\theverification.1)] $a = g^{v}\cdot K^{c} \bmod p$,
-    \item[(\theverification.2)] $b = C_0^{v}\cdot \beta^{c} \bmod p$.
-\end{enumerate}
-An election verifier must then confirm the following.
-\begin{enumerate}
-    \item[(\theverification.A)] The given value $v$ is in the set $\Z_q$.
-    \item[(\theverification.B)] The challenge value $c$ satisfies $c = H(\HH_E;\mathtt{0x31},K,C_0,C_1,C_2,a,b,\beta )$.
-\end{enumerate}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%% Challenged ballots
-\newcommand{\veriftitleCorrectnessOfDecryptionsChallenged}{Correctness of decryptions for challenged ballots}
-\newcommand{\veriftextCorrectnessOfDecryptionsChallenged}{
-For each challenged ballot, for each option in each contest on the challenged ballot, an election verifier must compute the values
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate}
-  \item[(\theverification.1)] $M = \beta \cdot S^{-1} \bmod p$,
-  \item[(\theverification.2)] $a = g^{v} \cdot K^{c} \bmod p$,
-  \item[(\theverification.3)] $b = \alpha^{v} \cdot M^{c} \bmod p$.
-\end{enumerate}
-An election verifier must then confirm the following.
-\begin{enumerate}
-    \item[(\theverification.A)] The given value $v$ is in the set $\Z_q$.
-    \item[(\theverification.B)] The challenge value $c$ satisfies $c = H(\HH_E;\mathtt{0x30},K,\alpha,\beta,a,b,M )$.
-\end{enumerate}}
-
-\newcommand{\veriftitleValidationOfCorrectDecryptionOfChallengedBallots}{Validation of correct decryption of challenged ballots}
-\newcommand{\veriftextValidationOfCorrectDecryptionOfChallengedBallots}{
-An election verifier must confirm the correct decryption of each selection $\sigma$ in each contest.
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate} 
-\item[(\theverification.A)]
-$S = K^\sigma \bmod p$.
-\end{enumerate}
-An election verifier must also confirm that the challenged ballot is well-formed, i.e. for each contest on the challenged ballot, it must confirm the following.
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate} 
-\item[(\theverification.B)]
-For each option in the contest, the selection $\sigma$ is a valid value --- usually either a $0$ or a $1$.
-\item[(\theverification.C)]
-The sum of all selections in the contest is at most the selection limit $L$ for that contest.  
-\end{enumerate}
-An election verifier must also confirm that for each decrypted challenged ballot, the selections listed in text match the corresponding text in the election manifest.
-\begin{enumerate}
-\item[(\theverification.D)] The contest text label occurs as a contest label in the list of contests in the election manifest. 
-\item[(\theverification.E)] For each option in the contest, the option text label occurs as an option label for the contest in the election manifest.
-\item[(\theverification.F)] For each option text label listed for this contest in the election manifest, the option label occurs for a option in the decrypted challenged ballot.
-\end{enumerate}
-}
-
-\newcommand{\veriftitleCorrectnessOfDecryptionsOfContestDataChallenged}{Correctness of contest data decryptions for challenged ballots}
-\newcommand{\veriftextCorrectnessOfDecryptionsOfContestDataChallenged}{
-An election verifier must confirm the correct decryption of the contest data field for each contest by verifying the conditions analogous to Verification~\ref{verif:decryption} for the corresponding NIZK proof with $(A,B)$ replaced by $(C_0,C_1,C_2)$ and $M$ by $\beta$ as follows.
-This means it must compute the values
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate}
-  \item[(\theverification.1)] $a = g^{v} \cdot K^{c} \bmod p$,
-  \item[(\theverification.2)] $b = C_0^{v} \cdot \beta^{c} \bmod p$.
-\end{enumerate}
-It must then confirm the following.
-\begin{enumerate}
-    \item[(\theverification.A)] The given value $v$ is in the set $\Z_q$.
-    \item[(\theverification.B)] The challenge value $c$ satisfies $c = H(\HH_E;\mathtt{0x31},K,C_0,C_1,C_2,a,b,\beta)$.
-\end{enumerate}}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%% Pre-encrypted ballots
-\newcommand{\veriftitlePreEncryptedBallotsCorrectnessOfSelectionEncryptions}{Well-formedness of selection encryptions in pre-encrypted ballots}
-\newcommand{\veriftextPreEncryptedBallotsCorrectnessOfSelectionEncryptions}{
-For each possible selection on each cast ballot, an election verifier must compute the values
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate}
-\item[(\theverification.1)] $a_0 = g^{v_0} \cdot \alpha^{c_0} \bmod p$,
-\item[(\theverification.2)] $a_1 = g^{v_1} \cdot \alpha^{c_1} \bmod p$,
-\item[(\theverification.3)] $b_0 = K^{v_0} \cdot \beta^{c_0} \bmod p$,
-\item[(\theverification.4)] $b_1 = K^{w_1}\cdot \beta^{c_1} \bmod p$, where $w_1 = (v_1-c_1) \bmod q$,
-\item[(\theverification.5)] $c = H(\HH_E;\mathtt{0x21},K,\alpha,\beta,a_0,b_0,a_1,b_1)$.
-\end{enumerate}
-An election verifier must then confirm the following:
-\begin{enumerate}
-\item[(\theverification.A)] The given values $\alpha$ and $\beta$ are in the set $\Z_p^r$. (A value $x$ is in $\Z_p^r$ if and only if $x$ is an integer such that $0\leq x<p$ and $x^q \bmod p = 1$ is satisfied.) 
-\item[(\theverification.B)] The given values $c_0$ and $c_1$ are each in the set $\{0,1,\dots,2^{256}-1\}$.
-\item[(\theverification.C)] The given values $v_0$ and $v_1$ are each in the set $\Z_q$. (A value $x$ is in $\Z_q$ if and only if $x$ is an integer such that $0\leq x<q$.)
-\item[(\theverification.D)] The equation $c = (c_0+c_1) \bmod q$ is satisfied.
-\end{enumerate}}
-
-\newcommand{\veriftitlePreEncryptedBallotsAdherenceToVoteLimits}{Adherence to vote limits in pre-encrypted ballots}
-\newcommand{\veriftextPreEncryptedBallotsAdherenceToVoteLimits}{
-For each contest on each cast ballot, an election verifier must compute the contest totals
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate}
-\item[(\theverification.1)] $\bar\alpha = \prod_i\alpha_i \bmod p$,
-\item[(\theverification.2)] $\bar\beta = \prod_i\beta_i \bmod p$,
-\end{enumerate}
-where the $(\alpha_i,\beta_i)$ represent all possible selections for the contest, as well as the values
-\begin{enumerate}
-\item[(\theverification.3)] $a_j = g^{v_j} \cdot \bar\alpha^{c_j} \bmod p$ for all $0\leq j \leq L$,
-\item[(\theverification.4)] $b_j = K^{w_j} \cdot \bar\beta^{c_j}\bmod p$, where $w_j = (v_j-jc_j) \bmod q$ for all $0\leq j \leq L$,
-\item[(\theverification.5)] $c = H(\HH_E;\mathtt{0x21},K,\bar\alpha,\bar\beta,a_0,b_0,a_1,b_1,\dots,a_L,b_L)$.
-\end{enumerate}
-An election verifier must then confirm the following:
-\begin{enumerate}
-\item[(\theverification.A)] The given values $c_j$ each satisfy $0\leq c_j < 2^{256}$ for all $0\leq j \leq L$.
-\item[(\theverification.B)] The given values $v_j$ are each in $\Z_q$ for all $0\leq j \leq L$.
-\item[(\theverification.C)] The equation $c = c_0 + c_1 + \dots + c_L \bmod q$ is satisfied.
-\end{enumerate}}
-
-\newcommand{\veriftitlePreEncryptedValidationOfTrackingCodes}{Validation of confirmation codes in pre-encrypted ballots}
-\newcommand{\veriftextPreEncryptedValidationOfTrackingCodes}{
-An election verifier must confirm the following for each pre-encrypted ballot $B$.
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate} 
-\item[(\theverification.A)] For each selection in each contest on the ballot and the corresponding selection vector $\Psi_{i,m}=\langle E_1,E_2,\ldots,E_m\rangle$ consisting of the selection encryptions $E_j = (\alpha_j, \beta_j)$, the selection hash $\psi_i$ satisfies
-$$\psi_i=H(\HH_E;\mathtt{0x40},K,\alpha_1,\beta_1,\alpha_2,\beta_2,\ldots,\alpha_m,\beta_m).$$
-\item[(\theverification.B)] The contest hash $\chi_l$ for the contest with context index $l$ for all $1\leq l \leq m_B$ has been correctly computed from the selection hashes $\psi_i$ as
-$$\chi_l=H(\HH_E;\mathtt{0x41},l,K,\psi_{\sigma(1)},\psi_{\sigma(2)},\ldots,\psi_{\sigma(m+L)}),$$ where $\sigma$ is a permutation and $\psi_{\sigma(1)}<\psi_{\sigma(2)}<\cdots<\psi_{\sigma(m+L)}$.
-\item[(\theverification.C)] The ballot confirmation code $\HH(B)$ has been correctly computed from the (sequentially ordered) contest hashes and if specified in the election manifest file from the additional byte array $\B_{\mathrm{aux}}$ as 
-$$H(B)=H(\HH_E; \mathtt{0x42}, \chi_1, \chi_2, \ldots, \chi_{m_B}, \B_{\mathrm{aux}}).$$
-\end{enumerate}
-An election verifier must also verify the following.
-\begin{enumerate}
-\item[(\theverification.D)] There are no duplicate confirmation codes, i.e.\ among the set of submitted (cast and challenged) ballots, no two have the same confirmation code.
-\end{enumerate}
-}
-
-\newcommand{\veriftitlePreEncryptedValidationOfShortCodes}{Validation of short codes in pre-encrypted ballots}
-\newcommand{\veriftextPreEncryptedValidationOfShortCodes}{
-An election verifier must confirm for every selectable option on every pre-encrypted ballot in the election record that the short code $\omega$ displayed with the selectable option satisfies
-\setlength{\leftmargini}{0.45in}
-\begin{enumerate} 
-  \item[(\theverification.A)] $\omega=\Omega(\psi)$ where $\psi$ is the selection hash associated with the selectable option.
-\end{enumerate}  
-Specifically, for cast ballots, this includes all short codes that are published in the election record whose associated selection hashes correspond to selection vectors that are accumulated to form tallies.
-For spoiled ballots, this includes all selection vectors on the ballot.
-
-An election verifier must also confirm that for contests with selection limit greater than 1, the selection vectors published in the election
-record match the product of the pre-encryptions associated with the short codes listed as
-selected.
-}
-
-
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{document}
-\begin{center}
-\begin{minipage}{\textwidth}
-  \centering
-  \includegraphics[width=5in]{electionguard-banner.png}\\
-  \vspace{.4in}
-  {\Huge {Design Specification}}\\
-  \vspace{.1in}
-  {\large Version 2.0.0}\\
-  \vspace{.4in}
-  {\large \today}\\
-  \vspace{.4in}
-  {\large Josh Benaloh and Michael Naehrig}\\
-  \vspace{.1in}
-  {\large \textsf{Microsoft Research}}\\
-\end{minipage}\vspace{0.1in}
-\end{center}
-
-% list notes to address; appears only in draft mode
-%\listoffixmes
 \pagebreak
 
 \tableofcontents
@@ -657,7 +213,18 @@ The challenge with ballot-comparison audits is that public release of the full s
 \subsubsection*{About this specification}
 This specification can be used by expert reviewers to evaluate the details of the \EG process and by independent parties to write \EG implementations. This document is not intended to be a fully detailed implementation specification. It does not specify serialization and data structures for the election record or mappings between the notation used here and the corresponding data types and components of a specific implementation. However, this document, together with a detailed implementation specification or a well-documented \EG implementation, can be used by independent parties to write \EG verifiers to confirm the consistency of election artifacts with announced election results. 
 
+S1 Individual voters can verify that their votes have been accurately recorded.
+S1 Voters and observers can verify that all recorded votes have been accurately counted.
+S1 An E2E-verifiable tally can be used as the primary tally in an election sor as a verifiable secondary tally alongside traditional methods.
+S1 ElectionGuard is compatible with in-person voting using an electronic ballot-marking device
+S1 ElectionGuard is compatible with in-person voting using an optical scanner capable of reading hand-marked ballots
+S1 ElectionGuard is compatible with in-person voting using an optical scanner capable of reading machine-marked ballots
+S1 ElectionGuard is compatible with with voting by mail
+S1 ElectionGuard is compatible with with Internet voting
+S1 ElectionGuard can enable public disclosure of encrypted ballots that can sbe matched directly to physical ballots selected for auditing
+S1 ElectionGuard can enable public disclosure of encrypted ballots that can be proven to match the reported tallies.
 
+%pagebreak
 \section{Overview}
 
 This section gives a very brief and high-level overview of the \EG system's functionality and how it can be used during an election or in a post-election audit such as an RLA.
@@ -666,11 +233,27 @@ To use \EG in an election, a set of \emph{guardians} is enlisted to serve as tru
 
 After the conclusion of voting or auditing, a \emph{quorum} of guardians is necessary to produce the artifacts required to enable public verification of the tally.
 
+S2a A quorum of guardians can produce the artifacts required to enable public verification of the tally.
+S2a A quorum of guardians is necessary to produce the artifacts required to enable public verification of the tally.
+
 \subsubsection*{Key generation}
 Prior to the start of voting (for an E2E-verifiable election) or auditing (for an RLA), the election guardians participate in a process wherein they generate public keys to be used in the election. Each guardian generates its own public-secret key pair.  These public keys will be combined to form a single public key with which votes are encrypted. They are also used individually by guardians to exchange information about their secret keys so that the election record can be produced after voting or auditing is complete -- even if not all guardians are available at that time.
 
 The key generation ceremony begins with each guardian publishing its public keys together with proofs of knowledge of the associated secret keys.  Once all public keys are published, each guardian uses each other guardian's public key to encrypt shares of its own secret keys. Finally, each guardian decrypts the shares it receives from other guardians and checks them for consistency.  If the received shares verify, the receiving guardian announces its completion.  If any shares fail to verify, the receiving guardian challenges the sender.  In this case, the sender is obliged to reveal the shares it sent. If all challenged guardians release their challenged shares and these shares all verify, the ceremony concludes and the election proceeds. If a challenged guardian fails to produce key shares that verify, that guardian is removed and the key generation ceremony restarts with a replacement guardian.
 
+S2b Each guardian generates its own public-secret key pair.
+S2b The guardian public keys can be combined to form a single public key
+S2b The single public key can encrypt votes.
+S2b The guardian public keys can be used individually by guardians to exbchange information about their secret keys enabling the election record tob be produced after voting or auditing is complete
+S2b The guardian public keys can be used individually by guardians to exbchange information about their secret keys enabling the election record tob be produced after voting or auditing is complete even if not all gubardians are available at that time
+S2b Each guardian can publish their public keys together with proofs of knbowledge of the associated secret keys.
+S2b Each guardian can use each other guardian's public key to encrypt shares ofb its own secret keys
+S2b Each guardian can decrypt the shares it receives from other guardians
+S2b Each guardian can check the decrypted shares for consistency
+S2b A guardian sender can reveal the shares it sent
+S2b If all challenged guardians release their challenged shares and these shbares all verify, the ceremony can conclude and the election proceed.
+S2b A guardian can be removed if they are challenged and fail to produce key shbares that verify
+S2b the key generation ceremony can be restarted with a replacement guardian.
 
 \subsubsection*{Ballot encryption}
 In most uses, the election system makes a single call to the \EG API after each voter completes the process of making selections or with each ballot to be encrypted for an RLA. \EG will encrypt the selections made by the voter and return a confirmation code which the system should give to the voter.\footnote{The confirmation code is not necessary for RLA usage.} 
@@ -680,14 +263,41 @@ In certain vote-by-mail scenarios and when \EG is used within an RLA, cast-vote 
 
 The encrypted ballots are published along with non-interactive zero-knowledge (NIZK) proofs of their well-formedness. The proofs assert that an encrypted ballot is well-formed, which means that it is a legitimate ballot and adheres to the limits imposed on selection options and contests. For example, they prove that a selection did not receive more votes than allowed and that no more than the allowed number of votes were received across the selection options in each contest. The encryption method used herein has a homomorphic property which allows the encrypted ballots to be combined into a single aggregate ballot which consists of encryptions of the election tallies.
 
+S2c The election system can make a single call to the ElectionGuard API after each voter completes the process of making selections
+S2c The election system can make a single call to the ElectionGuard API with each ballot to be encrypted for an RLA.
+S2c ElectionGuard will encrypt the selections made by the voter and return a confirmation code for the system to give to the voter after they complete the process of making selections. (not relevant to RLA scenario)
+S2c No other point at which an existing election system must interface with EG is required.
+S2c Voters will have an opportunity to challenge their encrypted ballots and view their decryptions to ensure that the encryptions are correct.
+S2c A decypted ballot should never be cast, can EG somehow ensure this?
+S2c In an RLA, some anonymized cast ballots may be challenged and decrypted.
+S2c In certain vote-by-mail scenarios, cast-vote records can be provided in batch without any interface between the voting equipment and ElectionGuard. 
+S2c When ElectionGuard is used within an RLA, cast-vote records can be provided in batch without any interface between the voting equipment and ElectionGuard
+S2c Encrypted ballots can be published along with non-interactive zero-knowledge (NIZK) proofs of their well-formedness.
+S2c The NIZK proofs assert that an encrypted ballot is a legitimate ballot
+S2c The NIZK proofs assert that an encrypted ballot adheres to the limits S2c imposed on selection options
+S2c The NIZK proofs assert that an encrypted ballot adheres to the limits imposed on contests
+S2c The NIZK proofs prove that a selection did not receive more votes than allowed 
+S2c The NIZK proofs prove that no more than the allowed number of votes were received across the selection options in each contest.
+S2c The encryption method allows the encrypted ballots to be combined into a single aggregate ballot
+S2c The single aggregate ballot into which the encryption method combined the encrypted ballots consists of encryptions of the election tallies.
 
 \subsubsection*{Verifiable decryption}
 In the final step, election guardians independently use a share of the secret decryption key, which each guardian computes from the previously shared secret key fragments, to jointly decrypt the election tallies and generate associated verification data. It is not necessary for all guardians to be available to complete this step.  If some guardians are missing, a quorum of guardians is sufficient to complete decryption and generate the verification data.
+
+S2d Each guardian can compute from the previously shared secret key fragments a share of the secret decryption key
+S2d Guardians can independently use their share of the secret decryption key to jointly decrypt the election tallies
+S2d Guardians can independently use their share of the secret decryption key to generate associated verification data
+S2d Only a quorum of guardians is sufficient to complete decryption
+S2d Only a quorum of guardians is sufficient to generate the verification data
 
 \subsubsection*{Independent verification}
 Observers can use this open specification and/or accompanying materials to write independent \emph{election verifiers} that can confirm the well-formedness of each encrypted ballot, the correct aggregation of these ballots, and the accurate decryption of election tallies.
 
 The verification of an election consists of various verification steps that can be separated into three groupings.
+
+S2e An observer can use this open specification and/or accompanying materials to write independent election verifiers that can confirm the well-formedness of each encrypted ballot
+S2e An observer can use this open specification and/or accompanying materials to write independent election verifiers that can the correct aggregation of these ballots
+S2e An observer can use this open specification and/or accompanying materials to write independent election verifiers that can the accurate decryption of election tallies.
 
 \paragraph{Verification of key generation.}
 The first group of verification steps pertain to the key generation process.  Under normal circumstances, guardians will engage in a key generation ceremony and produce an election public key without controversy, and there is no need for independent verification of this process.  However, if one or more parties to the key generation ceremony complain about the process, the associated independent verification steps can help to resolve conflicts.
@@ -715,15 +325,27 @@ The principal purposes of this document are to specify the functionality of the 
 
 
 \pagebreak
+
+-------- Section 3
+
 \section{Components}\label{sec:EGcomponents}
 This section describes the four principal components of \EG.
 \begin{enumerate}
-\item \emph{Parameter Requirements:} These are properties required of parameters to securely and efficiently instantiate the cryptographic components of \EG. These \emph{cryptographic parameters} are fixed ahead of every election and the same parameters can be used across multiple elections. A specific, recommended set of standard parameters is provided. In addition, there are properties required of the \emph{election parameters} that define the election contests, selectable options, and ballot styles, among other information.
+\item \emph{Parameter Requirements:} These are properties required of parameters to securely and efficiently instantiate the cryptographic components of ElectionGuard. These \emph{cryptographic parameters} are fixed ahead of every election and the same parameters can be used across multiple elections. A specific, recommended set of standard parameters is provided. In addition, there are properties required of the \emph{election parameters} that define the election contests, selectable options, and ballot styles, among other information.
 \item \emph{Key Generation:} Prior to each individual election, guardians must generate individual public-secret key pairs and exchange shares of secret keys to enable completion of an election even if some guardians become unavailable.  Although it is preferred to generate new keys for each election, it is permissible to use the same keys for multiple elections so long as the set of guardians remains the same.  A complete new set of keys must be generated if even a single guardian is replaced.
+
+S3a2 Guardians can generate individual public-secret key pairs
+S3a2 Guardians can exchange shares of secret keys
+S3a2 If the set of guardians remains the same they can re-use the same keys for multiple elections
+S3a2 A complete new set of keys must be generated if even a single guardian is replaced
+
 \item \emph{Ballot Encryption:} While encrypting the contents of a ballot is a relatively simple operation, most of the work of \EG is the process of creating externally-verifiable artifacts to prove that each encrypted ballot is well-formed (i.e., its decryption is a legitimate ballot without overvotes or improper values).
 \item \emph{Verifiable Decryption:} At the conclusion of each election, guardians use their secret key shares to jointly produce election tallies together with verifiable artifacts that prove that the tallies are correct.
 \end{enumerate}
 
+S3a3 Guardians can use their secret key shares to jointly produce election tallies together with verifiable artifacts that prove that the tallies are correct.
+
+S3b
 \subsubsection*{Notation}
 In the remainder of this specification, the following notation will be used.
 \begin{itemize}
@@ -739,24 +361,46 @@ In the remainder of this specification, the following notation will be used.
   \item In general, the variable pairs $(\alpha,\beta)$, $(a,b)$, and $(A,B)$ will be used to denote encryptions. Specifically, $(\alpha,\beta)$ will be used to designate encryptions of votes (usually an encryption of a zero or a one), $(A,B)$ will be used to denote aggregations of encryptions -- which may be encryptions of larger values, and $(a,b)$ will be used to denote encryption commitments used to prove properties of other encryptions.
 \end{itemize}
 
+S3c
 \subsubsection*{Encryption of votes}
 Encryption of votes in \EG is performed using a public key encryption method suggested by Devillez, Pereira, and Peters,\footnote{Devillez H., Pereira, O., Peters, T. (2022) \emph{How to Verifiably Encrypt Many Bits for an Election?} in ESORICS 2022 Lecture Notes in Computer Science, vol 13555.  Springer, Berlin, Heidelberg. \url{https://link.springer.com/chapter/10.1007/978-3-031-17146-8_32}} which is a variant exponential form of the ElGamal cryptosystem,\footnote{ElGamal T. (1985) \emph{A Public Key Cryptosystem and a Signature Scheme Based on Discrete Logarithms}. In: Blakley G.R., Chaum D. (eds) Advances in Cryptology. CRYPTO 1984. Lecture Notes in Computer Science, vol 196. Springer, Berlin, Heidelberg. \url{https://link.springer.com/content/pdf/10.1007/3-540-39568-7_2.pdf}} which is, in turn, a static form of the widely-used Diffie-Hellman(-Merkle) key exchange\footnote{Diffie W., Hellman, M. (1976) \emph{New Directions in Cryptography} IEEE Transactions on Information Theory, vol 22}.  This encryption method is called \emph{DPP vote encryption} or simply \emph{vote encryption} in this document and rests on precisely the same security basis as Diffie-Hellman(-Merkle) key exchange---which is used to protect the confidentiality of the vast majority of Internet traffic.
 
+S3c Encryption of votes in ElectionGuard is performed using the DPP vote encryption method of Devillez, Pereira, and Peters (2022)
+
 Primes $p$ and $q$ are publicly fixed such that $q$ is not a divisor of $r=(p-1)/q$.  A generator $g$ of the order $q$ subgroup $\Z_p^r$ is also fixed.  (Any $g=x^r \bmod p$ for which $x\in\Z_p^*$ suffices so long as $g\neq 1$.)
 
+S3c P is fixed
+S3c P is prime
+S3c Q is fixed
+S3c Q is prime
+S3c Q is is not a divisor of r=(p-1)/q
+S3c G is fixed.
+S3c G is a generator $g$ of the order $q$ subgroup $\Z_p^r$
+
 A public-secret key pair can be chosen by selecting a random $s\in\Z_q$ as a secret key and publishing $K=g^s \bmod p$ as the corresponding public key\footnote{As will be seen below, the actual public key used to encrypt votes will be a combination of separately generated public keys.  So, no entity will ever be in possession of a secret key that can be used to decrypt votes.}. 
+
+S3c No entity is ever in possession of a secret key that can be used to decrypt votes
 
 A message $m\in\Z_p^r$ is then encrypted by selecting a random nonce $\xi\in\Z_q$ and forming the pair $(\alpha, \beta) = (g^\xi \bmod p, K^m\cdot K^\xi \bmod p) = (g^\xi \bmod p, K^{m+\xi} \bmod p)$. An encryption $(\alpha, \beta)$ can be decrypted by the holder of the secret $s$ as $\beta/\alpha^s\bmod p = K^m \bmod p$ because
 \begin{equation}
 \frac{\beta}{\alpha^s} \equiv_p \frac{K^m\cdot K^\xi}{(g^\xi)^s} \equiv_p \frac{K^m\cdot (g^s)^\xi}{(g^\xi)^s} \equiv_p \frac{K^m\cdot g^{\xi s}}{g^{\xi s}} \equiv_p K^m.
 \end{equation}
+
+S3c A message $m\in\Z_p^r$ can be encrypted by selecting a random nonce $\xi\in\Z_q$ and forming the pair $(\alpha, \beta) = (g^\xi \bmod p, K^m\cdot K^\xi \bmod p) = (g^\xi \bmod p, K^{m+\xi} \bmod p)$
+S3c An encryption $(\alpha, \beta)$ can be decrypted by the holder of the secret $s$ as $\beta/\alpha^s\bmod p = K^m \bmod p$
+
 The value of $m$ can be computed from $K^m \bmod p$ as long as the message $m$ is limited to a small, known set of options.\footnote{The simplest way to compute $m$ from $K^m \bmod p$ is an exhaustive search through possible values of $m$.  Alternatively, a table pairing each possible value of $K^m \bmod p$ with $m$ can be pre-computed.  A final option which can accommodate a larger space of possible values for $m$ is to use Shanks's baby-step giant-step method as described in the 1971 paper \emph{Class Number, a Theory of Factorization and Genera}, Proceedings of Symposium in Pure Mathematics, Vol. 20, American Mathematical Society, Providence, 1971, pp. 415-440.} 
 
 The value of $K^m$ and therefore $m$ can also be computed from the encryption nonce $\xi$, namely via $\beta/K^\xi \equiv_p K^m$. While the secret key $s$ allows decryption of any ciphertext encrypted to the public key $K$, the encryption nonce only allows decryption of the specific ciphertext it was used to generate. The encryption nonce must therefore be securely protected. Release of an encryption nonce can, when appropriate, serve as a fast and convenient method of verifiable decryption.
 
 Usually, only two possible messages are encrypted in this way by \EG. An encryption of one is used to indicate that an option is selected, and an encryption of zero is used to indicate that an option is not selected. For some voting methods such as cumulative voting, Borda count, and a variety of cardinal voting methods like score voting and STAR-voting, it can be necessary to encrypt other small, positive integers.
 
+S3c The value of $K^m$ can be computed from the encryption nonce $\xi$
+S3c The value of $m$ can be computed from the encryption nonce $\xi$
+S3c An encryption of one is used to indicate that an option is selected
+S3c An encryption of zero is used to indicate that an option is not selected
 
+S3d
 \subsubsection*{Homomorphic properties}
 A fundamental quality of the DPP vote encryption is its additively homomorphic property. If two messages $m_1$ and $m_2$ are respectively encrypted as $(A_1,B_1 ) = (g^{\xi_1} \bmod p , K^{m_1+\xi_1} \bmod p)$ and $(A_2, B_2) = (g^{\xi_2}\bmod p, K^{m_2+\xi_2} \bmod p)$, then the component-wise product 
 \begin{equation}
@@ -766,29 +410,76 @@ is an encryption of the sum $m_1+m_2$. (There is an implicit assumption here tha
 
 This additively homomorphic property is used in two important ways in \EG.  First, all of the encryptions of a single option across ballots can be multiplied to form an encryption of the sum of the individual values. Since the individual values are one (or some other integer for certain voting methods) on ballots that select that option and zero otherwise, the sum is the tally of votes for that option and the product of the individual encryptions is an encryption of the tally.
 
+S3d All the encryptions of a single option across ballots can be multiplied to form an encryption of the sum of the individual values
+S3d An encryption of some other integer is used for certain voting methods
+S3d The product of the encryptions of a single option across ballots is an encryption of the tally
+
 The other use is to sum all of the selections made in a single contest on a single ballot. In the simplest case, after demonstrating that each option is an encryption of either zero or one, the product of the encryptions indicates the number of options that are encryptions of one, and this can be used to show that no more ones than permitted are among the encrypted options -- i.e., that no more options were selected than permitted. When larger integers are allowed, i.e. an option can receive multiple votes or weighted votes, the product of the ciphertexts then encrypts the total number of votes or the sum of weights and is used in the same way to ensure only the permitted number of votes or permitted sum of weights were used.
+
+S3d Each option can be demonstrated to be an encryption of either zero or one
+S3d Each option can be demonstrated to be an encryption of some other integer for certain voting methods
+S3d The product of the encrypted options of a single ballot can be used to show that no more options were selected than permitted
+S3d When an option can receive multiple or weighted votes, the product of the encrypted options of a single ballot can be used to show that only the permitted number of votes or permitted sum of weights were used
 
 However, as will be described below, it is possible for a holder of a nonce $\xi$ to prove to a third party that a pair $(\alpha, \beta)$ is an encryption of $m$ without revealing the nonce $\xi$ and without access to the secret $s$.
 
+S3d A holder of a nonce $\xi$ can prove to a third party that a pair $(\alpha, \beta)$ is an encryption of $m$ without access to the secret $s$ or revealing the nonce $\xi$
+
+S3e 
 \subsubsection*{Non-interactive zero-knowledge (NIZK) proofs}
 \EG provides numerous proofs about encryption keys, encrypted ballots, and election tallies using the following four techniques.
 \begin{enumerate}
 \item A Schnorr proof\footnote{Schnorr C.P. (1990) Efficient Identification and Signatures for Smart Cards. In: Brassard G. (eds) Advances in Cryptology — CRYPTO' 89 Proceedings. CRYPTO 1989. Lecture Notes in Computer Science, vol 435. Springer, New York, NY. \url{https://link.springer.com/content/pdf/10.1007\%2F0-387-34805-0_22.pdf}} allows the holder of a secret key $s$ to interactively prove possession of $s$ without revealing $s$.
+
+S3e1 The holder of a secret key $s$ can interactively prove possession of $s$ without revealing $s$ using a Schnorr proof.
+
 \item A Chaum-Pedersen proof\footnote{Chaum D., Pedersen T.P. (1993) \emph{Wallet Databases with Observers}. In: Brickell E.F. (eds) Advances in Cryptology — CRYPTO' 92. CRYPTO 1992. Lecture Notes in Computer Science, vol 740. Springer, Berlin, Heidelberg. \url{https://link.springer.com/content/pdf/10.1007\%2F3-540-48071-4_7.pdf}} allows an encryption to be interactively proven to decrypt to a particular value without revealing the nonce used for encryption or the secret decryption key $s$. (This proof can be constructed with access to either the nonce used for encryption or the secret decryption key.)
+
+S3e2 An encryption can be interactively proven to decrypt to a particular value without revealing the nonce used for encryption or the secret decryption key $s$, with access to the nonce used for encryption with a Chaum-Pedersen proof.
+S3e2 An encryption can be interactively proven to decrypt to a particular value without revealing the nonce used for encryption or the secret decryption key $s$, with access to $s$ using a Chaum-Pedersen proof.
+
 \item The Cramer-Damgård-Schoenmakers technique\footnote{Cramer R., Damgård I., Schoenmakers B. (1994) \emph{Proofs of Partial Knowledge and Simplified Design of Witness Hiding Protocols}. In: Desmedt Y.G. (eds) Advances in Cryptology — CRYPTO' 94. CRYPTO 1994. Lecture Notes in Computer Science, vol 839. Springer, Berlin, Heidelberg. \url{https://link.springer.com/content/pdf/10.1007\%2F3-540-48658-5_19.pdf}} enables a disjunction to be interactively proven without revealing which disjunct is true.
+
+S3e3 A disjunction can be interactively proven without revealing which disjunct is true using the Cramer-Damgård-Schoenmakers technique.
+
 \item The Fiat-Shamir heuristic\footnote{Fiat A., Shamir A. (1987) \emph{How To Prove Yourself: Practical Solutions to Identification and Signature Problems}. In: Odlyzko A.M. (eds) Advances in Cryptology — CRYPTO' 86. CRYPTO 1986. Lecture Notes in Computer Science, vol 263. Springer, Berlin, Heidelberg. \url{https://link.springer.com/content/pdf/10.1007\%2F3-540-47721-7_12.pdf}} allows interactive proofs to be converted into non-interactive proofs.
+
+S3e4 An interactive proof can be converted into a non-interactive proof using the Fiat-Shamir heuristic.
+
 \end{enumerate}
 Using a combination of the above techniques, it is possible for \EG to demonstrate that keys are properly chosen, that ballots are well-formed, and that decryptions match claimed values.\footnote{For all proof variants, \EG uses a compact representation that omits the commitments. Proofs consist of the challenge and response values only. When verifying proofs, the verification equations can be used to recompute the commitments and check their correctness via the challenge hash computation.}
 
+S3e ElectionGuard can demonstrate that keys are properly chosen.
+S3e ElectionGuard can demonstrate that ballots are well-formed.
+S3e ElectionGuard can demonstrate that decryptions match claimed values.
+
+S3f
 \subsubsection*{Threshold encryption}
 Threshold encryption is used for encryption of ballots and other data. This form of encryption makes it very easy to combine individual guardian public keys into a single public key.  It also offers a homomorphic property that allows individual encrypted votes to be combined to form encrypted tallies.
 
+S3f Threshold encryption is used for encryption of ballots and other data.
+S3f It is very easy to combine individual guardian public keys into a single public key.
+S3f Threshold encryption offers a homomorphic property that allows individual encrypted votes to be combined to form encrypted tallies.
+
 The guardians of an election will each generate a public-secret key pair. The public keys will then be combined (as described in the following section) into a single election public key which is used to encrypt all selections made by voters in the election.
+
+S3f The guardians of an election can each generate a public-secret key pair.
+S3f The guardians' public keys can be combined into a single election public key.
+S3f The single election public key can be used to encrypt all selections made by voters in the election.
 
 At the conclusion of the election, each guardian will compute a verifiable partial decryption of each tally. These partial decryptions will then be combined to form full verifiable decryptions of the election tallies.
 
+S3f A guardian can compute a verifiable partial decryption of each tally.
+S3f Verifiable partial tally decryptions can be combined  to form full verifiable decryptions of the election tallies.
+
 To accommodate the possibility that one or more of the guardians will not be available at the conclusion of the election to form their partial decryptions, the guardians will cryptographically share\footnote{Shamir A. (1979) \emph{How to Share a Secret}. Communications of the ACM, vol 22.} their secret keys amongst each other during key generation in a manner to be detailed in Section~\ref{sec:keygen}. Each guardian can then compute a share of the secret decryption key, which they use to form the partial decryptions. A pre-determined threshold quorum value ($k$) out of the ($n$) guardians will be necessary to produce a full decryption.
 
+S3f During key generation, a guardian can cryptographically share their secret keys with another guardian per Section~\ref{sec:keygen}.
+S3f A guardian, having received secret keys from other guardians, can compute a share of the secret decryption key
+S3f A guardian, having computed a share of the secret decryption key, can
+form a partial decryption.
+
+S3g 
 \subsubsection*{Encryption of other data}
 \EG provides means to encrypt data other than votes, which are selections usually encoded as zero or one that need to be homomorphically aggregated. Such data may include the cryptographic shares of a guardian's secret key that are sent to the other guardians and are encrypted to the receiving guardians' public keys, write-in information that needs to be attached to an encrypted selection and is encrypted to the election public key, or other auxiliary data attached to an encrypted ballot, either encrypted to the election public key or to an administrative public key. The non-vote data do not need to be homomorphically encrypted and can use a more standard form of public-key encryption removing the data size restrictions imposed by the vote encryption. \EG encrypts such data with hashed ElGamal encryption, which deploys a key derivation function (\KDF) to generate a key stream that is then XORed with the data. To implement the \KDF and to provide a message authentication code (\MAC), encryption makes use of the keyed Hash Message Authentication Code \HMAC. In \EG, \HMAC is instantiated as \HMAC-\SHA with the hash function \SHA.
 
@@ -1681,6 +1372,8 @@ The exact organizational structure of the election record will be specified in a
 
 \pagebreak
 
+-------- Section 4
+
 \section{Pre-Encrypted Ballots}\label{sec:pre-encrypted}
 
 In typical use, \EG ballots are encrypted after the voter selections are known.  However, there are several common scenarios in which it is desirable to perform the encryption before the selections of a voter are known.  These include Vote-by-Mail, pre-printed ballots for use in precincts with central count or minimal in-precinct equipment, and back-ups for precincts which ordinarily perform encryption on demand.
@@ -1860,6 +1553,8 @@ To allow vendors and jurisdictions to present distinct formats to their voters, 
 
 \pagebreak
 
+
+-------- Section 5
 
 \section{Hash Computation}\label{sec:hashing}
 The function $H$ that is used throughout \EG is instantiated based on the hashed message authentication code \HMAC. This section defines how to evaluate $H$. It first defines how inputs are represented as byte arrays and then how these inputs are used to compute hash values.   
@@ -2148,7 +1843,8 @@ The tables below list every use of the hash function $H$ in this specification t
   \bottomrule 
   \end{tabularx}
   \end{center}
-  
+
+-------- Section 6 Verifier Construction
 
 \pagebreak
 \section{Verifier Construction}
@@ -2169,235 +1865,48 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 
 \pagebreak
 \subsection{Validation Steps}
-This section collects the steps to validate an election and, for each step, lists the involved variables together with an explanation and pointers to how they are introduced in the specification.
 
 \subsubsection{Parameter verification}
 
-\EGverifrepeat{verif:parameters}{\veriftitleParameterValidation}{
-\veriftextParameterValidation}
-
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.35}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$ in $p-1$& \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ &\\
-        \hline
-        $n$ & Total number of guardians & \S\ref{sec:parameterhash}\\ 
-        $k$ & Quorum of guardians required to decrypt &\\
-        $\HH_P$ & Parameter base hash & \\
-        \hline
-        \texttt{manifest} & Election manifest & \S\ref{sec:manifest}\\
-        \hline
-        $\HH_M$ & Manifest hash & \S\ref{sec:manifesthash}\\
-        \hline
-        $\HH_B$	& Base hash &  \S\ref{sec:basehash}\\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 \subsubsection{Key ceremony verification}
 
 \EGverifExtendedrepeat{verif:guardiansPK}{\veriftitleGuardianPublicKeyValidation}{\veriftextGuardianPublicKeyValidation}
-
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $n$ & Total number of guardians & \S\ref{sec:parameterhash}\\
-        $k$ & Quorum of guardians required to decrypt & \\
-        $\HH_P$ & Parameter base hash & \\\hline
-        $i$ & Sequence number of sharing guardian $G_i$& \S\ref{sec:keygendetails}\\
-        $j$ & Sequence number of receiving guardian $G_j$& \\
-        $K_{i,j}$ & Public form of each random coefficient $a_{i,j}$ & \\
-        $h_{i,j}$ & Commitment in Schnorr proof of knowledge of coefficient $a_{i,j}$ & \\
-        $c_{i,j}$ & Challenge value	in proof & \\
-        $v_{i,j}$ & Response value in proof & \\
-        \bottomrule
-    \end{tabularx}
-}
+    
 \pagebreak
-
+    
 
 \EGverifExtendedrepeat{verif:electionPK}{\veriftitleElectionPublicKeyValidation}{\veriftextElectionPublicKeyValidation}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $r$	& Cofactor of $q$  in $p-1$ & \\\hline
-        $n$ & Total number of guardians & \S\ref{sec:parameterhash}\\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\
-        $i$ & Sequence number of sharing guardian $G_i$ & \\
-        $K_i$ & Public key of guardian $G_i$ & \\
-        \bottomrule
-    \end{tabularx}
-}
-
 \subsubsection{Extended base hash verification}
-
-\EGverifrepeat{verif:extendedBaseHash}{\veriftitleExtendedBaseHashValidation}{\veriftextExtendedBaseHashValidation}
-
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $\HH_B$	& Base hash & \S\ref{sec:basehash}\\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 \subsubsection{Ballot verification}
 
 \EGverifrepeat{verif:selection}{\veriftitleCorrectnessOfSelectionEncryptions}{\veriftextCorrectnessOfSelectionEncryptions}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $(\alpha,\beta)$ & Encryption of vote & \S\ref{sec:selectionencryption}\\\hline
-        $R$ & Option selection limit & \S\ref{sec:proofsballotcorrectness}\\
-        $j$ & Index running through the range $0,1,\dots, R$ & \\
-        $c_j$ & Derived challenge to encryption of $j$	& \\
-        $v_j$ & Response to challenge for encryption of $j$ & \\
-        \bottomrule
-    \end{tabularx}
-}
-
+    
 \pagebreak
 \vspace{.5in}
 \EGverifrepeat{verif:selectionlimit}{\veriftitleAdherenceToVoteLimits}{\veriftextAdherenceToVoteLimits}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $L$ & Contest selection limit & \S\ref{sec:selectionlimit}\\
-        $i$ & Sequence number of selections in the contest ($i$-th selection) & \\
-        $(\alpha_i,\beta_i)$ & Encryption of vote on $i$-th selection & \\
-        $j$ & Index running through the range $0,1,\dots, L$ & \\
-        $c_j$ & Selection limit challenge values & \\
-        $v_j$ & Responses to selection limit challenges	& \\
-        \bottomrule
-    \end{tabularx}
-}
-
+    
 \pagebreak
 \vspace{.5in}
 \EGverifrepeat{verif:trackingcodes}{\veriftitleValidationOfTrackingCodes}{\veriftextValidationOfTrackingCodes}
 
 
-{\centering
-\small
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $l$ & Sequence number of contests on the ballot & \S\ref{sec:contesthash}\\
-        $\Lambda_l$ & Contest label & \\
-        $i$ & Sequence number of selections in the contest & \\
-        $(\alpha_i,\beta_i)$ & Encryption of vote on $i$-th selection & \\
-        $\chi_l$ & Contest hash of the contest with contest index $l$& \\\hline
-        $\HH(B)$ & Confirmation code of ballot $B$ & \S\ref{sec:confirmationcode}\\
-        $\B_{\mathrm{aux}}$ & Additional input byte array & \\\hline
-        $\B_{\mathrm{aux}, 0}$ & Initial additional input byte array for ballot chaining & \S\ref{sec:ballotchaining} \\
-        $j$ & Sequence number of ballots in the hash chain & \\
-        $B_j$ & $j$-th ballot in the hash chain & \\
-        $\B_{\mathrm{aux}, j}$ & Additional input byte array for ballot chaining & \\
-        $\ell$ & Sequence number of last ballot in the hash chain & \\
-        $\overline{\B}_{\mathrm{aux}}$ & Closing input byte array for ballot chaining & \\
-        \bottomrule
-    \end{tabularx}
-}
 
 \pagebreak
 \subsubsection{Tally verification}
 \EGverifrepeat{verif:aggregation}{\veriftitleCorrectnessOfBallotAggregation}{\veriftextCorrectnessOfBallotAggregation}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l} 
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\\hline
-        $(\alpha_j,\beta_j)$ & Encryption of selection on the $j$-th ballot & \S\ref{sec:ballotaggregation} \\
-        $(A,B)$ & Encrypted aggregate total of votes for this option & \\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 \vspace{.5in}
 \EGverifrepeat{verif:decryption}{\veriftitleCorrectnessOfDecryptions}{
 \veriftextCorrectnessOfDecryptions}
-
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $(A,B)$ & Encrypted aggregate total of votes for option & \S\ref{sec:ballotaggregation}\\\hline
-        $T$ & Decrypted value of $(A,B)$ & \S\ref{sec:verifiable_decrypt}\\\hline
-        $c$ & Challenge to decryption & \S\ref{sec:verifiable_decrypt_proof}\\
-        $v$ & Response to challenge & \\
-        \bottomrule
-    \end{tabularx}
-}
 
 
 \pagebreak
@@ -2405,46 +1914,12 @@ This section collects the steps to validate an election and, for each step, list
 \EGverifrepeat{verif:tallies}{\veriftitleValidationOfCorrectDecryptionOfTallies}{
 \veriftextValidationOfCorrectDecryptionOfTallies}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $T$ & Decrypted value of $(A,B)$ & \S\ref{sec:verifiable_decrypt}\\
-        $t$ & Tally value & \\
-        \bottomrule
-    \end{tabularx}
-}
 
 \pagebreak
 
 \subsubsection{Verification of correct contest data decryption}
 \EGverifrepeat{verif:extdecryption}{\veriftitleCorrectnessOfDecryptionsOfContestData\footnotemark}{\veriftextCorrectnessOfDecryptionsOfContestData}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $(C_0,C_1,C_2)$ & Encrypted contest data & \S\ref{sec:decrypt_contest_data}\\
-        $\beta$ & Decryption factor of $(C_0,C_1,C_2)$ & \\
-        $c$ & Challenge to decryption & \\
-        $v$ & Response to challenge & \\
-        \bottomrule
-    \end{tabularx}
-}
 
 \pagebreak
 
@@ -2452,69 +1927,14 @@ This section collects the steps to validate an election and, for each step, list
 \subsubsection{Verification of challenged ballots}
 \EGverifBallotrepeat{verif:challengedDecrypt}{\veriftitleCorrectnessOfDecryptionsChallenged}{\veriftextCorrectnessOfDecryptionsChallenged}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.4}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $(\alpha,\beta)$ & Encrypted selection for option & \S\ref{sec:decrypt_challenged} \\
-        $S$ & Decryption of $(\alpha,\beta)$ & \\
-        $c$ & Challenge to decryption & \\
-        $v$ & Response to challenge & \\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 \EGverifBallotrepeat{verif:challengedballots}{\veriftitleValidationOfCorrectDecryptionOfChallengedBallots}{\veriftextValidationOfCorrectDecryptionOfChallengedBallots}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $L$ & Contest selection limit & \S\ref{sec:selectionlimit}\\\hline
-        $S$ & Decryption of $(\alpha,\beta)$ & \S\ref{sec:decrypt_challenged}\\
-        $\sigma$ & Selection value & \\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 \EGverifBallotrepeat{verif:challengedDecryptContest}{\veriftitleCorrectnessOfDecryptionsOfContestDataChallenged}{\veriftextCorrectnessOfDecryptionsOfContestDataChallenged}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $(C_0,C_1,C_2)$ & Encrypted contest data & \S\ref{sec:decrypt_challenged}\\
-        $\beta$ & Decryption factor of $(C_0,C_1,C_2)$ & \\
-        $c$ & Challenge to decryption & \\
-        $v$ & Response to challenge & \\
-        \bottomrule
-    \end{tabularx}
-}
 
 \pagebreak
 
@@ -2525,27 +1945,6 @@ This section collects the steps to validate an election and, for each step, list
 {\veriftitlePreEncryptedBallotsCorrectnessOfSelectionEncryptions}
 {\veriftextPreEncryptedBallotsCorrectnessOfSelectionEncryptions}
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $(\alpha,\beta)$ & Encryption of vote & \S\ref{sec:selectionencryption}\\\hline
-        $c_0$ & Derived challenge to encryption of zero	& \S\ref{sec:proofsballotcorrectness}\\
-        $c_1$ & Derived challenge to encryption of one & \\
-        $v_0$ & Response to zero challenge & \\
-        $v_1$ & Response to one challenge & \\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 \EGverifrepeat{verif:PreEncryptedBallotsAdherenceToVoteLimits}
@@ -2553,28 +1952,6 @@ This section collects the steps to validate an election and, for each step, list
 {\veriftextPreEncryptedBallotsAdherenceToVoteLimits}
 
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $p$	& 4096-bit prime modulus & \S\ref{sec:parameters}\\
-        $q$	& 256-bit prime order of subgroup of $\Z_p^*$ & \\
-        $r$	& Cofactor of $q$  in $p-1$ & \\
-        $g$	& Generator of subgroup of $\Z_p^*$ of order $q$ & \\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $L$ & Contest selection limit & \S\ref{sec:selectionlimit}\\
-        $i$ & Sequence number of selections in the contest ($i$-th selection) & \\
-        $(\alpha_i,\beta_i)$ & Encryption of vote on $i$-th selection & \\
-        $j$ & Index running through the range $0,1,\dots, L$ & \\
-        $c_j$ & Selection limit challenge values & \\
-        $v_j$ & Responses to selection limit challenges	& \\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
 
@@ -2583,27 +1960,6 @@ This section collects the steps to validate an election and, for each step, list
 {\veriftextPreEncryptedValidationOfTrackingCodes}
 
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $\HH_E$ & Extended base hash	& \S\ref{sec:extendedhash}\\\hline
-        $K$ & Joint election public key	& \S\ref{sec:keygendetails}\\\hline
-        $i$ & Sequence number of selections in the contest & \S\ref{sec:selectionhash_pre}\\
-        $\lambda_i$ & Selection label & \\
-        $(\alpha_i,\beta_i)$ & Encryption of vote on $i$-th selection & \\
-        $\psi_i$ & Selection hash &  \\\hline
-        $l$ & Sequence number of contests on the ballot & \S\ref{sec:contesthash_pre}\\
-        $\Lambda_l$ & Contest label & \\
-        $\chi_l$ & Contest hash of the $l$-th contest& \\\hline
-        $\HH(B)$ & Confirmation code of ballot $B$ & \S\ref{sec:confirmationcode_pre}\\
-        $\B_{\mathrm{aux}}$ & Additional input byte array & \\
-        \bottomrule
-    \end{tabularx}
-}
 
 \pagebreak
 
@@ -2612,21 +1968,10 @@ This section collects the steps to validate an election and, for each step, list
 {\veriftextPreEncryptedValidationOfShortCodes}
 
 
-{\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X|l}
-        \toprule
-        variable & description & \\
-        \midrule
-        $\psi$ & Selection hash & \S\ref{sec:selectionhash_pre}\\\hline
-        $\omega$ & Short code of selection hash & \S\ref{sec:shortcodes_pre}\\
-        $\Omega$ & Hash trimming function & \\
-        \bottomrule
-    \end{tabularx}
-}
 \pagebreak
 
+-------- Section 7 Applications to End-to-End Verifiability and Risk-Limiting Audits
+    
 \section{Applications to End-to-End Verifiability and Risk-Limiting Audits}
 The methods described in this specification can be used to enable either end-to-end (E2E) verifiability or enhanced risk-limiting audits (RLAs). In both cases, the ballots are individually encrypted and proofs are provided to allow observers to verify that the set of encrypted ballots is consistent with the announced tallies in an election.
 
@@ -2638,11 +1983,15 @@ While the administratively encrypted nonce can be stored in an electronic record
 
 If E2E-verifiability and enhanced RLAs are both provided in the same election, there must be separate ballot encryptions (ideally, but not necessarily, using separate election encryption keys) of each ballot. The E2E-verifiable data set must be distinguished from the enhanced RLA data set.  Using the same data set for both applications would compromise voter privacy for voters whose ballots are selected for auditing.
 
+-------- Section "8" Acknowledgments
 
 \section*{Acknowledgments}
 The authors are happy to thank Eion Blanchard, Nicholas Boucher, John Caron, Joey Dodds, Felix Doerre, Gerald Doussot, Aleks Essex, Keith Fung, Rainbow Huang, Chris Jeuell, Anunay Kulshrestha, Moses Liskov, Shreyas Minocha, Arash Mirzaei, Luke Myers, Karan Newatia, Olivier Pereira, John Ramsdell, Marsh Ray, Dan Shumow, Vanessa Teague, Aaron Tomb, Daniel Wagner, Jake Waksbaum, Dan Wallach, Matt Wilhelm, and Greg Zaverucha for many helpful comments and suggestions on earlier versions of this specification.
 
 \pagebreak
+
+-------- Section "9" Appendix: Other Parameters
+
 \section*{Appendix: Other Parameters}
 \subsubsection*{Reduced parameters -- using a 3072-bit prime}
 Starting from the same 256-bit prime $q = 2^{256}-189$ for the group order, the procedure outlined in Section~\ref{sec:parameters} on the standard baseline parameters can be used to find a 3072-bit prime $p_{3072}$. This results in the following parameters that are provided here as an alternative. The parameters satisfy all the same requirements, but the smaller prime offers faster arithmetic in the base field and thus improved performance. This comes at the cost of a somewhat lower security level. The prime $p_{3072}$ is given as 
@@ -2772,62 +2121,13 @@ The following parameter sets are provided for testing purposes only and must not
 \end{itemize}
 
 \pagebreak
+
+-------- Section "10" Glossary of typical variable usage
+
 \section*{Glossary of typical variable usage}
 
 {\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X}
-        \toprule
-        variable & description \\
-        \midrule
-        $(a,b)$ & Commitment to an encryption \\\hline
-        $(A,B)$ & Aggregation of multiple encrypted votes \\\hline
-        $a_{i,j}$ & Polynomial coefficient of secret polynomial of guardian $G_i$ \\\hline
-        $B$ & Ballot \\\hline
-        $c$ & Challenge value \\\hline
-        $D$ & Contest data field \\\hline
-        $g$ & Generator of order-$q$ group of $\Z_p^*$ \\\hline
-        $H$ & Hash function \\\hline
-        $i,j$ & Index values \\\hline
-        $k$ & Decryption threshold \\\hline
-        $K$ & Joint election public key	\\\hline
-        $K_i$ & Public key of $i^\mathrm{th}$ guardian \\\hline
-        $K_{i,j}$ & Public commitment of polynomial coefficent $a_{i,j}$ \\\hline
-        $l$, $\ell$ & Index values \\\hline
-        $L$ & Selection or range limit \\\hline
-        $M$ & Exponentiated decryption \\\hline
-        $M_i$ & Partial decryption of $i^\mathrm{th}$ guardian \\\hline
-        $n$ & Number of guardians \\\hline
-        $p$	& Large prime modulus \\\hline
-        $q$	& Small prime order of subgroup of $\Z_p^*$ \\\hline
-        $r$	& Cofactor of $q$  in $p-1$ \\\hline
-        $R$ & Range limit or option selection limit \\\hline
-        $s$ & Secret value \\\hline
-        $S$ & Encoded selection value \\\hline
-        $t$ & Tally value \\\hline
-        $T$ & Encoded tally value \\\hline
-        $u$, $v$ & Proof response values \\\hline
-        $w$ & Lagrange coefficient \\
-        \bottomrule
-    \end{tabularx}
 }
 
 {\centering
-    \renewcommand{\tabcolsep}{5pt}
-    \renewcommand{\arraystretch}{1.5}
-    \begin{tabularx}{\textwidth}{c|X}
-        \toprule
-        variable & description \\
-        \midrule
-        $(\alpha,\beta)$ & Encryption of individual vote	\\\hline
-        $\xi$ & Random nonce \\\hline
-        $\chi$ & Contest hash \\\hline
-        $\sigma$ & Selection value \\\hline
-        $\psi$ & Selection hash \\\hline
-        $\Psi$ & Selection vector \\\hline
-        $\omega$ & Short code of selection hash \\\hline
-        $\Omega$ & Hash trimming function \\
-        \bottomrule
-    \end{tabularx}
 }
