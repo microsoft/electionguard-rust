@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 pub mod array_ascii;
+pub mod base16;
 pub mod biguint_serde;
 pub mod csprng;
 pub mod file;

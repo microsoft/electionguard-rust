@@ -57,12 +57,16 @@ docs/implementation guide/References: complete
 Add .errorviz-version to .gitignore
 incorporate the latex of egds2.0 into todo.txt
 add todo.txt to repo
+serialize bignums only all as uppercase hex
+serialize bignums includes base e.g., "base16:f81e2b3..."
 
 ====^^^^====^^^^====^^^^====^^^^====^^^^==== locally committed ====^^^^====^^^^====^^^^====^^^^====^^^^====
 
 ====vvvv====vvvv====vvvv====vvvv====vvvv==== TODO general ====vvvv====vvvv====vvvv====vvvv====vvvv====
 
-serialize bignums includes base e.g., "base64:f81e2b3..."
+UG left pad as necessary to ensure length is correct
+serialize format wrapped in version
+
 ensure SecretCoefficient is serialized in a fixed-length format
 
 electionguard-test script: finish rewrite in nu

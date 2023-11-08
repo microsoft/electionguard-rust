@@ -61,7 +61,6 @@ pub(crate) enum Subcommands {
     //TODO /// Generate an encrypted share of the guardian secret key.
     //TODO GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
     //
-
     /// Generate pre-encrypted ballots.
     PreEncryptedBallotGenerate(
         crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate,
@@ -90,7 +89,6 @@ pub(crate) enum Subcommands {
     //TODO /// Write random ballot selections to a file for testing.
     //TODO VoterWriteRandomSelections(crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection),
     //
-
     /// Compute the joint election public key from the guardian public keys and write it to a file.
     WriteJointElectionPublicKey(
         crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,

@@ -71,6 +71,19 @@ for the simple installation process for those who already have a Rust toolchain:
 cargo install nu
 ```
 
+### (Totally optional) Insta cargo extension
+
+Some unit tests are managed by the excellent crate [`insta`](https://crates.io/crates/insta).
+
+Homepage: [insta.rs](https://insta.rs/).
+
+If you expect to be developing tests, installing the `cargo` extension is recommended:
+```
+cargo install cargo-insta
+```
+
+But this just a convenience and is not required.
+
 ## Configuration
 
 TODO
