@@ -5,13 +5,20 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+#[cfg(biguint_serialize_base64)]
 use base64::{engine::Config, Engine};
+
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+#[cfg(biguint_serialize_base64)]
 const BASE64_ENGINE: base64::engine::general_purpose::GeneralPurpose =
     base64::engine::general_purpose::STANDARD;
+
+#[cfg(biguint_serialize_base64)]
 const BASE64_PREFIX: &str = "base64:";
+
+use crate::base16::{biguint_from_str_with_prefix, to_string_with_prefix};
 
 pub fn biguint_serialize<S>(u: &BigUint, serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -19,17 +26,16 @@ where
 {
     //? TODO BUG left pad as necessary to ensure length is correct
 
-    #[cfg(biguint_serialize_hex)]
+    use serde::ser::Error;
+
+    #[cfg(not(biguint_serialize_base64))]
     {
-        //? TODO: re-do this
-        let hex = format!("0x{:x}", u);
-        hex.serialize(serializer)
+        let s = to_string_with_prefix(u, 16, None).map_err(S::Error::custom)?;
+        s.serialize(serializer)
     }
 
-    #[cfg(not(biguint_serialize_hex))]
+    #[cfg(biguint_serialize_base64)]
     {
-        use serde::ser::Error;
-
         // The string "base64:" follwed by RFC 4648-base64
         // https://www.rfc-editor.org/rfc/rfc4648.html
         let v = u.to_bytes_be();
@@ -56,25 +62,15 @@ pub fn biguint_deserialize<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
 where
     D: Deserializer<'de>,
 {
-    //? TODO: re-do this
     use serde::de::Error;
 
-    #[cfg(biguint_serialize_hex)]
+    #[cfg(not(biguint_serialize_base64))]
     {
-        let hex = String::deserialize(deserializer)?;
-        let bytes = hex.as_bytes();
-
-        let opt_u =
-            if !(3 <= bytes.len() && bytes[0] == b'0' && (bytes[1] == b'x' || bytes[1] == b'X')) {
-                None
-            } else {
-                BigUint::parse_bytes(&bytes[2..], 16)
-            };
-
-        opt_u.ok_or_else(|| D::Error::custom(format!("Invalid BigUint: {}", hex)))
+        let s = String::deserialize(deserializer)?;
+        biguint_from_str_with_prefix(&s).map_err(D::Error::custom)
     }
 
-    #[cfg(not(biguint_serialize_hex))]
+    #[cfg(biguint_serialize_base64)]
     {
         let s = String::deserialize(deserializer)?;
 
