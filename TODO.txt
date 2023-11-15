@@ -192,9 +192,12 @@ docs/api: reference NIST CDF where types clearly correspond. E.g., BallotStyle h
 
 \pagebreak
 
+-------- Section 1
+
 \section{Introduction}
 This document describes the cryptographic details of the design of \EG which can be used in conjunction with many new and existing voting systems to enable both end-to-end (E2E) verifiability and privacy-enhanced risk-limiting audits (RLAs). \EG is not a complete election system.  It instead provides components that are designed to be flexible and to promote innovation by election officials and system developers. When properly used, it can promote voter confidence by empowering voters to independently verify the accuracy of election results.
 
+---- S1a
 \subsubsection*{End-to-end (E2E) verifiability}
 An E2E-verifiable election provides artifacts which allow voters to confirm that their votes have been accurately recorded and counted. Specifically, an election is End-to-end (E2E) verifiable if two properties are achieved.
 \begin{enumerate}
@@ -205,11 +208,13 @@ An E2E-verifiable tally can be used as the primary tally in an election or as a 
 Note that there are many challenges to responsible Internet voting that are mitigated but not fully solved by E2E-verifiability.  The 2015 U.S. Vote Foundation report at https://www.usvotefoundation.org/E2E-VIV details many of these issues, and the 2018 National Academies report at https://nap.nationalacademies.org/catalog/25120/securing-the-vote-protecting-american-democracy includes a section on Internet voting (pp. 101--105).
 }.
 
+---- S1b
 \subsubsection*{Risk-limiting audits (RLAs)}
 RLAs offer election administrators efficient methods to validate reported election tallies against physical ballot records. There are several varieties of RLAs, but the most efficient and practical are \emph{ballot-comparison audits} in which electronic \emph{cast-vote records} (CVRs) are individually compared against physical ballots.
 
 The challenge with ballot-comparison audits is that public release of the full set of CVRs can compromise voter privacy while an audit without public disclosure of CVRs offers no basis for public confidence in the outcome. \EG can bridge this gap by enabling public disclosure of encrypted ballots that can be matched directly to physical ballots selected for auditing and can also be proven to match the reported tallies.
 
+---- S1c
 \subsubsection*{About this specification}
 This specification can be used by expert reviewers to evaluate the details of the \EG process and by independent parties to write \EG implementations. This document is not intended to be a fully detailed implementation specification. It does not specify serialization and data structures for the election record or mappings between the notation used here and the corresponding data types and components of a specific implementation. However, this document, together with a detailed implementation specification or a well-documented \EG implementation, can be used by independent parties to write \EG verifiers to confirm the consistency of election artifacts with announced election results. 
 
@@ -224,7 +229,11 @@ S1 ElectionGuard is compatible with with Internet voting
 S1 ElectionGuard can enable public disclosure of encrypted ballots that can sbe matched directly to physical ballots selected for auditing
 S1 ElectionGuard can enable public disclosure of encrypted ballots that can be proven to match the reported tallies.
 
+
+-------- Section 2
+
 %pagebreak
+---- S2a
 \section{Overview}
 
 This section gives a very brief and high-level overview of the \EG system's functionality and how it can be used during an election or in a post-election audit such as an RLA.
@@ -236,6 +245,7 @@ After the conclusion of voting or auditing, a \emph{quorum} of guardians is nece
 S2a A quorum of guardians can produce the artifacts required to enable public verification of the tally.
 S2a A quorum of guardians is necessary to produce the artifacts required to enable public verification of the tally.
 
+---- S2b
 \subsubsection*{Key generation}
 Prior to the start of voting (for an E2E-verifiable election) or auditing (for an RLA), the election guardians participate in a process wherein they generate public keys to be used in the election. Each guardian generates its own public-secret key pair.  These public keys will be combined to form a single public key with which votes are encrypted. They are also used individually by guardians to exchange information about their secret keys so that the election record can be produced after voting or auditing is complete -- even if not all guardians are available at that time.
 
@@ -255,6 +265,7 @@ S2b If all challenged guardians release their challenged shares and these shbare
 S2b A guardian can be removed if they are challenged and fail to produce key shbares that verify
 S2b the key generation ceremony can be restarted with a replacement guardian.
 
+---- S2c
 \subsubsection*{Ballot encryption}
 In most uses, the election system makes a single call to the \EG API after each voter completes the process of making selections or with each ballot to be encrypted for an RLA. \EG will encrypt the selections made by the voter and return a confirmation code which the system should give to the voter.\footnote{The confirmation code is not necessary for RLA usage.} 
 
@@ -281,6 +292,7 @@ S2c The NIZK proofs prove that no more than the allowed number of votes were rec
 S2c The encryption method allows the encrypted ballots to be combined into a single aggregate ballot
 S2c The single aggregate ballot into which the encryption method combined the encrypted ballots consists of encryptions of the election tallies.
 
+---- S2d
 \subsubsection*{Verifiable decryption}
 In the final step, election guardians independently use a share of the secret decryption key, which each guardian computes from the previously shared secret key fragments, to jointly decrypt the election tallies and generate associated verification data. It is not necessary for all guardians to be available to complete this step.  If some guardians are missing, a quorum of guardians is sufficient to complete decryption and generate the verification data.
 
@@ -290,6 +302,7 @@ S2d Guardians can independently use their share of the secret decryption key to 
 S2d Only a quorum of guardians is sufficient to complete decryption
 S2d Only a quorum of guardians is sufficient to generate the verification data
 
+---- S2e
 \subsubsection*{Independent verification}
 Observers can use this open specification and/or accompanying materials to write independent \emph{election verifiers} that can confirm the well-formedness of each encrypted ballot, the correct aggregation of these ballots, and the accurate decryption of election tallies.
 
@@ -320,6 +333,7 @@ It is critical that a complete verification of an election record also includes 
 
 The election record verification steps are highlighted in green boxes.
 
+---- S2f
 \subsubsection*{Using this specification}
 The principal purposes of this document are to specify the functionality of the \EG toolkit and to provide details necessary for independent parties to write election verifiers that consume the artifacts produced by the toolkit.
 
@@ -328,9 +342,11 @@ The principal purposes of this document are to specify the functionality of the 
 
 -------- Section 3
 
+---- S3a
 \section{Components}\label{sec:EGcomponents}
 This section describes the four principal components of \EG.
 \begin{enumerate}
+
 \item \emph{Parameter Requirements:} These are properties required of parameters to securely and efficiently instantiate the cryptographic components of ElectionGuard. These \emph{cryptographic parameters} are fixed ahead of every election and the same parameters can be used across multiple elections. A specific, recommended set of standard parameters is provided. In addition, there are properties required of the \emph{election parameters} that define the election contests, selectable options, and ballot styles, among other information.
 \item \emph{Key Generation:} Prior to each individual election, guardians must generate individual public-secret key pairs and exchange shares of secret keys to enable completion of an election even if some guardians become unavailable.  Although it is preferred to generate new keys for each election, it is permissible to use the same keys for multiple elections so long as the set of guardians remains the same.  A complete new set of keys must be generated if even a single guardian is replaced.
 
@@ -345,7 +361,7 @@ S3a2 A complete new set of keys must be generated if even a single guardian is r
 
 S3a3 Guardians can use their secret key shares to jointly produce election tallies together with verifiable artifacts that prove that the tallies are correct.
 
-S3b
+---- S3b
 \subsubsection*{Notation}
 In the remainder of this specification, the following notation will be used.
 \begin{itemize}
@@ -361,7 +377,7 @@ In the remainder of this specification, the following notation will be used.
   \item In general, the variable pairs $(\alpha,\beta)$, $(a,b)$, and $(A,B)$ will be used to denote encryptions. Specifically, $(\alpha,\beta)$ will be used to designate encryptions of votes (usually an encryption of a zero or a one), $(A,B)$ will be used to denote aggregations of encryptions -- which may be encryptions of larger values, and $(a,b)$ will be used to denote encryption commitments used to prove properties of other encryptions.
 \end{itemize}
 
-S3c
+---- S3c
 \subsubsection*{Encryption of votes}
 Encryption of votes in \EG is performed using a public key encryption method suggested by Devillez, Pereira, and Peters,\footnote{Devillez H., Pereira, O., Peters, T. (2022) \emph{How to Verifiably Encrypt Many Bits for an Election?} in ESORICS 2022 Lecture Notes in Computer Science, vol 13555.  Springer, Berlin, Heidelberg. \url{https://link.springer.com/chapter/10.1007/978-3-031-17146-8_32}} which is a variant exponential form of the ElGamal cryptosystem,\footnote{ElGamal T. (1985) \emph{A Public Key Cryptosystem and a Signature Scheme Based on Discrete Logarithms}. In: Blakley G.R., Chaum D. (eds) Advances in Cryptology. CRYPTO 1984. Lecture Notes in Computer Science, vol 196. Springer, Berlin, Heidelberg. \url{https://link.springer.com/content/pdf/10.1007/3-540-39568-7_2.pdf}} which is, in turn, a static form of the widely-used Diffie-Hellman(-Merkle) key exchange\footnote{Diffie W., Hellman, M. (1976) \emph{New Directions in Cryptography} IEEE Transactions on Information Theory, vol 22}.  This encryption method is called \emph{DPP vote encryption} or simply \emph{vote encryption} in this document and rests on precisely the same security basis as Diffie-Hellman(-Merkle) key exchange---which is used to protect the confidentiality of the vast majority of Internet traffic.
 
@@ -400,7 +416,7 @@ S3c The value of $m$ can be computed from the encryption nonce $\xi$
 S3c An encryption of one is used to indicate that an option is selected
 S3c An encryption of zero is used to indicate that an option is not selected
 
-S3d
+---- S3d
 \subsubsection*{Homomorphic properties}
 A fundamental quality of the DPP vote encryption is its additively homomorphic property. If two messages $m_1$ and $m_2$ are respectively encrypted as $(A_1,B_1 ) = (g^{\xi_1} \bmod p , K^{m_1+\xi_1} \bmod p)$ and $(A_2, B_2) = (g^{\xi_2}\bmod p, K^{m_2+\xi_2} \bmod p)$, then the component-wise product 
 \begin{equation}
@@ -425,7 +441,7 @@ However, as will be described below, it is possible for a holder of a nonce $\xi
 
 S3d A holder of a nonce $\xi$ can prove to a third party that a pair $(\alpha, \beta)$ is an encryption of $m$ without access to the secret $s$ or revealing the nonce $\xi$
 
-S3e 
+---- S3e 
 \subsubsection*{Non-interactive zero-knowledge (NIZK) proofs}
 \EG provides numerous proofs about encryption keys, encrypted ballots, and election tallies using the following four techniques.
 \begin{enumerate}
@@ -453,7 +469,7 @@ S3e ElectionGuard can demonstrate that keys are properly chosen.
 S3e ElectionGuard can demonstrate that ballots are well-formed.
 S3e ElectionGuard can demonstrate that decryptions match claimed values.
 
-S3f
+---- S3f
 \subsubsection*{Threshold encryption}
 Threshold encryption is used for encryption of ballots and other data. This form of encryption makes it very easy to combine individual guardian public keys into a single public key.  It also offers a homomorphic property that allows individual encrypted votes to be combined to form encrypted tallies.
 
@@ -479,14 +495,15 @@ S3f A guardian, having received secret keys from other guardians, can compute a 
 S3f A guardian, having computed a share of the secret decryption key, can
 form a partial decryption.
 
-S3g 
+---- S3g 
 \subsubsection*{Encryption of other data}
 \EG provides means to encrypt data other than votes, which are selections usually encoded as zero or one that need to be homomorphically aggregated. Such data may include the cryptographic shares of a guardian's secret key that are sent to the other guardians and are encrypted to the receiving guardians' public keys, write-in information that needs to be attached to an encrypted selection and is encrypted to the election public key, or other auxiliary data attached to an encrypted ballot, either encrypted to the election public key or to an administrative public key. The non-vote data do not need to be homomorphically encrypted and can use a more standard form of public-key encryption removing the data size restrictions imposed by the vote encryption. \EG encrypts such data with hashed ElGamal encryption, which deploys a key derivation function (\KDF) to generate a key stream that is then XORed with the data. To implement the \KDF and to provide a message authentication code (\MAC), encryption makes use of the keyed Hash Message Authentication Code \HMAC. In \EG, \HMAC is instantiated as \HMAC-\SHA with the hash function \SHA.
 
-
+---- S3.1
 \subsection{Parameter requirements}
 \EG uses integers to instantiate the encryption rather than elliptic curves in order to make construction of election verifiers as simple as possible without requiring special tools and dependencies. The encryption scheme used to encrypt votes is defined by a prime $p$ and a prime $q$ which divides $(p-1)$. We use $r = (p-1)/q$ to denote the cofactor of $q$, and a generator $g$ of the order $q$ subgroup $\Z_p^r$ is fixed. We also require $r/2$ to be prime. The specific values for a 4096-bit prime $p$ and a 256-bit prime $q$ which divides $(p-1)$ and a generator $g$ that define all standard baseline parameters are given below. 
 
+---- S3.1.1
 \subsubsection{Standard baseline cryptographic parameters}\label{sec:parameters}
 Standard parameters for \EG begin with the largest 256-bit prime $q = 2^{256}-189$. The (big endian) hexadecimal representation of $q$ is as follows.
 \begin{equation}
@@ -575,7 +592,7 @@ Alternative parameter sets are possible and may be allowed in future versions of
 \EGnote{As an example for alternative parameters, the Appendix provides a set of reduced parameters that offer better performance at a lower security level, and additionally provides various sets of very small and insecure parameters for testing purposes only. A good source for parameter generation is appendix A of FIPS 186-4\footnotemark. Allowing alternate non-standard parameters would force election verifiers to recognize and check that parameters are correctly generated. Since these checks are very different from other checks that are required of a verifier, allowing such parameters would add substantial complexity to election verifiers. For this reason, this version of \EG fixes the parameters as above.}
 \footnotetext{NIST (2013) Digital Signature Standard (DSS). In: FIPS 186-4. \url{https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf}}
 
-
+---- S3.1.2
 \subsubsection{Parameter base hash}\label{sec:parameterhash}
 The prime modulus $p$, the subgroup order $q$, and the subgroup generator $g$ are hashed using the \EG hash function $H$ (as specified in detail in Section~\ref{sec:hashing}) to form the parameter base hash
 \begin{equation}\label{eq:parameterhash}
@@ -587,7 +604,7 @@ H_P = \mathtt{0x2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296
 \end{equation}
 This hash value is an input to all subsequent hash computations, either directly or indirectly, which binds all hash outputs to the baseline parameters and the version of the specification used for the election.
 
-
+---- S3.1.3
 \subsubsection{Election parameters and the election manifest}\label{sec:manifest}
 Another parameter of an election is a public election manifest. The ElectionGuard manifest is a single file that describes the modalities of the election and must specify a wide range of data about it.  Most importantly, the manifest lists, among other information, all the contests in an election, the candidates (selectable options) for each contest together with associations between each option and its representation on a virtual ballot, and the contest selection limit—the number of options that a voter may select in that contest. It is assumed that each contest in the manifest has a unique label and that within each contest, each option also has a unique label. For instance, if Alice, Bob, and Carol are running for governor, and David and Ellen are running for senator, the election manifest file could enable the vector $\langle 0,1,0;0,1\rangle$ to be recognized as a ballot with votes for Bob as governor and Ellen as senator. This section defines how the manifest must uniquely specify the election parameters.
 
@@ -641,6 +658,7 @@ A manifest may specify whether the total number of write-ins selected in each co
 
 \paragraph{A note on selection limit proofs.}  In general, a combination of the above fields can be merged into a single selection limit proof per contest per ballot.  For example, a contest which includes an undervote field, an overvote field, and two separate write-in fields can include a single range proof that the sum of these fields is non-negative and does not exceed the contest selection limit.  The only exceptions are the very unusual cases where a manifest specifies including both an undervote field and an undervote count field or both individual write-in fields and a write-in total field.  In these cases, the selection limit proofs should each include only one of the paired fields (e.g., undervote or undervote count) and a second selection limit proof should be included if both paired fields are to be verified.  
 
+---- S3.1.4
 \subsubsection{Election manifest hash}\label{sec:manifesthash}
 The data in the election manifest is written to a file \texttt{manifest} in a canonical representation that may be implementation specific.
 The election manifest file \texttt{manifest} is hashed\footnote{The file that constitutes the election manifest is input to $H$ as an entire file. Again the $\mathtt{0x01}$ byte at the beginning of the second argument is a domain separation byte (in hex). In what follows, all uses of the function $H$ include such domain separation bytes.} using the \EG hash function with the parameter hash $\HH_P$ to produce the manifest digest
@@ -648,6 +666,7 @@ The election manifest file \texttt{manifest} is hashed\footnote{The file that co
 \HH_M = H(\HH_P; \mathtt{0x01}, \mathtt{manifest}).
 \end{equation}
 
+---- S3.1.5
 \subsubsection{Election base hash}\label{sec:basehash}
 The election base hash $\HH_B$ is computed from the parameter base hash $\HH_P$ and the manifest hash $\HH_M$ together with the number $n$ of guardians that participate in the election, and the quorum value $k$, as 
 \begin{equation}\label{eq:basehash}
@@ -659,7 +678,7 @@ Incorporating the byte array $\HH_B$ into subsequent hash computations binds tho
 \EGverif{\veriftitleParameterValidation}{\label{verif:parameters}
 \veriftextParameterValidation}
 
-
+---- S3.2
 \subsection{Key Generation}\label{sec:keygen}
 Before an election, the number of guardians ($n$) is fixed together with a quorum value ($k$) that describes the number of guardians necessary to decrypt tallies and produce election verification data. The values $n$ and $k$ are integers subject to the constraint that $1\leq k \leq n$.  Canvassing board members can often serve the role of election guardians, and typical values for $n$ and $k$ could be 5 and 3 -- indicating that 3 of 5 canvassing board members must cooperate to produce the artifacts that enable election verification. The reason for not setting the quorum value $k$ too low is that it will also be possible for $k$ guardians to decrypt individual ballots.
 
@@ -676,6 +695,7 @@ A pre-determined quorum value ($k$) out of the ($n$) guardians will be necessary
 
 If the same set of $n$ guardians support multiple elections using the same threshold value $k$, the generated keys and key shares may be reused across several elections.
 
+---- S3.2.1
 \subsubsection{Overview of key generation}
 The $n$ guardians of an election are denoted by $G_1,G_2,\dots,G_n$.  Each guardian $G_i$ generates an independent public-secret key pair by generating a random integer secret $s_i\in\Z_q$ and forming the public key $K_i = g^{s_i} \bmod p$. Each of these public keys will be published in the election record together with a non-interactive zero-knowledge Schnorr proof of knowledge of the associated secret key.  
 
@@ -695,6 +715,7 @@ At the conclusion of the election, individual encrypted ballots will be homomorp
 
 All challenged ballots are individually decrypted in precisely the same fashion.
 
+---- S3.2.2
 \subsubsection{Details of key generation}\label{sec:keygendetails}
 \paragraph{Guardian coefficients and key pair.}
 Each guardian $G_i$ in an election with a decryption threshold of $k$ generates $k$ secret polynomial coefficients $a_{i,j}$, for $0 \leq j < k$, by sampling them uniformly, at random in the range $0 < a_{i,j} < q$ and forms the polynomial
@@ -794,6 +815,7 @@ for later use in decryption as will be described in Section~\ref{sec:decrypt_mis
 
 At a minimum, guardian $G_i$ should retain the values $s_i$ and $P(i)$.
 
+---- S3.2.3
 \subsubsection{Extended base hash}\label{sec:extendedhash}
 Once the baseline parameters have been produced and confirmed, the base hash $\HH_B$ is hashed with the election public key $K$  to form an extended base hash 
 \begin{equation}\label{eq:extbasehash}
@@ -805,10 +827,12 @@ that will form the basis of subsequent hash computations.
 \veriftextExtendedBaseHashValidation}
 
 
+---- S3.3
 \subsection{Ballot Encryption}\label{sec:ballotencryption}
 
 Although there are some exceptions, an \EG ballot is typically comprised entirely of encryptions of one (indicating selection made) and zero (indicating selection not made). To enable homomorphic addition (for tallying), these values are exponentiated during vote encryption.
 
+---- S3.3.1
 \subsubsection{Selection encryption}\label{sec:selectionencryption}
 To encrypt a ballot entry $\sigma$, a random value $\xi$ is selected such that $0\leq \xi<q$, and $\sigma$ is encrypted as
 \begin{equation}\label{eqn:encryptvote}
@@ -825,6 +849,7 @@ Note that if multiple encrypted votes $(g^{\xi_i} \bmod p,\ K^{\sigma_i+\xi_i} \
 
 Some cardinal voting methods like cumulative voting, score voting, STAR-voting, and Borda count may require the encryption of small positive integers $\sigma$ greater than $1$ that represent multiple allowed votes or weighted votes. In all these cases, encryption is done as shown in Equation~\eqref{eqn:encryptvote}.
 
+---- S3.3.2
 \subsubsection{Generation of encryption nonces}\label{sec:noncegen}
 The “random” nonces used for vote encryption on a single ballot $B$ are all derived from a single 256-bit \emph{ballot nonce} $\xi_B$. It is assumed that each contest has a label $\Lambda$ and that within each contest each possible option has a label $\lambda$, which are specified in the election manifest. The manifest also specifies a unique sequence order of contests and options within contests. Within the $i$-th contest, which has contest label $\Lambda_i$, the nonce $\xi_{i,j}$ used to encrypt the selection for the $j$-th option, which has option label $\lambda_j$, is derived as
 \begin{equation}\label{eq:noncegen}
@@ -838,6 +863,7 @@ Since access to a ballot nonce $\xi_B$ enables decryption of the ballot which it
 To accommodate preservation of ballot nonces, an \EG manifest may optionally provide a public key to be used for encryption of ballot nonces. This public key may be the same as the election key used to encrypt voter selections, but some scenarios warrant the use of an independent public key.  If such a key is provided, \EG uses that key to encrypt each ballot's ballot nonce $\xi_B$ and return this encryption together with the encrypted ballot.  There are also some scenarios in which ballot nonces are encrypted with symmetric keys. Any such symmetric key should never be published, and the process for managing these symmetric keys is outside of the scope of this specification.
 
 
+---- S3.3.3
 \subsubsection{Ballot well-formedness}
 
 \paragraph{Contest selection limits.} 
@@ -864,6 +890,7 @@ The use of DPP vote encryption enables efficient zero-knowledge proofs of these 
 A range proof, i.e. a proof that a ciphertext is an encryption of one of the values $0,1,\dots,L$ is a generalization of the proof that a ciphertext is an encryption of zero or one. It can be used to prove well-formedness of an individual selection when it is allowed for options to receive multiple votes in a contest by a single voter. Using range proofs with a range up to a certain option selection limit for the individual option as well as the contest selection sum therefore enables cardinal voting methods such as cumulative voting, score voting, STAR-voting, and Borda count in \EG.
 
 
+---- S3.3.4
 \subsubsection{Outline for proofs of ballot correctness}
 This section provides the outlines for different types of encryption proofs that aim to give an understanding of how they work. It starts with the proof that a given ciphertext is an encryption of the value $0$. Based on that, it explains how it can be proved that a ciphertext is an encryption of the value $1$. It then combines those to arrive at the base case used in \EG, namely that a ciphertext is an encryption of $0$ or $1$. Finally, it shows how the latter is generalized to generate range proofs, i.e. proofs that a ciphertext encrypts a value in a range $0,1,\dots,L$.
 
@@ -882,6 +909,7 @@ The prover starts with whichever statement is \emph{not} true, generates a rando
 \paragraph{Sketch of NIZK Proof that $(\alpha,\beta)$ is an encryption of an integer $\ell$ such that $0\leq \ell \leq R$.}
 The above method to prove that $(\alpha,\beta)$ is an encryption of zero or one can be extended to more than two values in an analogous way. Now, the prover needs to produce false proofs that verify for all values that are not encrypted in the ciphertext. This means that for each $i$ with $0\leq i \leq R$ and $i\neq\ell$, the prover selects a challenge value $c_i$ and a response at random and uses them to create commitments $(a_i, b_i)$ that make the response verify the challenge for the false claim that $(\alpha,\beta)$ is an encryption of the value $i \neq \ell$. For the true assertion that $(\alpha,\beta)$ is an encryption of $\ell$, the prover makes honest commitments $(a_\ell, b_\ell)$. At this point, there exist commitments $(a_i, b_i)$ for all $0\leq i \leq R$ and a single challenge value $c$ is selected by hashing all these commitments. The remaining challenge value $c_\ell$ is then uniquely determined by the constraint $c = (c_0 + \dots + c_\ell + \dots + c_R) \bmod q$ and can be computed by subtracting from $c$ all other challenge values that were chosen for the false proofs. The challenge $c_\ell$ must be used to answer the true assertion that $(\alpha,\beta)$ is an encryption of $\ell$. The proof now consists of all challenge and response pairs, including the honestly generated one for the true assertion and $R$ faked pairs for the false assertions.
 
+---- S3.3.5
 \subsubsection{Details for proofs of ballot correctness}\label{sec:proofsballotcorrectness}
 This subsection begins with the special but common case where a selection is either a $0$ or a $1$, which means that the range bound is $R=1$. Both cases---unselected (encryption of $0$) and selected (encryption of $1$) are spelled out in detail before the general case range proof is specified.  An \EG implementation can directly implement the general range proof and use it in the special case $R=1$. There is no need to implement the case $R=1$ separately.
 
@@ -989,6 +1017,7 @@ Specializing the general range proof with $R=1$ and $\ell=0$ is identical to the
 
 
 
+---- S3.3.6
 \subsubsection{Encryption of contest data}\label{sec:encrypt_ext_data}
 For each contest, \EG maintains a contest data field. The information held in this field must be encoded in a byte array $D$ of a fixed length of $32\cdot b_D$ bytes, where $b_D$ is the smallest value large enough for $D$ to capture all additional information from the ballot that needs to be retained and stored in encrypted form as part of the encrypted ballot. This information consists of any text written into one or more write-in text fields, information about overvotes, undervotes, and null votes, and possibly other data about voter selections. This single data field containing all such data associated with the contest is encrypted with the election public key in a single hashed ElGamal encryption as follows.
 
@@ -1019,6 +1048,7 @@ The ciphertext encrypting $D$ is $C_D = (C_0, C_1, C_2)$, where
 \end{align}
 The component $C_1$ is computed by bitwise XOR (here denoted by $\oplus$) of each data block $D_{i}$ with the corresponding key $k_i$. Component $C_2$ is a message authentication code.
 
+---- S3.3.7
 \subsubsection{Contest data}
 The contest data can contain different kinds of information such as undervote, null vote, and overvote information together with the corresponding selections, the text captured for write-in options and other data associated to the contest.
 
@@ -1041,6 +1071,7 @@ For all write-in selections in a contest, \EG captures the text written into eac
 The collected contest data is encoded as a byte array of length $32\cdot b_D$ bytes. If the encoded data is shorter, it is padded to the fixed length of $32\cdot b_D$ bytes with an array of \texttt{00} bytes of the appropriate length at the end. If it is longer it must be truncated to have exactly $32 \cdot b_D$ bytes.
 
 
+---- S3.3.8
 \subsubsection{Proof of satisfying the contest selection limit}\label{sec:selectionlimit}
 The final step in proving that a ballot is well-formed is demonstrating that the selection limits for each contest have not been exceeded.  This is accomplished by homomorphically combining all of the $(\alpha_i,\beta_i)$ values for a contest by forming the aggregate contest encryption $(\bar\alpha,\bar\beta) = (\prod_i\alpha_i \bmod p,\ \prod_i\beta_i \bmod p)$ and proving that $(\bar\alpha,\bar\beta)$ is an encryption of a value that is not larger than the total number of votes allowed for that contest (usually one). The simplest way to complete this proof is to combine all of the pseudo-random nonces $\xi_i$ that were used to form each $(\alpha_i,\beta_i ) = (g^{\xi_i} \bmod p,\ K^{\xi_i+\sigma_i} \bmod p)$. The aggregate nonce $\xi = \sum_i \xi_i \bmod q$ matches the aggregate contest encryption as $(\bar\alpha,\bar\beta) = (\prod_i\alpha_i \bmod p, \prod_i\beta_i \bmod p) = (g^\xi \bmod p,\ K^{\xi+\ell} \bmod p)$ -- where $0 \leq \ell \leq L$ and $L$ is the selection limit for the contest.
 
@@ -1059,11 +1090,13 @@ Note that all of the above proofs can be performed directly by the entity perfor
 \veriftextAdherenceToVoteLimits}
 
 
+---- S3.4
 \subsection{Confirmation codes}\label{sec:confirmationcodes}
 Upon completion of the encryption of each ballot, a \emph{confirmation code} is prepared for each voter. The code is a hash value (an output of the function $H$ as specified in detail in Section~\ref{sec:hashing}) whose inputs must include the encrypted ballot and the extended base hash code $\HH_E$. Inputs to the hash may optionally include other information such as an identifier for the voting device, the location of the voting device, as well as the date and time that the ballot was encrypted.
 
 The data that constitutes the encrypted ballot for the purpose of computing its confirmation code consists of all encrypted selections on that ballot. I.e.\ it includes a ciphertext $(\alpha, \beta)$ for each selection in each contest on the ballot. In detail, a confirmation code for a given ballot $B$ is computed as follows. The number of contests on the ballot $B$ is denoted by $m_B$ and contests have a specified order defined in the election manifest file. Therefore, each contest has a unique sequence order $l$, where $1\leq l \leq m_B$.
 
+---- S3.4.1
 \subsubsection{Contest hash}\label{sec:contesthash}
 For each contest, \EG computes a \emph{contest hash}, which is a hash value of an input that contains all selection option encryptions in the contest. The encryptions are hashed in order specified by the election manifest file.  
 If $E_i = (\alpha_i, \beta_i)$ denotes the ciphertext encrypting the voter's choice for the $i$-th option ($1\leq i \leq m$) of the $l$-th contest ($1\leq l \leq m_B$), the contest hash value $\chi_l$ is computed from the contest label $\Lambda_l$, the election public key $K$, and the sequence of ciphertexts $E_1, E_2, \ldots, E_{m}$ as
@@ -1071,6 +1104,7 @@ If $E_i = (\alpha_i, \beta_i)$ denotes the ciphertext encrypting the voter's cho
 \chi_l = H(\HH_E; \mathtt{0x23}, \indc(\Lambda_l), K, \alpha_1, \beta_1, \alpha_2, \beta_2\ldots,\alpha_m, \beta_m).
 \end{equation}
 
+---- S3.4.2
 \subsubsection{Confirmation code}\label{sec:confirmationcode}
 The \emph{ballot confirmation code} is a \emph{ballot hash} $\HH(B)$ that is computed from all contest hashes as  
 \begin{equation}\label{eq:confirmationcode}
@@ -1078,6 +1112,7 @@ The \emph{ballot confirmation code} is a \emph{ballot hash} $\HH(B)$ that is com
 \end{equation}
 The input contains the contest hashes in the order of the contests as specified in the election manifest file. Besides the contest hashes, there is an additional, auxiliary input byte array $\B_{\mathrm{aux}}$. Its composition is specified in the election manifest file depending on the desired properties for the confirmation codes. The byte array $\B_{\mathrm{aux}}$ can be used to include strings that encode the above mentioned optional information on the voting device such as a device identifier and its location, or the date and time that the ballot was encrypted. It can also contain the confirmation code of a previous ballot to enable ballot chaining as described below. If ballot chaining is not used, the manifest file may specify that this additional input is not used, in which case $\B_{\mathrm{aux}}$ can be omitted (or treated as the empty byte array).
 
+---- S3.4.3
 \subsubsection{Ballot chaining}\label{sec:ballotchaining}
 For a fixed voting device, the additional input to the confirmation code $\HH_j = \HH(B_j)$ of the $j$-th ballot voted on this device can also include the confirmation code $\HH_{j-1} = \HH(B_{j-1})$ of the previous ballot $B_{j-1}$. When this is included, confirmation codes are part of a hash chain, which is initialized with 
 \begin{equation}\label{eq:hashchain0}
@@ -1104,6 +1139,7 @@ using $\overline\B_{\mathrm{aux}} = \HH(B_\ell)\parallel \B_{\mathrm{aux},0} \pa
 \paragraph{Ballot casting or challenging.}
 Once in possession of a confirmation code (\emph{and never before}), a voter is afforded an option to either cast the associated ballot or challenge it and restart the ballot preparation process.  The precise mechanism for voters to make these selections may vary depending upon the instantiation, but this choice would ordinarily be made immediately after a voter is presented with the confirmation code, and the status of the ballot would be undetermined until the decision is made. It is possible, for instance, for a voter to make the decision directly on the voting device, or a voter may instead be afforded an option to deposit the ballot in a receptacle or to take it to a poll worker to be challenged.  For vote-by-mail scenarios, a voter can be sent (hashes of) two complete sets of encryptions for each selectable option and can effect a ballot challenge implicitly by choosing which encryptions to return.
 
+---- S3.5
 \subsection{Ballot Aggregation}\label{sec:ballotaggregation}
 At the conclusion of voting, all of the ballot encryptions are published in the election record together with the proofs that the ballots are well-formed. Additionally, all of the encryptions of each option are homomorphically combined to form an encryption of the sum of the values that were individually encrypted. The encryptions $(\alpha_i, \beta_i)$ of each individual option are combined by forming the product 
 \begin{equation}
@@ -1115,6 +1151,7 @@ This aggregate encryption $(A,B)$, which represents an encryption of the tally o
 \veriftextCorrectnessOfBallotAggregation}
 
 
+---- S3.6
 \subsection{Verifiable Decryption}\label{sec:verifiable_decrypt}
 To decrypt an aggregate encryption $(A,B)$ (or an individual encryption such as one on a challenged ballot), guardians work together in a protocol, where each guardian produces a partial decryption and contributes to an accumulated Chaum-Pederson proof of correct decryption.
  
@@ -1130,6 +1167,7 @@ This $T$ has the property that $T=K^t \bmod p$ where $t$ is the tally of the ass
 
 In general, computation of this tally value $t$ is computationally intractable. However, in this application, $t$ is relatively small---usually bounded by the number of votes cast. This tally value $t$ can be determined from $T$ by exhaustive search, by precomputing a table of all possible $T$ values in the allowable range and then performing a single look-up, or by a combination in which some exponentiations are precomputed and a small search is used to find the value of $t$ (e.g., a partial table consisting of $K^{100} \bmod p$, $K^{200} \bmod p$, $K^{300} \bmod p$, \dots is precomputed and the value $T$ is repeatedly divided (or multiplied) by $K$ until a value is found that is in the partial table). The value $t$ is published in the election record, and verifiers should check both that $T = K^t \bmod p$ and that $B = T\cdot M \bmod p$.
 
+---- S3.6.1
 \subsubsection{Partial decryption by available guardians}\label{sec:decrypt_missing}
 
 During the key generation process (as described in Section~\ref{sec:keygendetails}), each guardian $G_i$ receives from each other guardian $G_j$ a share $P_j(i)$ of $G_j$'s secret key $s_j$ ($1\leq i,j \leq n$ and $i \neq j$). Guardian $G_i$ also computes its own share $P_i(i)$ and is therefore in possession of all shares $P_j(i)$ for $1 \leq j \leq n$. Either at that time or at a later time but before $G_i$ participates in any joint decryption process, $G_i$ computes 
@@ -1144,6 +1182,7 @@ M_{i} = A^{P(i)} \bmod p
 \end{equation}
 that contributes to computing the value $M = A^s \bmod p$.
 
+---- S3.6.2
 \subsubsection{Combination of partial decryptions.}
 The partial decryptions are combined to obtain $M$ with the help of the Lagrange coefficients that correspond to the available guardians. Let $U \subseteq \{1,2,\dots,n\}$ be the set of indices such that $\{G_i : i\in U\}$ is the set of available guardians. For decryption to succeed, a quorum of at least $k$ guardians is needed, i.e. $|U| = h \geq k$. All available guardians participate in the reconstruction even if $h>k$, i.e., there are more guardians available than strictly necessary for having a quorum. 
 
@@ -1160,6 +1199,7 @@ These coefficients are used to combine the $M_i$ for $i\in U$ provided by the av
 However, it is preferable to not release the secret $s$ (or any of the missing secrets) and instead only release the partial decryptions that the secret would have produced. This prevents the secret from being used for additional decryptions without the cooperation of at least $k$ guardians.\vspace{2pt}\\
 As an example, consider an election with five guardians and a threshold of three. If two guardians are missing at the time of decryption, the remaining three can perform any required decryptions as described in the text above. If, instead, they take the shortcut of simply reconstructing and then using the two missing secrets, then any of the three could, at a later time, use these missing secrets together with its own secret to perform additional decryptions without the cooperation of any other guardian.}
 
+---- S3.6.3
 \subsubsection{Proof of correctness}\label{sec:verifiable_decrypt_proof}
 The available guardians work together to produce a Chaum-Pedersen proof that $M$ was computed correctly, which means that $M= A^s \bmod p$. The proof is computed as follows.
 
@@ -1207,6 +1247,7 @@ The final step is to verify the tallies themselves.
 \EGverif{\veriftitleValidationOfCorrectDecryptionOfTallies}{\label{verif:tallies}
 \veriftextValidationOfCorrectDecryptionOfTallies}
 
+---- S3.6.4
 \subsubsection{Decryption of contest data}\label{sec:decrypt_contest_data}
 For each contest, an encrypted ballot contains a ciphertext $C_E = (C_0, C_1, C_2)$ encrypting contest data such as overvote, undervote, and null vote information and write-in text fields. The ciphertext has been generated as described in Section \ref{sec:encrypt_ext_data}. Such data may need to be decrypted if the tallies record a significant number of votes in write-in selections. Also, all contest data fields on each challenged ballot are decrypted.
 
@@ -1274,6 +1315,7 @@ The byte array $D$ can now be parsed to reveal the captured overvote, undervote,
 \veriftextCorrectnessOfDecryptionsOfContestData}
 
 
+---- S3.6.5
 \subsubsection{Decryption of challenged ballots}\label{sec:decrypt_challenged}
 Each and every challenged ballot must be verifiably decrypted.  \EG supports two methods of decrypting challenged ballots.  The first is for the guardians to use their secret keys in precisely the way they do to decrypt election tallies.  The second is to simply publish the primary nonce used to encrypt each challenged ballot.  Whether these nonces are available depends on how \EG is used.
 
@@ -1319,6 +1361,7 @@ If the resulting confirmation code matches the confirmation code provided to the
 
 Note that confirmation codes {\em do not} include any of the zero-knowledge proofs of ballot correctness.  So a verifier does not need to reproduce these zero-knowledge proofs.  Only the actual encryptions of the selections must be regenerated and confirmed.
 
+---- S3.7
 \subsection{The Election Record}
 The record of an election should be a full accounting of all of the election artifacts.  Specifically, it should contain the following.
 \begin{itemize}
@@ -1382,6 +1425,7 @@ With pre-encrypted ballots, each possible selection on a ballot is individually 
 
 \EG requires two applications to support pre-encrypted ballots: a \emph{ballot encrypting tool} to provide data to enable printing of blank ballots and a companion \emph{ballot recording tool} to receive information about selections made on pre-printed ballots and produce data compatible with the \EG election record.
 
+---- S4.1
 \subsection{Format of Pre-Encrypted Ballots}
 Each selectable option within each contest is associated with a vector $\Psi$ of encryptions $E_j$ --- with one encryption for each selectable option within the contest. Selectable options in a contest have a unique order determined by their option indices in increasing order. Let $i$ be the position of the  selectable option in this ordering (not necessarily identical to its option index).
 In its \emph{normal} form and for a contest with $m$ selection options, this vector 
@@ -1392,6 +1436,7 @@ includes an encryption $E_i=(\alpha_i,\beta_i) = \Enc(1; \xi_i)$ of one in the v
 
 The principal difference between a pre-encrypted ballot and a standard \EG ballot is that while standard \EG has a single vector of encryptions for each contest, here we have a vector of encryptions for each selectable option in each contest (generally including the possibility of an undervote in which no selections are made). Another difference is that while a standard \EG contest encryption can contain multiple selections, each vector of pre-encryptions represents at most one selection.  However, in a contest where a voter is allowed to make multiple selections, multiple pre-encryption vectors can be combined to form a single contest encryption vector with multiple encryptions of one that precisely matches the standard \EG format.
 
+---- S4.1.1
 \subsubsection{Selection hash}\label{sec:selectionhash_pre}
 Each pre-encrypted vector of a pre-encrypted ballot is hashed using the \EG hash function $H$ (specified in detail in Section~\ref{sec:hashing}) to form a \emph{selection hash}. For all selectable options, i.e. for each option at position $i$ in the contest with $1\leq i \leq m$, the hash value $\psi_i$ of the selection vector $\Psi_{i,m} = \langle E_1,E_2,\ldots,E_m\rangle$ is computed as 
 \begin{equation}\label{eq:selectionhash_pre}
@@ -1405,6 +1450,7 @@ In a contest with a selection limit of $L$, an additional $L$ null vectors are h
 \end{equation}
 where all $E_i = (\alpha_i, \beta_i)$ are encyptions of zero and $1\leq \ell \leq L$.
 
+---- S4.1.2
 \subsubsection{Contest hash}\label{sec:contesthash_pre}
 % Copyright (C) Microsoft Corporation. All rights reserved.
 All of the selection hashes within each contest will ultimately be hashed {\em in sorted order} to form the \emph{contest hash} of that contest. Each contest on a ballot has a unique position determined by the position of its contest index in the list of contest indices in increasing order. The contest hash for the $l$-th contest (with label $\Lambda_l$) on the ballot is computed as 
@@ -1414,6 +1460,7 @@ All of the selection hashes within each contest will ultimately be hashed {\em i
 where $\sigma$ is a permutation that represents the sorting of the selection hashes. This means that contests are \emph{not} hashed in the order given by the contest indices, but instead $\sigma(i)<\sigma(j)$ implies that $\psi_{\sigma(i)}<\psi_{\sigma(j)}$ (when hash values are interpreted as integers in big endian byte order). 
 The sorting is required so that the order of the selection hashes $\psi_1,\psi_2,\ldots,\psi_m$ does not reveal the contents of the encryptions that are used to generate the hashes.
 
+---- S4.1.3
 \subsubsection{Confirmation code}\label{sec:confirmationcode_pre}
 While contest hashes for pre-encrypted ballots are computed from selection hashes, which differs from the standard scenario for \EG described in Section~\ref{sec:confirmationcodes}, the computation of confirmation codes aligns with the previous case. The \emph{confirmation code} $\HH(B)$ of a pre-encrypted ballot $B$ is generated as the hash of all the contest hashes on the ballot in sequential order. If there are $m_B$ contests on the ballot (in sequential order specified by their contest indices in the election manifest file), its confirmation code is computed as 
 \begin{equation}\label{eq:ballothash_pre}
@@ -1425,6 +1472,7 @@ A ballot's hash will be printed directly on the ballot.
 Ideally, two copies of the ballot hash will be included on each ballot with one remaining permanently with the ballot and the other in an immediately adjacent location on a removable tab. These removable ballot codes are intended to be retained by voters and can be used as an identifier to allow voters to look up their (encrypted) ballots in the election record and confirm that they include the proper \emph{short codes} as described below.
 
 
+---- S4.1.4
 \subsubsection{Short Codes}\label{sec:shortcodes_pre}
 In any instantiation of pre-encrypted ballots, an additional \emph{hash trimming function} $\Omega$ must be provided.  The hash trimming function takes as its input a selection hash, and its output is a \emph{short code}.  As an example, $\Omega$ could produce the last byte of its input in a specified form. 
  For instance, a short code representation could be a pair of hex characters, a pair of letters from a 16-letter alphabet, a letter followed by a digit, or a three-digit number.  The size of a short code does not need to be a single byte, but this is a convenient choice.  Different vendors or jurisdictions might choose to distinguish themselves by using their own preferred short code formats, so the details of the short code format are intentionally left open.  However, $\Omega$ must be completely specified in the election manifest so that a verifier can match its functionality.
@@ -1434,6 +1482,7 @@ The hash trimming function $\Omega$ associates each selection on a ballot with a
 \paragraph{Undervotes.}
 In addition to the short codes for each possible selection, short codes are provided to indicate undervotes.  (It may not be necessary to print undervote short codes on ballots.)  A short code for a null vote is generated from a vector of encryptions of zero.  In a contest in which the voter may select only one option there will be a single pre-encrypted null vote and associated short code to indicate that the voter did not make a selection in that contest.  In general, the number of null votes and short codes for a contest should match the selection limit of the contest.  So, for example, a contest in which a voter may make three selections should have three null short codes.  Since the short codes corresponding to the selections made by each voter will be published in the election record, the use of null short codes allows the election record to not reveal undervotes.
 
+---- S4.2
 \subsection{The Ballot Encrypting Tool}
 The encrypting tool for pre-encrypted ballots takes as input parameters
 \begin{itemize}
@@ -1458,6 +1507,7 @@ Next, for each contest on the indicated ballot style, an encryption vector is pr
 
 Finally, the contest hashes are themselves hashed sequentially to form the ballot’s confirmation code according to Equation~\eqref{eq:ballothash_pre} in Section~\ref{sec:confirmationcode_pre}.
 
+---- S4.2.1
 \subsubsection{Deterministic nonce derivation}\label{sec:noncegen_pre}
 The process of deterministic encryption is guided by a primary nonce $\xi$.  It is assumed that each contest has a label $\Lambda$ and that within each contest each possible selection has a label $\lambda$.  The nonce used within the $i^\text{th}$ contest and within that the $j^\text{th}$ selection vector to form the $k^\text{th}$ encryption is 
 \begin{equation}\label{eq:noncegen_pre}
@@ -1468,11 +1518,13 @@ Note that the nonce $\xi_{i,j,k}$ will be used to encrypt a one whenever $j=k$ a
 The output of the encryption tool includes the (optionally encrypted) primary nonce, the selection hash corresponding to each selection on the ballot (including nulls), the contest hashes, and the confirmation code.
 
 
+---- S4.2.2
 \subsubsection{Using the Ballot Encrypting Tool}
 It is the responsibility of the entity that calls the encryption tool to produce short codes from selection hashes.  This must be done in a deterministic, repeatable fashion using a hash trimming function $\Omega$.  As suggested above, one option is to use a human-friendly representation of the final byte (or bytes) of each selection hash.  Another would be to use an ordinal integer to indicate where in the sorted order of selection hashes within each contest each selection falls.  (For example, if a contest has four possible selections, the integers 1, 2, 3, 4, 5 could be placed beside each selection – including “none” to indicate the sorted position of each of the five selection hashes.)  This flexibility allows vendors to distinguish themselves with different ballot presentations and for vendors and jurisdictions to choose presentations that best accommodate their voters.
 
 Unless the short codes in a particular instantiation are quite long, it is likely that there will be occasional collisions of short codes within a contest.  It is the responsibility of the entity that calls the ballot encryption tool to ensure that no ballot is printed with a short code that is repeated within a contest.  If a collision is found, the caller simply discards this ballot data and calls the ballot encryption tool again.  The caller may also choose to discard ballot data if a short code is repeated anywhere within a ballot or if two short codes -- within a contest or across a ballot – meet some definition of similarity.  The caller is free to discard data and obtain a new ballot pre-encryption as often as it likes.  (Note that a malicious encryption wrapper could bias the printed ballots by, for instance, only using encryptions in which a particular selection’s hash is always numerically first within a contest.  However, a malicious wrapper already knows the associations between the selection hashes, the short codes, and the actual selections, so it is not clear how a malicious wrapper could benefit from creating a bias.)
 
+---- S4.3
 \subsection{The Ballot Recording Tool}
 The ballot recording tool receives an election manifest, an identifier for a ballot style, the decrypted primary nonce $\xi$ and, for a cast ballot, all the selections made by the voter.  The recording tool uses the primary nonce $\xi$ to regenerate all of the encryptions on the ballot.  For a cast ballot, the tool then isolates the pre-encryptions corresponding to the selections made by the voter and, using the encryption nonces derived from the primary nonce, generates proofs of ballot-correctness as in standard \EG section~\ref{sec:proofsballotcorrectness}.
 
@@ -1480,6 +1532,7 @@ Note that if a contest selection limit is greater than one, the recording tool h
 
 For each uncast (implicitly or explicitly challenged) ballot, the recording tool returns the primary nonce that enables the encryptions to be opened and checked.
 
+---- S4.3.1
 \subsubsection{Using the Recording Tool}
 A wrapper for the recording tool takes one or more encrypted nonces and obtains the decryption(s) by interacting with guardians, an administrator, or a local database and then calls the recording tool with each decrypted nonce and ballot style – and for a cast ballot, the voter selections.
 
@@ -1487,6 +1540,7 @@ If the ballot is a cast ballot, the wrapper then uses the hash trimming function
 
 For an uncast ballot, the wrapper computes the short codes for all possible selections and posts in the election record the full set of pre-encryption vectors, selection hashes, and short codes for each possible selection.
 
+---- S4.4
 \subsection{The Election Record}
 Selection vectors generated from pre-encrypted ballots are indistinguishable from those produced by standard \EG.  However, the election record for each pre-encrypted ballot includes a significant amount of additional information.  Specifically, for each cast ballot, the election record should contain
 \begin{itemize}
@@ -1500,6 +1554,7 @@ For each uncast ballot, the primary nonce for that ballot is published in the en
 
 While the basic pre-encrypted ballots are identical to standard \EG ballots, the confirmation codes are computed differently.  Unlike standard \EG ballots, pre-encrypted ballot confirmation codes are computed before any selections are made.  The confirmation codes on pre-encrypted ballots are computed from the full set of pre-encryptions.  This is the same whether the pre-encrypted ballot is cast or spoiled.
 
+---- S4.4.1
 \subsubsection{Election Record Presentation}
 The presentation of data in the election record should be cognizant of the fact that there are two very different uses that may be made of this record.  Individual voters will want to look up their own cast and uncast ballots and to easily review that they match their expectations.  Election verifiers will want to verify the cryptographic artifacts associated with individual cast and uncast ballots and check their consistency as well as the consistency of the reported tallies.
 
@@ -1507,6 +1562,7 @@ It should therefore be possible for voters to see, in as clean a presentation as
 
 For election verifiers, all of the cryptographic artifacts should be made available for verification.  Verifiers should not only confirm the consistency of this additional data but also that this additional data is consistent with the cleaner data views made available to individual voters.
 
+---- S4.5
 \subsection{Verification of Pre-Encrypted Ballots}
 Every step of verification that applies to traditional \EG ballots also applies to pre-encrypted ballots – with the exception of the process for computing confirmation codes.  However, there are some additional verification steps that must be applied to pre-encrypted ballots.  Specifically, the following verifications should be done for every pre-encrypted cast ballot contained in the election record.
 \begin{itemize}
@@ -1537,6 +1593,7 @@ The following verifications should be done for every pre-encrypted ballot listed
 \veriftextPreEncryptedValidationOfShortCodes}
 
 
+---- S4.6
 \subsection{Hash-Trimming Functions}
 To allow vendors and jurisdictions to present distinct formats to their voters, the details of the hash-trimming function that produces short codes from full-sized hashes are not explicitly provided.  However, to facilitate verification, a variety of possible hash-trimming functions are pre-specified here.
 
@@ -1559,6 +1616,7 @@ To allow vendors and jurisdictions to present distinct formats to their voters, 
 \section{Hash Computation}\label{sec:hashing}
 The function $H$ that is used throughout \EG is instantiated based on the hashed message authentication code \HMAC. This section defines how to evaluate $H$. It first defines how inputs are represented as byte arrays and then how these inputs are used to compute hash values.   
 
+S5.1
 \subsection{Input data representation}\label{sec:hashinputdata}
 
 All inputs to the function $H$ are byte arrays. A \emph{byte} is a non-negative integer less than $2^8$, i.e. an integer in the set $\Bcal = \{0,1,\dots,255\}$. Its binary form consists of at most $8$ bits. Its hexadecimal form consists of at most two hexadecimal characters. Here, the leading 0 characters are written out such that a byte always has exactly two hexadecimal characters.  Therefore, $\Bcal$ is represented as $\{\mathtt{0x00}, \mathtt{0x01}, \mathtt{0x02},\dots \mathtt{0xFE}, \mathtt{0xFF}\}$. 
@@ -1576,6 +1634,7 @@ is a non-negative integer less than $2^{8m}$. Vice versa, if $0\leq a < 2^{8m}$,
 In this document and if not specified otherwise, a byte array and big endian non-negative integers are used synonymously. However, byte arrays representing integer data types have a fixed length and must be padded with $\mathtt{0x00}$ bytes to the left. The byte array $\mathtt{0x00}\parallel\mathtt{0x1F}\parallel \mathtt{0xFF}$ represents the same integer as $\Bcal$, but has length $3$ instead of $2$. For the integer data types used in \EG, this is laid out in detail in the following sections.
 
 
+S5.1.1
 \subsubsection{Integers modulo the large prime $p$}
 Most inputs to $H$ like public keys, vote encryptions and commitments for NIZK proofs consist of big integers modulo the large prime $p$, i.e. integers in the set $\Z_p = \{0,1,\dots, p-1\}$. Any such element is represented in big endian format by a fixed size byte array of length exactly $l_p$, the length of the byte array representing $p$. If $p$ has 4096 bits like the prime given in the standard parameters in Section~\ref{sec:parameters}, this length is exactly 512. The conversion from an integer to a byte array works explicitly as follows. For $a \in \Z_p$, the byte array $\bytes(a, l_p)$ of length $l_p$ representing $a$ is defined as
 \begin{equation}
@@ -1597,6 +1656,7 @@ This means that, for the standard parameters, where $l_p = 512$, we have $\bytes
 \end{equation*}
 For example, $\bytes(0, 512) = \mathtt{0x0000\dots 000000000000}$ is a byte array of 512 00-bytes, $\bytes(15, 512) = \mathtt{0x0000\dots 00000000000F}$, $\bytes(8572345, 512)= \texttt{0x0000\dots 00000082CDB9}$, and $\bytes(p-1, 512)$ is the array shown in Section~\ref{sec:parameters} for $p$, but ending with \texttt{\dots FFFFFFFFFFFFFE}. 
 
+S5.1.2
 \subsubsection{Integers modulo the small prime $q$}\label{sec:intmodq}
 Other inputs are integers modulo the smaller prime $q$, such as response values in NIZK proofs and encryption nonces. They are integers in the set $\Z_q = \{0,1,\dots,q-1\}$ and are represented by a fixed size byte array of length exactly $l_q$ in big endian format. For the standard parameters, $l_q=32$. The conversion from integer to byte array works as above. If $a\in \Z_q$, the byte array $\bytes(a,32)$ representing $a$ is defined as
 \begin{equation}
@@ -1617,18 +1677,22 @@ All byte arrays that represent integers modulo q have length 32. For example,
   \bytes(q-1,32) & = \mathtt{0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF42}.
 \end{align*}
 
+S5.1.3
 \subsubsection{Small integers}
 Other integers such as \emph{indices} are much smaller and are encoded as fixed length byte arrays in big endian format in the same way, but have much smaller lengths. In \EG, all such small integers are assumed to be smaller than $2^{31}$. They can therefore be encoded with $4$ bytes, i.e. with $32$ bits and the most significant bit set to $0$.\footnote{Setting the most significant bit to $0$ is done in consideration of languages and runtimes that do not have full support for unsigned integers.}
 
 The number of guardians $n$ and the quorum threshold value $k$ are examples of such small integers that require even less than 4 bytes for all reasonable use cases, i.e. they are represented as $\bytes(n, 4)$ and $\bytes(k, 4)$. For example, $\bytes(5,4) = \mathtt{0x00000005}$ and $\bytes(3,4) = \mathtt{0x00000003}$.
 
+S5.1.4
 \subsubsection{Strings}\label{sec:stringencoding}
 When an input to the function $H$ is a string $s$, it is encoded as a byte array $\bytes(s, \len(s))$ using UTF-8 encoding. Here, $\len(s)$ is the length of the UTF-8 encoding of the string $s$ in bytes. For example, the string ``ElectionGuard" is encoded as $\bytes(\mathrm{``ElectionGuard"}, 13) = \mathtt{0x456C656374696F6E4775617264}$.
 Some string inputs may be of variable length that cannot be specified in advance by this document. Therefore all encodings of strings that are input to the \EG hash function $H$ start with a $4$-byte encoding in big endian format of the byte length of the string encoding followed by the encoding itself.\footnote{The maximal length of strings that can be encoded for input to $H$ is therefore $2^{32}$ bytes.} For example, if the string ``ElectionGuard" is an input to $H$, the input byte array is $\bytes(13, 4)\parallel \bytes(\mathrm{``ElectionGuard"}, 13) = \mathtt{0x0000000D456C656374696F6E4775617264}$.
 
+S5.1.5
 \subsubsection{Files}
 When an input to the function $H$ is a file \texttt{file}, it is parsed as input entirely, meaning that all bytes of the file are parsed to $H$ as a byte array $\bytes(\mathtt{file}, \len(\mathtt{file}))$ that is a concatenation of all the bytes of the file in order. As above for strings, file lengths are not specified in this document and file inputs to $H$ start with a $4$-byte encoding\footnote{Input files to $H$ are restricted to a length of $2^{32}$ bytes.} in big endian format of the file byte length $\len(\mathtt{file})$ followed by the file bytes, i.e. $\bytes(\len(\mathtt{file}), 4)\parallel \bytes(\mathtt{file}, \len(\mathtt{file}))$.
 
+S5.2
 \subsection{Hash function}
 The hash function $H$ used in \EG is \HMAC-\SHA, i.e. \HMAC\footnote{NIST (2008) The Keyed-Hash Message Authentication Code (HMAC). In: FIPS 198-1. \url{https://csrc.nist.gov/publications/detail/fips/198/1/final}} instantiated with \SHA\footnote{NIST (2015) Secure Hash Standard (SHS). In: FIPS 180-4. \url{https://csrc.nist.gov/publications/detail/fips/180/4/final}}. Therefore, $H$ takes two byte arrays as inputs. 
 
@@ -1644,6 +1708,7 @@ The second input can have arbitrary length and is only restricted by the maximal
 
 The first input is used to bind hash values to a specific election by including the parameter base hash $\HH_P$, the election base hash $\HH_B$ or the extended base hash $\HH_E$. The second input consists of domain separation tags for different use cases and the actual data that is being hashed.
 
+S5.3
 \subsection{Hashing multiple inputs}
 \EG often requires that multiple input elements are hashed together. In fact, the second input to the function $H$ specified in the previous section always consists of multiple parts. The input byte array $B_1$ is then simply the concatenation of the byte arrays that represent the multiple input elements as specified in Section~\ref{sec:hashinputdata} in the order specified in each case. As all byte arrays that represent input elements have a fixed length, there is no need for a separator byte or character. 
 
@@ -1654,6 +1719,7 @@ $$\mathrm{B}_0 = \HH_E,\
 as inputs.
 The first argument is simply the extended base hash $\HH_E$. The second argument is the byte array that is the result of concatenating the domain separator byte $\mathtt{0x21}$ that identifies the use case and the byte arrays representing the public key $K$, the vote encryption components $\alpha$ and $\beta$ and the commitments to the Chaum-Pedersen proofs $a_0$, $b_0$, $a_1$, and $b_1$ in that order.
 
+S5.4
 \subsection{Hash function outputs}
 The output of \SHA and therefore $H$ is a 256-bit string, which can be interpreted as a byte array of $32$ bytes. As such, outputs of $H$ are directly used as inputs to $H$ again without any modifications. 
 
@@ -1665,9 +1731,11 @@ Therefore, hash function outputs correspond to integers in the interval $[0,2^{2
 
 Although hash function outputs are used in computations modulo $q$, they are not reduced modulo $q$ by default. Each hash function output, such as a challenge value $c$ in the computation of a NIZK proof, remains a byte array of length $32$ that can be interpreted as an integer in $[0,2^{256}-1]$. Only during the computation of response values does a reduction modulo $q$ occur.
 
+S5.5
 \subsection{Domain separation}
 The tables below list every use of the hash function $H$ in this specification together with the specific domain separation input for the second argument. They explicitly provide the byte arrays $\mathrm{B}_0$ and $\mathrm{B}_1$ that are passed to \HMAC as inputs to evaluate $\HMACSHA(\mathrm{B}_0,\mathrm{B}_1)$ together with the length $\len(\B_1)$ of $\B_1$ in bytes (note that always $\len(\B_0)=32$). The tables use the standard parameters such that $l_p = 512$ and $l_q = 32$. For other parameters, the values $l_p$ and $l_q$ can be different.
 
+S5.5.1
 \subsubsection{Parameter base, manifest and base hashes}
 \begin{center}
   \begin{tabularx}{\textwidth}{Xr}
@@ -1693,6 +1761,7 @@ The tables below list every use of the hash function $H$ in this specification t
   \end{tabularx}
 \end{center}
 
+S5.5.2
 \subsubsection{Key generation and extended base hash}
 \begin{center}
   %%%%%%%%%%%%%%%%%%%%%%
@@ -1721,6 +1790,7 @@ The tables below list every use of the hash function $H$ in this specification t
   \end{tabularx}
 \end{center}
 
+S5.5.3
 \subsubsection{Ballot encryption and confirmation codes}
 \enlargethispage{1cm}
 \begin{center}
@@ -1788,6 +1858,7 @@ The tables below list every use of the hash function $H$ in this specification t
   %%%%%%%%%%%%%%%%%%%%%%
 \end{center}
 
+S5.5.4
 \subsubsection{Verifiable decryption}
 \begin{center}
 \begin{tabularx}{\textwidth}{Xr}
@@ -1808,6 +1879,7 @@ The tables below list every use of the hash function $H$ in this specification t
 \end{tabularx}
 \end{center}
 
+S5.5.5
 \subsubsection{Pre-encrypted ballots}
 \begin{center}
   %%%%%%%%%%%%%%%%%%%%%%
@@ -1850,26 +1922,35 @@ The tables below list every use of the hash function $H$ in this specification t
 \section{Verifier Construction}
 While it is desirable for anyone who may construct an \EG verifier to have as complete an understanding as possible of the \EG design, this section isolates the items which must be verified and maps the variables used in the specification equations herein to the labels provided in the artifacts produced in an election.
 
+---- S6.1
 \subsection{Implementation Details}
+
+---- S6.1a
 There are four operations which must be performed -- all on very large integer values: modular addition, modular multiplication, modular exponentiation, and hash computations, i.e. evaluations of the hash function $H$. These operations can be performed using a programming language that provides native support, by importing tools to perform these large integer operations, or by implementing these operations from scratch.
 
+---- S6.1b
 \subsubsection*{Modular addition}
 To compute $(a+b) \bmod n$, one can compute $((a \bmod n)+(b \bmod n)) \bmod n$.  However, this is rarely beneficial. If it is known that $a,b\in \Z_n$, then one can choose to avoid the division normally inherent in the modular reduction and just use $(a+b) \bmod n = a+b$ (if $a+b<n$) or $a+b-n$ (if $a+b\geq n$).
 
+---- S6.1c
 \subsubsection*{Modular multiplication}
 To compute $(a\cdot b) \bmod n$, one can compute $((a \bmod n)\cdot (b \bmod n)) \bmod n$. Unless it is already known that $a,b\in \Z_n$, it is usually beneficial to perform modular reduction on these intermediate values before computing the product. However, it is still necessary to perform modular reduction on the result of the multiplication.
 
+---- S6.1d
 \subsubsection*{Modular exponentiation}
 To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one should not perform a modular reduction on the exponent.\footnote{In general, if $n$ is prime, one can compute $a^b \bmod n$ as $(a \bmod n)^{(b \bmod (n-1))} \bmod n$. In the particular instance of this specification, if $a\in \Z_p^r$, then one can compute $a^b \bmod p$ as $a^{(b \bmod q)} \bmod p$.}  One should, however, never simply attempt to compute the exponentiation $a^b$ before performing a modular reduction as the number $a^b$ would likely contain more digits then there are particles in the universe. Instead, one should use a special-purpose modular exponentiation method such as a repeated square-and-multiply algorithm which prevents intermediate values from growing excessively large. Some languages include a native modular exponentiation primitive, but when this is not available a specialized modular exponentiation tool can be imported or written from scratch.
 
 
 \pagebreak
+---- S6.2
 \subsection{Validation Steps}
 
+---- S6.2.1
 \subsubsection{Parameter verification}
 
 \pagebreak
 
+---- S6.2.2
 \subsubsection{Key ceremony verification}
 
 \EGverifExtendedrepeat{verif:guardiansPK}{\veriftitleGuardianPublicKeyValidation}{\veriftextGuardianPublicKeyValidation}
@@ -1879,9 +1960,11 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 
 \EGverifExtendedrepeat{verif:electionPK}{\veriftitleElectionPublicKeyValidation}{\veriftextElectionPublicKeyValidation}
 
+---- S6.2.3
 \subsubsection{Extended base hash verification}
 \pagebreak
 
+---- S6.2.4
 \subsubsection{Ballot verification}
 
 \EGverifrepeat{verif:selection}{\veriftitleCorrectnessOfSelectionEncryptions}{\veriftextCorrectnessOfSelectionEncryptions}
@@ -1899,6 +1982,7 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 
 
 \pagebreak
+---- S6.2.5
 \subsubsection{Tally verification}
 \EGverifrepeat{verif:aggregation}{\veriftitleCorrectnessOfBallotAggregation}{\veriftextCorrectnessOfBallotAggregation}
 
@@ -1917,6 +2001,7 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 
 \pagebreak
 
+---- S6.2.6
 \subsubsection{Verification of correct contest data decryption}
 \EGverifrepeat{verif:extdecryption}{\veriftitleCorrectnessOfDecryptionsOfContestData\footnotemark}{\veriftextCorrectnessOfDecryptionsOfContestData}
 
@@ -1924,6 +2009,7 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 \pagebreak
 
 
+---- S6.2.7
 \subsubsection{Verification of challenged ballots}
 \EGverifBallotrepeat{verif:challengedDecrypt}{\veriftitleCorrectnessOfDecryptionsChallenged}{\veriftextCorrectnessOfDecryptionsChallenged}
 
@@ -1938,6 +2024,7 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 
 \pagebreak
 
+---- S6.2.8
 \subsubsection{Verification of pre-encrypted ballots}
 
 
@@ -1972,6 +2059,7 @@ To compute $a^b \bmod n$, one can compute $(a \bmod n)^b \bmod n$, but one shoul
 
 -------- Section 7 Applications to End-to-End Verifiability and Risk-Limiting Audits
     
+---- S7
 \section{Applications to End-to-End Verifiability and Risk-Limiting Audits}
 The methods described in this specification can be used to enable either end-to-end (E2E) verifiability or enhanced risk-limiting audits (RLAs). In both cases, the ballots are individually encrypted and proofs are provided to allow observers to verify that the set of encrypted ballots is consistent with the announced tallies in an election.
 
@@ -1993,6 +2081,8 @@ The authors are happy to thank Eion Blanchard, Nicholas Boucher, John Caron, Joe
 -------- Section "9" Appendix: Other Parameters
 
 \section*{Appendix: Other Parameters}
+
+---- S9a
 \subsubsection*{Reduced parameters -- using a 3072-bit prime}
 Starting from the same 256-bit prime $q = 2^{256}-189$ for the group order, the procedure outlined in Section~\ref{sec:parameters} on the standard baseline parameters can be used to find a 3072-bit prime $p_{3072}$. This results in the following parameters that are provided here as an alternative. The parameters satisfy all the same requirements, but the smaller prime offers faster arithmetic in the base field and thus improved performance. This comes at the cost of a somewhat lower security level. The prime $p_{3072}$ is given as 
 $p_{3072} = 2^{3072}-2^{2816}+2^{256} (\lfloor 2^{2560} \mathrm{ln}(2)\rfloor+\delta_{3072}) + 2^{256} - 1$
@@ -2052,6 +2142,7 @@ And the generator $g_{3072}=2^{r_{3072}} \bmod p_{3072}$ has the following hexad
 \end{align*}
 }
 
+---- S9b
 \subsubsection*{Toy parameters for testing purposes only}
 The following parameter sets are provided for testing purposes only and must not be used in any real-world scenario. The involved primes are too small to provide any security at all.
 
