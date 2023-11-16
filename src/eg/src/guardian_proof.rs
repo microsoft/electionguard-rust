@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{ensure, Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::csprng::Csprng;
+use util::{csprng::Csprng, integer_util::to_be_bytes_left_pad};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientProof {
@@ -30,16 +30,17 @@ impl CoefficientProof {
     /// - h_i_j - the commit message
     pub fn challenge(
         h_p: HValue,
-        i: usize,
-        j: usize,
+        i: u32,
+        j: u32,
         capital_k_i_j: &BigUint,
         h_i_j: &BigUint,
     ) -> BigUint {
+        // v = 0x10 ∥ b(i,4) ∥ b(j,4) ∥ b(Ki,j,512) ∥ b(hi,j,512)
         let mut v = vec![0x10];
         v.extend_from_slice(i.to_be_bytes().as_slice());
         v.extend_from_slice(j.to_be_bytes().as_slice());
-        v.extend_from_slice(capital_k_i_j.to_bytes_be().as_slice());
-        v.extend_from_slice(h_i_j.to_bytes_be().as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(capital_k_i_j, 512).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(h_i_j, 512).as_slice());
         let c = eg_h(&h_p, &v);
         //The challenge is not reduced modulo q (cf. Section 5.4)
         BigUint::from_bytes_be(c.0.as_slice())
@@ -64,7 +65,7 @@ impl CoefficientProof {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
         let k = varying_parameters.k;
-        let i = i.get_one_based_usize();
+        let i = i.get_one_based_u32();
 
         // Compute commit message
         let u_vec = (0..k.get_one_based_u32())
@@ -75,8 +76,16 @@ impl CoefficientProof {
             .map(|u_i| fixed_parameters.g.modpow(u_i, fixed_parameters.p.as_ref()))
             .collect::<Vec<BigUint>>();
         // Compute challenge vector
-        let c_vec = (0..k.get_one_based_usize())
-            .map(|j| Self::challenge(h_p, i, j, &coefficient_commitments.0[j].0, &h_vec[j]))
+        let c_vec = (0..k.get_one_based_u32())
+            .map(|j| {
+                Self::challenge(
+                    h_p,
+                    i,
+                    j,
+                    &coefficient_commitments.0[j as usize].0,
+                    &h_vec[j as usize],
+                )
+            })
             .collect::<Vec<BigUint>>();
         // Compute response vector
         let v_vec = (0..k.get_one_based_usize())
@@ -107,7 +116,7 @@ impl CoefficientProof {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
         let k = varying_parameters.k;
-        let i = i.get_one_based_usize();
+        let i = i.get_one_based_u32();
         // Equation (2.1)
         let h_vec = (0..k.get_one_based_usize())
             .map(|j| {
@@ -124,17 +133,19 @@ impl CoefficientProof {
         let zero = BigUint::from(0u8);
         let one = BigUint::from(1u8);
         let mut verified = true;
-        for j in 0..k.get_one_based_usize() {
-            let capital_k_i_j = &coefficient_commitments.0[j].0;
+        for j in 0..k.get_one_based_u32() {
+            let capital_k_i_j = &coefficient_commitments.0[j as usize].0;
             // 2.A
             verified &= (zero <= *capital_k_i_j) && (*capital_k_i_j < *fixed_parameters.p.borrow());
             verified &= capital_k_i_j
                 .modpow(fixed_parameters.q.borrow(), fixed_parameters.p.borrow())
                 == one;
             // 2.B
-            verified &= (zero <= self.v[j]) && (self.v[j] < *fixed_parameters.q.borrow());
+            verified &=
+                (zero <= self.v[j as usize]) && (self.v[j as usize] < *fixed_parameters.q.borrow());
             // 2.C
-            verified &= self.c[j] == Self::challenge(h_p, i, j, capital_k_i_j, &h_vec[j])
+            verified &=
+                self.c[j as usize] == Self::challenge(h_p, i, j, capital_k_i_j, &h_vec[j as usize])
         }
         verified
     }
@@ -228,7 +239,8 @@ mod test {
 
     use crate::{
         example_election_manifest::example_election_manifest,
-        example_election_parameters::example_election_parameters, hashes::Hashes, guardian::GuardianIndex,
+        example_election_parameters::example_election_parameters, guardian::GuardianIndex,
+        hashes::Hashes,
     };
 
     use super::{GuardianProof, GuardianSecretKey};
@@ -270,7 +282,6 @@ mod test {
                 "Proof {proof_index} for key {pk_index} is invalid."
             )
         }
-
     }
 
     #[test]
@@ -279,18 +290,23 @@ mod test {
 
         let election_parameters = example_election_parameters();
         let election_manifest = example_election_manifest();
-        let varying_parameters = &election_parameters.varying_parameters;
 
         let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
 
         let index_one = GuardianIndex::from_one_based_index(1).unwrap();
         let index_two = GuardianIndex::from_one_based_index(2).unwrap();
-        let sk_one = GuardianSecretKey::generate(&mut csprng, &election_parameters, index_one, None);        
-        let sk_two = GuardianSecretKey::generate(&mut csprng, &election_parameters, index_two, None);     
+        let sk_one =
+            GuardianSecretKey::generate(&mut csprng, &election_parameters, index_one, None);
+        let sk_two =
+            GuardianSecretKey::generate(&mut csprng, &election_parameters, index_two, None);
 
         let proof = GuardianProof::generate(&mut csprng, &election_parameters, hashes.h_p, &sk_one);
 
-        assert!(proof.validate(&election_parameters, hashes.h_p, &sk_two.make_public_key()).is_err(), "Proof validation should fail")
-
+        assert!(
+            proof
+                .validate(&election_parameters, hashes.h_p, &sk_two.make_public_key())
+                .is_err(),
+            "Proof validation should fail"
+        )
     }
 }
