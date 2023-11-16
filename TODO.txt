@@ -352,8 +352,11 @@ This section describes the four principal components of \EG.
 
 S3a2 Guardians can generate individual public-secret key pairs
 S3a2 Guardians can exchange shares of secret keys
-S3a2 If the set of guardians remains the same they can re-use the same keys for multiple elections
+S3a2 If the set of guardians and parameters k and n remain the same, they can re-use the same keys for multiple elections
+S3a2 A complete new set of keys must be generated if k is changed
+S3a2 A complete new set of keys must be generated if n is changed
 S3a2 A complete new set of keys must be generated if even a single guardian is replaced
+S3a2 TODO is this true?: A complete new set of keys must be generated if any of p, q, r, g is changed
 
 \item \emph{Ballot Encryption:} While encrypting the contents of a ballot is a relatively simple operation, most of the work of \EG is the process of creating externally-verifiable artifacts to prove that each encrypted ballot is well-formed (i.e., its decryption is a legitimate ballot without overvotes or improper values).
 \item \emph{Verifiable Decryption:} At the conclusion of each election, guardians use their secret key shares to jointly produce election tallies together with verifiable artifacts that prove that the tallies are correct.
@@ -432,8 +435,8 @@ S3d The product of the encryptions of a single option across ballots is an encry
 
 The other use is to sum all of the selections made in a single contest on a single ballot. In the simplest case, after demonstrating that each option is an encryption of either zero or one, the product of the encryptions indicates the number of options that are encryptions of one, and this can be used to show that no more ones than permitted are among the encrypted options -- i.e., that no more options were selected than permitted. When larger integers are allowed, i.e. an option can receive multiple votes or weighted votes, the product of the ciphertexts then encrypts the total number of votes or the sum of weights and is used in the same way to ensure only the permitted number of votes or permitted sum of weights were used.
 
-S3d Each option can be demonstrated to be an encryption of either zero or one
-S3d Each option can be demonstrated to be an encryption of some other integer for certain voting methods
+S3d Every option can be demonstrated to be an encryption of either zero or one
+S3d Every option can be demonstrated to be an encryption of some other integer for certain voting methods
 S3d The product of the encrypted options of a single ballot can be used to show that no more options were selected than permitted
 S3d When an option can receive multiple or weighted votes, the product of the encrypted options of a single ballot can be used to show that only the permitted number of votes or permitted sum of weights were used
 
@@ -479,13 +482,13 @@ S3f Threshold encryption offers a homomorphic property that allows individual en
 
 The guardians of an election will each generate a public-secret key pair. The public keys will then be combined (as described in the following section) into a single election public key which is used to encrypt all selections made by voters in the election.
 
-S3f The guardians of an election can each generate a public-secret key pair.
+S3f Every guardian can generate a public-secret key pair.
 S3f The guardians' public keys can be combined into a single election public key.
 S3f The single election public key can be used to encrypt all selections made by voters in the election.
 
 At the conclusion of the election, each guardian will compute a verifiable partial decryption of each tally. These partial decryptions will then be combined to form full verifiable decryptions of the election tallies.
 
-S3f A guardian can compute a verifiable partial decryption of each tally.
+S3f A guardian can compute a verifiable partial decryption of every tally.
 S3f Verifiable partial tally decryptions can be combined  to form full verifiable decryptions of the election tallies.
 
 To accommodate the possibility that one or more of the guardians will not be available at the conclusion of the election to form their partial decryptions, the guardians will cryptographically share\footnote{Shamir A. (1979) \emph{How to Share a Secret}. Communications of the ACM, vol 22.} their secret keys amongst each other during key generation in a manner to be detailed in Section~\ref{sec:keygen}. Each guardian can then compute a share of the secret decryption key, which they use to form the partial decryptions. A pre-determined threshold quorum value ($k$) out of the ($n$) guardians will be necessary to produce a full decryption.
@@ -499,9 +502,33 @@ form a partial decryption.
 \subsubsection*{Encryption of other data}
 \EG provides means to encrypt data other than votes, which are selections usually encoded as zero or one that need to be homomorphically aggregated. Such data may include the cryptographic shares of a guardian's secret key that are sent to the other guardians and are encrypted to the receiving guardians' public keys, write-in information that needs to be attached to an encrypted selection and is encrypted to the election public key, or other auxiliary data attached to an encrypted ballot, either encrypted to the election public key or to an administrative public key. The non-vote data do not need to be homomorphically encrypted and can use a more standard form of public-key encryption removing the data size restrictions imposed by the vote encryption. \EG encrypts such data with hashed ElGamal encryption, which deploys a key derivation function (\KDF) to generate a key stream that is then XORed with the data. To implement the \KDF and to provide a message authentication code (\MAC), encryption makes use of the keyed Hash Message Authentication Code \HMAC. In \EG, \HMAC is instantiated as \HMAC-\SHA with the hash function \SHA.
 
+S3g EGRI provides a non-homomorphic encryption method known as "hashed ElGamal" for encrypting data other than votes
+S3g EGRI provides a way to use the appropriate private key to decrypt data encrypted with hashedElGamal
+S3g data encrypted with hashedElGamal cannot be decrypted without the private key
+S3g hashed ElGamal encryption does not have the data size restrictions imposed by the vote encryption
+S3g hashed ElGamal encryption uses a KDF based on HMAC-SHA-2-256 to generate a key stream XORed with the data
+S3g EGRI allows to encrypt the cryptographic shares of a guardian's secret key to the receiving guardians' public keys
+S3g EGRI allows to encrypt to the election public key write-in information to be attached to an encrypted selection
+S3g EGRI allows to attach to an encrypted selection write-in information that is encrypted to the election public key
+S3g EGRI allows to attach to an encrypted ballot other auxiliary data without size restrictions encrypted with hashed-ElGamal to the election public key
+S3g EGRI allows to attach to an encrypted ballot other auxiliary data without size restrictions encrypted with hashed-ElGamal to an administrative public key
+
 ---- S3.1
 \subsection{Parameter requirements}
 \EG uses integers to instantiate the encryption rather than elliptic curves in order to make construction of election verifiers as simple as possible without requiring special tools and dependencies. The encryption scheme used to encrypt votes is defined by a prime $p$ and a prime $q$ which divides $(p-1)$. We use $r = (p-1)/q$ to denote the cofactor of $q$, and a generator $g$ of the order $q$ subgroup $\Z_p^r$ is fixed. We also require $r/2$ to be prime. The specific values for a 4096-bit prime $p$ and a 256-bit prime $q$ which divides $(p-1)$ and a generator $g$ that define all standard baseline parameters are given below. 
+
+S3.1 EGRI uses integer-based encryption rather than elliptic curves
+S3.1 EGRI does not use elliptic curves
+S3.1 The encryption scheme used to encrypt votes is defined by primes p and q.
+S3.1 q divides p - 1
+S3.1 r = (p-1)/q is fixed. We also require $r/2$ to be prim
+S3.1 r is a generator g of the order q subgroup Z_p^r
+S3.1 subgroup Z_p^r is of order q
+S3.1 r/2 is prime
+S3.1 The value of p matches the specific value given in EG 2.0 DS section 3.1
+S3.1 The value of q matches the specific value given in EG 2.0 DS section 3.1
+S3.1 The value of r matches the specific value given in EG 2.0 DS section 3.1
+S3.1 The value of g matches the specific value given in EG 2.0 DS section 3.1
 
 ---- S3.1.1
 \subsubsection{Standard baseline cryptographic parameters}\label{sec:parameters}
@@ -604,29 +631,78 @@ H_P = \mathtt{0x2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296
 \end{equation}
 This hash value is an input to all subsequent hash computations, either directly or indirectly, which binds all hash outputs to the baseline parameters and the version of the specification used for the election.
 
+S3.1.2 H_P is computed as H("v2.0.0" zero extended to length 32 ; 0x00, p, q, g)
+S3.1.2 The value computed for H_P is 0x2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296
+
 ---- S3.1.3
 \subsubsection{Election parameters and the election manifest}\label{sec:manifest}
 Another parameter of an election is a public election manifest. The ElectionGuard manifest is a single file that describes the modalities of the election and must specify a wide range of data about it.  Most importantly, the manifest lists, among other information, all the contests in an election, the candidates (selectable options) for each contest together with associations between each option and its representation on a virtual ballot, and the contest selection limit—the number of options that a voter may select in that contest. It is assumed that each contest in the manifest has a unique label and that within each contest, each option also has a unique label. For instance, if Alice, Bob, and Carol are running for governor, and David and Ellen are running for senator, the election manifest file could enable the vector $\langle 0,1,0;0,1\rangle$ to be recognized as a ballot with votes for Bob as governor and Ellen as senator. This section defines how the manifest must uniquely specify the election parameters.
 
+S3.1.3a The RI provides a parameter for a public election manifest
+S3.1.3a The election manifest is a single file
+S3.1.3a The election manifest describes the modalities of the election and specifies a wide range of data about it
+S3.1.3a The election manifest lists for each contest, the candidates (selectable options)
+S3.1.3a The election manifest lists for each contest, associations between each selectable option and its representation on a virtual ballot
+S3.1.3a The election manifest lists for each contest, the number of options that a voter may select in that contest (selection limit)
+S3.1.3a The election manifest lists for each contest, defines a label unique across all contests in the manifest
+S3.1.3a The election manifest lists for each selectable option, defines a label unique across all selectable options in that contest
 
 \paragraph{Labels.}
 The election objects relevant for \EG such as contests, selectable options, and ballot styles are identified by unique labels. A \emph{label} is a string, it should be a short, concise name or identifier and should therefore not contain any long-form descriptions or line break characters, tabs, and similar special characters. Likewise, a label should not have leading or trailing whitespace characters.
 
 The \EG manifest must contain a label that contains a unique and descriptive identifier for the election.
 
+S3.1.3b Contests are identified by labels unique within the election manifest
+S3.1.3b Selectable options are identified by labels unique within their contest
+S3.1.3b The RI rejects labels that contain line break characters, tabs, or similar special characters
+S3.1.3b The RI rejects labels that have leading or trailing whitespace
+S3.1.3b The election manifest has a unique and descriptive identifier for the election. The RI rejects any manifest without it
+
 \paragraph{Indices.} Instead of using the labels directly, \EG handles contests, selectable options, ballot styles, etc. in terms of their position in a unique ordered list. They can therefore be uniquely identified by an index value. An \emph{index} is a $1$-based ordinal in the range $1 \leq i < 2^{31}$.\footnote{The upper bound of $2^{31}-1$ is in consideration of languages and runtimes that do not have full support for unsigned integers.}
+
+S3.1.3c Index values are integers in the range 1 <= i < 2^31
+S3.1.3c Every contest within the election manifest is uniquely identified by an index value, implied by the order defined in the election manifest.
+S3.1.3c Every selectable option within a contest is uniquely identified by an index value, implied by the order defined in the contest election manifest.
+S3.1.3c Every ballot style within the election manifest is uniquely identified by an index value implied by the order defined in the election manifest.
+S3.1.3c The first ballot style within the election manifest has index value 1.
 
 \paragraph{Contests and the contest index.}
 The election manifest must contain a single ordered list of all the contests that can appear on any ballot generated for the election. Each contest must have a contest label $\lambda_\Ccal$ that is unique within the election. The position of a given contest $\Ccal$ in this list is the \emph{contest index} $\indc(\lambda_\Ccal)$. The contest list provides a bijective mapping between the unique contest labels and the corresponding contest index values. Note that the first contest in the list has contest index $1$. 
 
+S3.1.3d The election manifest defines a single ordered list of all contests on any ballot
+S3.1.3d The first contest within the election manifest has index value 1.
+
 \paragraph{Selectable options and the option index.}
 For each contest in the contest list, the election manifest must also contain a single ordered list of all the selectable options in this contest. Each selectable option $\Ocal$ must have an option label $\lambda_\Ocal$ that is unique within the contest. The position of a given selectable option $\Ocal$ in this list is the \emph{option index} $\indo(\lambda_\Ocal)$. This option list provides a bijective mapping between the unique selectable option labels and the corresponding option index values. The first selectable option in the list has option index $1$.
+
+S3.1.3e Every contest in the election manifest defines a single ordered list of all selectable options.
+S3.1.3e The first selectable option within each contest has index value 1.
 
 \paragraph{Ballot styles and the ballot style index.}
 A \emph{ballot style} is a single list of contest indices that defines which contests appear on a ballot generated according to this ballot style. If a contest index is contained in this list, the corresponding contest is present, otherwise it is not. The list is not ordered and only specifies whether a contest is present or not on a ballot of this ballot style. Each ballot style $\Scal$ must have a ballot style label $\lambda_\Scal$ that is unique within the election. The election manifest must contain a single, ordered list of all ballot styles that are possible in the election. The position of a given ballot style $\Scal$ in this list is the \emph{ballot style index} $\inds(\lambda_\Scal)$. The ballot style list provides a bijective mapping between the unique ballot styles and the corresponding ballot style index values. Again, the first ballot style in the list has ballot style index $1$.
 
+S3.1.3f The election manifest defines a single ordered list of all ballot styles
+S3.1.3f The first ballot style within the election manifest has index value 1.
+S3.1.3f Every ballot style defines a label unique across all ballot styles in the manifest
+S3.1.3f Every ballot style defines a single list of contest indices
+S3.1.3f Order is not significant in a ballot style contest index list
+S3.1.3f The RI rejects the manifest if any contest index does not refer to a contest in the election manifest
+S3.1.3f The RI rejects the manifest if any contest index appears more than once in the same ballot style contest index list
+
 \paragraph{Selections, option selection limits and contest selection limits.}
 A \emph{selection} is the assignment of a value to an option by the voter. This could be the value $1$, meaning that the voter selected this option, or the value $0$, meaning that the voter did not select this option. To allow other voting methods, \EG allows a selection to be the assignment of a value in a range $\{0,1,\dots,R\}$, where $R$ is the \emph{option selection limit}, a positive integer that defines the maximal value allowed to be assigned to this option by the voter. For each contest, the election manifest must specify the option selection limit for the options in this contest, and must also specify a \emph{contest selection limit} $L$, which is the maximal total value for the sum of all selections made in that contest.
+
+S3.1.3g Every contest in the election manifest may specify a nonnegative integer contest selection limit
+S3.1.3g If not specified, the contest selection limit defaults to 1
+S3.1.3g The contest selection limit limits the maximum total value that can be assigned all options in that contest
+
+S3.1.3g Every selectable option in every contest may specify a nonnegative integer option selection limit
+S3.1.3g If not specified, the option selection limit defaults to 1
+S3.1.3g The option selection limit limits the maximum value that can be assigned to that selectable option
+S3.1.3g Every selectable option field must be voter-assigned a nonnegative integer value less than or equal to the smaller of the contest and option selection limits.
+S3.1.3g RI may warn if any contest selection limit is zero
+S3.1.3g RI may warn if any option selection limit is zero
+S3.1.3g RI may warn if any option selection limit is greater than the contest selection limit
 
 \paragraph{Optional data fields.}
 The election manifest offers optional data fields for additional data that can be attached to any of the above concepts and to the manifest in general at the top level. They can be used to provide additional information on contests, selectable options, and ballot styles that go beyond the short unique labels described above. In addition, there can be data fields that describe general information about the election, jurisdiction, election device manufacturers, software versions, the date and location, etc. that help to interpret the additional data. 
@@ -634,8 +710,17 @@ The election manifest offers optional data fields for additional data that can b
 
 There are many other things that a manifest may specify.  Some examples are listed here.
 
+S3.1.3h Election manifest allows additional data to describe general information about the election
+S3.1.3h Election manifest allows additional data to describe general information about the jurisdiction
+S3.1.3h Election manifest allows additional data to describe general information about the election device manufacturers
+S3.1.3h Election manifest allows additional data to describe general information about software versions
+S3.1.3h Election manifest allows additional data to describe general information about date
+S3.1.3h Election manifest allows additional data to describe general information about location
+
 \paragraph{Undervotes.}
 An undervote occurs in a contest if the number of selected options (or more generally, the total sum of selections assigned by the voter) is strictly less than the contest selection limit, the number (or total sum) of allowed selections a voter can make in that contest.
+
+S3.1.3i 'Undervote condition' or 'undervoted' is a per-contest state in which the sum of the selections is strictly less than the contest selection limit
 
 \paragraph{Counting undervoted contests.}
 A manifest may specify whether the fact that a contest was undervoted should be recorded for public verification.  If this is specified, the indicated contest should have an additional field that functions very much like a selectable option field. The value of this field is an encryption of one if the contest was undervoted on the ballot and an encryption of zero otherwise. The undervote field should be set to one only when the number of option fields that are set to one is strictly less than the contest selection limit. This can be enforced by checking that the sum of all field contents should not exceed the contest selection limit for that contest.
@@ -643,20 +728,73 @@ A manifest may specify whether the fact that a contest was undervoted should be 
 This field is an undervote indicator field and is added to all ballots that contain this contest if the occurrence of an undervote is to be verifiably recorded. The field only indicates that an undervote has occurred on the specific ballot in this contest. A tally of this field will contain the total number of ballots that showed an undervote in this contest.
 The field does not record by how many votes the contest was undervoted, i.e. by how much the total number of selections by the voter is less than the contest selection limit. This number can be recorded in an undervote difference count field.
 
+S3.1.3j Every contest within the election manifest can specify that an undervote condition is to be recorded for public verification
+S3.1.3j If a contest specifies to record undervote conditions, the contest has an additional 'undervoted' field that functions much like a selectable option
+S3.1.3j Every contest 'undervoted' field must be system-assigned a value of 0 or 1
+S3.1.3j Every contest 'undervoted' field must be system-assigned a value 1 if and only if that contest was undervoted on that ballot
+S3.1.3j Every contest 'undervoted' field must include a range proof that the encrypted value is either 0 or 1
+S3.1.3j The value of a contest 'undervoted' field does not count against the contest selection limit
+
 \paragraph{Undervote Difference Count.}
 A manifest may specify whether the total number of undervotes, i.e. the difference between the number of selections the voter made and the contest selection limit, for each contest should be recorded for public verification. If this is specified, the indicated contest should have an additional field that functions very much like an option field but whose value need not be limited to zero or one.  The value of this field is an encryption of the number of undervotes on that ballot for that contest.  This can be enforced by checking that the sum of all field contents should exactly match the contest selection limit for that contest.
+
+S3.1.3k Every contest within the election manifest can specify that the net undervote is to be recorded for public verification. TODO: Does it make sense to specify this in addition to the S3.1.3j 'undervoted' additional field, or are they mutually exclusive?
+S3.1.3k If a contest specifies to record the net undervote, the contest has an additional 'net undervote' field that functions much like a selectable option, but is not voter-assigned
+S3.1.3k Every contest 'net undervote' field must be system-assigned a value of 0 through the contest selection limit, according to the net undervote on that ballot
+S3.1.3k Every contest 'net undervote' field must include a range proof that the encrypted value is 0 through the contest selection limit, inclusive
+S3.1.3k The value that the system assigns to a contest 'net undervote' field must be the contest selection limit minus the sum of the voter-assigned selections
+S3.1.3k The value of any 'net undervote' field does not count against the contest selection limit
+S3.1.3k TODO: range proof for 'net undervote' field?
 
 \paragraph{Overvotes.}
 An overvote occurs in a contest if the voter selected more options than allowed, i.e. more than the contest selection limit for that contest specifies.
 A manifest may specify whether an overvoted contest should be recorded for public verification.  If this is specified, the indicated contest should have an additional field that functions very much like an option field.  The value of this field is an encryption of one if the contest was overvoted on the ballot and an encryption of zero otherwise.  When the overvote field is set to one, all other selection fields should be set to zero, and this can be enforced by checking that the sum of the other fields---when added to the product of the contest selection limit with the overvote field contents should not exceed the selection limit for that contest.\footnote{An alternative implementation would be to always set the overvote field to either zero or the contest selection limit. This would be slightly more efficient computationally, but the publicly verified number of overvotes for that contest would be scaled up by a factor of the contest selection limit and the selection limit would then need to be divided out for reporting purposes.} Similar to the undervote difference count, the overvote difference count can be verifiably recorded in a separate overvote difference field.
 
+S3.1.3l 'Overvote condition' or 'overvoted' is a per-contest state in which a selection is strictly greater the option selection limit and/or the sum of the selections is strictly greater than the contest selection limit.
+S3.1.3l Every contest within the election manifest can specify that an overvote condition is to be recorded for public verification
+S3.1.3l If a contest specifies to record overvote conditions, the contest has an additional 'overvoted' field that functions much like a selectable option, but is not voter-assigned
+S3.1.3l Every contest 'overvoted' field must be system-assigned a value of 0 or 1
+S3.1.3l Every contest 'overvoted' field must be system-assigned a value of 1 if and only if that contest was overvoted on that ballot
+S3.1.3l Every contest 'overvoted' field must include a range proof that the encrypted value is either 0 or 1
+S3.1.3l The value of an 'overvoted' field does not count against the contest selection limit
+S3.1.3l Whenever a contest 'overvoted' field is set to 1, all voter-assigned fields must be set to 0
+S3.1.3l RI (tallying? verification?) must verify for every contest that the sum of all voter-assigned fields, 'undervoted', 'net undervote', and (the product of the 'overvoted' field and the contest selection limit) is less than or equal to the contest selection limit.
+
+S3.1.3l Every contest within the election manifest can specify that the net overvote is to be recorded for public verification. TODO: Does it make sense to specify this in addition to the S3.1.3l 'overvoted' additional field, or are they mutually exclusive?
+S3.1.3l If a contest specifies to record the net overvote, the contest has an additional 'net overvote' field that functions much like a selectable option, but is not voter-assigned
+S3.1.3l Every contest 'net overvote' field must be system-assigned the nonnegative integer value that is the the greater of (each option's voter-assigned selection minus the option selection limit), (the sum of the voter-assigned selections minus the contest selection limit), and 0. I.e., the total selection value that would need to be removed to cure the overvote condition.
+S3.1.3l Every contest 'net overvote' field must include a range proof that the encrypted value is a nonnegative integer less than or equal to the greater of [(the sum of the voter-assigned selection option fields minus the contest selection limit) and (the sum of the voter-assigned selection option fields minus the smallest option selection limit)]. TODO could this identify the overvoted field
+S3.1.3l The value of any 'net overvote' field does not count against the contest selection limit
+
+
 \paragraph{Write-Ins.}
 A manifest may specify whether the utilization of each write-in field in each contest is recorded for public verification.  If this is specified, the indicated contest should have one or more additional fields (usually matching the contest selection limit) that function very much like option fields.  If a single write-in is utilized in a contest, the first write-in field is set to one and all others are set to zero; if two write-ins are utilized in a contest, the first two write-in fields are set to one and all others are set to zero; etc.  Range proofs should be included to show that each of these individual write-in fields is an encryption of either zero or one.
+
+S3.1.3m Every contest within the election manifest can specify the number of write-in fields to be recorded for public verification
+S3.1.3m RI may warn if any contest specifies a number of write-in fields greater than the contest selection limit
+S3.1.3m If a contest specifies to include a nonzero number of write-in fields, the contest has that number additional 'write-in N' fields as voter-assignable selectable options
+S3.1.3m Any such write-in fields are to be labeled as "write-in N", where 'N' is the corresponding 1-based index value within the contest
+S3.1.3m "Written-in" means that the election system has recorded some voter-supplied, non-empty, non-blank data in associated with a contest and write-in field index value
+S3.1.3m Write-in fields must be written-in in index order. I.e., write-in field N can only be written-in if all write-in fields having lower-valued indexes are also written-in.
+S3.1.3m All write-in fields must be assigned a value of 0 or 1
+S3.1.3m A write-in field field must be assigned a value of 1 if and only if it was written-in
+S3.1.3m The value of an write-in field counts against the contest selection limit
+S3.1.3m Every write-in field must supply a range proof that the encrypted value is either 0 or 1
+S3.1.3m TODO can we prove they are written-in in order?
+
 
 \paragraph{Write-Ins Total.} 
 A manifest may specify whether the total number of write-ins selected in each contest is recorded for public verification.  If this is specified, the indicated contest should have a single additional field that functions very much like option fields but whose value need not be limited to zero or one.  The value of this field is an encryption of the number of write-ins utilized on that ballot for that contest.  Range proofs should be used to demonstrate that in each instance, the value of this field is non-negative and does not exceed the contests selection limit.
 
+S3.1.3n Every contest within the election manifest can specify that the count of write-in fields written-in is to be recorded for public verification.
+S3.1.3n If a contest specifies to record the the count of fields written-in, the contest has an additional system-assigned 'count written-in' field
+S3.1.3n Every contest 'count written-in' field must be system-assigned a value of 0 through the contest selection limit
+S3.1.3n The value that the system assigns to a contest 'count written-in' field must be the count of write-in fields that were written-in
+S3.1.3n The value of any 'count written-in' field does not count against the contest selection limit
+
 \paragraph{A note on selection limit proofs.}  In general, a combination of the above fields can be merged into a single selection limit proof per contest per ballot.  For example, a contest which includes an undervote field, an overvote field, and two separate write-in fields can include a single range proof that the sum of these fields is non-negative and does not exceed the contest selection limit.  The only exceptions are the very unusual cases where a manifest specifies including both an undervote field and an undervote count field or both individual write-in fields and a write-in total field.  In these cases, the selection limit proofs should each include only one of the paired fields (e.g., undervote or undervote count) and a second selection limit proof should be included if both paired fields are to be verified.  
+
+S3.1.3o TODO Range proofs of the various combinations of fields (selectable options, undervoted, net undervote, overvoted, net overvote, write-in N, count written-in) may be combined under specific conditions
 
 ---- S3.1.4
 \subsubsection{Election manifest hash}\label{sec:manifesthash}
@@ -666,6 +804,11 @@ The election manifest file \texttt{manifest} is hashed\footnote{The file that co
 \HH_M = H(\HH_P; \mathtt{0x01}, \mathtt{manifest}).
 \end{equation}
 
+S3.1.4 A canonical byte representation is defined for the election manifest.
+S3.1.4 RI allows to write the election manifest canonical representation to a file.
+S3.1.4 RI uses the election manifest canonical representation in the hash computation.
+S3.1.4 H_M is computed as H(H_P; 0x01, [election manifest canonical representation])
+
 ---- S3.1.5
 \subsubsection{Election base hash}\label{sec:basehash}
 The election base hash $\HH_B$ is computed from the parameter base hash $\HH_P$ and the manifest hash $\HH_M$ together with the number $n$ of guardians that participate in the election, and the quorum value $k$, as 
@@ -674,6 +817,9 @@ The election base hash $\HH_B$ is computed from the parameter base hash $\HH_P$ 
 \end{equation}
 Incorporating the byte array $\HH_B$ into subsequent hash computations binds those hashes to the election parameters, the number of guardians, the threshold value and to a specific election by including the manifest.
 
+S3.1.5 parameter n is the number of guardians
+S3.1.5 parameter k is the number of guardians required to form a quorum for decryption
+S3.1.5 H_B is computed as H(H_P; 0x02, H_M, n, k)
 
 \EGverif{\veriftitleParameterValidation}{\label{verif:parameters}
 \veriftextParameterValidation}
@@ -695,6 +841,20 @@ A pre-determined quorum value ($k$) out of the ($n$) guardians will be necessary
 
 If the same set of $n$ guardians support multiple elections using the same threshold value $k$, the generated keys and key shares may be reused across several elections.
 
+ref: S3a2 Guardians can generate individual public-secret key pairs
+ref: S3a2 Guardians can exchange shares of secret keys
+ref: S3a2 If the set of guardians and parameters k and n remain the same, they can re-use the same keys for multiple elections
+ref: S3a2 A complete new set of keys must be generated if even a single guardian is replaced
+
+S3.2 RI rejects any election manifest unless 1 <= k <= n < 2^31
+S3.2 Ballots are encrypted using threshold encryption
+S3.2 It is straightforward to combine individual guardian public keys into a single election public key
+S3.2 Every guardian can Shamir-share their secret key during key generation
+S3.2 All selections made by voters can be encrypted to the single election public key
+S3.2 After the election, every guardian can compute a verifiable partial decryption of every tally
+S3.2 'k' distinct guardian secret keys can produce a full decryption of every tally
+S3.2 Fewer than 'k' distinct guardian secret keys can not produce a full decryption of any tally
+
 ---- S3.2.1
 \subsubsection{Overview of key generation}
 The $n$ guardians of an election are denoted by $G_1,G_2,\dots,G_n$.  Each guardian $G_i$ generates an independent public-secret key pair by generating a random integer secret $s_i\in\Z_q$ and forming the public key $K_i = g^{s_i} \bmod p$. Each of these public keys will be published in the election record together with a non-interactive zero-knowledge Schnorr proof of knowledge of the associated secret key.  
@@ -715,6 +875,22 @@ At the conclusion of the election, individual encrypted ballots will be homomorp
 
 All challenged ballots are individually decrypted in precisely the same fashion.
 
+ref: S3.2 Each guardian can Shamir-share their secret key during key generation
+S3.2.1 Receiving guardians can confirm that the key shares they receive are correct
+S3.2.1 Every guardian can generate an independent public-secret key pair by generating a random integer secret s_i in Z_q
+S3.2.1 Every guardian can form their guardian public key as K_i = g^{s_i} mod p
+S3.2.1 The election record contains every guardian's public key
+S3.2.1 The election record contains, for every guardian public key, a non-interactive zero-knowledge Schnorr proof of knowledge of the associated secret key
+S3.2.1 The joint election public key K is computed as \prod_{i=1}^n K_i mod p
+S3.2.1 Every guardian G_i can generate k - 1 random polynomial coefficients a_{i,j} such that 0 < j < k and 0 <= a_{i,j} < q
+S3.2.1 Every guardian G_i can generate and publish commitments K_{i,j} = g^{a_{i,j}} mod p to each of its polynomial coefficients
+S3.2.1 Guardian polynomial coefficients are generated and managed in precisely the same fashion as secret keys
+S3.2.1 Individual encrypted ballots can be homomorphically combined into a single encrypted aggregate ballot
+S3.2.1 The single encrypted aggregate ballot consists of an encryption of the tally for each contest (e.g. selection option) field
+S3.2.1 Any set of k guardians' private keys is sufficient to complete decryption of the tally for each contest (e.g. selection option) field
+S3.2.1 No set of fewer than k guardians' private keys is sufficient to complete decryption of the tally for any contest (e.g. selection option) field
+S3.2.1 Any challenged ballot can be individually decrypted in the same fashion as the tally for a contest (e.g. selection option) field
+
 ---- S3.2.2
 \subsubsection{Details of key generation}\label{sec:keygendetails}
 \paragraph{Guardian coefficients and key pair.}
@@ -728,6 +904,12 @@ Guardian $G_i$ then publishes commitments
 \end{equation}
 for each of its polynomial coefficients $a_{i,j}$, for $0 \le j <k$. The constant term $a_{i,0}$ of this polynomial will serve as the secret key for guardian $G_i$, and for convenience we denote $s_i = a_{i,0}$, and its commitment $K_{i,0}$ will serve as the public key for guardian $G_i$ and will also be denoted as $K_i = K_{i,0}$.
 In order to prove possession of the coefficient associated with each public commitment, for each $K_{i,j}$ with $0\leq j < k$, guardian $G_i$ generates a Schnorr proof of knowledge for each of its coefficients as follows.
+
+S3.2.2a Every guardian can generate and store k secret polynomial coefficients by sampling a CSRNG uniformly from 0 < a_{i,j} < q
+S3.2.2a Every guardian can generate and publish 
+S3.2.2a 
+S3.2.2a 
+S3.2.2a 
 
 \paragraph{NIZK Proof:} Guardian $G_i$ proves knowledge of secrets $a_{i,j}$ such that $K_{i,j}= g^{a_{i,j}} \bmod p$.
 
@@ -753,6 +935,9 @@ g^{P_i(\alpha)} \bmod p = g^{\sum_{j=0}^{k-1} a_{i,j} \alpha^j}\bmod p
 \end{equation}
 
 \EGnote{Although this formula includes double exponentiation -- raising a given value to the power $\alpha^j$ -- in what follows, $\alpha$ and $j$ will always be small values (bounded by $n$). This can also be reduced since the same result will be achieved if the exponents $\alpha^j$ are reduced to $\alpha^j \bmod q$.}
+
+S3.2.2b
+
 
 \paragraph{Share encryption.}
 To share secret values amongst each other, each guardian $G_i$ encrypts its share for each other guardian $G_\ell$ using an encryption function $E_\ell$ that can be instantiated using that guardian's public/secret key pair $(K_\ell = g^{s_\ell} \bmod p, s_\ell)$ as laid out in the section describing the encryption of other data above. This means that each guardian $G_i$ publishes the encryption $E_\ell(P_i(\ell))$ for every other guardian $G_\ell$ as follows.
@@ -788,12 +973,18 @@ C_{i,\ell,2} = \HMAC(k_0, \bytes(C_{i,\ell,0},512)\parallel C_{i,\ell,1}).
 
 
 
+S3.2.2c
+
+
 \paragraph{Share decryption.}
 After receiving the ciphertext $(C_{i,\ell,0},C_{i,\ell,1},C_{i,\ell,2})$ from guardian $G_i$, guardian $G_\ell$ decrypts it by computing $\beta_{i,\ell} =(C_{i,\ell,0})^{s_\ell} \bmod p$, setting $\alpha_{i,\ell} = C_{i,\ell,0}$ and obtaining $k_{i,\ell} = H(\HH_P; \mathtt{0x11}, i, \ell, K_\ell,\alpha_{i,\ell}, \beta_{i,\ell})$. Now the \MAC key $k_0$ and the encryption key $k_1$ can be computed as above in Equations \eqref{eq:share_enc_MACkey} and \eqref{eq:share_enc_ENCkey}, which allows $G_\ell$ to verify the validity of the \MAC, namely that $C_{i,\ell,2} = \HMAC(k_0, \bytes(C_{i,\ell,0},512) \parallel C_{i,\ell,1})$. If the \MAC verifies, $G_\ell$ decrypts 
 \begin{equation}
   \bytes(P_i(\ell),32) = C_{i,\ell,1}\oplus k_1.
 \end{equation}
 
+
+
+S3.2.2d
 
 
 \paragraph{Share verification.}
@@ -870,12 +1061,21 @@ To accommodate preservation of ballot nonces, an \EG manifest may optionally pro
 A contest in an election consists of a set of options together with a selection limit that indicates the number of selections that are allowed to be made in that contest. In most elections, most contests have a selection limit of one. However, a larger selection limit (e.g., select up to three) is not uncommon in some elections. Approval voting can be achieved by setting the selection limit to the total number of options in a contest. Ranked choice voting is not supported in this version of \EG, but it may be enabled in a future version.\footnote{Benaloh J., Moran. T, Naish L., Ramchen K., and Teague V. (2009) \emph{Shuffle-Sum:  Coercion-Resistant Verifiable Tallying for STV Voting} in Transactions of Information Forensics and Security.} Write-ins are assumed to be explicitly registered or allowed to be lumped into a single “write-ins” category for the purpose of verifiable tallying.  Verifiable tallying of free-form write-ins may be best done with a MixNet\footnote{Chaum D. (1981) \emph{Untraceable Electronic Mail, Return Addresses, and Digital Pseudonyms} Communications of the ACM.} design.
 
 
+S3.3.3a
+
+
 \paragraph{Undervotes.}
 A legitimate vote in a contest consists of a set of selections with cardinality not exceeding the selection limit of that contest. To accommodate legitimate undervotes, in previous versions of \EG (up to v1.1), the internal representation of a contest was augmented with “placeholder” options equal in number to the selection limit. Placeholder options were selected as necessary to force the total number of selections made in a contest to be equal to the selection limit. When the selection limit is one, for example, \EG used a single placeholder option that can be thought of as a “none of the above” option. The current version of \EG adopts a different approach to accomodate undervotes and allows the total number of selected options to lie in a range between $0$ and the selection limit. This has lower computational cost and leads to smaller election records.
+
+S3.3.3b
 
 
 \paragraph{Overvotes.}
 When the number of selections made by the voter exceeds the selection limit for a specific contest, the votes in the contest become invalid as an overvote. To not affect the election tallies, all selectable options in the contest are set to zero (unselected). To record that an overvote has occurred and what specific selections were made by the voter in this contest, this information is encoded into a contest data field, together with other data such as write-in text. This data is then encrypted with the election public key using the hashed ElGamal encryption described in Section~\ref{sec:encrypt_ext_data}.
+
+S3.3.3c
+
+
 
 \paragraph{Ballot well-formedness}.
 Two things must now be proven about the encryption of each vote to ensure a ballot is well-formed.
@@ -885,36 +1085,63 @@ Two things must now be proven about the encryption of each vote to ensure a ball
 \end{enumerate}
 The use of DPP vote encryption enables efficient zero-knowledge proofs of these requirements, and the Fiat-Shamir heuristic can be used to make these proofs non-interactive. Chaum-Pedersen proofs are used to demonstrate that an encryption is that of a specified value, and these are combined with the Cramer-Damgård-Schoenmakers technique to show that an encryption is that of one of a specified set of values---usually that a value is an encryption of either zero or one.  The encryptions of selections in a contest are homomorphically combined, and the result is shown to be an encryption of a non-negative value that is at most the contest's selection limit---again using Chaum-Pedersen proofs combined with the Cramer-Damgård-Schoenmakers technique.
 
+S3.3.3d
+
+
 
 \paragraph{Cardinal voting methods.}
 A range proof, i.e. a proof that a ciphertext is an encryption of one of the values $0,1,\dots,L$ is a generalization of the proof that a ciphertext is an encryption of zero or one. It can be used to prove well-formedness of an individual selection when it is allowed for options to receive multiple votes in a contest by a single voter. Using range proofs with a range up to a certain option selection limit for the individual option as well as the contest selection sum therefore enables cardinal voting methods such as cumulative voting, score voting, STAR-voting, and Borda count in \EG.
+
+S3.3.3e
+
 
 
 ---- S3.3.4
 \subsubsection{Outline for proofs of ballot correctness}
 This section provides the outlines for different types of encryption proofs that aim to give an understanding of how they work. It starts with the proof that a given ciphertext is an encryption of the value $0$. Based on that, it explains how it can be proved that a ciphertext is an encryption of the value $1$. It then combines those to arrive at the base case used in \EG, namely that a ciphertext is an encryption of $0$ or $1$. Finally, it shows how the latter is generalized to generate range proofs, i.e. proofs that a ciphertext encrypts a value in a range $0,1,\dots,L$.
 
+S3.3.4a
+
+
 \paragraph{NIZK Proof that $(\alpha,\beta)$ is an encryption of zero.}
 To prove that ciphertext $(\alpha,\beta)$ is an encryption of zero, the Chaum-Pedersen protocol proceeds as follows.
 This proof assumes knowledge of the secret encryption nonce $\xi$. The prover selects a random value $u$ in $\Z_q$ and commits to the pair $(a,b)= (g^u \bmod p,\ K^u \bmod p)$. A hash computation is then performed (using the Fiat-Shamir heuristic) to create a pseudo-random challenge value $c = H(\HH_E,K,\alpha,\beta,a,b)$, and the prover responds with $v = (u-c\xi) \bmod q$. A verifier can now confirm the claim by checking that both $g^v\cdot \alpha^c \equiv_p a$ and $K^v\cdot \beta^c \equiv_p b$ are true.
+
+S3.3.4b
+
 
 \paragraph{NIZK Proof that $(\alpha,\beta)$ is an encryption of one.}
 To prove that $(\alpha,\beta)$ is an encryption of one, $\beta/K \bmod p$ is substituted for $\beta$ in the above. The verifier can be relieved of the need to perform a modular division by computing $\beta K^{q-1} \bmod p$ rather than $\beta/K \bmod p$. As an alternative, the verifier can confirm that $K^{(v-c) \bmod q}\cdot \beta^c \equiv_p b$ instead of $K^v\cdot (\beta/K)^c \equiv_p b$.
 
 As with many zero-knowledge protocols, if the prover knows a challenge value prior to making its commitment, it can create a false proof. For example, if a particular challenge $c$ is known to be forthcoming, a prover can generate a random $v\in\Z_q$ and commit to $(a,b) = (g^v\alpha^c \bmod p,\ K^v\beta^c \bmod p)$.  This selection will satisfy the required checks for $(\alpha,\beta)$ to appear as an encryption of zero regardless of the values of $(\alpha,\beta)$. Similarly, setting $(a,b) = (g^v\alpha^c \bmod p,\ K^{(v-c)\bmod q}\beta^c \bmod p)$ will satisfy the required checks for $(\alpha,\beta)$ to appear as an encryption of one regardless of the values of $(\alpha,\beta)$. This quirk is what enables the Cramer-Damgård-Schoenmakers technique to prove a disjunction of two predicates.
 
+S3.3.4c
+
+
 \paragraph{Sketch of NIZK Proof that $(\alpha,\beta)$ is an encryption of zero or one.}
 The prover starts with whichever statement is \emph{not} true, generates a random challenge for it, and then derives the commitment from it to be able to produce a false proof, as described in the previous paragraph. For example, if $(\alpha, \beta)$ is an encryption of one, the prover chooses a challenge $c_0$ and a response at random, then derives values for $(a_0,b_0)$ so that the `response' satisfies the `challenge'; if $(\alpha, \beta)$ is an encryption of zero, the prover chooses $c_1$ and a response at random and derives satisfying values for $(a_1,b_1)$. The prover then works on the true part. It generates a truthful commitment $(a_0,b_0)$ like the first part of a proof of an encryption of zero (or a truthful commitment $(a_1,b_1)$ like the first part of a proof of an encryption of one, whichever is true). A single challenge value $c$ is selected by hashing all commitments and baseline parameters. The prover must produce challenge values $c_0$ and $c_1$ s.t. $c = c_0 + c_1 \bmod q$. It answers its false claim with the challenge it chose in the beginning ($c_0$ if $(\alpha,\beta)$ is an encryption of one, $c_1$ if it is an encryption of zero), then derives the other challenge by subtraction ($c_1 = c - c_0 \bmod q$ or $c_0 = c - c_1 \bmod q$ as needed). It then finishes the proof of the true part as usual, using this challenge. An observer can see that one of the claims must be true but cannot tell which.
+
+S3.3.4d
+
 
 \paragraph{Sketch of NIZK Proof that $(\alpha,\beta)$ is an encryption of an integer $\ell$ such that $0\leq \ell \leq R$.}
 The above method to prove that $(\alpha,\beta)$ is an encryption of zero or one can be extended to more than two values in an analogous way. Now, the prover needs to produce false proofs that verify for all values that are not encrypted in the ciphertext. This means that for each $i$ with $0\leq i \leq R$ and $i\neq\ell$, the prover selects a challenge value $c_i$ and a response at random and uses them to create commitments $(a_i, b_i)$ that make the response verify the challenge for the false claim that $(\alpha,\beta)$ is an encryption of the value $i \neq \ell$. For the true assertion that $(\alpha,\beta)$ is an encryption of $\ell$, the prover makes honest commitments $(a_\ell, b_\ell)$. At this point, there exist commitments $(a_i, b_i)$ for all $0\leq i \leq R$ and a single challenge value $c$ is selected by hashing all these commitments. The remaining challenge value $c_\ell$ is then uniquely determined by the constraint $c = (c_0 + \dots + c_\ell + \dots + c_R) \bmod q$ and can be computed by subtracting from $c$ all other challenge values that were chosen for the false proofs. The challenge $c_\ell$ must be used to answer the true assertion that $(\alpha,\beta)$ is an encryption of $\ell$. The proof now consists of all challenge and response pairs, including the honestly generated one for the true assertion and $R$ faked pairs for the false assertions.
 
+S3.3.4e
+
+
 ---- S3.3.5
 \subsubsection{Details for proofs of ballot correctness}\label{sec:proofsballotcorrectness}
-This subsection begins with the special but common case where a selection is either a $0$ or a $1$, which means that the range bound is $R=1$. Both cases---unselected (encryption of $0$) and selected (encryption of $1$) are spelled out in detail before the general case range proof is specified.  An \EG implementation can directly implement the general range proof and use it in the special case $R=1$. There is no need to implement the case $R=1$ separately.
+This subsection begins with the special but common case where a selection is either a $0$ or a $1$, which means that the range bound is $R=1$. Both cases---unselected (encryption of $0$) and selected (encryption of $1$) are spelled out in detail before the general case range proof is specified.  An \EG implementation can directly implement the general range proof 
+
+S3.3.5a
+
 
 \paragraph{Unselected option.}
 To encrypt an “unselected” option on a ballot, a pseudo-random nonce $\xi\in\Z_q$ for the selection is derived from the ballot nonce $\xi_B$ as described in Section~\ref{sec:noncegen}, and an encryption of zero is formed as $(\alpha,\beta)=(g^\xi \bmod p,\ K^\xi \bmod p)$.
+
+S3.3.5b
+
 
 \paragraph{NIZK Proof:} Proves that $(\alpha,\beta)$ is an encryption of zero or one.\\
 (Requires knowledge of encryption nonce $\xi$ for which $(\alpha,\beta)$ is an encryption of zero.)
@@ -946,8 +1173,14 @@ c & = ((c-c_1)+c_1) \bmod q = (c_0+c_1) \bmod q,\\
 (g^{v_1} \alpha^{c_1}, K^{v_1-c_1} \beta^{c_1}) & \equiv_p (g^{u_1-c_1 \xi} g^{c_1 \xi}, K^{u_1-c_1 \xi - c_1} K^{c_1 \xi}) \equiv_p (a_1, b_1).
 \end{align}
 
+S3.3.5c
+
+
 \paragraph{Selected option.}
 To encrypt a “selected” option on a ballot, a pseudo-random nonce $\xi\in\Z_q$ for the selection is derived from the ballot nonce $\xi_B$ as described in Section~\ref{sec:noncegen}, and an encryption of one is formed as $(\alpha,\beta) = (g^\xi  \bmod p,\ K^{\xi+1} \bmod p)$.
+
+S3.3.5d
+
 
 \paragraph{NIZK Proof:} Proves that $(\alpha,\beta)$ is an encryption of zero or one.\\
 (Requires knowledge of encryption nonce $\xi$ for which $(\alpha,\beta)$ is an encryption of one.)
@@ -980,6 +1213,9 @@ c & =(c_0+(c-c_0)) \bmod q = (c_0+c_1 ) \bmod q,\\
 (g^{v_1} \alpha^{c_1}, K^{v_1-c_1} \beta^{c_1}) & \equiv_p (g^{u_1-c_1 \xi} g^{c_1 \xi}, K^{u_1-c_1 \xi-c_1} (K^{\xi+1})^{c_1})
 \equiv_p (a_1, b_1).
 \end{align}
+
+S3.3.5d
+
 
 
 The remainder of this section specifies the general case of a range proof used for encrypting a selection. It is a straightforward generalization of the method for proofs of encryptions of $0$ or $1$ described above. Any zero-knowledge proof that asserts a ciphertext $(\alpha, \beta)$ encrypts an integer value $\sigma$ in the range $0, 1, \dots, R$ for some integer $R$ is computed in detail as follows.   
@@ -1014,6 +1250,8 @@ Specializing the general range proof with $R=1$ and $\ell=0$ is identical to the
 
 \EGverif{\veriftitleCorrectnessOfSelectionEncryptions}{\label{verif:selection}
 \veriftextCorrectnessOfSelectionEncryptions}
+
+S3.3.5e
 
 
 
