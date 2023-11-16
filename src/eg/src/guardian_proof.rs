@@ -35,7 +35,7 @@ impl CoefficientProof {
         capital_k_i_j: &BigUint,
         h_i_j: &BigUint,
     ) -> BigUint {
-        // v = 0x10 ∥ b(i,4) ∥ b(j,4) ∥ b(Ki,j,512) ∥ b(hi,j,512)
+        // v = 0x10 | b(i,4) | b(j,4) | b(capital_k_i_j,512) | b(h_i_j,j,512)
         let mut v = vec![0x10];
         v.extend_from_slice(i.to_be_bytes().as_slice());
         v.extend_from_slice(j.to_be_bytes().as_slice());
