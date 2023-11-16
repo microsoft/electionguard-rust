@@ -48,6 +48,8 @@
 //! - [GuardianPublicKey](crate::guardian_public_key::GuardianPublicKey) A guardian's public key.
 //!   Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s.
 //!
+//! - [GuardianProof](crate::guardian_proof::GuardianProof) A proof of possession for a guardian's public key.
+//!
 //! - [JointElectionPublicKey](crate::joint_election_public_key::JointElectionPublicKey)
 //!   The joint election public key.
 //!
@@ -73,6 +75,7 @@ pub mod example_election_manifest;
 pub mod example_election_parameters;
 pub mod fixed_parameters;
 pub mod guardian;
+pub mod guardian_proof;
 pub mod guardian_public_key;
 pub mod guardian_public_key_info;
 pub mod guardian_secret_key;
