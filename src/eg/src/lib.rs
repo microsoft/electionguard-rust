@@ -79,6 +79,7 @@ pub mod guardian_proof;
 pub mod guardian_public_key;
 pub mod guardian_public_key_info;
 pub mod guardian_secret_key;
+pub mod guardian_share;
 pub mod hash;
 pub mod hashes;
 pub mod hashes_ext;
