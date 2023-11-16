@@ -5,9 +5,9 @@ use crate::{
     guardian::GuardianIndex,
     guardian_public_key_info::GuardianPublicKeyInfo,
     guardian_secret_key::{CoefficientCommitments, GuardianSecretKey, SecretCoefficients},
-    hash::{HValue, eg_h},
+    hash::{eg_h, HValue},
 };
-use anyhow::{ensure, Result, Context};
+use anyhow::{ensure, Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
@@ -81,7 +81,9 @@ impl CoefficientProof {
         // Compute response vector
         let v_vec = (0..k.get_one_based_usize())
             .map(|j| {
-                (&u_vec[j] - &c_vec[j] * &secret_coefficients.0[j].0) % fixed_parameters.q.as_ref()
+                fixed_parameters
+                    .q
+                    .subtract_group_elem(&u_vec[j], &(&c_vec[j] * &secret_coefficients.0[j].0))
             })
             .collect::<Vec<BigUint>>();
         CoefficientProof { c: c_vec, v: v_vec }
@@ -154,7 +156,7 @@ impl GuardianProof {
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
         h_p: HValue,
-        secret_key: GuardianSecretKey,
+        secret_key: &GuardianSecretKey,
     ) -> Self {
         let i = secret_key.i;
         let coefficient_proof = CoefficientProof::new(
@@ -185,8 +187,8 @@ impl GuardianProof {
         public_key_info: &dyn GuardianPublicKeyInfo,
     ) -> Result<()> {
         ensure!(
-            self.i != public_key_info.i(),
-            "The guardian index of the proof and the public key must match."
+            self.i == public_key_info.i(),
+            "The guardian indices of the proof and the public key must match."
         );
 
         ensure!(
@@ -194,7 +196,7 @@ impl GuardianProof {
                 election_parameters,
                 h_p,
                 self.i,
-                &public_key_info.coefficient_commitments()
+                public_key_info.coefficient_commitments()
             ),
             "The proof is invalid."
         );
@@ -203,9 +205,7 @@ impl GuardianProof {
     }
 
     /// Reads a `GuardianProof` from a `std::io::Read`. Validation will require the corresponding public key.
-    pub fn from_stdioread_validated(
-        stdioread: &mut dyn std::io::Read,
-    ) -> Result<Self> {
+    pub fn from_stdioread_validated(stdioread: &mut dyn std::io::Read) -> Result<Self> {
         let self_: Self = serde_json::from_reader(stdioread).context("Reading GuardianProof")?;
         Ok(self_)
     }
@@ -218,5 +218,79 @@ impl GuardianProof {
             .map_err(Into::<anyhow::Error>::into)
             .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
             .context("Writing GuardianProof")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::iter::zip;
+    use util::csprng::Csprng;
+
+    use crate::{
+        example_election_manifest::example_election_manifest,
+        example_election_parameters::example_election_parameters, hashes::Hashes, guardian::GuardianIndex,
+    };
+
+    use super::{GuardianProof, GuardianSecretKey};
+
+    #[test]
+    fn test_guardian_proof_generation() {
+        let mut csprng = Csprng::new(b"test_proof_generation");
+
+        let election_parameters = example_election_parameters();
+        let election_manifest = example_election_manifest();
+        let varying_parameters = &election_parameters.varying_parameters;
+
+        let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
+
+        let guardian_secret_keys = varying_parameters
+            .each_guardian_i()
+            .map(|i| GuardianSecretKey::generate(&mut csprng, &election_parameters, i, None))
+            .collect::<Vec<_>>();
+
+        let guardian_public_keys = guardian_secret_keys
+            .iter()
+            .map(|secret_key| secret_key.make_public_key())
+            .collect::<Vec<_>>();
+
+        let guardian_proofs = guardian_secret_keys
+            .iter()
+            .map(|secret_key| {
+                GuardianProof::generate(&mut csprng, &election_parameters, hashes.h_p, secret_key)
+            })
+            .collect::<Vec<_>>();
+
+        for (pk, proof) in zip(guardian_public_keys, guardian_proofs) {
+            let proof_index = proof.i;
+            let pk_index = pk.i;
+            assert!(
+                proof
+                    .validate(&election_parameters, hashes.h_p, &pk)
+                    .is_ok(),
+                "Proof {proof_index} for key {pk_index} is invalid."
+            )
+        }
+
+    }
+
+    #[test]
+    fn test_guardian_proof_generation_wrong_index() {
+        let mut csprng = Csprng::new(b"test_proof_generation");
+
+        let election_parameters = example_election_parameters();
+        let election_manifest = example_election_manifest();
+        let varying_parameters = &election_parameters.varying_parameters;
+
+        let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
+
+        let index_one = GuardianIndex::from_one_based_index(1).unwrap();
+        let index_two = GuardianIndex::from_one_based_index(2).unwrap();
+        let sk_one = GuardianSecretKey::generate(&mut csprng, &election_parameters, index_one, None);        
+        let sk_two = GuardianSecretKey::generate(&mut csprng, &election_parameters, index_two, None);     
+
+        let proof = GuardianProof::generate(&mut csprng, &election_parameters, hashes.h_p, &sk_one);
+
+        assert!(proof.validate(&election_parameters, hashes.h_p, &sk_two.make_public_key()).is_err(), "Proof validation should fail")
+
     }
 }
