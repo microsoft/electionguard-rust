@@ -905,11 +905,8 @@ Guardian $G_i$ then publishes commitments
 for each of its polynomial coefficients $a_{i,j}$, for $0 \le j <k$. The constant term $a_{i,0}$ of this polynomial will serve as the secret key for guardian $G_i$, and for convenience we denote $s_i = a_{i,0}$, and its commitment $K_{i,0}$ will serve as the public key for guardian $G_i$ and will also be denoted as $K_i = K_{i,0}$.
 In order to prove possession of the coefficient associated with each public commitment, for each $K_{i,j}$ with $0\leq j < k$, guardian $G_i$ generates a Schnorr proof of knowledge for each of its coefficients as follows.
 
-S3.2.2a Every guardian can generate and store k secret polynomial coefficients by sampling a CSRNG uniformly from 0 < a_{i,j} < q
-S3.2.2a Every guardian can generate and publish 
-S3.2.2a 
-S3.2.2a 
-S3.2.2a 
+S3.2.2a Every guardian i can generate and store k secret polynomial coefficients (indexed as 0 <= j < k) by sampling a CSRNG uniformly as 0 < a_{i,j} < q
+S3.2.2a Every guardian i can generate, store, and publish a Schnorr proof of knowledge for each of its k secret polynomial coefficients (indexed as 0 <= j < k).
 
 \paragraph{NIZK Proof:} Guardian $G_i$ proves knowledge of secrets $a_{i,j}$ such that $K_{i,j}= g^{a_{i,j}} \bmod p$.
 
@@ -936,8 +933,13 @@ g^{P_i(\alpha)} \bmod p = g^{\sum_{j=0}^{k-1} a_{i,j} \alpha^j}\bmod p
 
 \EGnote{Although this formula includes double exponentiation -- raising a given value to the power $\alpha^j$ -- in what follows, $\alpha$ and $j$ will always be small values (bounded by $n$). This can also be reduced since the same result will be achieved if the exponents $\alpha^j$ are reduced to $\alpha^j \bmod q$.}
 
-S3.2.2b
-
+S3.2.2b [1/7] The Schnorr proof of knowledge for a guardian G_i coefficient 0 <= j < k is formed by
+S3.2.2b [2/7] generating a random integer value by sampling a CSRNG uniformly as 0 <= u_{i,j} < q
+S3.2.2b [3/7] computing h_{i,j} = g^{u_{i,j}} mod p.
+S3.2.2b [4/7] computing challenge value c_{i,j} = H(H_P; 0x10, i, j, K_{i,j}, h_{i,j})
+S3.2.2b [5/7] computing response value v_{i,j} = (u_{i,j} - c_{i,j}*a_{i,j}) mod q
+S3.2.2b [6/7] the Schnorr proof is then the pair (c_{i,j}, v_{i,j}).
+S3.2.2b [7/7] The Schnorr proof of knowledge for a guardian G_i coefficient 0 <= j < k can be published.
 
 \paragraph{Share encryption.}
 To share secret values amongst each other, each guardian $G_i$ encrypts its share for each other guardian $G_\ell$ using an encryption function $E_\ell$ that can be instantiated using that guardian's public/secret key pair $(K_\ell = g^{s_\ell} \bmod p, s_\ell)$ as laid out in the section describing the encryption of other data above. This means that each guardian $G_i$ publishes the encryption $E_\ell(P_i(\ell))$ for every other guardian $G_\ell$ as follows.
@@ -973,7 +975,19 @@ C_{i,\ell,2} = \HMAC(k_0, \bytes(C_{i,\ell,0},512)\parallel C_{i,\ell,1}).
 
 
 
-S3.2.2c
+S3.2.2c Every guardian G_i can encrypt its key share for every other guardian G_l to that guardian's public key K_l = g^{s_l} mod p
+S3.2.2c [1/12] To encrypt its key share to that other guardian's public key K_l, guardian G_i
+S3.2.2c [2/12] randomly-selects a nonce by sampling a CSRNG uniformly as 0 <= xi_{i,l} < q
+S3.2.2c [3/12] computes alpha_{i,l} = g^{xi_{i,l}} mod p
+S3.2.2c [4/12] computes beta_{i,l} = K_l^{xi_{i,l}} mod p
+S3.2.2c [5/12] computes the secret key k_{i,l} = H(H_P; 0x11, i, l, K_l, alpha_{i,l}, beta_{i,l})
+S3.2.2c [6/12] computes MAC key k_0(32 bytes) = HMAC(k_{i,l}, 0x01 || "share_enc_keys" (14 bytes) || 0x00 || "share_encrypt" (13 bytes) || i (4 bytes) || l (4 bytes) || 0x0200)
+S3.2.2c [7/12] computes encryption key k_1(32 bytes) = HMAC(k_{i,l}, 0x02 || "share_enc_keys" (14 bytes) || 0x00 || "share_encrypt" (13 bytes) || i (4 bytes) || l (4 bytes) || 0x0200)
+S3.2.2c [8/12] encodes P_i(l) as a 32 byte array per Section 5.1.2
+S3.2.2c [9/12] computes C_{i,l,0}(512 bytes) = g^xi_{i,l} mod p
+S3.2.2c [10/12] computes C_{i,l,1}(32 bytes) = P_i xor k_1
+S3.2.2c [11/12] computes C_{i,l,2}(32 bytes) = HMAC(k_0, C_{i,l,0}(512 bytes) || C_{i,l,1}).
+S3.2.2c [12/12] the encryption of P_i(l) is formed by E_l(P_i(l)) = (C_{i,l,0}, C_{i,l,1}, C_{i,l,2})
 
 
 \paragraph{Share decryption.}
@@ -984,7 +998,17 @@ After receiving the ciphertext $(C_{i,\ell,0},C_{i,\ell,1},C_{i,\ell,2})$ from g
 
 
 
-S3.2.2d
+S3.2.2d Every guardian G_l must reject any received key share having a bad MAC value
+S3.2.2d [1/9] Every guardian G_l can decrypt a correctly encrypted-and-MAC'd key share received from every other guardian G_i by
+S3.2.2d [2/9] computes beta_{i,l} = (C_{i,l,0})^{s_l} mod p
+S3.2.2d [3/9] computes alpha_{i,l} = C_{i,l,0}
+S3.2.2d [4/9] computes k_{i,l} = H(H_P; 0x11, i, l, K_l, alpha_{i,l}, beta_{i,l})
+S3.2.2c [5/9] computes MAC key k_0(32 bytes) = HMAC(k_{i,l}, 0x01 || "share_enc_keys" (14 bytes) || 0x00 || "share_encrypt" (13 bytes) || i (4 bytes) || l (4 bytes) || 0x0200)
+S3.2.2c [6/9] computes encryption key k_1(32 bytes) = HMAC(k_{i,l}, 0x02 || "share_enc_keys" (14 bytes) || 0x00 || "share_encrypt" (13 bytes) || i (4 bytes) || l (4 bytes) || 0x0200)
+S3.2.2d [7/9] uses a constant time method to compare received MAC C_{i,l,2} with HMAC(k_0, C_{i,l,0}(512 bytes) || C_{i,l,1})
+S3.2.2d [8/9] rejects any received key share if the comparison determines they are not identical
+S3.2.2d [9/9] computes P_i(l)(32 bytes) = C_{i,l,1} xor k_1
+
 
 
 \paragraph{Share verification.}
@@ -1006,6 +1030,20 @@ for later use in decryption as will be described in Section~\ref{sec:decrypt_mis
 
 At a minimum, guardian $G_i$ should retain the values $s_i$ and $P(i)$.
 
+
+S3.2.2e [1/4] Every guardian G_l, after having received and decrypted every key share from another guardian G_i,
+S3.2.2e [2/4] verifies the k commitments K_{i, 0 <= j < k} made by G_i by
+S3.2.2e [3/4] computing (g^{P_i(l)} mod p) [equality -> (confirmed|failed)] (\prod_{j=0}^{k-1}(K_{i,j})^{l^j} mod p)
+S3.2.2e [4/4] publicly reports i, l, and ('confirmed' or 'failed').
+S3.2.2e Every guardian G_i, in response to G_l reporting not receiving a suitable value P_i(l), can publish the P_i(l) and nonce xi_{i,l} they used to compute the key share to G_l
+S3.2.2e [1/4] RI provides a utility to determine whether the published P_i(l) and xi_{i,l} match both the published encryption and the above equation.
+S3.2.2e [2/4] This utility may also advise to
+S3.2.2e [3/4] (if not matching) evict guardian G_i from the election on suspicion of malfeasance and restart the key generation process again with a different guardian, or
+S3.2.2e [4/4] (if matching) absovle guardian G_i of suspicion of malfeasance and continue the key ceremony, optionally with suspicion on guardian G_l for having made a false claim of malfeasance.
+S3.2.2e Every guardian G_i computes its share of the implicit secret key, P(i) = (sum_{j = 1}^n P_j(i)) mod q = (P_1(i) + P_2(i) + ... + P_n(i) mod q
+S3.2.2e Every guardian G_i saves for later use its share of the implicit secret key, P(i)
+S3.2.2e Every guardian G_i saves for later use its random integer secret s_i
+
 ---- S3.2.3
 \subsubsection{Extended base hash}\label{sec:extendedhash}
 Once the baseline parameters have been produced and confirmed, the base hash $\HH_B$ is hashed with the election public key $K$  to form an extended base hash 
@@ -1017,6 +1055,7 @@ that will form the basis of subsequent hash computations.
 \EGverif{\veriftitleExtendedBaseHashValidation}{\label{verif:extendedBaseHash}
 \veriftextExtendedBaseHashValidation}
 
+S3.2.3 The extended base hash is computed as H_E = H(H_B; 0x12, K) (reminder: K is election public key)
 
 ---- S3.3
 \subsection{Ballot Encryption}\label{sec:ballotencryption}
@@ -1040,6 +1079,14 @@ Note that if multiple encrypted votes $(g^{\xi_i} \bmod p,\ K^{\sigma_i+\xi_i} \
 
 Some cardinal voting methods like cumulative voting, score voting, STAR-voting, and Borda count may require the encryption of small positive integers $\sigma$ greater than $1$ that represent multiple allowed votes or weighted votes. In all these cases, encryption is done as shown in Equation~\eqref{eqn:encryptvote}.
 
+S3.3.1 [1/7] RI allows to encrypt a ballot entry 'sigma' by
+S3.3.1 [2/7] generating a random value xi by sampling a PRF (described in 3.3.2) uniformly as 0 <= xi < q
+S3.3.1 [3/7] computing alpha = g^xi mod p
+S3.3.1 [4/7] computing beta = (K^sigma * K^xi) mod p = K^{sigma + xi} mod p
+S3.3.1 [5/7] Note that in the common case of sigma = 0, beta = K^xi mod p
+S3.3.1 [6/7] and       in the common case of sigma = 1, beta = K^{1 + xi} mod p
+S3.3.1 [7/7] Finally, Enc(sigma, xi) = (alpha, beta).
+
 ---- S3.3.2
 \subsubsection{Generation of encryption nonces}\label{sec:noncegen}
 The “random” nonces used for vote encryption on a single ballot $B$ are all derived from a single 256-bit \emph{ballot nonce} $\xi_B$. It is assumed that each contest has a label $\Lambda$ and that within each contest each possible option has a label $\lambda$, which are specified in the election manifest. The manifest also specifies a unique sequence order of contests and options within contests. Within the $i$-th contest, which has contest label $\Lambda_i$, the nonce $\xi_{i,j}$ used to encrypt the selection for the $j$-th option, which has option label $\lambda_j$, is derived as
@@ -1053,6 +1100,30 @@ Since access to a ballot nonce $\xi_B$ enables decryption of the ballot which it
 
 To accommodate preservation of ballot nonces, an \EG manifest may optionally provide a public key to be used for encryption of ballot nonces. This public key may be the same as the election key used to encrypt voter selections, but some scenarios warrant the use of an independent public key.  If such a key is provided, \EG uses that key to encrypt each ballot's ballot nonce $\xi_B$ and return this encryption together with the encrypted ballot.  There are also some scenarios in which ballot nonces are encrypted with symmetric keys. Any such symmetric key should never be published, and the process for managing these symmetric keys is outside of the scope of this specification.
 
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv dup
+Ballot nonces may be independent across different ballots, and only the nonces used to encrypt ballot selections need to be derived from the ballot nonce.\footnote{As will be seen below, in addition to encryption of voter selections, an \EG ballot contains additional encryptions that enable independent verification of a ballot's correctness.  The nonces used for these additional encryptions do not need to be derived from the ballot nonce $\xi_B$.}  The use of a single ballot nonce for each ballot allows the entire ballot encryption to be re-derived from the contents of a ballot and the ballot nonce. It also allows the encrypted ballot to be fully decrypted with the single ballot nonce.
+
+Since access to a ballot nonce $\xi_B$ enables decryption of the ballot which it encrypted, ballot nonces must be protected carefully.  Typically, ballot nonces will be destroyed immediately after they are used.  But there are several scenarios which warrant the preservation of ballot nonces---sometimes only briefly, but sometimes for an extended period.
+
+To accommodate preservation of ballot nonces, an \EG manifest may optionally provide a public key to be used for encryption of ballot nonces. This public key may be the same as the election key used to encrypt voter selections, but some scenarios warrant the use of an independent public key.  If such a key is provided, \EG uses that key to encrypt each ballot's ballot nonce $\xi_B$ and return this encryption together with the encrypted ballot.  There are also some scenarios in which ballot nonces are encrypted with symmetric keys. Any such symmetric key should never be published, and the process for managing these symmetric keys is outside of the scope of this specification.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ dup
+
+
+S3.3.2 RI allows to "encrypt a voted plaintext ballot" `BallotSate::CompletedPlaintext` comprised of an election manifest label, a ballot style label, and a set of voter-assigned contest option selections (sigma).
+S3.3.2 [1/5] RI can process any `BallotSate::CompletedPlaintext` ballot:
+S3.3.2 [2/5] generate xi_B
+S3.3.2 [3/5] impose contest and option selection limits to voter-assigned fields
+S3.3.2 [4/5] assign appropriate values to system-assigned fields (e.g. overvote, undervote, write-ins, etc.)
+S3.3.2 [5/5] for each contest i and field ("option") j, generate xi_{i,j} = H(H_E; 0x20, xi_B, i (4 bytes), j (4 bytes))
+S3.3.2 RI allows to save xi_B
+S3.3.2 RI allows to destroy xi_B immediately after it is used
+S3.3.2 RI allows to encrypt xi_B to the election public key K
+S3.3.2 RI allows to encrypt xi_B to a public key specified in the election manifest
+S3.3.2 RI allows to use a private key to decrypt an xi_B encrypted to a public key
+S3.3.2 RI allows to encrypt xi_B to a symmetric key TBD
+S3.3.2 RI allows to store an encryption of xi_B
+
+TODO more
 
 ---- S3.3.3
 \subsubsection{Ballot well-formedness}
