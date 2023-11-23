@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
-    election_record::PreVotingData, hash::eg_h, index::Index, joint_election_public_key::Ciphertext,
+    election_record::PreVotingData, hash::eg_h, index::Index,
+    joint_election_public_key::Ciphertext, vec1::HasIndexTypeMarker,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +35,8 @@ pub type ProofRangeIndex = Index<ProofRange>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRange(Vec<ProofRangeSingle>);
+
+impl HasIndexTypeMarker for ProofRange {}
 
 impl ProofRange {
     pub fn challenge(
@@ -150,6 +153,15 @@ impl ProofRange {
 
         let mut w = <Vec<BigUint>>::with_capacity(big_l + 1);
         for j in 0..big_l + 1 {
+            let c_j_at_least_0 = self.0[j].c >= BigUint::from(0u8);
+            let c_j_less_than_2_256 = self.0[j].c.bits() <= 256; // c_j < 2^256
+            let v_j_at_least_0 = self.0[j].v >= BigUint::from(0u8);
+            let v_j_less_than_q = &self.0[j].v < pvd.parameters.fixed_parameters.q.as_ref(); // v_j < q
+                                                                                             // Check B and C, namely that 0 <= c_j < 2^256 and 0 <= v_j < q
+            if !(c_j_at_least_0 && c_j_less_than_2_256 && v_j_at_least_0 && v_j_less_than_q) {
+                return false;
+            }
+
             w.push(self.0[j].v.clone());
             w[j] = pvd
                 .parameters
@@ -178,16 +190,28 @@ impl ProofRange {
 
         rhs %= pvd.parameters.fixed_parameters.q.as_ref();
 
-        c == rhs
+        // Check that x in Z_p^r which is equivalent to 0 <= x < p and x^q mod p = 1
+        let check_in_z_p_r = |x: &BigUint| -> bool {
+            let x_at_least_0 = x >= &BigUint::from(0u8);
+            let x_less_than_p = x < pvd.parameters.fixed_parameters.p.as_ref();
+            let x_q_mod_p = x.modpow(
+                pvd.parameters.fixed_parameters.q.as_ref(),
+                pvd.parameters.fixed_parameters.p.as_ref(),
+            );
+            let x_q_mod_p_is_1 = x_q_mod_p == BigUint::from(1u8);
+            x_at_least_0 && x_less_than_p && x_q_mod_p_is_1
+        };
 
-        // 4.A
-        // TODO
+        // Since check B and C are handled in the loop above, we only need to check A and D:
+        // Check A
+        let alpha_in_z_p_r = check_in_z_p_r(&ct.alpha);
+        let beta_in_z_p_r = check_in_z_p_r(&ct.beta);
 
-        // 4.B
-        // TODO
+        let check_a = alpha_in_z_p_r && beta_in_z_p_r;
 
-        // 4.C
-        // TODO
+        // Check D
+        let check_d = c == rhs;
+        check_a && check_d
     }
 }
 

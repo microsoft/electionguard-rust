@@ -19,7 +19,7 @@ use crate::{
     index::Index,
     joint_election_public_key::Ciphertext,
     nonce::encrypted as nonce,
-    vec1::Vec1,
+    vec1::{HasIndexType, Vec1},
     zk::ProofRange,
 };
 
@@ -62,6 +62,10 @@ pub struct ContestEncrypted {
     pub proof_selection_limit: ProofRange,
 }
 
+impl HasIndexType for ContestEncrypted {
+    type IndexType = Contest;
+}
+
 impl ContestEncrypted {
     fn encrypt_selection(
         header: &PreVotingData,
@@ -85,7 +89,7 @@ impl ContestEncrypted {
             vote.push(header.public_key.encrypt_with(
                 &header.parameters.fixed_parameters,
                 &nonce,
-                pt_vote.vote[j] as usize,
+                pt_vote.vote[j - 1] as usize,
                 true,
             ));
         }
@@ -162,6 +166,17 @@ impl ContestEncrypted {
         )
     }
 
+    pub fn verify_selection_limit(&self, header: &PreVotingData, selection_limit: usize) -> bool {
+        let combined_ct =
+            Self::sum_selection_vector(&header.parameters.fixed_parameters, &self.selection);
+        ProofRange::verify(
+            &self.proof_selection_limit,
+            header,
+            &combined_ct,
+            selection_limit,
+        )
+    }
+
     pub fn sum_selection_vector(
         fixed_parameters: &FixedParameters,
         selection: &[Ciphertext],
@@ -187,5 +202,23 @@ impl ContestEncrypted {
 
         sum_ct.nonce = Some(sum_nonce);
         sum_ct
+    }
+
+    pub fn verify(&self, header: &PreVotingData, selection_limit: usize) -> bool {
+        let mut j = 1;
+        for ct in &self.selection {
+            let Ok(idx)= Index::from_one_based_index(j as u32) else {return false};
+            let Some(proof) = self.proof_ballot_correctness.get(idx) else {return false};
+            if !ct.verify_ballot_correctness(header, proof) {
+                return false;
+            }
+            j += 1;
+        }
+
+        if !self.verify_selection_limit(header, selection_limit) {
+            return false;
+        }
+
+        true
     }
 }
