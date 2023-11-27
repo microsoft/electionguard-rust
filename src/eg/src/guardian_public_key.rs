@@ -51,7 +51,7 @@ impl GuardianPublicKeyInfo for GuardianPublicKey {
 }
 
 impl GuardianPublicKey {
-    /// Verifies that the `GuardianPublicKey` is well-formed
+    /// Verifies that the [`GuardianPublicKey`] is well-formed
     /// and conforms to the election parameters.
     /// Useful after deserialization.
     pub fn validate(

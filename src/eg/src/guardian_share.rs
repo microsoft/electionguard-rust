@@ -110,7 +110,7 @@ impl GuardianEncryptedShare {
         Self::hmac(&k0, &v)
     }
 
-    /// This function creates a new `GuardianEncryptedShare` of the dealer's secret key for a given recipient.
+    /// This function creates a new [`GuardianEncryptedShare`] of the dealer's secret key for a given recipient.
     /// The arguments are
     /// - csprng - secure randomness generator
     /// - election_parameters - the election parameters

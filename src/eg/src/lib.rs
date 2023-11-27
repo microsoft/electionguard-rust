@@ -41,14 +41,16 @@
 //!   and election manifest. Namely, the parameter base hash `h_p`, the election manifest hash `h_m`,
 //!   and the election base hash `h_b`.
 //!
-//! - [GuardianSecretKey](crate::guardian_secret_key::GuardianSecretKey) A guardian's secret key.
-//!   Contains a [collection of](crate::guardian_secret_key::SecretCoefficients)
-//!   [SecretCoefficient](crate::guardian_secret_key::SecretCoefficient)s.
+//! - Guardians hold the keys to decrypt election results
+//! 
+//!     - [GuardianSecretKey](crate::guardian_secret_key::GuardianSecretKey) A guardian's secret key.
+//!         Contains a [collection of](crate::guardian_secret_key::SecretCoefficients)
+//!         [SecretCoefficient](crate::guardian_secret_key::SecretCoefficient)s.
 //!
-//! - [GuardianPublicKey](crate::guardian_public_key::GuardianPublicKey) A guardian's public key.
-//!   Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s.
-//!
-//! - [GuardianProof](crate::guardian_proof::GuardianProof) A proof of possession for a guardian's public key.
+//!     - [GuardianPublicKey](crate::guardian_public_key::GuardianPublicKey) A guardian's public key.
+//!         Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s 
+//!         and a vector of [CoefficientProofs](crate::guardian_coeff_proof::CoefficientProof).
+//!         
 //!
 //! - [JointElectionPublicKey](crate::joint_election_public_key::JointElectionPublicKey)
 //!   The joint election public key.

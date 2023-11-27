@@ -90,7 +90,7 @@ impl CoefficientProof {
         }
     }
 
-    /// This function verifies a `CoefficientProof` with respect to a given `CoefficientCommitment` and context
+    /// This function verifies a [`CoefficientProof`] with respect to a given [`CoefficientCommitment`] and context
     /// The arguments are
     /// - self - the `CoefficientProof`
     /// - fixed_parameters - the fixed parameters

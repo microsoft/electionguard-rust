@@ -27,7 +27,7 @@ pub struct SecretCoefficient(
 );
 
 impl SecretCoefficient {
-    /// Returns the `SecretCoefficient` as a big-endian byte array of the correct length for `mod q`.
+    /// Returns the [`SecretCoefficient`] as a big-endian byte array of the correct length for `mod q`.
     pub fn to_be_bytes_len_q(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_q(&self.0)
     }
@@ -64,7 +64,7 @@ pub struct CoefficientCommitment(
 );
 
 impl CoefficientCommitment {
-    /// Returns the `CoefficientCommitment` as a big-endian byte array of the correct length for `mod p`.
+    /// Returns the [`CoefficientCommitment`] as a big-endian byte array of the correct length for `mod p`.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
     }
