@@ -80,9 +80,9 @@ impl GuardianEncryptedShare {
         // v = 0x01 | label | 0x00 | context | 0x0200
         let mut v = vec![0x01];
         v.extend_from_slice(label);
-        v.extend(vec![0x00]);
-        v.extend(context.clone());
-        v.extend(vec![0x02, 0x00]);
+        v.push(0x00);
+        v.extend(&context);
+        v.extend([0x02, 0x00]);
         //SHA-256 HMAC which is equivalent to H(key,value)
         let k1 = Self::hmac(k_i_l, &v);
 
@@ -90,8 +90,8 @@ impl GuardianEncryptedShare {
         // v = 0x02 | label | 0x00 | context | 0x0200
         let mut v = vec![0x02];
         v.extend_from_slice(label);
-        v.extend(vec![0x00]);
-        v.extend(context.clone());
+        v.push(0x00);
+        v.extend(context);
         v.extend(vec![0x02, 0x00]);
         //SHA-256 HMAC which is equivalent to H(key,value)
         let k2 = Self::hmac(k_i_l, &v);
@@ -160,7 +160,7 @@ impl GuardianEncryptedShare {
         }
     }
 
-    /// This function creates a new `GuardianEncryptedShare` of the dealer's secret key for a given recipient.
+    /// This function creates a new [`GuardianEncryptedShare`] of the dealer's secret key for a given recipient.
     /// The arguments are
     /// - csprng - secure randomness generator
     /// - election_parameters - the election parameters
