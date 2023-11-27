@@ -1,8 +1,7 @@
-use std::{borrow::Borrow, iter::zip};
-
-use anyhow::{bail, ensure, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+use std::iter::zip;
+use thiserror::Error;
 use util::{bitwise::xor, csprng::Csprng, integer_util::to_be_bytes_left_pad};
 
 use crate::{
@@ -26,6 +25,16 @@ pub struct GuardianEncryptedShare {
     pub c0: BigUint,
     pub c1: HValue,
     pub c2: HValue,
+}
+
+#[derive(Error, Debug)]
+pub enum DecryptionError {
+    #[error("The dealer of the ciphertext is {i}, but the public key has index {j}.")]
+    DealerIndicesMismatch { i: GuardianIndex, j: GuardianIndex },
+    #[error("The recipient of the ciphertext is {i}, but the secret key has index {j}.")]
+    RecipientIndicesMismatch { i: GuardianIndex, j: GuardianIndex },
+    #[error("The MAC does not verify.")]
+    InvalidMAC,
 }
 
 impl GuardianEncryptedShare {
@@ -161,21 +170,25 @@ impl GuardianEncryptedShare {
         election_parameters: &ElectionParameters,
         dealer_public_key: &GuardianPublicKey,
         recipient_secret_key: &GuardianSecretKey,
-    ) -> Result<BigUint> {
-        ensure!(
-            self.dealer == dealer_public_key.i,
-            "The indices for the dealer must match."
-        );
-        ensure!(
-            self.recipient == recipient_secret_key.i,
-            "The indices for the dealer must match."
-        );
+    ) -> Result<BigUint, DecryptionError> {
+        if self.dealer != dealer_public_key.i {
+            return Err(DecryptionError::DealerIndicesMismatch {
+                i: self.dealer,
+                j: dealer_public_key.i,
+            });
+        }
+        if self.recipient != recipient_secret_key.i {
+            return Err(DecryptionError::RecipientIndicesMismatch {
+                i: self.dealer,
+                j: dealer_public_key.i,
+            });
+        }
 
         let i = self.dealer.get_one_based_u32();
         let l = self.recipient.get_one_based_u32();
         let fixed_parameters = &election_parameters.fixed_parameters;
         let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
-        let p: &BigUint = fixed_parameters.p.borrow();
+        let p: &BigUint = fixed_parameters.p.as_ref();
         let capital_k = &recipient_secret_key.coefficient_commitments.0[0].0;
 
         let alpha = &self.c0;
@@ -185,7 +198,9 @@ impl GuardianEncryptedShare {
         let (k0, k1) = Self::mac_and_encryption_key(i, l, &k_i_l);
         let mac = Self::share_mac(k0, to_be_bytes_left_pad(alpha, 512).as_slice(), &self.c1);
 
-        ensure!(mac == self.c2, "The MAC does not verify.");
+        if mac != self.c2 {
+            return Err(DecryptionError::InvalidMAC);
+        }
 
         let p_l_bytes = xor(self.c1.0.as_slice(), k1.0.as_slice());
 
@@ -204,6 +219,18 @@ pub struct GuardianSecretKeyShare {
     pub p_i: BigUint,
 }
 
+#[derive(Error, Debug)]
+pub enum ShareCombinationError {
+    #[error("Public key of guardian {0} is invalid.")]
+    InvalidPublicKey(GuardianIndex),
+    #[error("Guardian {0} is represented more than once in the guardian public keys.")]
+    DuplicateGuardian(GuardianIndex),
+    #[error("Guardian {0} is represented more than once in the guardian public keys.")]
+    MissingGuardian(String),
+    #[error("Could not decrypt and validate share from guardian {0}.")]
+    DecryptionError(GuardianIndex),
+}
+
 impl GuardianSecretKeyShare {
     /// This function computes a new `GuardianSecretKeyShare` from a list of `GuardianEncryptedShare`
     /// The arguments are
@@ -218,27 +245,29 @@ impl GuardianSecretKeyShare {
         guardian_public_keys: &[GuardianPublicKey],
         encrypted_shares: &[GuardianEncryptedShare],
         recipient_secret_key: &GuardianSecretKey,
-    ) -> Result<Self> {
+    ) -> Result<Self, ShareCombinationError> {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
         let n = varying_parameters.n.get_one_based_usize();
 
         // Validate every supplied guardian public key.
         for guardian_public_key in guardian_public_keys {
-            guardian_public_key.validate(election_parameters)?;
+            if guardian_public_key.validate(election_parameters).is_err() {
+                return Err(ShareCombinationError::InvalidPublicKey(
+                    guardian_public_key.i,
+                ));
+            }
         }
 
         // Verify that every guardian is represented exactly once.
         let mut seen = vec![false; n];
         for guardian_public_key in guardian_public_keys {
             let seen_ix = guardian_public_key.i.get_zero_based_usize();
-
-            ensure!(
-                !seen[seen_ix],
-                "Guardian {} is represented more than once in the guardian public keys",
-                guardian_public_key.i
-            );
-
+            if seen[seen_ix] {
+                return Err(ShareCombinationError::DuplicateGuardian(
+                    guardian_public_key.i,
+                ));
+            }
             seen[seen_ix] = true;
         }
 
@@ -250,27 +279,23 @@ impl GuardianSecretKeyShare {
             .collect();
 
         if !missing_guardian_ixs.is_empty() {
-            let iter = missing_guardian_ixs.iter().enumerate().map(|(n, ix)| {
-                let guardian_i = ix + 1;
-                if 0 == n {
-                    format!("{guardian_i}")
+            let info = missing_guardian_ixs.iter().fold(String::new(), |acc, ix| {
+                if acc.is_empty() {
+                    (ix + 1).to_string()
                 } else {
-                    format!(", {guardian_i}")
+                    acc + "," + &(ix + 1).to_string()
                 }
             });
-
-            bail!("Guardian(s) {iter:?} are not represented in the guardian public keys");
+            return Err(ShareCombinationError::MissingGuardian(info));
         }
 
         // Decrypt and validate shares
         let mut shares = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
             let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
-            ensure!(
-                res.is_ok(),
-                "Could not decrypt and validate share from guardian {}",
-                pk.i
-            );
+            if res.is_err() {
+                return Err(ShareCombinationError::DecryptionError(pk.i));
+            }
             shares.push(res.unwrap_or(BigUint::from(0_u8)))
         }
 
@@ -290,13 +315,12 @@ impl GuardianSecretKeyShare {
 mod test {
     use num_bigint::{BigInt, BigUint, Sign};
     use num_traits::{One, Zero};
-    use std::{borrow::Borrow, iter::zip, mem};
+    use std::{iter::zip, mem};
     use util::{csprng::Csprng, prime::BigUintPrime};
 
     use crate::{
-        example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters, guardian::GuardianIndex,
-        guardian_secret_key::GuardianSecretKey, hashes::Hashes,
+        guardian_secret_key::GuardianSecretKey,
     };
 
     use super::{GuardianEncryptedShare, GuardianSecretKeyShare};
@@ -384,7 +408,7 @@ mod test {
             let b_i = xs
                 .iter()
                 .filter(|&l| l != i)
-                .map(|l| l * mod_inverse(&q.subtract_group_elem(l, i), q.borrow()).unwrap())
+                .map(|l| l * mod_inverse(&q.subtract_group_elem(l, i), q.as_ref()).unwrap())
                 .fold(BigUint::one(), |mut acc, s| {
                     acc *= s;
                     acc % q.as_ref()
@@ -462,7 +486,7 @@ mod test {
             .map(|pk| BigUint::from(pk.i.get_one_based_u32()))
             .collect::<Vec<_>>();
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
-        let joint_key_2 = lagrange_interpolation_at_zero(&xs, &ys, fixed_parameters.q.borrow());
+        let joint_key_2 = lagrange_interpolation_at_zero(&xs, &ys, &fixed_parameters.q);
 
         key_shares
             .iter()
