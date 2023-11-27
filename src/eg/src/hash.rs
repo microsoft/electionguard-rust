@@ -1,10 +1,5 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
-#![deny(clippy::manual_assert)]
-
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose, Engine as _};
 use digest::{FixedOutput, Update};
@@ -251,8 +246,18 @@ impl<'de> Deserialize<'de> for HValue {
     }
 }
 
-// ElectionGuard "H" function.
+/// ElectionGuard `H` hash function.
 pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
+    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
+    // to only fail on slice of incorrect size.
+    #[allow(clippy::unwrap_used)]
+    let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
+
+    AsRef::<[u8; 32]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
+}
+
+/// Identical to `H` but separate to follow the specification used to for [`GuardianEncryptedShare`]
+pub fn eg_hmac(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
     // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
     // to only fail on slice of incorrect size.
     #[allow(clippy::unwrap_used)]

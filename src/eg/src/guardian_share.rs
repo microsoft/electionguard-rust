@@ -10,7 +10,8 @@ use crate::{
     guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey,
     guardian_secret_key::GuardianSecretKey,
-    hash::{eg_h, HValue},
+    hash::{eg_h, eg_hmac, HValue},
+    hashes::ParameterBaseHash,
 };
 
 /// Encrypted guardian share
@@ -23,11 +24,7 @@ pub struct GuardianEncryptedShare {
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
     pub c0: BigUint,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub c1: BigUint,
+    pub c1: HValue,
     pub c2: HValue,
 }
 
@@ -58,11 +55,6 @@ impl GuardianEncryptedShare {
         eg_h(&h_p, &v)
     }
 
-    /// SHA-256 HMAC this is (currently) the same as eg_h
-    fn hmac(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
-        eg_h(key, data)
-    }
-
     /// This function computes the MAC key (Equation 16) and the encryption key (Equation 17)
     /// The arguments are
     /// - i - the dealer index
@@ -75,7 +67,6 @@ impl GuardianEncryptedShare {
         let mut context = "share_encrypt".as_bytes().to_vec();
         context.extend_from_slice(i.to_be_bytes().as_slice());
         context.extend_from_slice(l.to_be_bytes().as_slice());
-
         // MAC key
         // v = 0x01 | label | 0x00 | context | 0x0200
         let mut v = vec![0x01];
@@ -83,9 +74,7 @@ impl GuardianEncryptedShare {
         v.push(0x00);
         v.extend(&context);
         v.extend([0x02, 0x00]);
-        //SHA-256 HMAC which is equivalent to H(key,value)
-        let k1 = Self::hmac(k_i_l, &v);
-
+        let k1 = eg_hmac(k_i_l, &v);
         // encryption key
         // v = 0x02 | label | 0x00 | context | 0x0200
         let mut v = vec![0x02];
@@ -93,8 +82,7 @@ impl GuardianEncryptedShare {
         v.push(0x00);
         v.extend(context);
         v.extend(vec![0x02, 0x00]);
-        //SHA-256 HMAC which is equivalent to H(key,value)
-        let k2 = Self::hmac(k_i_l, &v);
+        let k2 = eg_hmac(k_i_l, &v);
 
         (k1, k2)
     }
@@ -104,10 +92,10 @@ impl GuardianEncryptedShare {
     /// - k0 - the MAC key
     /// - c0 - ciphertext part 1
     /// - c1 - ciphertext part 2
-    fn share_mac(k0: HValue, c0: &[u8], c1: &[u8]) -> HValue {
+    fn share_mac(k0: HValue, c0: &[u8], c1: &HValue) -> HValue {
         let mut v = c0.to_vec();
-        v.extend_from_slice(c1);
-        Self::hmac(&k0, &v)
+        v.extend_from_slice(c1.0.as_slice());
+        eg_hmac(&k0, &v)
     }
 
     /// This function creates a new [`GuardianEncryptedShare`] of the dealer's secret key for a given recipient.
@@ -120,15 +108,16 @@ impl GuardianEncryptedShare {
     pub fn new(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
-        h_p: HValue,
         dealer_private_key: &GuardianSecretKey,
         recipient_public_key: &GuardianPublicKey,
     ) -> Self {
         let fixed_parameters = &election_parameters.fixed_parameters;
+        let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
+
         let i = dealer_private_key.i.get_one_based_u32();
         let l = recipient_public_key.i.get_one_based_u32();
-        let q: &BigUint = fixed_parameters.q.borrow();
-        let p: &BigUint = fixed_parameters.p.borrow();
+        let q: &BigUint = fixed_parameters.q.as_ref();
+        let p: &BigUint = fixed_parameters.p.as_ref();
         let capital_k = recipient_public_key.public_key_k_i_0();
 
         //Generate alpha and beta (Equation 14)
@@ -137,7 +126,6 @@ impl GuardianEncryptedShare {
         let beta = capital_k.modpow(&xi, p);
 
         let k_i_l = Self::secret_key(h_p, i, l, capital_k, &alpha, &beta);
-
         let (k0, k1) = Self::mac_and_encryption_key(i, l, &k_i_l);
 
         //Generate key share as P(l) (cf. Equations 9 and 18) using Horner's method
@@ -149,28 +137,28 @@ impl GuardianEncryptedShare {
 
         //Ciphertext as in Equation (19)
         let c1 = xor(to_be_bytes_left_pad(&p_l, 32).as_slice(), k1.0.as_slice());
+        //The unwrap is justified as the output the XOR will always be 32 bytes.
+        let c1 = HValue(c1[0..32].try_into().unwrap());
         let c2 = Self::share_mac(k0, to_be_bytes_left_pad(&alpha, 512).as_slice(), &c1);
 
         GuardianEncryptedShare {
             dealer: dealer_private_key.i,
             recipient: recipient_public_key.i,
             c0: alpha,
-            c1: BigUint::from_bytes_be(c1.as_slice()),
+            c1,
             c2,
         }
     }
 
-    /// This function creates a new [`GuardianEncryptedShare`] of the dealer's secret key for a given recipient.
+    /// This function decrypts and validates a [`GuardianEncryptedShare`].
     /// The arguments are
-    /// - csprng - secure randomness generator
+    /// - self - the encrypted share
     /// - election_parameters - the election parameters
-    /// - h_p - the parameter base hash
     /// - dealer_public_key - the dealer's `GuardianPublicKey`
     /// - recipient_secret_key - the recipient's `GuardianSecretKey`
     pub fn decrypt_and_validate(
         &self,
         election_parameters: &ElectionParameters,
-        h_p: HValue,
         dealer_public_key: &GuardianPublicKey,
         recipient_secret_key: &GuardianSecretKey,
     ) -> Result<BigUint> {
@@ -186,6 +174,7 @@ impl GuardianEncryptedShare {
         let i = self.dealer.get_one_based_u32();
         let l = self.recipient.get_one_based_u32();
         let fixed_parameters = &election_parameters.fixed_parameters;
+        let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
         let p: &BigUint = fixed_parameters.p.borrow();
         let capital_k = &recipient_secret_key.coefficient_commitments.0[0].0;
 
@@ -194,18 +183,11 @@ impl GuardianEncryptedShare {
         let k_i_l = Self::secret_key(h_p, i, l, capital_k, alpha, &beta);
 
         let (k0, k1) = Self::mac_and_encryption_key(i, l, &k_i_l);
-        let mac = Self::share_mac(
-            k0,
-            to_be_bytes_left_pad(alpha, 512).as_slice(),
-            to_be_bytes_left_pad(&self.c1, 32).as_slice(),
-        );
+        let mac = Self::share_mac(k0, to_be_bytes_left_pad(alpha, 512).as_slice(), &self.c1);
 
         ensure!(mac == self.c2, "The MAC does not verify.");
 
-        let p_l_bytes = xor(
-            to_be_bytes_left_pad(&self.c1, 32).as_slice(),
-            k1.0.as_slice(),
-        );
+        let p_l_bytes = xor(self.c1.0.as_slice(), k1.0.as_slice());
 
         Ok(BigUint::from_bytes_be(p_l_bytes.as_slice()))
     }
@@ -233,7 +215,6 @@ impl GuardianSecretKeyShare {
     /// This function assumes that i-th encrypted_share and the i-th guardian_public_key are from the same guardian.
     pub fn compute(
         election_parameters: &ElectionParameters,
-        h_p: HValue,
         guardian_public_keys: &[GuardianPublicKey],
         encrypted_shares: &[GuardianEncryptedShare],
         recipient_secret_key: &GuardianSecretKey,
@@ -284,8 +265,7 @@ impl GuardianSecretKeyShare {
         // Decrypt and validate shares
         let mut shares = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
-            let res =
-                share.decrypt_and_validate(election_parameters, h_p, pk, recipient_secret_key);
+            let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
             ensure!(
                 res.is_ok(),
                 "Could not decrypt and validate share from guardian {}",
@@ -332,9 +312,6 @@ mod test {
         let mut csprng = Csprng::new(b"test_proof_generation");
 
         let election_parameters = example_election_parameters();
-        let election_manifest = example_election_manifest();
-
-        let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
 
         let index_one = GuardianIndex::from_one_based_index(1).unwrap();
         let index_two = GuardianIndex::from_one_based_index(2).unwrap();
@@ -345,20 +322,10 @@ mod test {
         let pk_one = sk_one.make_public_key();
         let pk_two = sk_two.make_public_key();
 
-        let encrypted_share = GuardianEncryptedShare::new(
-            &mut csprng,
-            &election_parameters,
-            hashes.h_p,
-            &sk_one,
-            &pk_two,
-        );
+        let encrypted_share =
+            GuardianEncryptedShare::new(&mut csprng, &election_parameters, &sk_one, &pk_two);
 
-        let result = encrypted_share.decrypt_and_validate(
-            &election_parameters,
-            hashes.h_p,
-            &pk_one,
-            &sk_two,
-        );
+        let result = encrypted_share.decrypt_and_validate(&election_parameters, &pk_one, &sk_two);
 
         assert!(result.is_ok(), "The decrypted share should be valid");
     }
@@ -437,12 +404,9 @@ mod test {
         let mut csprng = Csprng::new(b"test_proof_generation");
 
         let election_parameters = example_election_parameters();
-        let election_manifest = example_election_manifest();
 
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
-
-        let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
 
         let guardian_secret_keys = varying_parameters
             .each_guardian_i()
@@ -464,7 +428,6 @@ mod test {
                         GuardianEncryptedShare::new(
                             &mut csprng,
                             &election_parameters,
-                            hashes.h_p,
                             dealer_sk,
                             &pk,
                         )
@@ -476,7 +439,6 @@ mod test {
             .map(|(sk, shares)| {
                 GuardianSecretKeyShare::compute(
                     &election_parameters,
-                    hashes.h_p,
                     &guardian_public_keys,
                     &shares,
                     &sk,

@@ -1,13 +1,7 @@
+/// Computes the xor of two byte slices.
+/// For slices of unequal length, the xor of the min(len(a),len(b))-prefix is computed
 pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    assert!(
-        a.len() == b.len(),
-        "Byte strings must be of the same length!"
-    );
-    let mut c = vec![];
-    for (b1, b2) in a.iter().zip(b.iter()) {
-        c.push(*b1 ^ *b2);
-    }
-    c
+    a.iter().zip(b).map(|(x, y)| x ^ y).collect()
 }
 
 #[cfg(test)]
