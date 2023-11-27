@@ -42,13 +42,13 @@
 //!   and the election base hash `h_b`.
 //!
 //! - Guardians hold the keys to decrypt election results
-//! 
+//!
 //!     - [GuardianSecretKey](crate::guardian_secret_key::GuardianSecretKey) A guardian's secret key.
 //!         Contains a [collection of](crate::guardian_secret_key::SecretCoefficients)
 //!         [SecretCoefficient](crate::guardian_secret_key::SecretCoefficient)s.
 //!
 //!     - [GuardianPublicKey](crate::guardian_public_key::GuardianPublicKey) A guardian's public key.
-//!         Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s 
+//!         Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s
 //!         and a vector of [CoefficientProofs](crate::guardian_coeff_proof::CoefficientProof).
 //!         
 //!

@@ -1,7 +1,7 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
+use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use anyhow::{Result, Context};
 
 use util::integer_util::to_be_bytes_left_pad;
 
