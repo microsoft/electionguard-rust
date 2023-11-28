@@ -94,6 +94,7 @@ impl Ciphertext {
         ProofRange::new(header, csprng, q, self, selected as usize, 1)
     }
 
+    /// Verify the proof that the cipher text is an encryption of 0 or 1.
     pub fn verify_ballot_correctness(&self, header: &PreVotingData, proof: &ProofRange) -> bool {
         proof.verify(header, self, 1)
     }

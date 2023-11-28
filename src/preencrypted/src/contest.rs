@@ -15,7 +15,7 @@ use eg::{
     hash::HValue,
     index::Index,
     joint_election_public_key::Ciphertext,
-    vec1::{Vec1, HasIndexType, HasIndexTypeMarker},
+    vec1::{HasIndexType, HasIndexTypeMarker, Vec1},
     zk::ProofRange,
 };
 use serde::{Deserialize, Serialize};
@@ -43,10 +43,10 @@ pub struct ContestPreEncrypted {
     pub contest_hash: HValue,
 }
 
-impl HasIndexType for ContestPreEncrypted{
+impl HasIndexType for ContestPreEncrypted {
     type IndexType = Contest;
 }
-impl HasIndexTypeMarker for ContestSelectionPreEncrypted{}
+impl HasIndexTypeMarker for ContestSelectionPreEncrypted {}
 
 impl PartialEq for ContestPreEncrypted {
     fn eq(&self, other: &Self) -> bool {

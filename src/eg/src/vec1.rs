@@ -12,10 +12,12 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{index::Index, zk::ProofRange};
 
+/// Trait for specifying a type that a `Vec1<T>` should be indexed by.
 pub trait HasIndexType {
     type IndexType;
 }
 
+/// Marker trait for marking that a `Vec1<T>` should be indexed by `Index<T>`.
 pub trait HasIndexTypeMarker {}
 
 impl<T: HasIndexTypeMarker> HasIndexType for T {

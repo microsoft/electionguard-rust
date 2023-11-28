@@ -7,7 +7,11 @@
 
 use num_bigint::BigUint;
 
-use crate::{election_record::PreVotingData, hash::eg_h};
+use crate::{
+    election_manifest::{ContestIndex, ContestOptionIndex},
+    election_record::PreVotingData,
+    hash::eg_h,
+};
 
 /// Generates a nonce for encrypted ballots (Equation 22)
 ///
@@ -17,14 +21,14 @@ use crate::{election_record::PreVotingData, hash::eg_h};
 pub fn encrypted(
     header: &PreVotingData,
     primary_nonce: &[u8],
-    label_i: &[u8],
-    label_j: &[u8],
+    label_i: ContestIndex,
+    label_j: ContestOptionIndex,
 ) -> BigUint {
     let mut v = vec![0x20];
 
     v.extend_from_slice(primary_nonce);
-    v.extend_from_slice(label_i);
-    v.extend_from_slice(label_j);
+    v.extend_from_slice(&label_i.get_one_based_u32().to_be_bytes());
+    v.extend_from_slice(&label_j.get_one_based_u32().to_be_bytes());
 
     let nonce = eg_h(&header.hashes_ext.h_e, &v);
 

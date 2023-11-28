@@ -12,14 +12,14 @@ use crate::{
     contest_hash,
     contest_selection::ContestSelection,
     device::Device,
-    election_manifest::{Contest, ContestOptionIndex},
+    election_manifest::{Contest, ContestIndex, ContestOptionIndex},
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
     joint_election_public_key::Ciphertext,
     nonce::encrypted as nonce,
-    vec1::{HasIndexType, Vec1},
+    vec1::Vec1,
     zk::ProofRange,
 };
 
@@ -62,15 +62,11 @@ pub struct ContestEncrypted {
     pub proof_selection_limit: ProofRange,
 }
 
-impl HasIndexType for ContestEncrypted {
-    type IndexType = Contest;
-}
-
 impl ContestEncrypted {
     fn encrypt_selection(
         header: &PreVotingData,
         primary_nonce: &[u8],
-        contest: &Contest,
+        contest_index: ContestIndex,
         pt_vote: &ContestSelection,
     ) -> Vec<Ciphertext> {
         // TODO: Check if selection limit is satisfied
@@ -79,13 +75,7 @@ impl ContestEncrypted {
         for j in 1..pt_vote.vote.len() + 1 {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let o_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
-            let nonce = nonce(
-                header,
-                primary_nonce,
-                contest.label.as_bytes(),
-                #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-                contest.options.get(o_idx).unwrap().label.as_bytes(),
-            );
+            let nonce = nonce(header, primary_nonce, contest_index, o_idx);
             vote.push(header.public_key.encrypt_with(
                 &header.parameters.fixed_parameters,
                 &nonce,
@@ -101,10 +91,12 @@ impl ContestEncrypted {
         csprng: &mut Csprng,
         primary_nonce: &[u8],
         contest: &Contest,
+        contest_index: ContestIndex,
         pt_vote: &ContestSelection,
     ) -> ContestEncrypted {
-        let selection = Self::encrypt_selection(&device.header, primary_nonce, contest, pt_vote);
-        let contest_hash = contest_hash::contest_hash(&device.header, &contest.label, &selection);
+        let selection =
+            Self::encrypt_selection(&device.header, primary_nonce, contest_index, pt_vote);
+        let contest_hash = contest_hash::contest_hash(&device.header, contest_index, &selection);
 
         let mut proof_ballot_correctness = Vec1::new();
         for (i, sel) in selection.iter().enumerate() {
@@ -166,6 +158,7 @@ impl ContestEncrypted {
         )
     }
 
+    /// Verify the proof that the selection limit is satisfied.
     pub fn verify_selection_limit(&self, header: &PreVotingData, selection_limit: usize) -> bool {
         let combined_ct =
             Self::sum_selection_vector(&header.parameters.fixed_parameters, &self.selection);
@@ -204,6 +197,7 @@ impl ContestEncrypted {
         sum_ct
     }
 
+    /// Verify the proof that each encrypted vote is an encryption of 0 or 1.
     pub fn verify(&self, header: &PreVotingData, selection_limit: usize) -> bool {
         let mut j = 1;
         for ct in &self.selection {
@@ -215,10 +209,6 @@ impl ContestEncrypted {
             j += 1;
         }
 
-        if !self.verify_selection_limit(header, selection_limit) {
-            return false;
-        }
-
-        true
+        self.verify_selection_limit(header, selection_limit)
     }
 }
