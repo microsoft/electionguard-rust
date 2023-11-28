@@ -488,13 +488,6 @@ mod test {
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
         let joint_key_2 = lagrange_interpolation_at_zero(&xs, &ys, &fixed_parameters.q);
 
-        key_shares
-            .iter()
-            .fold(BigUint::from(0_u8), |mut acc, share| {
-                acc += &share.p_i;
-                acc % fixed_parameters.q.as_ref()
-            });
-
         assert_eq!(joint_key_1, joint_key_2, "Joint keys should match.")
     }
 }
