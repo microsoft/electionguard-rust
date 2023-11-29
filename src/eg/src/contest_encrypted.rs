@@ -199,14 +199,12 @@ impl ContestEncrypted {
 
     /// Verify the proof that each encrypted vote is an encryption of 0 or 1.
     pub fn verify(&self, header: &PreVotingData, selection_limit: usize) -> bool {
-        let mut j = 1;
-        for ct in &self.selection {
-            let Ok(idx)= Index::from_one_based_index(j as u32) else {return false};
+        for (ct, j) in self.selection.iter().zip(1..) {
+            let Ok(idx)= Index::from_one_based_index(j) else {return false};
             let Some(proof) = self.proof_ballot_correctness.get(idx) else {return false};
             if !ct.verify_ballot_correctness(header, proof) {
                 return false;
             }
-            j += 1;
         }
 
         self.verify_selection_limit(header, selection_limit)
