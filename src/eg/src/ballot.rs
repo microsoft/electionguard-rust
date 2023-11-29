@@ -151,7 +151,7 @@ impl BallotEncrypted {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-pub mod test {
+mod test {
     use super::*;
     use crate::{
         ballot::BallotEncrypted, contest_selection::ContestSelection, device::Device,

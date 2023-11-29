@@ -153,12 +153,16 @@ impl ProofRange {
 
         let mut w = <Vec<BigUint>>::with_capacity(big_l + 1);
         for j in 0..big_l + 1 {
-            let c_j_at_least_0 = self.0[j].c >= BigUint::from(0u8);
+            // We should check that c_j >= 0, but that is
+            // enforced by c_j being a BigUint.
             let c_j_less_than_2_256 = self.0[j].c.bits() <= 256; // c_j < 2^256
-            let v_j_at_least_0 = self.0[j].v >= BigUint::from(0u8);
+
+            // We should also check that v_j >= 0, but that is
+            // enforced by v_j being a BigUint.
             let v_j_less_than_q = &self.0[j].v < pvd.parameters.fixed_parameters.q.as_ref(); // v_j < q
-                                                                                             // Check B and C, namely that 0 <= c_j < 2^256 and 0 <= v_j < q
-            if !(c_j_at_least_0 && c_j_less_than_2_256 && v_j_at_least_0 && v_j_less_than_q) {
+
+            // Check B and C, namely that 0 <= c_j < 2^256 and 0 <= v_j < q (again, 0 <= c_j, v_j follows from them being BigUint's)
+            if !(c_j_less_than_2_256 && v_j_less_than_q) {
                 return false;
             }
 
