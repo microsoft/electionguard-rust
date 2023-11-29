@@ -1,3 +1,8 @@
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::iter::zip;
@@ -147,6 +152,7 @@ impl GuardianEncryptedShare {
         //Ciphertext as in Equation (19)
         let c1 = xor(to_be_bytes_left_pad(&p_l, 32).as_slice(), k1.0.as_slice());
         //The unwrap is justified as the output the XOR will always be 32 bytes.
+        #[allow(clippy::unwrap_used)]
         let c1 = HValue(c1[0..32].try_into().unwrap());
         let c2 = Self::share_mac(k0, to_be_bytes_left_pad(&alpha, 512).as_slice(), &c1);
 

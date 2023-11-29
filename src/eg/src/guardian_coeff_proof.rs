@@ -1,3 +1,8 @@
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use crate::{
     fixed_parameters::FixedParameters,
     guardian_secret_key::{CoefficientCommitment, SecretCoefficient},

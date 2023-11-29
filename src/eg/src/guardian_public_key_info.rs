@@ -1,4 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![deny(clippy::manual_assert)]
+
 use crate::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
     guardian_coeff_proof::CoefficientProof, guardian_secret_key::CoefficientCommitments,
