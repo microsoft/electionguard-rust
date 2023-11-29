@@ -196,14 +196,15 @@ impl ProofRange {
 
         // Check that x in Z_p^r which is equivalent to 0 <= x < p and x^q mod p = 1
         let check_in_z_p_r = |x: &BigUint| -> bool {
-            let x_at_least_0 = x >= &BigUint::from(0u8);
+            // We should check that x >= 0, but that is
+            // enforced by x being a BigUint.
             let x_less_than_p = x < pvd.parameters.fixed_parameters.p.as_ref();
             let x_q_mod_p = x.modpow(
                 pvd.parameters.fixed_parameters.q.as_ref(),
                 pvd.parameters.fixed_parameters.p.as_ref(),
             );
             let x_q_mod_p_is_1 = x_q_mod_p == BigUint::from(1u8);
-            x_at_least_0 && x_less_than_p && x_q_mod_p_is_1
+            x_less_than_p && x_q_mod_p_is_1
         };
 
         // Since check B and C are handled in the loop above, we only need to check A and D:
