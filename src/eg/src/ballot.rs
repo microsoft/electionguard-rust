@@ -159,19 +159,10 @@ mod test {
         guardian_secret_key::GuardianSecretKey, hashes::Hashes, hashes_ext::HashesExt,
         index::Index, joint_election_public_key::JointElectionPublicKey,
     };
-    use rand_core::{OsRng, RngCore};
     use util::csprng::Csprng;
 
     fn g_key(i: u32) -> GuardianSecretKey {
-        let mut seed_bytes: [u8; Csprng::recommended_max_seed_bytes()] =
-            core::array::from_fn(|_i| 0);
-        OsRng.fill_bytes(&mut seed_bytes);
-        let mut seed_data = Vec::new();
-        seed_data.extend_from_slice(&seed_bytes);
-
         let mut seed = Vec::new();
-        seed.extend_from_slice(&(seed_data.len() as u64).to_be_bytes());
-        seed.extend_from_slice(seed_data.as_slice());
         let customization_data = format!("GuardianSecretKeyGenerate({})", i.clone());
         seed.extend_from_slice(&(customization_data.as_bytes().len() as u64).to_be_bytes());
         seed.extend_from_slice(customization_data.as_bytes());
