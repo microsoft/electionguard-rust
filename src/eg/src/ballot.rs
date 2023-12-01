@@ -120,7 +120,7 @@ impl BallotEncrypted {
         &self.device
     }
 
-    /// Verify all of the `ContestEncrypted` in the `BallotEncrypted`. Given a ballot style it checks
+    /// Verify all of the [`ContestEncrypted`] in the [`BallotEncrypted`]. Given a ballot style it checks
     /// that all contests are voted on in the ballot style, and that all of the vote proofs are
     /// correct.
     pub fn verify(&self, header: &PreVotingData, ballot_style_index: Index<BallotStyle>) -> bool {
