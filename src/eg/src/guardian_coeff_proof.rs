@@ -112,18 +112,18 @@ impl CoefficientProof {
         commitment: &CoefficientCommitment,
     ) -> Result<(), ProofValidationError> {
         let commitment = &commitment.0;
-        let zero = BigUint::from(0u8);
         let one = BigUint::from(1u8);
         let p = fixed_parameters.p.as_ref();
         let q = fixed_parameters.q.as_ref();
         let g = &fixed_parameters.g;
 
-        // Verification check (2.A)
-        if &zero > commitment || commitment >= p || commitment.modpow(q, p) != one {
+        // Verification check (2.A) 0 <= commitment < p and commitment^q = 1
+        // using unsigned integers makes the 0 <= implicit
+        if commitment >= p || commitment.modpow(q, p) != one {
             return Err(ProofValidationError::CommitmentNotInGroup);
         }
-        // Verification check (2.B)
-        if zero > self.response || &self.response >= q {
+        // Verification check (2.B) 0 <= response < 1
+        if &self.response >= q {
             return Err(ProofValidationError::ResponseNotInField);
         }
         // Equation (2.1)
