@@ -5,20 +5,21 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
-
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-
 use util::csprng::Csprng;
 
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
     guardian::GuardianIndex,
+    guardian_coeff_proof::CoefficientProof,
     guardian_public_key::GuardianPublicKey,
-    guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
+    guardian_public_key_info::{
+        validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
+    },
+    hashes::ParameterBaseHash,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,7 +33,7 @@ pub struct SecretCoefficient(
 );
 
 impl SecretCoefficient {
-    /// Returns the `SecretCoefficient` as a big-endian byte array of the correct length for `mod q`.
+    /// Returns the [`SecretCoefficient`] as a big-endian byte array of the correct length for `mod q`.
     pub fn to_be_bytes_len_q(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_q(&self.0)
     }
@@ -53,7 +54,7 @@ impl SecretCoefficients {
 
         SecretCoefficients(
             (0..k.get_one_based_u32())
-                .map(|_j| SecretCoefficient(csprng.next_biguint_lt(fixed_parameters.q.borrow())))
+                .map(|_j| SecretCoefficient(csprng.next_biguint_lt(fixed_parameters.q.as_ref())))
                 .collect(),
         )
     }
@@ -69,18 +70,7 @@ pub struct CoefficientCommitment(
 );
 
 impl CoefficientCommitment {
-    /// Verifies that `CoefficientCommitment` is well-formed and conforms
-    /// to the election parameters. Useful after deserialization.
-    pub(crate) fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
-        ensure!(
-            election_parameters.fixed_parameters.is_valid_modp(&self.0),
-            "Coefficient commitment is not a valid mod p value"
-        );
-
-        Ok(())
-    }
-
-    /// Returns the `CoefficientCommitment` as a big-endian byte array of the correct length for `mod p`.
+    /// Returns the [`CoefficientCommitment`] as a big-endian byte array of the correct length for `mod p`.
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
     }
@@ -125,6 +115,9 @@ pub struct GuardianSecretKey {
 
     /// "Published" polynomial coefficient commitments.
     pub coefficient_commitments: CoefficientCommitments,
+
+    /// Ownership proofs for secret coefficients.
+    pub coefficient_proofs: Vec<CoefficientProof>,
 }
 
 impl GuardianPublicKeyInfo for GuardianSecretKey {
@@ -139,6 +132,10 @@ impl GuardianPublicKeyInfo for GuardianSecretKey {
     fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
     }
+
+    fn coefficient_proofs(&self) -> &[CoefficientProof] {
+        &self.coefficient_proofs
+    }
 }
 
 impl GuardianSecretKey {
@@ -148,40 +145,48 @@ impl GuardianSecretKey {
         i: GuardianIndex,
         opt_name: Option<String>,
     ) -> Self {
-        let secret_coefficients = SecretCoefficients::generate(csprng, election_parameters);
-        assert_ne!(secret_coefficients.0.len(), 0);
+        let fixed_parameters = &election_parameters.fixed_parameters;
+        let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
 
-        let coefficient_commitments = CoefficientCommitments::new(
-            &election_parameters.fixed_parameters,
-            &secret_coefficients,
-        );
-        assert_ne!(secret_coefficients.0.len(), 0);
+        let secret_coefficients = SecretCoefficients::generate(csprng, election_parameters);
+
+        let coefficient_commitments =
+            CoefficientCommitments::new(fixed_parameters, &secret_coefficients);
+
+        let coefficient_proofs = secret_coefficients
+            .0
+            .iter()
+            .zip(&coefficient_commitments.0)
+            .enumerate()
+            .map(|(j, (coef, com))| {
+                CoefficientProof::new(
+                    csprng,
+                    fixed_parameters,
+                    h_p,
+                    i.get_one_based_u32(),
+                    j as u32,
+                    coef,
+                    com,
+                )
+            })
+            .collect();
 
         GuardianSecretKey {
             secret_coefficients,
             coefficient_commitments,
+            coefficient_proofs,
             i,
             opt_name,
         }
     }
 
-    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
-    pub fn from_stdioread_validated(
-        stdioread: &mut dyn std::io::Read,
-        election_parameters: &ElectionParameters,
-    ) -> Result<Self> {
-        let self_: Self =
-            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
-
-        self_.validate(election_parameters)?;
-
-        Ok(self_)
-    }
-
     /// Verifies that the `GuardianSecretKey` is well-formed
     /// and conforms to the election parameters.
     /// Useful after deserialization.
-    pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
+    pub fn validate(
+        &self,
+        election_parameters: &ElectionParameters,
+    ) -> Result<(), PublicKeyValidationError> {
         validate_guardian_public_key_info(self, election_parameters)
     }
 
@@ -198,7 +203,21 @@ impl GuardianSecretKey {
             i: self.i,
             opt_name: self.opt_name.clone(),
             coefficient_commitments: self.coefficient_commitments.clone(),
+            coefficient_proofs: self.coefficient_proofs.clone(),
         }
+    }
+
+    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let self_: Self =
+            serde_json::from_reader(stdioread).context("Reading GuardianSecretKey")?;
+
+        self_.validate(election_parameters)?;
+
+        Ok(self_)
     }
 
     /// Writes a `GuardianSecretKey` to a `std::io::Write`.

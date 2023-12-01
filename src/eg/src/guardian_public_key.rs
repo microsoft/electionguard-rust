@@ -15,7 +15,10 @@ use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
     guardian::GuardianIndex,
-    guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
+    guardian_coeff_proof::CoefficientProof,
+    guardian_public_key_info::{
+        validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
+    },
     guardian_secret_key::CoefficientCommitments,
 };
 
@@ -31,6 +34,8 @@ pub struct GuardianPublicKey {
 
     /// "Published" polynomial coefficient commitments.
     pub coefficient_commitments: CoefficientCommitments,
+
+    pub coefficient_proofs: Vec<CoefficientProof>,
 }
 
 impl GuardianPublicKeyInfo for GuardianPublicKey {
@@ -45,26 +50,20 @@ impl GuardianPublicKeyInfo for GuardianPublicKey {
     fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
     }
+
+    fn coefficient_proofs(&self) -> &[CoefficientProof] {
+        &self.coefficient_proofs
+    }
 }
 
 impl GuardianPublicKey {
-    /// Reads a `GuardianPublicKey` from a `std::io::Read` and validates it.
-    pub fn from_stdioread_validated(
-        stdioread: &mut dyn std::io::Read,
-        election_parameters: &ElectionParameters,
-    ) -> Result<Self> {
-        let self_: Self =
-            serde_json::from_reader(stdioread).context("Reading GuardianPublicKey")?;
-
-        self_.validate(election_parameters)?;
-
-        Ok(self_)
-    }
-
-    /// Verifies that the `GuardianPublicKey` is well-formed
+    /// Verifies that the [`GuardianPublicKey`] is well-formed
     /// and conforms to the election parameters.
     /// Useful after deserialization.
-    pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
+    pub fn validate(
+        &self,
+        election_parameters: &ElectionParameters,
+    ) -> Result<(), PublicKeyValidationError> {
         validate_guardian_public_key_info(self, election_parameters)
     }
 
@@ -80,16 +79,6 @@ impl GuardianPublicKey {
         to_be_bytes_left_pad(&self.public_key_k_i_0(), fixed_parameters.l_p_bytes())
     }
 
-    /// Returns a pretty JSON `String` representation of the `GuardianPublicKey`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
-
     /// Writes a `GuardianPublicKey` to a `std::io::Write`.
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
@@ -98,6 +87,29 @@ impl GuardianPublicKey {
             .map_err(Into::<anyhow::Error>::into)
             .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
             .context("Writing GuardianPublicKey")
+    }
+
+    /// Reads a `GuardianPublicKey` from a `std::io::Read` and validates it.
+    pub fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        election_parameters: &ElectionParameters,
+    ) -> Result<Self> {
+        let self_: Self =
+            serde_json::from_reader(stdioread).context("Reading GuardianPublicKey")?;
+
+        self_.validate(election_parameters)?;
+
+        Ok(self_)
+    }
+
+    /// Returns a pretty JSON `String` representation of the `GuardianPublicKey`.
+    /// The final line will end with a newline.
+    pub fn to_json(&self) -> String {
+        // `unwrap()` is justified here because why would JSON serialization fail?
+        #[allow(clippy::unwrap_used)]
+        let mut s = serde_json::to_string_pretty(self).unwrap();
+        s.push('\n');
+        s
     }
 }
 

@@ -41,23 +41,22 @@
 //!   and election manifest. Namely, the parameter base hash `h_p`, the election manifest hash `h_m`,
 //!   and the election base hash `h_b`.
 //!
-//! - [GuardianSecretKey](crate::guardian_secret_key::GuardianSecretKey) A guardian's secret key.
-//!   Contains a [collection of](crate::guardian_secret_key::SecretCoefficients)
-//!   [SecretCoefficient](crate::guardian_secret_key::SecretCoefficient)s.
+//! - Guardians hold the keys to decrypt election results
 //!
-//! - [GuardianPublicKey](crate::guardian_public_key::GuardianPublicKey) A guardian's public key.
-//!   Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s.
+//!     - [GuardianSecretKey](crate::guardian_secret_key::GuardianSecretKey) A guardian's secret key.
+//!         Contains a [collection of](crate::guardian_secret_key::SecretCoefficients)
+//!         [SecretCoefficient](crate::guardian_secret_key::SecretCoefficient)s.
+//!
+//!     - [GuardianPublicKey](crate::guardian_public_key::GuardianPublicKey) A guardian's public key.
+//!         Contains a [collection of](crate::guardian_secret_key::CoefficientCommitments) [coefficient commitment](crate::guardian_secret_key::CoefficientCommitment)s
+//!         and a vector of [CoefficientProofs](crate::guardian_coeff_proof::CoefficientProof).
+//!         
 //!
 //! - [JointElectionPublicKey](crate::joint_election_public_key::JointElectionPublicKey)
 //!   The joint election public key.
 //!
 //! - [HashesExt](crate::hashes_ext::HashesExt) The extended base hash. This can only be computed
 //!   after the joint election public key is known.
-
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
-#![deny(clippy::manual_assert)]
 
 pub mod ballot;
 pub mod ballot_style;
@@ -73,9 +72,11 @@ pub mod example_election_manifest;
 pub mod example_election_parameters;
 pub mod fixed_parameters;
 pub mod guardian;
+pub mod guardian_coeff_proof;
 pub mod guardian_public_key;
 pub mod guardian_public_key_info;
 pub mod guardian_secret_key;
+pub mod guardian_share;
 pub mod hash;
 pub mod hashes;
 pub mod hashes_ext;

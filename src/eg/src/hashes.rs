@@ -1,20 +1,45 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
-
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
-#![deny(clippy::manual_assert)]
-
-use std::borrow::Borrow;
+use std::vec;
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use util::integer_util::to_be_bytes_left_pad;
 
 use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
+    fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
 };
+
+/// Parameter base hash (cf. Section 3.1.2 in Specs 2.0.0)
+/// This is used to compute guardian keys which can be independent of the election (manifest).
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ParameterBaseHash {
+    pub h_p: HValue,
+}
+
+impl ParameterBaseHash {
+    pub fn compute(fixed_parameters: &FixedParameters) -> Self {
+        // H_V = 0x76322E302E30 | b(0, 26)
+        let h_v: HValue = [
+            // This is the UTF-8 encoding of "v2.0.0"
+            0x76, 0x32, 0x2E, 0x30, 0x2E, 0x30, // Padding
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]
+        .into();
+
+        // v = 0x00 | b(p,512)| b(q,32) | b(g,512)
+        let mut v = vec![0x00];
+        v.extend_from_slice(to_be_bytes_left_pad(fixed_parameters.p.as_ref(), 512).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(fixed_parameters.q.as_ref(), 32).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(&fixed_parameters.g, 512).as_slice());
+        let h_p = eg_h(&h_v, &v);
+
+        Self { h_p }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hashes {
@@ -33,33 +58,10 @@ impl Hashes {
         election_parameters: &ElectionParameters,
         election_manifest: &ElectionManifest,
     ) -> Result<Self> {
-        // H_V = 322E302E30 ∥ b(0, 27)
-        let h_v: HValue = [
-            0x32, 0x2E, 0x30, 0x2E, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00,
-        ]
-        .into();
-
-        // Computation of the parameter base hash H_P.
-        let h_p = {
-            // H_P = H(HV ; 00, p, q, g)
-
-            let mut v_pqg = vec![0x00];
-
-            for biguint in [
-                election_parameters.fixed_parameters.p.borrow(),
-                election_parameters.fixed_parameters.q.borrow(),
-                &election_parameters.fixed_parameters.g,
-            ] {
-                v_pqg.append(&mut biguint.to_bytes_be());
-            }
-
-            eg_h(&h_v, &v_pqg)
-        };
+        // Computation of the base parameter hash H_P.
+        let h_p = ParameterBaseHash::compute(&election_parameters.fixed_parameters).h_p;
 
         // Computation of the election manifest hash H_M.
-
         let h_m = {
             let mut v = vec![0x01];
 
@@ -159,6 +161,16 @@ mod test {
     use hex_literal::hex;
 
     #[test]
+    fn test_parameter_base_hash() {
+        let fixed_parameters = example_election_parameters().fixed_parameters;
+        let hash = ParameterBaseHash::compute(&fixed_parameters);
+        let expected_h_p = HValue::from(hex!(
+            "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296"
+        ));
+        assert_eq!(hash.h_p, expected_h_p);
+    }
+
+    #[test]
     fn test_hashes() -> Result<()> {
         let election_parameters = example_election_parameters();
         let election_manifest = example_election_manifest();
@@ -166,7 +178,7 @@ mod test {
         let hashes = Hashes::compute(&election_parameters, &election_manifest)?;
 
         let expected_h_p = HValue::from(hex!(
-            "BAD5EEBFE2C98C9031BA8C36E7E4FB76DAC20665FD3621DF33F3F666BEC9AC0D"
+            "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296"
         ));
         let expected_h_m = HValue::from(hex!(
             "2FE7EA3C2E3C42F88647B4727254F960F1BB7B0D00A6A60C21D2F8984F5090B7"
