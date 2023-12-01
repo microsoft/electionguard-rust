@@ -6,7 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use std::collections::BTreeMap;
-
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
