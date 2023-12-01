@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
-    election_record::PreVotingData, index::Index, joint_election_public_key::Ciphertext,
-    zk::ProofRange,
+    election_manifest::Contest, election_record::PreVotingData, index::Index,
+    joint_election_public_key::Ciphertext, vec1::HasIndexType, zk::ProofRange,
 };
 
 // An encrypted option in a contest.
@@ -33,10 +33,14 @@ pub type ContestSelectionPlaintext = u8;
 pub type ContestSelectionIndex = Index<ContestSelection>;
 
 /// A contest selection by a voter.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContestSelection {
     /// Vector used to represent the selection
     pub vote: Vec<ContestSelectionPlaintext>,
+}
+
+impl HasIndexType for ContestSelection {
+    type IndexType = Contest;
 }
 
 impl ContestSelection {
@@ -88,6 +92,11 @@ impl Ciphertext {
         q: &BigUintPrime,
     ) -> ProofRange {
         ProofRange::new(header, csprng, q, self, selected as usize, 1)
+    }
+
+    /// Verify the proof that the cipher text is an encryption of 0 or 1.
+    pub fn verify_ballot_correctness(&self, header: &PreVotingData, proof: &ProofRange) -> bool {
+        proof.verify(header, self, 1)
     }
 }
 

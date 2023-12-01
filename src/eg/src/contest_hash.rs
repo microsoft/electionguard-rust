@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use crate::{
+    election_manifest::ContestIndex,
     // contest_selection::ContestSelectionCiphertext,
     election_record::PreVotingData,
     hash::{eg_h, HValue},
@@ -16,10 +17,14 @@ use crate::{
 ///
 /// χl = H(H_E;23,Λ_l,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
-pub fn contest_hash(header: &PreVotingData, contest_label: &String, vote: &[Ciphertext]) -> HValue {
+pub fn contest_hash(
+    header: &PreVotingData,
+    contest_index: ContestIndex,
+    vote: &[Ciphertext],
+) -> HValue {
     let mut v = vec![0x23];
 
-    v.extend_from_slice(contest_label.as_bytes());
+    v.extend_from_slice(&contest_index.get_one_based_u32().to_be_bytes());
     v.extend_from_slice(
         header
             .public_key

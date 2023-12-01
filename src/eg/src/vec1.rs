@@ -10,7 +10,19 @@ use std::collections::TryReserveError;
 use anyhow::{ensure, Error, Result};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::index::Index;
+use crate::{index::Index, zk::ProofRange};
+
+/// Trait for specifying a type that a `Vec1<T>` should be indexed by.
+pub trait HasIndexType {
+    type IndexType;
+}
+
+/// Marker trait for marking that a `Vec1<T>` should be indexed by `Index<T>`.
+pub trait HasIndexTypeMarker {}
+
+impl<T: HasIndexTypeMarker> HasIndexType for T {
+    type IndexType = T;
+}
 
 /// A `Vec`-like container intended to be used when 1-based indexing is required.
 /// It is missing many of the methods of `std::vec::Vec`, and not intended to be a general-purpose
@@ -20,7 +32,7 @@ use crate::index::Index;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Vec1<T>(Vec<T>);
 
-impl<T> Vec1<T> {
+impl<T: HasIndexType> Vec1<T> {
     // error[E0658]: inherent associated types are unstable
     // see issue #8995 <https://github.com/rust-lang/rust/issues/8995> for more information
     //pub type IndexType = Index<K>;
@@ -100,19 +112,19 @@ impl<T> Vec1<T> {
 
     /// Returns a ref to a contained element, if one exists at the supplied index.
     /// Compare to: [`slice::get`].
-    pub fn get(&self, index: Index<T>) -> Option<&T> {
+    pub fn get(&self, index: Index<T::IndexType>) -> Option<&T> {
         self.0.get(index.get_zero_based_usize())
     }
 
     /// Returns a mut ref to a contained element, if one exists at the supplied index.
     /// Compare to: [`slice::get_mut`].
-    pub fn get_mut(&mut self, index: Index<T>) -> Option<&mut T> {
+    pub fn get_mut(&mut self, index: Index<T::IndexType>) -> Option<&mut T> {
         self.0.get_mut(index.get_zero_based_usize())
     }
 
     /// Returns an iterator over the 1-based indices of any contained elements.
     #[allow(clippy::reversed_empty_ranges)]
-    pub fn indices(&self) -> impl Iterator<Item = Index<T>> {
+    pub fn indices(&self) -> impl Iterator<Item = Index<T::IndexType>> {
         let n = self.0.len();
         let ri = if Index::<T>::VALID_RANGEINCLUSIVE_USIZE.contains(&n) {
             // Iterate 1 through n.
@@ -138,7 +150,7 @@ impl<T> Vec1<T> {
     //todo!(); //? TODO: consider iterator over index value and mut ref
 }
 
-impl<T> Default for Vec1<T> {
+impl<T: HasIndexType> Default for Vec1<T> {
     fn default() -> Self {
         Self(Vec::new())
     }
@@ -146,7 +158,7 @@ impl<T> Default for Vec1<T> {
 
 /// Attempt to create a [`Vec1<T>`] from a [`Vec<T>`].
 /// This will fail if the source has 2^31 or more elements.
-impl<T> std::convert::TryFrom<std::vec::Vec<T>> for Vec1<T> {
+impl<T: HasIndexType> std::convert::TryFrom<std::vec::Vec<T>> for Vec1<T> {
     type Error = Error;
     fn try_from(v: std::vec::Vec<T>) -> Result<Self> {
         ensure!(
@@ -162,7 +174,7 @@ impl<T> std::convert::TryFrom<std::vec::Vec<T>> for Vec1<T> {
 ///
 /// It is hoped that someday Rust's const generics feature will have improved to
 /// the point that we can prove this at compile time, and implement [`From`] instead.
-impl<T, const N: usize> std::convert::TryFrom<[T; N]> for Vec1<T> {
+impl<T: HasIndexType, const N: usize> std::convert::TryFrom<[T; N]> for Vec1<T> {
     type Error = Error;
     fn try_from(arr: [T; N]) -> Result<Self> {
         let v: std::vec::Vec<T> = arr.into();
@@ -170,7 +182,7 @@ impl<T, const N: usize> std::convert::TryFrom<[T; N]> for Vec1<T> {
     }
 }
 
-impl<T> Serialize for Vec1<T>
+impl<T: HasIndexType> Serialize for Vec1<T>
 where
     T: Serialize,
 {
@@ -182,7 +194,7 @@ where
     }
 }
 
-impl<'de, T> Deserialize<'de> for Vec1<T>
+impl<'de, T: HasIndexType> Deserialize<'de> for Vec1<T>
 where
     T: Deserialize<'de>,
 {
@@ -198,12 +210,15 @@ where
     }
 }
 
+impl HasIndexTypeMarker for Vec1<ProofRange> {}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test_vec1 {
     use super::*;
 
     type CharIndex = Index<char>;
+    impl HasIndexTypeMarker for char {}
 
     #[test]
     fn test() {
