@@ -159,7 +159,7 @@ impl ContestEncrypted {
     }
 
     /// Verify the proof that the selection limit is satisfied.
-    pub fn verify_selection_limit(&self, header: &PreVotingData, selection_limit: usize) -> bool {
+    fn verify_selection_limit(&self, header: &PreVotingData, selection_limit: usize) -> bool {
         let combined_ct =
             Self::sum_selection_vector(&header.parameters.fixed_parameters, &self.selection);
         ProofRange::verify(
@@ -197,7 +197,8 @@ impl ContestEncrypted {
         sum_ct
     }
 
-    /// Verify the proof that each encrypted vote is an encryption of 0 or 1.
+    /// Verify the proof that each encrypted vote is an encryption of 0 or 1,
+    /// and that the selection limit is satisfied.
     pub fn verify(&self, header: &PreVotingData, selection_limit: usize) -> bool {
         for (ct, j) in self.selection.iter().zip(1..) {
             let Ok(idx)= Index::from_one_based_index(j) else {return false};
