@@ -86,4 +86,5 @@ pub mod nonce;
 pub mod standard_parameters;
 pub mod varying_parameters;
 pub mod vec1;
+pub mod verifiable_decryption;
 pub mod zk;

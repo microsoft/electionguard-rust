@@ -5,11 +5,13 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
+use std::{borrow::Borrow, iter::zip, mem};
 
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
-use num_traits::Zero;
+use num_traits::{One, Zero};
+
+use crate::prime::BigUintPrime;
 
 pub fn cnt_bits_repr_usize(n: usize) -> usize {
     if n == 0 {
@@ -64,6 +66,97 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     v
 }
 
+// Returns the inverse of a_u mod m_u (if it exists)
+pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
+    if m_u.is_zero() {
+        return None;
+    }
+    let m = BigInt::from_biguint(Sign::Plus, m_u.clone());
+    let mut t = (BigInt::zero(), BigInt::one());
+    let mut r = (m.clone(), BigInt::from_biguint(Sign::Plus, a_u.clone()));
+    while !r.1.is_zero() {
+        let q = r.0.clone() / r.1.clone();
+        //https://docs.rs/num-integer/0.1.45/src/num_integer/lib.rs.html#353
+        let f = |mut r: (BigInt, BigInt)| {
+            mem::swap(&mut r.0, &mut r.1);
+            r.1 -= q.clone() * r.0.clone();
+            r
+        };
+        r = f(r);
+        t = f(t);
+    }
+    if r.0.is_one() {
+        if t.0 < BigInt::zero() {
+            return Some((t.0 + m).magnitude().clone());
+        }
+        return Some(t.0.magnitude().clone());
+    }
+
+    None
+}
+
+pub fn get_single_coefficient(xs: &[BigUint], i: &BigUint, q: &BigUintPrime) -> BigUint {
+    xs.iter()
+        .filter(|&l| l != i)
+        .map(|l| {
+            let l_minus_i = q.subtract_group_elem(l, i);
+            //The unwrap is justified as l-i != 0 -> inverse always exists
+            #[allow(clippy::unwrap_used)]
+            let inv_l_minus_i = mod_inverse(&l_minus_i, q.as_ref()).unwrap();
+            l * inv_l_minus_i
+        })
+        .fold(BigUint::one(), |mut acc, s| {
+            acc *= s;
+            acc % q.as_ref()
+        })
+}
+
+// Computes the lagrange coefficients mod q
+fn get_lagrange_coefficient(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
+    let mut coeffs = vec![];
+    for i in xs {
+        let w_i = get_single_coefficient(xs, i, q);
+        coeffs.push(w_i);
+    }
+    coeffs
+}
+
+/// Computes the lagrange interpolation in the field Z_q
+/// The arguments are
+/// - xs - the list of nodes, field elements in Z_q
+/// - ys - the list of values, field elements in Z_q
+/// - q - field modulus
+pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) -> BigUint {
+    let coeffs = get_lagrange_coefficient(xs, q);
+    zip(coeffs, ys)
+        .map(|(c, y)| c * y % q.as_ref())
+        .fold(BigUint::zero(), |mut acc, s| {
+            acc += s;
+            acc % q.as_ref()
+        })
+}
+
+/// Computes the lagrange interpolation in the exponent of group element.
+/// The arguments are
+/// - xs - the list of nodes, field elements in Z_q
+/// - ys - the list of values (in the exponent), group elements in Z-p^r
+/// - q - field modulus
+/// - p - group modulus
+pub fn group_lagrange_at_zero(
+    xs: &[BigUint],
+    ys: &[BigUint],
+    q: &BigUintPrime,
+    p: &BigUintPrime,
+) -> BigUint {
+    let coeffs = get_lagrange_coefficient(xs, q);
+    zip(coeffs, ys)
+        .map(|(c, y)| y.modpow(&c, p.as_ref()))
+        .fold(BigUint::one(), |mut acc, s| {
+            acc *= s;
+            acc % p.as_ref()
+        })
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -105,5 +198,24 @@ mod tests {
         assert_eq!(to_be_bytes_left_pad(&x_ff, 0), vec![0xff]);
         assert_eq!(to_be_bytes_left_pad(&x_ff, 1), vec![0xff]);
         assert_eq!(to_be_bytes_left_pad(&x_ff, 2), vec![0x00, 0xff]);
+    }
+
+    #[test]
+    fn test_mod_inverse() {
+        assert_eq!(
+            mod_inverse(&BigUint::from(3_u8), &BigUint::from(11_u8)),
+            Some(BigUint::from(4_u8)),
+            "The inverse of 3 mod 11 should be 4."
+        );
+        assert_eq!(
+            mod_inverse(&BigUint::from(0_u8), &BigUint::from(11_u8)),
+            None,
+            "The inverse of 0 mod 11 should not exist."
+        );
+        assert_eq!(
+            mod_inverse(&BigUint::from(3_u8), &BigUint::from(12_u8)),
+            None,
+            "The inverse of 3 mod 12 should not exist."
+        )
     }
 }

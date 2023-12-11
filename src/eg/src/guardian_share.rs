@@ -319,10 +319,9 @@ impl GuardianSecretKeyShare {
 
 #[cfg(test)]
 mod test {
-    use num_bigint::{BigInt, BigUint, Sign};
-    use num_traits::{One, Zero};
-    use std::{iter::zip, mem};
-    use util::{csprng::Csprng, prime::BigUintPrime};
+    use num_bigint::BigUint;
+    use std::iter::zip;
+    use util::{csprng::Csprng, integer_util::field_lagrange_at_zero};
 
     use crate::{
         example_election_parameters::example_election_parameters, guardian::GuardianIndex,
@@ -358,75 +357,6 @@ mod test {
         let result = encrypted_share.decrypt_and_validate(&election_parameters, &pk_one, &sk_two);
 
         assert!(result.is_ok(), "The decrypted share should be valid");
-    }
-
-    fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
-        if m_u.is_zero() {
-            return None;
-        }
-        let m = BigInt::from_biguint(Sign::Plus, m_u.clone());
-        let mut t = (BigInt::zero(), BigInt::one());
-        let mut r = (m.clone(), BigInt::from_biguint(Sign::Plus, a_u.clone()));
-        while !r.1.is_zero() {
-            let q = r.0.clone() / r.1.clone();
-            //https://docs.rs/num-integer/0.1.45/src/num_integer/lib.rs.html#353
-            let f = |mut r: (BigInt, BigInt)| {
-                mem::swap(&mut r.0, &mut r.1);
-                r.1 = r.1 - q.clone() * r.0.clone();
-                r
-            };
-            r = f(r);
-            t = f(t);
-        }
-        if r.0.is_one() {
-            if t.0 < BigInt::zero() {
-                return Some((t.0 + m).magnitude().clone());
-            }
-            return Some(t.0.magnitude().clone());
-        }
-
-        None
-    }
-
-    #[test]
-    fn test_mod_inverse() {
-        assert_eq!(
-            mod_inverse(&BigUint::from(3_u8), &BigUint::from(11_u8)),
-            Some(BigUint::from(4_u8)),
-            "The inverse of 3 mod 11 should be 4."
-        );
-        assert_eq!(
-            mod_inverse(&BigUint::from(0_u8), &BigUint::from(11_u8)),
-            None,
-            "The inverse of 0 mod 11 should not exist."
-        );
-        assert_eq!(
-            mod_inverse(&BigUint::from(3_u8), &BigUint::from(12_u8)),
-            None,
-            "The inverse of 3 mod 12 should not exist."
-        )
-    }
-
-    fn lagrange_interpolation_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) -> BigUint {
-        // Lagrange coefficients
-        let mut coeffs = vec![];
-        for i in xs {
-            let b_i = xs
-                .iter()
-                .filter(|&l| l != i)
-                .map(|l| l * mod_inverse(&q.subtract_group_elem(l, i), q.as_ref()).unwrap())
-                .fold(BigUint::one(), |mut acc, s| {
-                    acc *= s;
-                    acc % q.as_ref()
-                });
-            coeffs.push(b_i);
-        }
-        zip(coeffs, ys)
-            .map(|(c, y)| c * y % q.as_ref())
-            .fold(BigUint::zero(), |mut acc, s| {
-                acc += s;
-                acc % q.as_ref()
-            })
     }
 
     #[test]
@@ -492,7 +422,7 @@ mod test {
             .map(|pk| BigUint::from(pk.i.get_one_based_u32()))
             .collect::<Vec<_>>();
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
-        let joint_key_2 = lagrange_interpolation_at_zero(&xs, &ys, &fixed_parameters.q);
+        let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.q);
 
         assert_eq!(joint_key_1, joint_key_2, "Joint keys should match.")
     }
