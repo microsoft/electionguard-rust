@@ -220,19 +220,34 @@ mod tests {
     }
 
     #[test]
-    fn test_lagrange_interpolation() { 
+    fn test_lagrange_interpolation() {
         // Toy parameters according to specs
-        let q = BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(BigUint::from(127_u8));
-        let p = BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(BigUint::from(59183_u32));
+        let q = BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+            BigUint::from(127_u8),
+        );
+        let p = BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+            BigUint::from(59183_u32),
+        );
         let g = BigUint::from(32616_u32);
         // Test polynomial x^2 -1
-        let xs = [BigUint::from(1_u8),BigUint::from(2_u8),BigUint::from(3_u8)];
-        let ys = [BigUint::from(0_u8),BigUint::from(3_u8),BigUint::from(8_u8)];
+        let xs = [
+            BigUint::from(1_u8),
+            BigUint::from(2_u8),
+            BigUint::from(3_u8),
+        ];
+        let ys = [
+            BigUint::from(0_u8),
+            BigUint::from(3_u8),
+            BigUint::from(8_u8),
+        ];
         let group_ys: Vec<_> = ys.iter().map(|x| g.modpow(x, p.as_ref())).collect();
         // -1 mod q
         let x_0 = BigUint::from(126_u8);
-        
-        assert_eq!(field_lagrange_at_zero(&xs, &ys, &q),x_0);
-        assert_eq!(group_lagrange_at_zero(&xs, &group_ys, &q, &p),g.modpow(&x_0, p.as_ref()))
+
+        assert_eq!(field_lagrange_at_zero(&xs, &ys, &q), x_0);
+        assert_eq!(
+            group_lagrange_at_zero(&xs, &group_ys, &q, &p),
+            g.modpow(&x_0, p.as_ref())
+        )
     }
 }
