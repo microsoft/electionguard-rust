@@ -148,7 +148,7 @@ pub struct DecryptionProofStateShare {
 
 /// The response share of a single guardian for a DecryptionProof
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DecryptionProofAnswerShare {
+pub struct DecryptionProofResponseShare {
     pub i: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
@@ -265,7 +265,7 @@ impl DecryptionProof {
         proof_commit_shares: &[DecryptionProofCommitShare],
         proof_commit_state: &DecryptionProofStateShare,
         secret_key_share: &GuardianSecretKeyShare,
-    ) -> Result<DecryptionProofAnswerShare, ResponseShareError> {
+    ) -> Result<DecryptionProofResponseShare, ResponseShareError> {
         if proof_commit_state.i != secret_key_share.i {
             return Err(ResponseShareError::KeyStateShareIndexMismatch {
                 i: proof_commit_state.i,
@@ -295,7 +295,7 @@ impl DecryptionProof {
             &proof_commit_state.u_i,
             &(c_i * secret_key_share.p_i.clone()),
         );
-        Ok(DecryptionProofAnswerShare {
+        Ok(DecryptionProofResponseShare {
             i: proof_commit_state.i,
             v_i,
         })
@@ -319,7 +319,7 @@ impl DecryptionProof {
         ciphertext: &Ciphertext,
         decryption_shares: &[DecryptionShare],
         proof_commit_shares: &[DecryptionProofCommitShare],
-        proof_response_shares: &[DecryptionProofAnswerShare],
+        proof_response_shares: &[DecryptionProofResponseShare],
         guardian_public_keys: &[GuardianPublicKey],
     ) -> Result<Self, CombineProofError> {
         let fixed_parameters = &election_parameters.fixed_parameters;
@@ -474,12 +474,12 @@ pub enum DecryptionError {
     NoDlog,
 }
 
-pub struct VerifiedDecryption {
+pub struct VerifiableDecryption {
     plain_text: BigUint,
     proof: DecryptionProof,
 }
 
-impl VerifiedDecryption {
+impl VerifiableDecryption {
     pub fn new(
         fixed_parameters: &FixedParameters,
         joint_key: &JointElectionPublicKey,
@@ -499,7 +499,7 @@ impl VerifiedDecryption {
             None => return Err(DecryptionError::NoDlog),
             Some(x) => x,
         };
-        Ok(VerifiedDecryption {
+        Ok(VerifiableDecryption {
             plain_text,
             proof: proof.clone(),
         })
@@ -553,7 +553,7 @@ mod test {
         joint_election_public_key::JointElectionPublicKey,
     };
 
-    use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiedDecryption};
+    use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption};
 
     fn key_setup(
         csprng: &mut Csprng,
@@ -663,7 +663,7 @@ mod test {
         )
         .unwrap();
 
-        let decryption = VerifiedDecryption::new(
+        let decryption = VerifiableDecryption::new(
             fixed_parameters,
             &joint_key,
             &ciphertext,
