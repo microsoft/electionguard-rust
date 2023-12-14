@@ -3,6 +3,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides the implementation of verifiable decryption for [`Ciphertext`]s. For more details see Section `3.6` of the Electionguard specification `2.0.0`.
+
 use itertools::izip;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
@@ -26,18 +28,21 @@ use crate::{
     joint_election_public_key::{Ciphertext, JointElectionPublicKey},
 };
 
+/// A decryption share is a guardian's partial decryption of a given ciphertext. This corresponds to the `M_i` in Section `3.6.2`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionShare {
+    /// The guardian's index
     pub i: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// The decryption share value
     pub m_i: BigUint,
 }
 
 impl DecryptionShare {
-    /// This function computes the [`DecryptionShare`] for a given ciphertext and secret key share.
+    /// This function computes the [`DecryptionShare`] for a given [`Ciphertext`] and [`GuardianSecretKeyShare`].
     /// The arguments are
     /// - self - the encrypted share
     /// - fixed_parameters - the fixed parameters
@@ -58,21 +63,26 @@ impl DecryptionShare {
     }
 }
 
+/// The combined decryption share allows to compute the plain-text from a given ciphertext. This corresponds to the `M` in Section `3.6.2`.
 pub struct CombinedDecryptionShare(BigUint);
 
+/// Represents errors occurring while combining [`DecryptionShare`]s into a [`CombinedDecryptionShare`].
 #[derive(Error, Debug)]
 pub enum ShareCombinationError {
-    #[error("Only {l} {desc} shares given, but at least {k} required.")]
-    NotEnoughShares { l: usize, k: u32, desc: String },
-    #[error("Guardian {i} is represented more than once in the {desc} shares.")]
-    DuplicateGuardian { i: GuardianIndex, desc: String },
+    /// Occurs if not enough shares were provided. Combination requires shares from at least `k` out of `n` guardians.
+    #[error("Only {l} decryption shares given, but at least {k} required.")]
+    NotEnoughShares { l: usize, k: u32 },
+    /// Occurs if multiple shares from the same guardian are provided.
+    #[error("Guardian {i} is represented more than once in the decryption shares.")]
+    DuplicateGuardian { i: GuardianIndex },
 }
 
 impl CombinedDecryptionShare {
-    /// This functions combines decryption shares (cf. Equation 68 in specs 2.0.0)
+    /// This functions combines decryption shares
     /// The arguments are
     /// - election_parameters - the election parameters
     /// - decryption_shares - a vector of decryption shares
+    /// The computation follows Equation `68`.
     pub fn combine(
         election_parameters: &ElectionParameters,
         decryption_shares: &[DecryptionShare],
@@ -85,21 +95,14 @@ impl CombinedDecryptionShare {
         let l = decryption_shares.len();
         // Ensure that we have at least k decryption shares
         if l < k as usize {
-            return Err(ShareCombinationError::NotEnoughShares {
-                l,
-                k,
-                desc: "decryption".into(),
-            });
+            return Err(ShareCombinationError::NotEnoughShares { l, k });
         }
         // Verify that every guardian (index) is represented at most once.
         let mut seen = vec![false; n];
         for share in decryption_shares {
             let seen_ix = share.i.get_zero_based_usize();
             if seen[seen_ix] {
-                return Err(ShareCombinationError::DuplicateGuardian {
-                    i: share.i,
-                    desc: "decryption".into(),
-                });
+                return Err(ShareCombinationError::DuplicateGuardian { i: share.i });
             }
             seen[seen_ix] = true;
         }
@@ -119,58 +122,75 @@ impl CombinedDecryptionShare {
     }
 }
 
-/// The commitment share of a single guardian for a DecryptionProof
+/// The commitment share of a single guardian for a [`DecryptionProof`].
+/// This corresponds to `(a_i,b_i)` in Equation `69`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofCommitShare {
+    /// The guardian's index
     pub i: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// First part of the commit share
     pub a_i: BigUint,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// Second part of the commit share
     pub b_i: BigUint,
 }
 
-/// The secret state for a commitment share of a single guardian for a DecryptionProof
+/// The secret state for a commitment share of a single guardian for a [`DecryptionProof`].
+/// This corresponds to `u_i` as in Equation `69`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofStateShare {
+    /// The guardian's index
     pub i: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// The commit state
     pub u_i: BigUint,
 }
 
-/// The response share of a single guardian for a DecryptionProof
+/// The response share of a single guardian for a [`DecryptionProof`].
+/// This corresponds to `v_i` as in Equation `73`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofResponseShare {
+    /// The guardian's index
     pub i: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// The response share
     pub v_i: BigUint,
 }
 
+/// Represents errors occurring while computing a response share.
 #[derive(Error, Debug)]
 pub enum ResponseShareError {
+    /// Occurs if one tries to compute the response from a state share that does not match the secret key share.
     #[error("Indices of key share (here {i}) and state share (here {j}) must match!")]
     KeyStateShareIndexMismatch { i: GuardianIndex, j: GuardianIndex },
 }
 
+/// Represents errors occurring while combining the commit and response shares into a single [`DecryptionProof`].
 #[derive(Error, Debug)]
 pub enum CombineProofError {
-    #[error("The given list must be sorted the same way!")]
+    /// Occurs if the input list are not ordered the same way.
+    #[error("The given list must be ordered the same way!")]
     IndexMismatch,
+    /// Occurs if the joint public key does not match the list of public keys.
     #[error("The given list of public keys does not match the given joint public key!")]
     JointPKMissmatch,
-    #[error("Could not combine the given decryption shares.")]
-    ShareCombinationError,
+    /// Occurs if the decryption shares could not be combined.
+    #[error("Could not combine the given decryption shares: {0}")]
+    ShareCombinationError(ShareCombinationError),
+    /// Occurs if the commitment and response shares are inconsistent (Checks `9.A` and `9.B`).
     #[error("The commit message ({1}) of guardian {0} is inconsistent!")]
     CommitInconsistency(GuardianIndex, String),
 }
@@ -194,12 +214,13 @@ pub struct DecryptionProof {
 }
 
 impl DecryptionProof {
-    /// This function generates the commitment share and secret state for a decryption proof (cf. Equations 69 and 70 in the specs 2.0.0)
+    /// This function generates the commitment share and secret state for a decryption proof
     /// The arguments are
     /// - csprng - secure randomness generator
     /// - fixed_parameters - the fixed parameters
     /// - ciphertext - the ElGamal ciphertext
     /// - i - the guardian index
+    /// The computation follows Equations `69` and `70`.
     pub fn generate_commit_share(
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
@@ -350,7 +371,7 @@ impl DecryptionProof {
         let m = CombinedDecryptionShare::combine(election_parameters, decryption_shares);
         let m = match m {
             Ok(res) => res,
-            Err(_) => return Err(CombineProofError::ShareCombinationError),
+            Err(e) => return Err(CombineProofError::ShareCombinationError(e)),
         };
 
         let p = fixed_parameters.p.as_ref();
@@ -466,20 +487,34 @@ impl DecryptionProof {
     }
 }
 
+/// Represents errors occurring during decryption.
 #[derive(Error, Debug)]
 pub enum DecryptionError {
+    /// Occurs if the combined decryption share has no inverse.
     #[error("The combined decryption share has no inverse!")]
     NoInverse,
+    /// Occurs if the computation of the plain-text from `T` and the joint public-key fails.
     #[error("Could not compute the plaintext using dlog!")]
     NoDlog,
 }
 
+/// Represents a "in-the-exponent" plain-text with a [`DecryptionProof`].
+/// This corresponds to `t` and `(c,v)` as in Section `3.6.3`.
 pub struct VerifiableDecryption {
-    plain_text: BigUint,
-    proof: DecryptionProof,
+    /// The decrypted plain-text
+    pub plain_text: BigUint,
+    /// The proof of correctness
+    pub proof: DecryptionProof,
 }
 
 impl VerifiableDecryption {
+    /// This function computes a verifiable decryption
+    /// The arguments are
+    /// - fixed_parameters - the fixed parameters
+    /// - joint_key - the joint election public key
+    /// - ciphertext - the ciphertext
+    /// - m - combined decryption share
+    /// - proof - the proof of correctness
     pub fn new(
         fixed_parameters: &FixedParameters,
         joint_key: &JointElectionPublicKey,
@@ -507,7 +542,7 @@ impl VerifiableDecryption {
 
     /// This function checks the correctness of the decryption for given ciphertext and joint public key
     /// Arguments are
-    /// - self - the verified decryption
+    /// - self - the verifiable decryption
     /// - fixed_parameters - the fixed parameters
     /// - h_e - the extended bash hash
     /// - joint_key - the joint election public key

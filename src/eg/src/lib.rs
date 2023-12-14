@@ -57,6 +57,8 @@
 //!
 //! - [HashesExt](crate::hashes_ext::HashesExt) The extended base hash. This can only be computed
 //!   after the joint election public key is known.
+//!
+//! - [VerifiableDecryption](crate::verifiable_decryption::VerifiableDecryption) A decrypted plain-text with a [proof of correct decryption](crate::verifiable_decryption::DecryptionProof)
 
 pub mod ballot;
 pub mod ballot_style;
