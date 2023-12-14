@@ -196,7 +196,7 @@ pub enum CombineProofError {
 }
 
 /// Proof that a given plaintext is the decryption of a given ciphertext relative to a given public key
-/// Technically, this is a Sigma protocol for the dlog relation (also known as a Schnor proof)
+/// Technically, this is a Sigma protocol for the dlog relation (also known as a Schnorr proof)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProof {
     /// Challenge
