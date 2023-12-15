@@ -75,11 +75,12 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
     let mut t = (BigInt::zero(), BigInt::one());
     let mut r = (m.clone(), BigInt::from_biguint(Sign::Plus, a_u.clone()));
     while !r.1.is_zero() {
-        let q = r.0.clone() / r.1.clone();
+        let q = &r.0 / &r.1;
+        //let q = r.0.clone() / r.1.clone();
         //https://docs.rs/num-integer/0.1.45/src/num_integer/lib.rs.html#353
         let f = |mut r: (BigInt, BigInt)| {
             mem::swap(&mut r.0, &mut r.1);
-            r.1 -= q.clone() * r.0.clone();
+            r.1 -= &q * &r.0;
             r
         };
         r = f(r);
@@ -95,6 +96,12 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
     None
 }
 
+/// Compute a single Lagrange coefficient mod q.
+/// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+/// The arguments are
+/// - `xs` - the list of nodes, field elements in Z_q
+/// - `i` - the node (and index) of the coefficient
+/// - `q`` - field modulus
 pub fn get_single_coefficient(xs: &[BigUint], i: &BigUint, q: &BigUintPrime) -> BigUint {
     xs.iter()
         .filter_map(|l| {
@@ -108,7 +115,7 @@ pub fn get_single_coefficient(xs: &[BigUint], i: &BigUint, q: &BigUintPrime) -> 
         })
 }
 
-// Computes the lagrange coefficients mod q
+/// Computes the Lagrange coefficients mod q
 fn get_lagrange_coefficient(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
     let mut coeffs = vec![];
     for i in xs {
@@ -118,11 +125,11 @@ fn get_lagrange_coefficient(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
     coeffs
 }
 
-/// Computes the lagrange interpolation in the field Z_q
+/// Computes the Lagrange interpolation in the field Z_q
 /// The arguments are
-/// - xs - the list of nodes, field elements in Z_q
-/// - ys - the list of values, field elements in Z_q
-/// - q - field modulus
+/// - `xs` - the list of nodes, field elements in Z_q
+/// - `ys` - the list of values, field elements in Z_q
+/// - `q`` - field modulus
 pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) -> BigUint {
     let coeffs = get_lagrange_coefficient(xs, q);
     zip(coeffs, ys)
@@ -133,7 +140,7 @@ pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) 
         })
 }
 
-/// Computes the lagrange interpolation in the exponent of group element.
+/// Computes the Lagrange interpolation in the exponent of group element.
 /// The arguments are
 /// - xs - the list of nodes, field elements in Z_q
 /// - ys - the list of values (in the exponent), group elements in Z-p^r
