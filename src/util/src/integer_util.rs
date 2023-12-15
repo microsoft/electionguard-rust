@@ -66,7 +66,13 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     v
 }
 
-// Returns the inverse of a_u mod m_u (if it exists)
+/// Computes the inverse of `a_u` modulo `m_u` (if it exists).
+///
+/// The arguments are
+/// - `a_u` - an integer
+/// - `m_u` - the modulus
+///
+// Returns the inverse of `a_u` mod `m_u` iff `gcd(a_u,m_u) == 1`
 pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
     if m_u.is_zero() {
         return None;
@@ -96,7 +102,8 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
     None
 }
 
-/// Compute a single Lagrange coefficient mod q.
+/// Computes a single Lagrange coefficient mod q.
+///
 /// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
@@ -125,7 +132,8 @@ fn get_lagrange_coefficient(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
     coeffs
 }
 
-/// Computes the Lagrange interpolation in the field Z_q
+/// Computes the Lagrange interpolation in the field Z_q.
+///
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
 /// - `ys` - the list of values, field elements in Z_q
@@ -141,6 +149,7 @@ pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) 
 }
 
 /// Computes the Lagrange interpolation in the exponent of group element.
+///
 /// The arguments are
 /// - xs - the list of nodes, field elements in Z_q
 /// - ys - the list of values (in the exponent), group elements in Z-p^r

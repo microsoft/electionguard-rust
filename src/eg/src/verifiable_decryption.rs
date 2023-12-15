@@ -5,6 +5,16 @@
 
 //! This module provides the implementation of verifiable decryption for [`Ciphertext`]s. For more details see Section `3.6` of the Electionguard specification `2.0.0`.
 
+use crate::{
+    discrete_log::DiscreteLog,
+    election_parameters::ElectionParameters,
+    fixed_parameters::FixedParameters,
+    guardian::GuardianIndex,
+    guardian_public_key::GuardianPublicKey,
+    guardian_share::GuardianSecretKeyShare,
+    hash::{eg_h, HValue},
+    joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+};
 use itertools::izip;
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
@@ -17,18 +27,9 @@ use util::{
     },
 };
 
-use crate::{
-    discrete_log::DiscreteLog,
-    election_parameters::ElectionParameters,
-    fixed_parameters::FixedParameters,
-    guardian::GuardianIndex,
-    guardian_public_key::GuardianPublicKey,
-    guardian_share::GuardianSecretKeyShare,
-    hash::{eg_h, HValue},
-    joint_election_public_key::{Ciphertext, JointElectionPublicKey},
-};
-
-/// A decryption share is a guardian's partial decryption of a given ciphertext. This corresponds to the `M_i` in Section `3.6.2`.
+/// A decryption share is a guardian's partial decryption of a given ciphertext.
+///
+/// This corresponds to the `M_i` in Section `3.6.2`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionShare {
     /// The guardian's index
@@ -43,6 +44,7 @@ pub struct DecryptionShare {
 
 impl DecryptionShare {
     /// This function computes the [`DecryptionShare`] for a given [`Ciphertext`] and [`GuardianSecretKeyShare`].
+    ///
     /// The arguments are
     /// - `self` - the encrypted share
     /// - `fixed_parameters` - the fixed parameters
@@ -63,7 +65,9 @@ impl DecryptionShare {
     }
 }
 
-/// The combined decryption share allows to compute the plain-text from a given ciphertext. This corresponds to the `M` in Section `3.6.2`.
+/// The combined decryption share allows to compute the plain-text from a given ciphertext.
+///
+/// This corresponds to the `M` in Section `3.6.2`.
 pub struct CombinedDecryptionShare(BigUint);
 
 /// Represents errors occurring while combining [`DecryptionShare`]s into a [`CombinedDecryptionShare`].
@@ -78,10 +82,12 @@ pub enum ShareCombinationError {
 }
 
 impl CombinedDecryptionShare {
-    /// This functions combines decryption shares
+    /// Computes the combination of [`DecryptionShare`]s.
+    ///
     /// The arguments are
     /// - `election_parameters` - the election parameters
     /// - `decryption_shares` - a vector of decryption shares
+    ///
     /// The computation follows Equation `68`.
     pub fn combine(
         election_parameters: &ElectionParameters,
@@ -123,6 +129,7 @@ impl CombinedDecryptionShare {
 }
 
 /// The commitment share of a single guardian for a [`DecryptionProof`].
+///
 /// This corresponds to `(a_i,b_i)` in Equation `69`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofCommitShare {
@@ -143,6 +150,7 @@ pub struct DecryptionProofCommitShare {
 }
 
 /// The secret state for a commitment share of a single guardian for a [`DecryptionProof`].
+///
 /// This corresponds to `u_i` as in Equation `69`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofStateShare {
@@ -157,6 +165,7 @@ pub struct DecryptionProofStateShare {
 }
 
 /// The response share of a single guardian for a [`DecryptionProof`].
+///
 /// This corresponds to `v_i` as in Equation `73`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofResponseShare {
@@ -195,8 +204,9 @@ pub enum CombineProofError {
     CommitInconsistency(GuardianIndex, String),
 }
 
-/// Proof that a given plaintext is the decryption of a given ciphertext relative to a given public key
-/// Technically, this is a Sigma protocol for the dlog relation (also known as a Schnorr proof)
+/// Proof that a given plaintext is the decryption of a given ciphertext relative to a given public key.
+///
+/// This is a Sigma protocol for a discrete logarithm relation. It corresponds to the proof from Section `3.6.3`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProof {
     /// Challenge
@@ -214,12 +224,14 @@ pub struct DecryptionProof {
 }
 
 impl DecryptionProof {
-    /// This function generates the commitment share and secret state for a decryption proof
+    /// This function generates the commitment share and secret state for a decryption proof.
+    ///
     /// The arguments are
     /// - `csprng` - secure randomness generator
     /// - `fixed_parameters` - the fixed parameters
     /// - `ciphertext` - the ElGamal ciphertext
     /// - `i` - the guardian index
+    ///
     /// The computation follows Equations `69` and `70`.
     pub fn generate_commit_share(
         csprng: &mut Csprng,
@@ -238,7 +250,10 @@ impl DecryptionProof {
         (dcs, dss)
     }
 
-    /// This function computes the challenge for the decryption NIZK as specified in Equation (71)
+    /// This function computes the challenge for the decryption NIZK.
+    ///
+    /// The computation corresponds to Equation `71`.
+    ///
     /// The arguments are
     /// - `h_e` - the extended bash hash
     /// - `k` - the joint election public key
@@ -267,7 +282,10 @@ impl DecryptionProof {
         BigUint::from_bytes_be(c.0.as_slice())
     }
 
-    /// This function computes a guardian's response share for the decryption NIZK as specified in Equation (73)
+    /// This function computes a guardian's response share for the decryption NIZK.
+    ///
+    /// This corresponds to the computation specified in Equation `73`.
+    ///
     /// The arguments are
     /// - `fixed_parameters` - the fixed parameters
     /// - `h_e` - the extended bash hash
@@ -322,7 +340,8 @@ impl DecryptionProof {
         })
     }
 
-    /// This function computes a decryption proof given the commit shares and
+    /// This function computes a decryption proof given the commit and response shares.
+    ///
     /// The arguments are
     /// - `election_parameters` - the election parameters
     /// - `h_e` - the extended bash hash
@@ -332,7 +351,11 @@ impl DecryptionProof {
     /// - `proof_commit_shares` - the shares of the commit message
     /// - `proof_response_shares` - the shares of the response
     /// - `guardian_public_keys` - the guardians' public keys
-    /// This function checks that decryption_shares, proof_commit_shares,proof_response_shares, are *sorted* the same way, i.e. the i-th element in each list belongs to the same guardian. The function also checks that guardian_public_keys contains all n public keys.
+    ///
+    /// This function checks that decryption_shares, proof_commit_shares,
+    /// proof_response_shares, are *ordered* the same way,
+    /// i.e. the i-th element in each list belongs to the same guardian.
+    /// The function also checks that guardian_public_keys contains all n public keys.
     pub fn combine_proof(
         election_parameters: &ElectionParameters,
         h_e: &HValue,
@@ -450,7 +473,8 @@ impl DecryptionProof {
         })
     }
 
-    /// This function validates a decryption proof
+    /// This function validates a decryption proof.
+    ///
     /// The arguments are
     /// - `self` - the decryption proof
     /// - `fixed_parameters` - the fixed parameters
@@ -499,6 +523,7 @@ pub enum DecryptionError {
 }
 
 /// Represents a "in-the-exponent" plain-text with a [`DecryptionProof`].
+///
 /// This corresponds to `t` and `(c,v)` as in Section `3.6.3`.
 pub struct VerifiableDecryption {
     /// The decrypted plain-text
@@ -508,7 +533,8 @@ pub struct VerifiableDecryption {
 }
 
 impl VerifiableDecryption {
-    /// This function computes a verifiable decryption
+    /// This function computes a verifiable decryption.
+    ///
     /// The arguments are
     /// - `fixed_parameters` - the fixed parameters
     /// - `joint_key` - the joint election public key
@@ -540,7 +566,8 @@ impl VerifiableDecryption {
         })
     }
 
-    /// This function checks the correctness of the decryption for given ciphertext and joint public key
+    /// This function checks the correctness of the decryption for given ciphertext and joint public key.
+    ///
     /// Arguments are
     /// - `self` - the verifiable decryption
     /// - `fixed_parameters` - the fixed parameters
