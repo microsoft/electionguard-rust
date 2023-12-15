@@ -77,6 +77,9 @@ pub enum ShareCombinationError {
     #[error("Only {l} decryption shares given, but at least {k} required.")]
     NotEnoughShares { l: usize, k: u32 },
     /// Occurs if multiple shares from the same guardian are provided.
+    #[error("Guardian {i} is has an index bigger than {n}")]
+    InvalidGuardian { i: GuardianIndex, n: GuardianIndex },
+    /// Occurs if multiple shares from the same guardian are provided.
     #[error("Guardian {i} is represented more than once in the decryption shares.")]
     DuplicateGuardian { i: GuardianIndex },
 }
@@ -103,10 +106,16 @@ impl CombinedDecryptionShare {
         if l < k as usize {
             return Err(ShareCombinationError::NotEnoughShares { l, k });
         }
-        // Verify that every guardian (index) is represented at most once.
+        // Verify that every guardian (index) is represented at most once and that all guardians indices are within the bounds.
         let mut seen = vec![false; n];
         for share in decryption_shares {
             let seen_ix = share.i.get_zero_based_usize();
+            if seen_ix >= n {
+                return Err(ShareCombinationError::InvalidGuardian {
+                    i: share.i,
+                    n: varying_parameters.n,
+                });
+            }
             if seen[seen_ix] {
                 return Err(ShareCombinationError::DuplicateGuardian { i: share.i });
             }
@@ -190,8 +199,11 @@ pub enum ResponseShareError {
 /// Represents errors occurring while combining the commit and response shares into a single [`DecryptionProof`].
 #[derive(Error, Debug)]
 pub enum CombineProofError {
+    /// Occurs if the input list are not of the same length
+    #[error("The given lists must be of the same length!")]
+    ListLengthMismatch,
     /// Occurs if the input list are not ordered the same way.
-    #[error("The given list must be ordered the same way!")]
+    #[error("The given lists must be ordered the same way!")]
     IndexMismatch,
     /// Occurs if the joint public key does not match the list of public keys.
     #[error("The given list of public keys does not match the given joint public key!")]
@@ -367,6 +379,12 @@ impl DecryptionProof {
         guardian_public_keys: &[GuardianPublicKey],
     ) -> Result<Self, CombineProofError> {
         let fixed_parameters = &election_parameters.fixed_parameters;
+
+        if decryption_shares.len() != proof_commit_shares.len()
+            || decryption_shares.len() != proof_response_shares.len()
+        {
+            return Err(CombineProofError::ListLengthMismatch);
+        }
 
         //Check that the indices match
         for (ds, cs, rs) in izip!(
