@@ -44,10 +44,10 @@ pub struct DecryptionShare {
 impl DecryptionShare {
     /// This function computes the [`DecryptionShare`] for a given [`Ciphertext`] and [`GuardianSecretKeyShare`].
     /// The arguments are
-    /// - self - the encrypted share
-    /// - fixed_parameters - the fixed parameters
-    /// - secret_key_share - the secret key share
-    /// - ciphertext - the ElGamal ciphertext
+    /// - `self` - the encrypted share
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `secret_key_share` - the secret key share
+    /// - `ciphertext` - the ElGamal ciphertext
     pub fn from(
         fixed_parameters: &FixedParameters,
         secret_key_share: &GuardianSecretKeyShare,
@@ -452,12 +452,12 @@ impl DecryptionProof {
 
     /// This function validates a decryption proof
     /// The arguments are
-    /// - self - the decryption proof
-    /// - fixed_parameters - the fixed parameters
-    /// - h_e - the extended bash hash
-    /// - joint_key - the joint election public key
-    /// - ciphertext - the ciphertext
-    /// - m - combined decryption share
+    /// - `self` - the decryption proof
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `h_e` - the extended bash hash
+    /// - `joint_key` - the joint election public key
+    /// - `ciphertext` - the ciphertext
+    /// - `m` - combined decryption share
     pub fn validate(
         &self,
         fixed_parameters: &FixedParameters,
