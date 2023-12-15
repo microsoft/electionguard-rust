@@ -80,8 +80,8 @@ pub enum ShareCombinationError {
 impl CombinedDecryptionShare {
     /// This functions combines decryption shares
     /// The arguments are
-    /// - election_parameters - the election parameters
-    /// - decryption_shares - a vector of decryption shares
+    /// - `election_parameters` - the election parameters
+    /// - `decryption_shares` - a vector of decryption shares
     /// The computation follows Equation `68`.
     pub fn combine(
         election_parameters: &ElectionParameters,
@@ -216,10 +216,10 @@ pub struct DecryptionProof {
 impl DecryptionProof {
     /// This function generates the commitment share and secret state for a decryption proof
     /// The arguments are
-    /// - csprng - secure randomness generator
-    /// - fixed_parameters - the fixed parameters
-    /// - ciphertext - the ElGamal ciphertext
-    /// - i - the guardian index
+    /// - `csprng` - secure randomness generator
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `ciphertext` - the ElGamal ciphertext
+    /// - `i` - the guardian index
     /// The computation follows Equations `69` and `70`.
     pub fn generate_commit_share(
         csprng: &mut Csprng,
@@ -240,12 +240,12 @@ impl DecryptionProof {
 
     /// This function computes the challenge for the decryption NIZK as specified in Equation (71)
     /// The arguments are
-    /// - h_e - the extended bash hash
-    /// - k - the joint election public key
-    /// - c - the ciphertext
-    /// - a - first part of the commit message
-    /// - b - second part of the commit message
-    /// - m - combined decryption share
+    /// - `h_e` - the extended bash hash
+    /// - `k` - the joint election public key
+    /// - `c` - the ciphertext
+    /// - `a` - first part of the commit message
+    /// - `b` - second part of the commit message
+    /// - `m` - combined decryption share
     fn challenge(
         h_e: &HValue,
         k: &JointElectionPublicKey,
@@ -269,14 +269,14 @@ impl DecryptionProof {
 
     /// This function computes a guardian's response share for the decryption NIZK as specified in Equation (73)
     /// The arguments are
-    /// - fixed_parameters - the fixed parameters
-    /// - h_e - the extended bash hash
-    /// - k - the joint election public key
-    /// - m - combined decryption share
-    /// - ciphertext - the ciphertext
-    /// - proof_commit_shares - the shares of the commit message
-    /// - proof_commit_state - the guardian's commit state
-    /// - secret_key_share - the guardian's key share
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `h_e` - the extended bash hash
+    /// - `k` - the joint election public key
+    /// - `m` - combined decryption share
+    /// - `ciphertext` - the ciphertext
+    /// - `proof_commit_shares` - the shares of the commit message
+    /// - `proof_commit_state` - the guardian's commit state
+    /// - `secret_key_share` - the guardian's key share
     pub fn generate_response_share(
         fixed_parameters: &FixedParameters,
         h_e: &HValue,
@@ -324,14 +324,14 @@ impl DecryptionProof {
 
     /// This function computes a decryption proof given the commit shares and
     /// The arguments are
-    /// - election_parameters - the election parameters
-    /// - h_e - the extended bash hash
-    /// - joint_key - the joint election public key
-    /// - ciphertext - the ciphertext
-    /// - decryption_shares - the decryption shares
-    /// - proof_commit_shares - the shares of the commit message
-    /// - proof_response_shares - the shares of the response
-    /// - guardian_public_keys - the guardians' public keys
+    /// - `election_parameters` - the election parameters
+    /// - `h_e` - the extended bash hash
+    /// - `joint_key` - the joint election public key
+    /// - `ciphertext` - the ciphertext
+    /// - `decryption_shares` - the decryption shares
+    /// - `proof_commit_shares` - the shares of the commit message
+    /// - `proof_response_shares` - the shares of the response
+    /// - `guardian_public_keys` - the guardians' public keys
     /// This function checks that decryption_shares, proof_commit_shares,proof_response_shares, are *sorted* the same way, i.e. the i-th element in each list belongs to the same guardian. The function also checks that guardian_public_keys contains all n public keys.
     pub fn combine_proof(
         election_parameters: &ElectionParameters,
@@ -510,11 +510,11 @@ pub struct VerifiableDecryption {
 impl VerifiableDecryption {
     /// This function computes a verifiable decryption
     /// The arguments are
-    /// - fixed_parameters - the fixed parameters
-    /// - joint_key - the joint election public key
-    /// - ciphertext - the ciphertext
-    /// - m - combined decryption share
-    /// - proof - the proof of correctness
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `joint_key` - the joint election public key
+    /// - `ciphertext` - the ciphertext
+    /// - `m` - combined decryption share
+    /// - `proof` - the proof of correctness
     pub fn new(
         fixed_parameters: &FixedParameters,
         joint_key: &JointElectionPublicKey,
@@ -542,11 +542,11 @@ impl VerifiableDecryption {
 
     /// This function checks the correctness of the decryption for given ciphertext and joint public key
     /// Arguments are
-    /// - self - the verifiable decryption
-    /// - fixed_parameters - the fixed parameters
-    /// - h_e - the extended bash hash
-    /// - joint_key - the joint election public key
-    /// - ciphertext - the ciphertext
+    /// - `self` - the verifiable decryption
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `h_e` - the extended bash hash
+    /// - `joint_key` - the joint election public key
+    /// - `ciphertext` - the ciphertext
     pub fn verify(
         &self,
         fixed_parameters: &FixedParameters,
