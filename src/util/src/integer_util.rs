@@ -97,13 +97,10 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
 
 pub fn get_single_coefficient(xs: &[BigUint], i: &BigUint, q: &BigUintPrime) -> BigUint {
     xs.iter()
-        .filter(|&l| l != i)
-        .map(|l| {
+        .filter_map(|l| {
             let l_minus_i = q.subtract_group_elem(l, i);
-            //The unwrap is justified as l-i != 0 -> inverse always exists
-            #[allow(clippy::unwrap_used)]
-            let inv_l_minus_i = mod_inverse(&l_minus_i, q.as_ref()).unwrap();
-            l * inv_l_minus_i
+            let inv_l_minus_i = mod_inverse(&l_minus_i, q.as_ref())?;
+            Some(l * inv_l_minus_i)
         })
         .fold(BigUint::one(), |mut acc, s| {
             acc *= s;
