@@ -11,7 +11,7 @@ use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
     election_manifest::Contest, election_record::PreVotingData, index::Index,
-    joint_election_public_key::Ciphertext, vec1::HasIndexType, zk::ProofRange,
+    joint_election_public_key::{Ciphertext, Nonce}, vec1::HasIndexType, zk::ProofRange,
 };
 
 // An encrypted option in a contest.
@@ -89,9 +89,10 @@ impl Ciphertext {
         header: &PreVotingData,
         csprng: &mut Csprng,
         selected: bool,
+        nonce: &Nonce,
         q: &BigUintPrime,
     ) -> ProofRange {
-        ProofRange::new(header, csprng, q, self, selected as usize, 1)
+        ProofRange::new(header, csprng, q, self, nonce, selected as usize, 1)
     }
 
     /// Verify the proof that the cipher text is an encryption of 0 or 1.

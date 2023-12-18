@@ -17,7 +17,7 @@ use crate::{
     fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext,
+    joint_election_public_key::{Ciphertext, Nonce},
     nonce::encrypted as nonce,
     vec1::Vec1,
     zk::ProofRange,
@@ -68,20 +68,19 @@ impl ContestEncrypted {
         primary_nonce: &[u8],
         contest_index: ContestIndex,
         pt_vote: &ContestSelection,
-    ) -> Vec<Ciphertext> {
+    ) -> Vec<(Ciphertext, Nonce)> {
         // TODO: Check if selection limit is satisfied
 
-        let mut vote: Vec<Ciphertext> = Vec::new();
+        let mut vote: Vec<(Ciphertext, Nonce)> = Vec::new();
         for j in 1..pt_vote.vote.len() + 1 {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let o_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
             let nonce = nonce(header, primary_nonce, contest_index, o_idx);
-            vote.push(header.public_key.encrypt_with(
+            vote.push((header.public_key.encrypt_with(
                 &header.parameters.fixed_parameters,
                 &nonce,
                 pt_vote.vote[j - 1] as usize,
-                true,
-            ));
+            ), Nonce::new(nonce)));
         }
         vote
     }
@@ -94,18 +93,20 @@ impl ContestEncrypted {
         contest_index: ContestIndex,
         pt_vote: &ContestSelection,
     ) -> ContestEncrypted {
-        let selection =
+        let selection_and_nonce =
             Self::encrypt_selection(&device.header, primary_nonce, contest_index, pt_vote);
+        let selection = selection_and_nonce.iter().map(|(ct, _)| ct.clone()).collect::<Vec<_>>();
         let contest_hash = contest_hash::contest_hash(&device.header, contest_index, &selection);
 
         let mut proof_ballot_correctness = Vec1::new();
-        for (i, sel) in selection.iter().enumerate() {
+        for (i, (sel, nonce)) in selection_and_nonce.iter().enumerate() {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proof_ballot_correctness
                 .try_push(sel.proof_ballot_correctness(
                     &device.header,
                     csprng,
                     pt_vote.vote[i] == 1u8,
+                    nonce,
                     &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
@@ -118,10 +119,11 @@ impl ContestEncrypted {
             &device.header,
             csprng,
             &device.header.parameters.fixed_parameters.q,
-            &selection,
+            &selection_and_nonce,
             num_selections as usize,
             contest.selection_limit,
         );
+
         ContestEncrypted {
             selection,
             contest_hash,
@@ -142,17 +144,18 @@ impl ContestEncrypted {
         header: &PreVotingData,
         csprng: &mut Csprng,
         q: &BigUintPrime,
-        selection: &[Ciphertext],
+        selection: &[(Ciphertext, Nonce)],
         num_selections: usize,
         selection_limit: usize,
     ) -> ProofRange {
-        let combined_ct =
-            Self::sum_selection_vector(&header.parameters.fixed_parameters, selection);
+        let (combined_ct, combined_nonce) =
+            Self::sum_selection_nonce_vector(&header.parameters.fixed_parameters, selection);
         ProofRange::new(
             header,
             csprng,
             q,
             &combined_ct,
+            &combined_nonce,
             num_selections,
             selection_limit,
         )
@@ -170,6 +173,29 @@ impl ContestEncrypted {
         )
     }
 
+    pub fn sum_selection_nonce_vector(
+        fixed_parameters: &FixedParameters,
+        selection_with_nonces: &[(Ciphertext, Nonce)],
+    ) -> (Ciphertext, Nonce) {
+        // First element in the selection
+
+        // let mut sum_ct = selection[0].clone();
+        let mut sum_ct = selection_with_nonces[0].0.clone();
+
+        let mut sum_nonce = selection_with_nonces[0].1.clone();
+
+        // Subsequent elements in the selection
+
+        for (sel, nonce) in selection_with_nonces.iter().skip(1) {
+            sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
+            sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
+
+            sum_nonce.xi = (&sum_nonce.xi + &nonce.xi) % fixed_parameters.q.as_ref();
+        }
+
+        (sum_ct, sum_nonce)
+    }
+
     pub fn sum_selection_vector(
         fixed_parameters: &FixedParameters,
         selection: &[Ciphertext],
@@ -178,22 +204,14 @@ impl ContestEncrypted {
 
         // let mut sum_ct = selection[0].clone();
         let mut sum_ct = selection[0].clone();
-        assert!(sum_ct.nonce.is_some());
-
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let mut sum_nonce = sum_ct.nonce.as_ref().unwrap().clone();
 
         // Subsequent elements in the selection
 
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         for sel in selection.iter().skip(1) {
             sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
             sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
-
-            sum_nonce = (sum_nonce + sel.nonce.as_ref().unwrap()) % fixed_parameters.q.as_ref();
         }
 
-        sum_ct.nonce = Some(sum_nonce);
         sum_ct
     }
 
@@ -210,4 +228,22 @@ impl ContestEncrypted {
 
         self.verify_selection_limit(header, selection_limit)
     }
+}
+
+pub fn tally_votes(
+    encrypted_contests: &[ContestEncrypted],
+    number_of_candidates: usize,
+) -> Option<Vec<Ciphertext>> {
+    let mut result = vec![Ciphertext::one(); number_of_candidates];
+    for contest in encrypted_contests {
+        if contest.selection.len() != number_of_candidates {
+            return None;
+        }
+        for (j, encryption) in contest.selection.iter().enumerate() {
+            result[j].alpha = &result[j].alpha * &encryption.alpha;
+            result[j].beta = &result[j].beta * &encryption.beta;
+        }
+    }
+
+    Some(result)
 }

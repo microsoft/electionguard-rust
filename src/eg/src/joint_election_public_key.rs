@@ -7,7 +7,7 @@
 
 use anyhow::{bail, ensure, Context, Result};
 use num_bigint::BigUint;
-use num_traits::One;
+use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -41,18 +41,36 @@ pub struct Ciphertext {
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
     pub beta: BigUint,
-    #[serde(skip)]
-    pub nonce: Option<BigUint>,
 }
 
-/// Does not match nonces if either nonce is None.
+/// The encryption nonce used to produce a [`Ciphertext`]
+/// Relevant for producing proofs about the plaintext.
+#[derive(Debug, Clone)]
+pub struct Nonce {
+    pub xi: BigUint
+}
+
+impl Nonce {
+    pub fn new(xi: BigUint) -> Nonce{
+        Nonce{xi}
+    }
+
+    pub fn zero() -> Nonce {
+        Nonce{xi: BigUint::zero()}
+    }
+}
+
+impl Ciphertext {
+    pub fn one() -> Ciphertext {
+        Ciphertext {
+            alpha: BigUint::one(),
+            beta: BigUint::one(),
+        }
+    }
+}
+
 impl PartialEq for Ciphertext {
     fn eq(&self, other: &Self) -> bool {
-        if self.nonce.is_some() && other.nonce.is_some() {
-            return self.alpha == other.alpha
-                && self.beta == other.beta
-                && self.nonce == other.nonce;
-        }
         self.alpha == other.alpha && self.beta == other.beta
     }
 }
@@ -125,7 +143,6 @@ impl JointElectionPublicKey {
         fixed_parameters: &FixedParameters,
         nonce: &BigUint,
         vote: usize,
-        store_nonce: bool,
     ) -> Ciphertext {
         let alpha = fixed_parameters
             .g
@@ -134,18 +151,9 @@ impl JointElectionPublicKey {
             .joint_election_public_key
             .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
 
-        if store_nonce {
-            Ciphertext {
-                alpha,
-                beta,
-                nonce: Some(nonce.clone()),
-            }
-        } else {
-            Ciphertext {
-                alpha,
-                beta,
-                nonce: None,
-            }
+        Ciphertext {
+            alpha,
+            beta,
         }
     }
 
