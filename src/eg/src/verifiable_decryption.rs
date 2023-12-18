@@ -3,7 +3,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-//! This module provides the implementation of verifiable decryption for [`Ciphertext`]s. For more details see Section `3.6` of the Electionguard specification `2.0.0`.
+//! This module provides the implementation of verifiable decryption for [`Ciphertext`]s.
+//! For more details see Section `3.6` of the Electionguard specification `2.0.0`.
 
 use crate::{
     discrete_log::DiscreteLog,
@@ -510,6 +511,7 @@ impl DecryptionProof {
     ) -> bool {
         let g = &fixed_parameters.g;
         let p = fixed_parameters.p.as_ref();
+        let q = fixed_parameters.q.as_ref();
 
         let key = &joint_key.joint_election_public_key;
 
@@ -517,7 +519,7 @@ impl DecryptionProof {
         let b = (ciphertext.alpha.modpow(&self.response, p) * m.0.modpow(&self.challenge, p)) % p;
 
         //Check (9.A)
-        if &self.response >= p {
+        if &self.response >= q {
             return false;
         }
         let c = Self::challenge(h_e, joint_key, ciphertext, &a, &b, m);
