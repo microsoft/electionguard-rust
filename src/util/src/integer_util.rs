@@ -105,6 +105,7 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
 /// Computes a single Lagrange coefficient mod q.
 ///
 /// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+///
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
 /// - `i` - the node (and index) of the coefficient
@@ -131,6 +132,7 @@ fn get_single_coefficient_at_zero_unchecked(
 /// Computes a single Lagrange coefficient mod q.
 ///
 /// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+///
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
 /// - `i` - the node (and index) of the coefficient

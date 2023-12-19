@@ -424,6 +424,6 @@ mod test {
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
         let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.q);
 
-        assert_eq!(joint_key_1, joint_key_2, "Joint keys should match.")
+        assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.")
     }
 }
