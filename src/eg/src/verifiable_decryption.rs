@@ -24,7 +24,7 @@ use thiserror::Error;
 use util::{
     csprng::Csprng,
     integer_util::{
-        get_single_coefficient, group_lagrange_at_zero, mod_inverse, to_be_bytes_left_pad,
+        get_single_coefficient_at_zero, group_lagrange_at_zero, mod_inverse, to_be_bytes_left_pad,
     },
 };
 
@@ -83,6 +83,9 @@ pub enum ShareCombinationError {
     /// Occurs if multiple shares from the same guardian are provided.
     #[error("Guardian {i} is represented more than once in the decryption shares.")]
     DuplicateGuardian { i: GuardianIndex },
+    /// Occurs if the Lagrange interpolation fails.
+    #[error("Could not compute the polynomial interpolation.")]
+    InterpolationFailure,
 }
 
 impl CombinedDecryptionShare {
@@ -129,12 +132,13 @@ impl CombinedDecryptionShare {
             .collect();
         let ys: Vec<_> = decryption_shares.iter().map(|s| s.m_i.clone()).collect();
 
-        Ok(CombinedDecryptionShare(group_lagrange_at_zero(
-            &xs,
-            &ys,
-            &fixed_parameters.q,
-            &fixed_parameters.p,
-        )))
+        let m = group_lagrange_at_zero(&xs, &ys, &fixed_parameters.q, &fixed_parameters.p);
+
+        match m {
+            // This should not happen
+            None => Err(ShareCombinationError::InterpolationFailure),
+            Some(m) => Ok(CombinedDecryptionShare(m)),
+        }
     }
 }
 
@@ -195,6 +199,9 @@ pub enum ResponseShareError {
     /// Occurs if one tries to compute the response from a state share that does not match the secret key share.
     #[error("Indices of key share (here {i}) and state share (here {j}) must match!")]
     KeyStateShareIndexMismatch { i: GuardianIndex, j: GuardianIndex },
+    /// Occurs if the Lagrange coefficient can not be computed.
+    #[error("Computation of the Lagrange coefficient failed.")]
+    CoefficientFailure,
 }
 
 /// Represents errors occurring while combining the commit and response shares into a single [`DecryptionProof`].
@@ -215,6 +222,9 @@ pub enum CombineProofError {
     /// Occurs if the commitment and response shares are inconsistent (Checks `9.A` and `9.B`).
     #[error("The commit message ({1}) of guardian {0} is inconsistent!")]
     CommitInconsistency(GuardianIndex, String),
+    /// Occurs if the Lagrange coefficient can not be computed.
+    #[error("Computation of the Lagrange coefficient failed.")]
+    CoefficientFailure,
 }
 
 /// Proof that a given plaintext is the decryption of a given ciphertext relative to a given public key.
@@ -340,7 +350,11 @@ impl DecryptionProof {
             .iter()
             .map(|s| BigUint::from(s.i.get_one_based_u32()))
             .collect();
-        let w_i = get_single_coefficient(&xs, &i_big, &fixed_parameters.q);
+        let w_i = match get_single_coefficient_at_zero(&xs, &i_big, &fixed_parameters.q) {
+            Some(w_i) => w_i,
+            None => return Err(ResponseShareError::CoefficientFailure),
+        };
+
         let c_i = (c * w_i) % q;
 
         let v_i = fixed_parameters.q.subtract_group_elem(
@@ -434,7 +448,10 @@ impl DecryptionProof {
         let mut c_i_vec = vec![];
         for cs in proof_commit_shares {
             let i = BigUint::from(cs.i.get_one_based_u32());
-            let w_i = get_single_coefficient(&xs, &i, &fixed_parameters.q);
+            let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.q) {
+                Some(w_i) => w_i,
+                None => return Err(CombineProofError::CoefficientFailure),
+            };
             let c_i = (c.clone() * w_i) % q;
             c_i_vec.push(c_i);
         }

@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use itertools::Itertools;
 use std::{borrow::Borrow, iter::zip, mem};
 
 use num_bigint::{BigInt, BigUint, Sign};
@@ -82,7 +83,6 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
     let mut r = (m.clone(), BigInt::from_biguint(Sign::Plus, a_u.clone()));
     while !r.1.is_zero() {
         let q = &r.0 / &r.1;
-        //let q = r.0.clone() / r.1.clone();
         //https://docs.rs/num-integer/0.1.45/src/num_integer/lib.rs.html#353
         let f = |mut r: (BigInt, BigInt)| {
             mem::swap(&mut r.0, &mut r.1);
@@ -108,8 +108,14 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
 /// - `i` - the node (and index) of the coefficient
-/// - `q`` - field modulus
-pub fn get_single_coefficient(xs: &[BigUint], i: &BigUint, q: &BigUintPrime) -> BigUint {
+/// - `q` - field modulus
+///
+/// The output of this function may be nonsensical if the elements in `xs` are not unique.
+fn get_single_coefficient_at_zero_unchecked(
+    xs: &[BigUint],
+    i: &BigUint,
+    q: &BigUintPrime,
+) -> BigUint {
     xs.iter()
         .filter_map(|l| {
             let l_minus_i = q.subtract_group_elem(l, i);
@@ -122,11 +128,38 @@ pub fn get_single_coefficient(xs: &[BigUint], i: &BigUint, q: &BigUintPrime) -> 
         })
 }
 
+/// Computes a single Lagrange coefficient mod q.
+///
+/// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+/// The arguments are
+/// - `xs` - the list of nodes, field elements in Z_q
+/// - `i` - the node (and index) of the coefficient
+/// - `q` - field modulus
+///
+/// The function returns `None` if `i` is not in `xs` or if the nodes in `xs` are not unique.
+pub fn get_single_coefficient_at_zero(
+    xs: &[BigUint],
+    i: &BigUint,
+    q: &BigUintPrime,
+) -> Option<BigUint> {
+    if !xs.contains(i) || !xs.iter().all_unique() {
+        return None;
+    }
+    Some(get_single_coefficient_at_zero_unchecked(xs, i, q))
+}
+
 /// Computes the Lagrange coefficients mod q
-fn get_lagrange_coefficient(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
+///
+/// That is the list of  `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+/// The arguments are
+/// - `xs` - the list of nodes, field elements in Z_q
+/// - `q` - field modulus
+///
+/// The output of this function may be nonsensical if the elements in `xs` are not unique.
+fn get_lagrange_coefficients_at_zero_unchecked(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
     let mut coeffs = vec![];
     for i in xs {
-        let w_i = get_single_coefficient(xs, i, q);
+        let w_i = get_single_coefficient_at_zero_unchecked(xs, i, q);
         coeffs.push(w_i);
     }
     coeffs
@@ -138,14 +171,21 @@ fn get_lagrange_coefficient(xs: &[BigUint], q: &BigUintPrime) -> Vec<BigUint> {
 /// - `xs` - the list of nodes, field elements in Z_q
 /// - `ys` - the list of values, field elements in Z_q
 /// - `q`` - field modulus
-pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) -> BigUint {
-    let coeffs = get_lagrange_coefficient(xs, q);
-    zip(coeffs, ys)
-        .map(|(c, y)| c * y % q.as_ref())
-        .fold(BigUint::zero(), |mut acc, s| {
-            acc += s;
-            acc % q.as_ref()
-        })
+///
+/// The function returns `None` if the nodes in `xs` are not unique or if `xs` and `ys` are not of the same length.
+pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) -> Option<BigUint> {
+    if xs.len() != ys.len() || !xs.iter().all_unique() {
+        return None;
+    }
+    let coeffs = get_lagrange_coefficients_at_zero_unchecked(xs, q);
+    let y0 =
+        zip(coeffs, ys)
+            .map(|(c, y)| c * y % q.as_ref())
+            .fold(BigUint::zero(), |mut acc, s| {
+                acc += s;
+                acc % q.as_ref()
+            });
+    Some(y0)
 }
 
 /// Computes the Lagrange interpolation in the exponent of group element.
@@ -155,19 +195,26 @@ pub fn field_lagrange_at_zero(xs: &[BigUint], ys: &[BigUint], q: &BigUintPrime) 
 /// - ys - the list of values (in the exponent), group elements in Z-p^r
 /// - q - field modulus
 /// - p - group modulus
+///
+/// The function returns `None` if the nodes in `xs` are not unique or if `xs` and `ys` are not of the same length.
 pub fn group_lagrange_at_zero(
     xs: &[BigUint],
     ys: &[BigUint],
     q: &BigUintPrime,
     p: &BigUintPrime,
-) -> BigUint {
-    let coeffs = get_lagrange_coefficient(xs, q);
-    zip(coeffs, ys)
-        .map(|(c, y)| y.modpow(&c, p.as_ref()))
-        .fold(BigUint::one(), |mut acc, s| {
+) -> Option<BigUint> {
+    if xs.len() != ys.len() || !xs.iter().all_unique() {
+        return None;
+    }
+    let coeffs = get_lagrange_coefficients_at_zero_unchecked(xs, q);
+    let y0 = zip(coeffs, ys).map(|(c, y)| y.modpow(&c, p.as_ref())).fold(
+        BigUint::one(),
+        |mut acc, s| {
             acc *= s;
             acc % p.as_ref()
-        })
+        },
+    );
+    Some(y0)
 }
 
 #[cfg(test)]
@@ -256,11 +303,59 @@ mod tests {
         let group_ys: Vec<_> = ys.iter().map(|x| g.modpow(x, p.as_ref())).collect();
         // -1 mod q
         let x_0 = BigUint::from(126_u8);
+        let g_x_0 = g.modpow(&x_0, p.as_ref());
 
-        assert_eq!(field_lagrange_at_zero(&xs, &ys, &q), x_0);
+        assert_eq!(field_lagrange_at_zero(&xs, &ys, &q), Some(x_0));
+        assert_eq!(group_lagrange_at_zero(&xs, &group_ys, &q, &p), Some(g_x_0));
+
+        // List of different length
+        assert_eq!(field_lagrange_at_zero(&xs[0..2], &ys, &q), None);
+        assert_eq!(field_lagrange_at_zero(&xs, &ys[0..2], &q), None);
+        assert_eq!(group_lagrange_at_zero(&xs[0..2], &group_ys, &q, &p), None);
+        assert_eq!(group_lagrange_at_zero(&xs, &group_ys[0..2], &q, &p), None);
+        // Repeated nodes
+        let xs = [
+            BigUint::from(1_u8),
+            BigUint::from(2_u8),
+            BigUint::from(2_u8),
+        ];
+        assert_eq!(field_lagrange_at_zero(&xs, &ys, &q), None);
+        assert_eq!(group_lagrange_at_zero(&xs, &group_ys, &q, &p), None);
+    }
+
+    #[test]
+    fn test_single_lagrange_coefficient() {
+        // Toy parameters according to specs
+        let q = BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+            BigUint::from(127_u8),
+        );
+        // Test polynomial x^2 -1
+        let xs = [
+            BigUint::from(1_u8),
+            BigUint::from(2_u8),
+            BigUint::from(3_u8),
+        ];
         assert_eq!(
-            group_lagrange_at_zero(&xs, &group_ys, &q, &p),
-            g.modpow(&x_0, p.as_ref())
-        )
+            get_single_coefficient_at_zero(&xs, &BigUint::from(1_u8), &q),
+            Some(BigUint::from(3_u8)),
+            "The coefficient at 1 should be 3."
+        );
+
+        assert_eq!(
+            get_single_coefficient_at_zero(&xs, &BigUint::from(4_u8), &q),
+            None,
+            "The function should not allow to compute coefficients for i outside of xs"
+        );
+        // Repeated nodes
+        let xs = [
+            BigUint::from(1_u8),
+            BigUint::from(2_u8),
+            BigUint::from(2_u8),
+        ];
+        assert_eq!(
+            get_single_coefficient_at_zero(&xs, &BigUint::from(1_u8), &q),
+            None,
+            "The function should reject xs with non-unique elements"
+        );
     }
 }
