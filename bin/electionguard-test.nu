@@ -59,14 +59,15 @@ def main [
         ([ target debug ] | path join)
     }
 
-    let electionguard_exe = ($cargo_target_reldir | path join electionguard.exe)
-    std log info $"electionguard_exe=($electionguard_exe)"
+    let binary_name = "electionguard"
+    let binary = ($cargo_target_reldir | path join $binary_name)
+    log info $"binary=($binary)"
 
     #  Figure out RUSTFLAGS
     # 
     std log info $"Previous RUSTFLAGS: ($env.RUSTFLAGS?)"
     if $test_hash_mismatch_warn_only {
-        let-env RUSTFLAGS = ($"($env.RUSTFLAGS?) --cfg test_hash_mismatch_warn_only" | str trim)
+        $env.RUSTFLAGS = ($"($env.RUSTFLAGS?) --cfg test_hash_mismatch_warn_only" | str trim)
     }
     std log info $"Subsequent RUSTFLAGS: ($env.RUSTFLAGS?)"
 
@@ -125,17 +126,18 @@ def main [
     #  Erase ELECTIONGUARD_ARTIFACTS_DIR
     #
     if $erase_artifacts {
-        # if "%clarg_erase_artifacts%" EQU "0" goto :skip_erase_artifacts
-        # if not exist "%ELECTIONGUARD_ARTIFACTS_DIR%" goto :skip_erase_artifacts
-        # echo.
-        # echo Removing artifacts directory.
-        # rmdir /s /q "%ELECTIONGUARD_ARTIFACTS_DIR%"
+        if ($electionguard_artifacts_dir | path exists) {
+            log info $"Removing artifacts directory."
+            rm -rf $electionguard_artifacts_dir
+        }
     }
 
     #  Run ElectionGuard tests
     # 
     if not $no_egtest {
-        egtests
+        (egtests $binary $election_parameters
+            --cargo_profile_build_flag $cargo_profile_build_flag
+            --electionguard_artifacts_dir $electionguard_artifacts_dir)
     }
 
     #  Success!
@@ -143,159 +145,176 @@ def main [
     log info "Success!"
 }
 
-def ensure_artifacts_dir [] {
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%" goto :skip_create_artifacts_dir
-    # echo.
-    # echo Creating artifacts directory.
-    # mkdir "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%"
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_create_artifacts_dir
-}
-
-def egtests [] {
+def egtests [
+    binary: string
+    election_parameters: record<n: int, k: int, date: string, info: string>
+    --cargo_profile_build_flag: string
+    --electionguard_artifacts_dir: string
+] {
     #  Build electionguard.exe and its dependents
     # 
-    # cargo build%cargo_profile_build_flag% -p electionguard
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # 
-    # if not exist "%electionguard_exe%" (
-    #     echo ERROR: electionguard.exe does not exist: %electionguard_exe%
-    #     exit /b 1
-    # )
+    run-subprocess [
+        cargo build $cargo_profile_build_flag -p electionguard
+    ]
+
+    if not ($binary | path exists) {
+        log error $"ERROR: binary does not exist: ($binary)"
+        exit
+    }
+
     # 
     #  ensure ELECTIONGUARD_ARTIFACTS_DIR exists
     # 
-    # call :sub_ensure_artifacts_dir
+    let electionguard_artifacts_public_dir = $electionguard_artifacts_dir | path join "public"
+
+    if not ($electionguard_artifacts_public_dir | path exists) {
+        log info $"Creating artifacts directory."
+        mkdir $electionguard_artifacts_public_dir
+    }
+
     # 
     #  Write random seed
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\pseudorandom_seed_defeats_all_secrecy.bin" goto :skip_write_random_seed
-    # %electionguard_exe% write-random-seed
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_random_seed
+    if not ($electionguard_artifacts_public_dir | path join "pseudorandom_seed_defeats_all_secrecy.bin" | path exists) {
+        run-subprocess [ $binary write-random-seed ]
+    }
+
     # 
     #  Verify standard parameters
     # 
-    # (set standard_parameters_verified_file="%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\standard_parameters_verified.txt")
-    # 
-    # if exist "%standard_parameters_verified_file%" goto :skip_verify_standard_parameters
-    # %electionguard_exe% --insecure-deterministic verify-standard-parameters
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # 
-    # echo Standard parameters: Verified! >"%standard_parameters_verified_file%"
-    # 
-    # :skip_verify_standard_parameters
+    let standard_parameters_verified_file = $electionguard_artifacts_public_dir | path join "standard_parameters_verified.txt"
+    if ($standard_parameters_verified_file | path exists) {
+        run-subprocess [
+            $binary --insecure-deterministic verify-standard-parameters
+        ]
+
+        log info $"Standard parameters: Verified! >($standard_parameters_verified_file)"
+    }
+
     # 
     #  Write election manifest (canonical)
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_manifest_canonical.bin" goto :skip_write_manifest_canonical
-    # %electionguard_exe% write-manifest --in-example --out-format canonical
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_manifest_canonical
+    if not ($electionguard_artifacts_public_dir | path join "election_manifest_canonical.bin" | path exists) {
+        run-subprocess [
+            $binary write-manifest --in-example --out-format canonical
+        ]
+    }
+
     # 
     #  Write election manifest (pretty)
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_manifest_pretty.json" goto :skip_write_manifest_pretty
-    # %electionguard_exe% write-manifest --out-format pretty
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_manifest_pretty
+    if not ($electionguard_artifacts_public_dir | path join "election_manifest_pretty.json" | path exists) {
+        run-subprocess [ $binary write-manifest --out-format pretty ]
+    }
+
     # 
     #  Write election parameters
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\election_parameters.json" goto :skip_write_parameters
-    # %electionguard_exe% write-parameters --n %eg_n% --k %eg_k% --date "%eg_date%" --info "%eg_info%"
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_parameters
+    if not ($electionguard_artifacts_public_dir | path join "election_parameters.json" | path exists) {
+        run-subprocess [
+            $binary write-parameters
+                --n $election_parameters.n
+                --k $election_parameters.k
+                --date $election_parameters.date
+                --info $election_parameters.info
+                --ballot-chaining prohibited
+        ]
+    }
+
     # 
     #  Write hashes
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\hashes.json" goto :skip_write_hashes
-    # %electionguard_exe% --insecure-deterministic write-hashes
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_hashes
+    if not ($electionguard_artifacts_public_dir | path join "hashes.json" | path exists) {
+        run-subprocess [
+            $binary --insecure-deterministic write-hashes
+        ]
+    }
+
     # 
     #  For each guardian
-    # 
-    # for /L %%N in (1, 1, %eg_n%) do call :sub_egtest_per_guardian %%N
-    # echo.
-    # echo ---- All guardians done.
+    #
+    for $i in 1..$election_parameters.n {
+        (egtest_per_guardian $binary $i
+            --electionguard_artifacts_dir $electionguard_artifacts_dir
+            --electionguard_artifacts_public_dir $electionguard_artifacts_public_dir)
+    }
+
+    log info ""
+    log info "---- All guardians done."
+
     # 
     #  Write joint election public key
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\joint_election_public_key.json" goto :skip_write_joint_election_public_key
-    # %electionguard_exe% --insecure-deterministic write-joint-election-public-key
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_joint_election_public_key
+    if not ($electionguard_artifacts_public_dir | path join "joint_election_public_key.json" | path exists) {
+        run-subprocess [
+            $binary --insecure-deterministic write-joint-election-public-key
+        ]
+    }
+
     # 
     #  Write HashesExt
     # 
-    # if exist "%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\hashes_ext.json" goto :skip_write_hashes_ext
-    # %electionguard_exe% --insecure-deterministic write-hashes-ext
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_write_hashes_ext
+    if not ($electionguard_artifacts_public_dir | path join "hashes_ext.json" | path exists) {
+        run-subprocess [ $binary --insecure-deterministic write-hashes-ext ]
+    }
+
     # 
     #  Tests success!
     # 
-    # echo.
-    # echo ElectionGuard tests successful!
-    # echo.
-    # echo Resulting artifact files:
-    # dir "%ELECTIONGUARD_ARTIFACTS_DIR%" /s /b
+    log info ""
+    log info "ElectionGuard tests successful!"
+    log info ""
+    log info "Resulting artifact files:"
+
+    ls $electionguard_artifacts_dir
 }
 
-# rem ======================================================= Subroutine: ElectionGuard tests - per guardian actions
-def sub_egtest_per_guardian [] {
-    # set /a "i=%1"
-    # 
-    # (set guardian_secret_dir=%ELECTIONGUARD_ARTIFACTS_DIR%\SECRET_for_guardian_%i%)
-    # 
-    # if exist "%guardian_secret_dir%" goto :skip_create_guardian_secret_dir
-    # mkdir "%guardian_secret_dir%"
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # :skip_create_guardian_secret_dir
-    # 
-    # (set guardian_secret_key_file=%guardian_secret_dir%\guardian_%i%.SECRET_key.json)
-    # (set guardian_public_key_file=%ELECTIONGUARD_ARTIFACTS_PUBLIC_DIR%\guardian_%i%.public_key.json)
-    # (set guardian_name=Guardian %i%)
-    # 
-    # echo.
-    # echo ---- Guardian %i%
-    # echo.
-    # echo Secret key file: %guardian_secret_key_file%
-    # echo Public key file: %guardian_public_key_file%
-    # 
-    # if exist "%guardian_secret_key_file%" goto :skip_generate_secret_key
-    # 
-    # if exist "%guardian_public_key_file%" (
-    #     erase "%guardian_public_key_file%"
-    # 
-    #     if "%ERRORLEVEL%" NEQ "0" exit /b
-    # )
-    # 
-    # %electionguard_exe% --insecure-deterministic guardian-secret-key-generate --i %i% --name "%guardian_name%"
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # if not exist "%guardian_secret_key_file%" (
-    #     echo ERROR: Guardian %i% secret key file does not exist: %guardian_secret_key_file%
-    #     exit /b 1
-    # )
-    # :skip_generate_secret_key
-    # 
-    # if exist "%guardian_public_key_file%" goto :skip_writing_public_key
-    # %electionguard_exe% --insecure-deterministic guardian-secret-key-write-public-key --i %i%
-    # if "%ERRORLEVEL%" NEQ "0" exit /b
-    # 
-    # if not exist "%guardian_public_key_file%" (
-    #     echo ERROR: Guardian %i% public key file does not exist: %guardian_public_key_file%
-    #     exit /b 1
-    # )
-    # :skip_writing_public_key
-    # 
-    # goto :skip_printing_public_key
-    # echo.
-    # echo vvvvvvvvvvvvvv Guardian %i% "%guardian_name%" public key vvvvvvvvvvvvvv
-    # type %guardian_public_key_file%
-    # echo ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Guardian %i% "%guardian_name%" public key ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    # :skip_printing_public_key
+def egtest_per_guardian [
+    binary: string
+    i: int
+    --electionguard_artifacts_dir: string
+    --electionguard_artifacts_public_dir: string
+] {
+    let guardian_secret_dir = $electionguard_artifacts_dir | path join $"SECRET_for_guardian_($i)"
+    if not ($guardian_secret_dir | path exists) {
+        mkdir $guardian_secret_dir
+    }
+
+    let guardian_secret_key_file = $guardian_secret_dir | path join $"guardian_($i).SECRET_key.json"
+    let guardian_public_key_file = $electionguard_artifacts_public_dir | path join $"guardian_($i).public_key.json"
+    let guardian_name = $"Guardian ($i)"
+
+    log info ""
+    log info $"---- Guardian ($i)"
+    log info ""
+    log info $"Secret key file: ($guardian_secret_key_file)"
+    log info $"Public key file: ($guardian_public_key_file)"
+
+    if not ($guardian_secret_key_file | path exists) {
+        if ($guardian_public_key_file | path exists) {
+            rm $guardian_public_key_file
+        }
+
+        run-subprocess [
+            $binary --insecure-deterministic guardian-secret-key-generate --i $i --name $guardian_name
+        ]
+
+        if not ($guardian_secret_key_file | path exists) {
+            log error $"ERROR: Guardian ($i) secret key file does not exist: ($guardian_secret_key_file)"
+            exit 1
+        }
+    }
+
+    if not ($guardian_public_key_file | path exists) {
+        run-subprocess [
+            $binary --insecure-deterministic guardian-secret-key-write-public-key --i $i
+        ]
+
+        if not ($guardian_public_key_file | path exists) {
+            log error $"Guardian ($i) public key file does not exist: ($guardian_public_key_file)"
+            exit 1
+        }
+    }
 }
 
 # Runs a subprocess and returns the exit code.
