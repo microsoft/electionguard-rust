@@ -329,10 +329,10 @@ impl GuardianSecretKeyShare {
         let mut shares = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
             let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
-            if res.is_err() {
-                return Err(ShareCombinationError::DecryptionError(pk.i, res.unwrap_err()));
+            match res {
+                Err(e) => return Err(ShareCombinationError::DecryptionError(pk.i, e)),
+                Ok(share) => shares.push(share),
             }
-            shares.push(res.unwrap_or(BigUint::from(0_u8)))
         }
 
         let key = shares.iter().fold(BigUint::from(0_u8), |mut acc, share| {
