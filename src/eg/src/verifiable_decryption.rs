@@ -78,7 +78,7 @@ pub enum ShareCombinationError {
     /// Occurs if not enough shares were provided. Combination requires shares from at least `k` out of `n` guardians.
     #[error("Only {l} decryption shares given, but at least {k} required.")]
     NotEnoughShares { l: usize, k: u32 },
-    /// Occurs if multiple shares from the same guardian are provided.
+    /// Occurs if the guardian index is out of bounds.
     #[error("Guardian {i} is has an index bigger than {n}")]
     InvalidGuardian { i: GuardianIndex, n: GuardianIndex },
     /// Occurs if multiple shares from the same guardian are provided.
