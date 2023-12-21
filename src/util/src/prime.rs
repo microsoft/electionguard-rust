@@ -80,7 +80,7 @@ pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
 
                 true
             } else {
-                let n: &BigUint = n.borrow();
+                let n: &BigUint = n;
 
                 if !n.bit(0) {
                     return false;

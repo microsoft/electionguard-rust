@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// The joint election public key.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct JointElectionPublicKey {
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
