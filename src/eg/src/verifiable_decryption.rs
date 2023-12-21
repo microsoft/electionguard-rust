@@ -3,7 +3,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-//! This module provides the implementation of verifiable decryption for [`Ciphertext`]s. For more details see Section `3.6` of the Electionguard specification `2.0.0`.
+//! This module provides the implementation of verifiable decryption for [`Ciphertext`]s.
+//! For more details see Section `3.6` of the Electionguard specification `2.0.0`.
 
 use crate::{
     discrete_log::DiscreteLog,
@@ -23,7 +24,7 @@ use thiserror::Error;
 use util::{
     csprng::Csprng,
     integer_util::{
-        get_single_coefficient, group_lagrange_at_zero, mod_inverse, to_be_bytes_left_pad,
+        get_single_coefficient_at_zero, group_lagrange_at_zero, mod_inverse, to_be_bytes_left_pad,
     },
 };
 
@@ -68,20 +69,24 @@ impl DecryptionShare {
 /// The combined decryption share allows to compute the plain-text from a given ciphertext.
 ///
 /// This corresponds to the `M` in Section `3.6.2`.
+#[derive(Debug)]
 pub struct CombinedDecryptionShare(BigUint);
 
 /// Represents errors occurring while combining [`DecryptionShare`]s into a [`CombinedDecryptionShare`].
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ShareCombinationError {
     /// Occurs if not enough shares were provided. Combination requires shares from at least `k` out of `n` guardians.
     #[error("Only {l} decryption shares given, but at least {k} required.")]
     NotEnoughShares { l: usize, k: u32 },
-    /// Occurs if multiple shares from the same guardian are provided.
+    /// Occurs if the guardian index is out of bounds.
     #[error("Guardian {i} is has an index bigger than {n}")]
     InvalidGuardian { i: GuardianIndex, n: GuardianIndex },
     /// Occurs if multiple shares from the same guardian are provided.
     #[error("Guardian {i} is represented more than once in the decryption shares.")]
     DuplicateGuardian { i: GuardianIndex },
+    /// Occurs if the Lagrange interpolation fails.
+    #[error("Could not compute the polynomial interpolation.")]
+    InterpolationFailure,
 }
 
 impl CombinedDecryptionShare {
@@ -128,12 +133,13 @@ impl CombinedDecryptionShare {
             .collect();
         let ys: Vec<_> = decryption_shares.iter().map(|s| s.m_i.clone()).collect();
 
-        Ok(CombinedDecryptionShare(group_lagrange_at_zero(
-            &xs,
-            &ys,
-            &fixed_parameters.q,
-            &fixed_parameters.p,
-        )))
+        let m = group_lagrange_at_zero(&xs, &ys, &fixed_parameters.q, &fixed_parameters.p);
+
+        match m {
+            // This should not happen
+            None => Err(ShareCombinationError::InterpolationFailure),
+            Some(m) => Ok(CombinedDecryptionShare(m)),
+        }
     }
 }
 
@@ -194,6 +200,9 @@ pub enum ResponseShareError {
     /// Occurs if one tries to compute the response from a state share that does not match the secret key share.
     #[error("Indices of key share (here {i}) and state share (here {j}) must match!")]
     KeyStateShareIndexMismatch { i: GuardianIndex, j: GuardianIndex },
+    /// Occurs if the Lagrange coefficient can not be computed.
+    #[error("Computation of the Lagrange coefficient failed.")]
+    CoefficientFailure,
 }
 
 /// Represents errors occurring while combining the commit and response shares into a single [`DecryptionProof`].
@@ -206,14 +215,17 @@ pub enum CombineProofError {
     #[error("The given lists must be ordered the same way!")]
     IndexMismatch,
     /// Occurs if the joint public key does not match the list of public keys.
-    #[error("The given list of public keys does not match the given joint public key!")]
-    JointPKMissmatch,
+    #[error("Could not compute the joint public key from the list of public keys!")]
+    JointPKFailure,
     /// Occurs if the decryption shares could not be combined.
     #[error("Could not combine the given decryption shares: {0}")]
     ShareCombinationError(ShareCombinationError),
     /// Occurs if the commitment and response shares are inconsistent (Checks `9.A` and `9.B`).
     #[error("The commit message ({1}) of guardian {0} is inconsistent!")]
     CommitInconsistency(GuardianIndex, String),
+    /// Occurs if the Lagrange coefficient can not be computed.
+    #[error("Computation of the Lagrange coefficient failed!")]
+    CoefficientFailure,
 }
 
 /// Proof that a given plaintext is the decryption of a given ciphertext relative to a given public key.
@@ -339,7 +351,11 @@ impl DecryptionProof {
             .iter()
             .map(|s| BigUint::from(s.i.get_one_based_u32()))
             .collect();
-        let w_i = get_single_coefficient(&xs, &i_big, &fixed_parameters.q);
+        let w_i = match get_single_coefficient_at_zero(&xs, &i_big, &fixed_parameters.q) {
+            Some(w_i) => w_i,
+            None => return Err(ResponseShareError::CoefficientFailure),
+        };
+
         let c_i = (c * w_i) % q;
 
         let v_i = fixed_parameters.q.subtract_group_elem(
@@ -357,21 +373,19 @@ impl DecryptionProof {
     /// The arguments are
     /// - `election_parameters` - the election parameters
     /// - `h_e` - the extended bash hash
-    /// - `joint_key` - the joint election public key
     /// - `ciphertext` - the ciphertext
     /// - `decryption_shares` - the decryption shares
     /// - `proof_commit_shares` - the shares of the commit message
     /// - `proof_response_shares` - the shares of the response
     /// - `guardian_public_keys` - the guardians' public keys
     ///
-    /// This function checks that decryption_shares, proof_commit_shares,
-    /// proof_response_shares, are *ordered* the same way,
+    /// This function checks that `decryption_shares`, `proof_commit_shares`,
+    /// `proof_response_shares`, are *ordered* the same way,
     /// i.e. the i-th element in each list belongs to the same guardian.
-    /// The function also checks that guardian_public_keys contains all n public keys.
+    /// The function also checks that `guardian_public_keys` contains all n public keys.
     pub fn combine_proof(
         election_parameters: &ElectionParameters,
         h_e: &HValue,
-        joint_key: &JointElectionPublicKey,
         ciphertext: &Ciphertext,
         decryption_shares: &[DecryptionShare],
         proof_commit_shares: &[DecryptionProofCommitShare],
@@ -399,15 +413,11 @@ impl DecryptionProof {
 
         //Check that the joint key matches the given public keys
         //This also checks that all public keys are given
-        let computed_k = JointElectionPublicKey::compute(election_parameters, guardian_public_keys);
-        match computed_k {
-            Err(_) => return Err(CombineProofError::JointPKMissmatch),
-            Ok(some_k) => {
-                if some_k != *joint_key {
-                    return Err(CombineProofError::JointPKMissmatch);
-                }
-            }
-        }
+        let joint_key =
+            match JointElectionPublicKey::compute(election_parameters, guardian_public_keys) {
+                Err(_) => return Err(CombineProofError::JointPKFailure),
+                Ok(pk) => pk,
+            };
 
         let m = CombinedDecryptionShare::combine(election_parameters, decryption_shares);
         let m = match m {
@@ -424,7 +434,7 @@ impl DecryptionProof {
             .fold((BigUint::one(), BigUint::one()), |(a, b), share| {
                 ((a * share.a_i.clone()) % p, (b * share.b_i.clone()) % p)
             });
-        let c = Self::challenge(h_e, joint_key, ciphertext, &a, &b, &m);
+        let c = Self::challenge(h_e, &joint_key, ciphertext, &a, &b, &m);
 
         let xs: Vec<BigUint> = proof_commit_shares
             .iter()
@@ -433,7 +443,10 @@ impl DecryptionProof {
         let mut c_i_vec = vec![];
         for cs in proof_commit_shares {
             let i = BigUint::from(cs.i.get_one_based_u32());
-            let w_i = get_single_coefficient(&xs, &i, &fixed_parameters.q);
+            let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.q) {
+                Some(w_i) => w_i,
+                None => return Err(CombineProofError::CoefficientFailure),
+            };
             let c_i = (c.clone() * w_i) % q;
             c_i_vec.push(c_i);
         }
@@ -510,6 +523,7 @@ impl DecryptionProof {
     ) -> bool {
         let g = &fixed_parameters.g;
         let p = fixed_parameters.p.as_ref();
+        let q = fixed_parameters.q.as_ref();
 
         let key = &joint_key.joint_election_public_key;
 
@@ -517,7 +531,7 @@ impl DecryptionProof {
         let b = (ciphertext.alpha.modpow(&self.response, p) * m.0.modpow(&self.challenge, p)) % p;
 
         //Check (9.A)
-        if &self.response >= p {
+        if &self.response >= q {
             return false;
         }
         let c = Self::challenge(h_e, joint_key, ciphertext, &a, &b, m);
@@ -621,19 +635,26 @@ impl VerifiableDecryption {
 mod test {
     use num_bigint::BigUint;
     use std::iter::zip;
-    use util::csprng::Csprng;
+    use util::{csprng::Csprng, prime::BigUintPrime};
 
     use crate::{
         election_parameters::ElectionParameters,
         example_election_parameters::example_election_parameters,
+        fixed_parameters::{FixedParameterGenerationParameters, FixedParameters, NumsNumber},
+        guardian::GuardianIndex,
         guardian_public_key::GuardianPublicKey,
         guardian_secret_key::GuardianSecretKey,
         guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
         hash::HValue,
-        joint_election_public_key::JointElectionPublicKey,
+        joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+        varying_parameters::{BallotChaining, VaryingParameters},
+        verifiable_decryption::ShareCombinationError,
     };
 
-    use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption};
+    use super::{
+        CombinedDecryptionShare, DecryptionProof, DecryptionProofCommitShare, DecryptionShare,
+        VerifiableDecryption,
+    };
 
     fn key_setup(
         csprng: &mut Csprng,
@@ -678,6 +699,119 @@ mod test {
         let joint_key =
             JointElectionPublicKey::compute(election_parameters, &guardian_public_keys).unwrap();
         (joint_key, guardian_public_keys, key_shares)
+    }
+
+    fn get_toy_parameters() -> FixedParameters {
+        FixedParameters {
+            opt_ElectionGuard_Design_Specification: None,
+            generation_parameters: FixedParameterGenerationParameters {
+                q_bits_total: 7,
+                p_bits_total: 16,
+                p_bits_msb_fixed_1: 0,
+                p_middle_bits_source: NumsNumber::ln_2,
+                p_bits_lsb_fixed_1: 0,
+            },
+            p: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+                BigUint::from(59183_u32),
+            ),
+            q: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+                BigUint::from(127_u8),
+            ),
+            r: BigUint::from(466_u32),
+            g: BigUint::from(32616_u32),
+        }
+    }
+
+    #[test]
+    fn test_decryption_share_combination() {
+        // Toy parameters according to specs
+        let fixed_parameters = get_toy_parameters();
+        let varying_parameters = VaryingParameters {
+            n: GuardianIndex::from_one_based_index(3).unwrap(),
+            k: GuardianIndex::from_one_based_index(3).unwrap(),
+            date: "2023-05-02".to_string(),
+            info: "The test election".to_string(),
+            ballot_chaining: BallotChaining::Prohibited,
+        };
+        let election_parameters = ElectionParameters {
+            fixed_parameters,
+            varying_parameters,
+        };
+        let p = &election_parameters.fixed_parameters.p;
+        let g = &election_parameters.fixed_parameters.g;
+
+        // Using x^2-1 as polynomial
+        let decryption_shares = [
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(1).unwrap(),
+                m_i: g.modpow(&BigUint::from(0_u8), p.as_ref()),
+            },
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                m_i: g.modpow(&BigUint::from(3_u8), p.as_ref()),
+            },
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(3).unwrap(),
+                m_i: g.modpow(&BigUint::from(8_u8), p.as_ref()),
+            },
+        ];
+        let exp_m = CombinedDecryptionShare(g.modpow(&BigUint::from(126_u8), p.as_ref()));
+
+        assert_eq!(
+            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares)
+                .unwrap()
+                .0,
+            exp_m.0
+        );
+
+        assert_eq!(
+            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares[0..2])
+                .unwrap_err(),
+            ShareCombinationError::NotEnoughShares { l: 2, k: 3 }
+        );
+
+        let decryption_shares = [
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(1).unwrap(),
+                m_i: g.modpow(&BigUint::from(0_u8), p.as_ref()),
+            },
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                m_i: g.modpow(&BigUint::from(3_u8), p.as_ref()),
+            },
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(4).unwrap(),
+                m_i: g.modpow(&BigUint::from(8_u8), p.as_ref()),
+            },
+        ];
+        assert_eq!(
+            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares).unwrap_err(),
+            ShareCombinationError::InvalidGuardian {
+                i: GuardianIndex::from_one_based_index(4).unwrap(),
+                n: GuardianIndex::from_one_based_index(3).unwrap()
+            }
+        );
+
+        let decryption_shares = [
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(1).unwrap(),
+                m_i: g.modpow(&BigUint::from(0_u8), p.as_ref()),
+            },
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                m_i: g.modpow(&BigUint::from(3_u8), p.as_ref()),
+            },
+            DecryptionShare {
+                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                m_i: g.modpow(&BigUint::from(8_u8), p.as_ref()),
+            },
+        ];
+        assert_eq!(
+            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares).unwrap_err(),
+            ShareCombinationError::DuplicateGuardian {
+                i: GuardianIndex::from_one_based_index(2).unwrap()
+            }
+        );
     }
 
     #[test]
@@ -734,7 +868,6 @@ mod test {
         let proof = DecryptionProof::combine_proof(
             &election_parameters,
             &h_e,
-            &joint_key,
             &ciphertext,
             &dec_shares,
             &com_shares,
