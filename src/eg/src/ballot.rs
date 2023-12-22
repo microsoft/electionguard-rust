@@ -5,7 +5,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
@@ -16,6 +15,7 @@ use crate::{
     device::Device,
     election_manifest::ContestIndex,
     hash::HValue,
+    serialize::SerializablePretty,
     vec1::Vec1,
 };
 
@@ -126,16 +126,6 @@ impl BallotEncrypted {
     pub fn device(&self) -> &String {
         &self.device
     }
-
-    /// Writes a `BallotEncrypted` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .context("Error serializing voter selection")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing serialized voter selection to file")
-    }
 }
+
+impl SerializablePretty for BallotEncrypted {}

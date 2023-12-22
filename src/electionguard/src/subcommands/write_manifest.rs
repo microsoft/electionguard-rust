@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
+use eg::serialize::{SerializableCanonical, SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::ElectionManifestSource,
@@ -92,7 +93,7 @@ impl Subcommand for WriteManifest {
 
         let write_result = match self.out_format {
             Canonical => election_manifest.to_stdiowrite_canonical(&mut stdiowrite),
-            Pretty => election_manifest.to_stdiowrite_pretty(&mut stdiowrite),
+            Pretty => election_manifest.to_stdiowrite(&mut stdiowrite),
         };
 
         write_result.with_context(|| {

@@ -9,7 +9,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context, Result};
 
-use eg::{ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData};
+use eg::{
+    ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData,
+    serialize::SerializablePretty,
+};
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
 use util::file::create_path;
 

@@ -9,7 +9,9 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
-use eg::{guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey};
+use eg::{
+    guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey, serialize::SerializablePretty,
+};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::load_election_parameters,
