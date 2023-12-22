@@ -271,9 +271,9 @@ impl GuardianSecretKeyShare {
     /// The arguments are
     /// - `election_parameters` - the election parameters
     /// - `h_p` - the parameter base hash
-    /// - `guardian_public_keys` - a list of `GuardianPublicKey`
-    /// - `encrypted_shares` - a list of `GuardianEncryptedShare`
-    /// - `recipient_secret_key` - the recipient's `GuardianSecretKey`
+    /// - `guardian_public_keys` - a list of [`GuardianPublicKey`]
+    /// - `encrypted_shares` - a list of [`GuardianEncryptedShare`]
+    /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
     /// 
     /// This function assumes that i-th encrypted_share and the i-th guardian_public_key are from the same guardian.
     pub fn compute(
