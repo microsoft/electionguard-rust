@@ -826,7 +826,7 @@ mod test {
 
         let message: usize = 42;
         let nonce = csprng.next_biguint_lt(fixed_parameters.q.as_ref());
-        let ciphertext = joint_key.encrypt_with(fixed_parameters, &nonce, message, false);
+        let ciphertext = joint_key.encrypt_with(fixed_parameters, &nonce, message);
 
         let dec_shares: Vec<_> = key_shares
             .iter()
