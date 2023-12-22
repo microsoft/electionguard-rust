@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides implementation of guardian secret keys. For more details see Section `3.2` of the Electionguard specification `2.0.0`.
+
 use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -22,6 +24,9 @@ use crate::{
     hashes::ParameterBaseHash,
 };
 
+/// A polynomial coefficient used to define a secret key sharing.
+/// 
+/// This corresponds to the `a_{i,j}` in Equation `9`. 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecretCoefficient(
     //? TODO ensure this is serialized in a fixed-length format
@@ -39,6 +44,8 @@ impl SecretCoefficient {
     }
 }
 
+/// A vector of [`SecretCoefficient`]s defining a sharing of the guardian's secret key.
+/// 
 /// "Each guardian G_i in an election with a decryption threshold of k generates k secret
 /// polynomial coefficients a_i,j, for 0 ≤ j < k, by sampling them uniformly, at random in
 /// the range 0 ≤ a_i,j < q.
@@ -46,6 +53,12 @@ impl SecretCoefficient {
 pub struct SecretCoefficients(pub Vec<SecretCoefficient>);
 
 impl SecretCoefficients {
+
+    /// This function generates a fresh [`SecretCoefficients`].
+    ///
+    /// The arguments are
+    /// - `csprng` - secure randomness generator
+    /// - `election_parameters` - the election parameters
     pub fn generate(csprng: &mut Csprng, election_parameters: &ElectionParameters) -> Self {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
@@ -60,6 +73,9 @@ impl SecretCoefficients {
     }
 }
 
+/// A commitment to a single [`SecretCoefficient`].
+/// 
+/// This corresponds to the `K_{i,j}` in Equation `10`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientCommitment(
     #[serde(
@@ -76,10 +92,17 @@ impl CoefficientCommitment {
     }
 }
 
+/// A vector of [`CoefficientCommitment`]s, defining the guardians public key.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientCommitments(pub Vec<CoefficientCommitment>);
 
 impl CoefficientCommitments {
+
+    /// This function computes the [`CoefficientCommitments`] for given [`SecretCoefficients`].
+    ///
+    /// The arguments are
+    /// - `fixed_parameters` - the fixed parameters    
+    /// - `secret_coefficients` - the secret coefficients
     pub fn new(
         fixed_parameters: &FixedParameters,
         secret_coefficients: &SecretCoefficients,
@@ -100,10 +123,12 @@ impl CoefficientCommitments {
     }
 }
 
-/// Secret key for a guardian.
+/// The secret key for a guardian.
+/// 
+/// See Section `3.2.2` for details on the generation of secret keys.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianSecretKey {
-    /// Guardian number, 1 <= i <= [`crate::varying_parameters::VaryingParameters::n`].
+    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
     pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
@@ -116,7 +141,7 @@ pub struct GuardianSecretKey {
     /// "Published" polynomial coefficient commitments.
     pub coefficient_commitments: CoefficientCommitments,
 
-    /// Ownership proofs for secret coefficients.
+    /// Proofs of knowledge for secret coefficients.
     pub coefficient_proofs: Vec<CoefficientProof>,
 }
 
@@ -139,6 +164,14 @@ impl GuardianPublicKeyInfo for GuardianSecretKey {
 }
 
 impl GuardianSecretKey {
+
+    /// This function generates a fresh [`GuardianSecretKey`] for guardian `i`.
+    ///
+    /// The arguments are
+    /// - `csprng` - secure randomness generator
+    /// - `election_parameters` - the election parameters
+    /// - `i` - the guardian's index
+    /// - `opt_name` - an optional name
     pub fn generate(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
@@ -180,8 +213,7 @@ impl GuardianSecretKey {
         }
     }
 
-    /// Verifies that the `GuardianSecretKey` is well-formed
-    /// and conforms to the election parameters.
+    /// This function verifies that the `GuardianSecretKey` is well-formed and conforms to the election parameters.
     /// Useful after deserialization.
     pub fn validate(
         &self,
@@ -190,14 +222,19 @@ impl GuardianSecretKey {
         validate_guardian_public_key_info(self, election_parameters)
     }
 
+    /// This function returns the [`SecretCoefficients`] of the [`GuardianSecretKey`].
     pub fn secret_coefficients(&self) -> &SecretCoefficients {
         &self.secret_coefficients
     }
 
+    /// This function returns the actual secret key of the [`GuardianSecretKey`].
+    /// 
+    /// The returned value corresponds to `a_{i,0}` as defined in Section `3.2.2`.
     pub fn secret_s(&self) -> &BigUint {
         &self.secret_coefficients.0[0].0
     }
 
+    /// This function computes the [`GuardianPublicKey`] corresponding to the [`GuardianSecretKey`].
     pub fn make_public_key(&self) -> GuardianPublicKey {
         GuardianPublicKey {
             i: self.i,
@@ -207,7 +244,7 @@ impl GuardianSecretKey {
         }
     }
 
-    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
+    /// Reads a [`GuardianSecretKey`] from a [`std::io::Read`] and validates it.
     pub fn from_stdioread_validated(
         stdioread: &mut dyn std::io::Read,
         election_parameters: &ElectionParameters,
@@ -220,7 +257,7 @@ impl GuardianSecretKey {
         Ok(self_)
     }
 
-    /// Writes a `GuardianSecretKey` to a `std::io::Write`.
+    /// Writes a [`GuardianSecretKey`] to a [`std::io::Write`].
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 

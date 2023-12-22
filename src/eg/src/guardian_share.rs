@@ -3,6 +3,10 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides the implementation of guardian key shares. 
+//! 
+//! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
+
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::iter::zip;
@@ -18,39 +22,49 @@ use crate::{
     hashes::ParameterBaseHash,
 };
 
-/// Encrypted guardian share
+/// An encrypted share for sending shares to other guardians.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianEncryptedShare {
+    /// The sender of the share
     pub dealer: GuardianIndex,
+    /// The recipient of the share
     pub recipient: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// First ciphertext part, corresponds to `C_{i,l,0}` in Equation `19`.
     pub c0: BigUint,
+    /// Second ciphertext part, corresponds to `C_{i,l,1}` in Equation `19`.
     pub c1: HValue,
+    /// Third ciphertext part, corresponds to `C_{i,l,2}` in Equation `19`.
     pub c2: HValue,
 }
 
+/// Represents errors occurring while decrypting a [`GuardianEncryptedShare`].
 #[derive(Error, Debug)]
 pub enum DecryptionError {
+    /// Occurs if the given public key does not match the dealer.
     #[error("The dealer of the ciphertext is {i}, but the public key has index {j}.")]
     DealerIndicesMismatch { i: GuardianIndex, j: GuardianIndex },
+    /// Occurs if the given secret key does not match the recipient.
     #[error("The recipient of the ciphertext is {i}, but the secret key has index {j}.")]
     RecipientIndicesMismatch { i: GuardianIndex, j: GuardianIndex },
+    /// Occurs if the mac is invalid.
     #[error("The MAC does not verify.")]
     InvalidMAC,
 }
 
 impl GuardianEncryptedShare {
-    /// This function computes the share encryption secret key as defined in Equation (15)
+    /// This function computes the share encryption secret key as defined in Equation `15`.
+    /// 
     /// The arguments are
-    /// - h_p - the parameter base hash
-    /// - i - the dealer index
-    /// - l - the recipient index
-    /// - capital_k_l - the recipient public key
-    /// - alpha - as in Equation (14)
-    /// - beta - as in Equation (14)
+    /// - `h_p` - the parameter base hash
+    /// - `i` - the dealer index
+    /// - `l` - the recipient index
+    /// - `capital_k_l` - the recipient public key
+    /// - `alpha` - as in Equation `14`
+    /// - `beta` - as in Equation `14`
     fn secret_key(
         h_p: HValue,
         i: u32,
@@ -69,11 +83,12 @@ impl GuardianEncryptedShare {
         eg_h(&h_p, &v)
     }
 
-    /// This function computes the MAC key (Equation 16) and the encryption key (Equation 17)
+    /// This function computes the MAC key (Equation `16`) and the encryption key (Equation `17`).
+    /// 
     /// The arguments are
-    /// - i - the dealer index
-    /// - l - the recipient index
-    /// - k_i_l - the secret key as in Equation (15)
+    /// - `i` - the dealer index
+    /// - `l` - the recipient index
+    /// - `k_i_l` - the secret key as in Equation `15`
     fn mac_and_encryption_key(i: u32, l: u32, k_i_l: &HValue) -> (HValue, HValue) {
         // label = b("share_enc_keys",14)
         let label = "share_enc_keys".as_bytes();
@@ -101,11 +116,12 @@ impl GuardianEncryptedShare {
         (k1, k2)
     }
 
-    /// This function computes the MAC as in Equation (19)
+    /// This function computes the MAC as in Equation `19`.
+    /// 
     /// The arguments are
-    /// - k0 - the MAC key
-    /// - c0 - ciphertext part 1
-    /// - c1 - ciphertext part 2
+    /// - `k0` - the MAC key
+    /// - `c0` - ciphertext part 1
+    /// - `c1` - ciphertext part 2
     fn share_mac(k0: HValue, c0: &[u8], c1: &HValue) -> HValue {
         let mut v = c0.to_vec();
         v.extend_from_slice(c1.0.as_slice());
@@ -113,12 +129,13 @@ impl GuardianEncryptedShare {
     }
 
     /// This function creates a new [`GuardianEncryptedShare`] of the dealer's secret key for a given recipient.
+    /// 
     /// The arguments are
-    /// - csprng - secure randomness generator
-    /// - election_parameters - the election parameters
-    /// - h_p - the parameter base hash
-    /// - dealer_private_key - the dealer's `GuardianSecretKey`
-    /// - recipient_public_key - the recipient's `GuardianPublicKey`
+    /// - `csprng` - secure randomness generator
+    /// - `election_parameters` - the election parameters
+    /// - `h_p` - the parameter base hash
+    /// - `dealer_private_key` - the dealer's [`GuardianSecretKey`]
+    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
     pub fn new(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
@@ -166,11 +183,12 @@ impl GuardianEncryptedShare {
     }
 
     /// This function decrypts and validates a [`GuardianEncryptedShare`].
+    /// 
     /// The arguments are
-    /// - self - the encrypted share
-    /// - election_parameters - the election parameters
-    /// - dealer_public_key - the dealer's `GuardianPublicKey`
-    /// - recipient_secret_key - the recipient's `GuardianSecretKey`
+    /// - `self` - the encrypted share
+    /// - `election_parameters` - the election parameters
+    /// - `dealer_public_key` - the dealer's [`GuardianPublicKey`]
+    /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
     pub fn decrypt_and_validate(
         &self,
         election_parameters: &ElectionParameters,
@@ -214,37 +232,49 @@ impl GuardianEncryptedShare {
     }
 }
 
-/// A guardian's share of the master secret key
+/// A guardian's share of the joint secret key, it corresponds to `P(i)` in Equation `22`.
+/// 
+/// The corresponding public key is never computed explicitly.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianSecretKeyShare {
+    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
     pub i: GuardianIndex,
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
+    /// Secret key share
     pub p_i: BigUint,
 }
 
+
+/// Represents errors occurring while combining shares to compute a [`GuardianSecretKeyShare`].
 #[derive(Error, Debug)]
 pub enum ShareCombinationError {
+    /// Occurs if a given public key is invalid.
     #[error("Public key of guardian {0} is invalid.")]
     InvalidPublicKey(GuardianIndex),
+    /// Occurs if multiple public keys of the same guardian are given.
     #[error("Guardian {0} is represented more than once in the guardian public keys.")]
     DuplicateGuardian(GuardianIndex),
-    #[error("Guardian {0} is represented more than once in the guardian public keys.")]
+    /// Occurs if the public key of a guardian is missing.
+    #[error("The public key of guardian {0} is missing.")]
     MissingGuardian(String),
-    #[error("Could not decrypt and validate share from guardian {0}.")]
-    DecryptionError(GuardianIndex),
+    /// Occurs if a share could not be decrypted.
+    #[error("Could not decrypt and validate share from guardian {0}: {1}")]
+    DecryptionError(GuardianIndex, DecryptionError),
 }
 
 impl GuardianSecretKeyShare {
-    /// This function computes a new `GuardianSecretKeyShare` from a list of `GuardianEncryptedShare`
+    /// This function computes a new [`GuardianSecretKeyShare`] from a list of [`GuardianEncryptedShare`].
+    /// 
     /// The arguments are
-    /// - election_parameters - the election parameters
-    /// - h_p - the parameter base hash
-    /// - guardian_public_keys - a list of `GuardianPublicKey`
-    /// - encrypted_shares - a list of `GuardianEncryptedShare`
-    /// - recipient_secret_key - the recipient's `GuardianSecretKey`
+    /// - `election_parameters` - the election parameters
+    /// - `h_p` - the parameter base hash
+    /// - `guardian_public_keys` - a list of [`GuardianPublicKey`]
+    /// - `encrypted_shares` - a list of [`GuardianEncryptedShare`]
+    /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
+    /// 
     /// This function assumes that i-th encrypted_share and the i-th guardian_public_key are from the same guardian.
     pub fn compute(
         election_parameters: &ElectionParameters,
@@ -299,10 +329,10 @@ impl GuardianSecretKeyShare {
         let mut shares = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
             let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
-            if res.is_err() {
-                return Err(ShareCombinationError::DecryptionError(pk.i));
+            match res {
+                Err(e) => return Err(ShareCombinationError::DecryptionError(pk.i, e)),
+                Ok(share) => shares.push(share),
             }
-            shares.push(res.unwrap_or(BigUint::from(0_u8)))
         }
 
         let key = shares.iter().fold(BigUint::from(0_u8), |mut acc, share| {

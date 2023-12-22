@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module implements guardian indices. 
+
 use crate::index::Index;
 
 #[doc(hidden)]

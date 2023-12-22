@@ -5,6 +5,9 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides the [`GuardianPublicKeyInfo`] trait 
+//! which allows read access and validation of public key data.
+
 use crate::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
     guardian_coeff_proof::CoefficientProof, guardian_secret_key::CoefficientCommitments,
@@ -12,10 +15,12 @@ use crate::{
 };
 use thiserror::Error;
 
-/// Trait for read access to data from a `GuardianPublicKey`, which is common to
-/// both `GuardianPublicKey` and `GuardianSecretKey`.
+/// Trait for read access to data from a [`GuardianPublicKey`], which is common to
+/// both [`GuardianPublicKey`] and [`GuardianSecretKey`]. 
+/// 
+/// It also allows to validate both types of keys (cf. Verification `2` in Section `3.2.2`).
 pub trait GuardianPublicKeyInfo {
-    /// Guardian number, 1 <= i <= n.
+    /// Guardian number, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
     fn i(&self) -> GuardianIndex;
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
@@ -24,25 +29,35 @@ pub trait GuardianPublicKeyInfo {
     /// "Published" polynomial coefficient commitments.
     fn coefficient_commitments(&self) -> &CoefficientCommitments;
 
-    /// Ownership proofs for secret coefficients.
+    /// Proofs of knowledge for secret coefficients.
     fn coefficient_proofs(&self) -> &[CoefficientProof];
 }
 
+/// Represents errors occurring during the validation of a public key.
 #[derive(Error, Debug)]
 pub enum PublicKeyValidationError {
+    /// Occurs if the guardian's index is out of bounds.
     #[error("Guardian number i={i} is not in the range 1 <= i <= n={n}")]
     IndexOutOfRange { i: usize, n: usize },
-    #[error("The proof response is not a valid element in Z_q.")]
+    /// Occurs if the guardian's name contains a newline character.
+    #[error("The guardian's name must not contain a newline.")]
     NameContainsNewLine,
+    /// Occurs if the guardian's commitment vector is not of length [`k`](crate::varying_parameters::VaryingParameters::k).
     #[error("Expected k={k} coefficient commitments, found {c_len}")]
     InadequateNumberOfCommitments { k: usize, c_len: usize },
+    /// Occurs if a coefficient proof is invalid.
     #[error("The proof for coefficient {j} is invalid.")]
     InvalidProof { j: usize },
 }
 
-/// Verifies that the thing implementing `GuardianPublicKeyInfo` is well-formed and conforms
-/// to the election parameters.
-/// Useful after deserialization.
+/// Verifies that the thing implementing [`GuardianPublicKeyInfo`] is well-formed and conforms
+/// to the election parameters. 
+/// 
+/// The arguments are:
+/// - `gpki` - the public key object
+/// - `election_parameters` - the election parameters
+/// 
+/// This corresponds to Verification `2` in Section `3.2.2`. Useful after deserialization.
 pub(crate) fn validate_guardian_public_key_info(
     gpki: &dyn GuardianPublicKeyInfo,
     election_parameters: &ElectionParameters,
