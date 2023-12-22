@@ -130,10 +130,16 @@ impl BallotEncrypted {
     /// that all contests are voted on in the ballot style, and that all of the vote proofs are
     /// correct.
     pub fn verify(&self, header: &PreVotingData, ballot_style_index: Index<BallotStyle>) -> bool {
-        let Some(ballot_style) = header.manifest.ballot_styles.get(ballot_style_index) else {return false};
+        let Some(ballot_style) = header.manifest.ballot_styles.get(ballot_style_index) else {
+            return false;
+        };
         for contest_index in &ballot_style.contests {
-            let Some(contest) = header.manifest.contests.get(*contest_index) else {return false};
-            let Some(contest_encrypted) = self.contests().get(contest_index) else {return false};
+            let Some(contest) = header.manifest.contests.get(*contest_index) else {
+                return false;
+            };
+            let Some(contest_encrypted) = self.contests().get(contest_index) else {
+                return false;
+            };
 
             if !contest_encrypted.verify(header, contest.selection_limit) {
                 return false;
