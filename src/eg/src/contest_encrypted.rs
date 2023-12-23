@@ -85,7 +85,7 @@ impl ContestEncrypted {
             vote.push(header.public_key.encrypt_with(
                 &header.parameters.fixed_parameters,
                 &nonce,
-                pt_vote.vote[j] as usize,
+                pt_vote.vote[j - 1] as usize,
                 true,
             ));
         }
