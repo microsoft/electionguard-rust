@@ -47,16 +47,18 @@ pub struct Ciphertext {
 /// Relevant for producing proofs about the plaintext.
 #[derive(Debug, Clone)]
 pub struct Nonce {
-    pub xi: BigUint
+    pub xi: BigUint,
 }
 
 impl Nonce {
-    pub fn new(xi: BigUint) -> Nonce{
-        Nonce{xi}
+    pub fn new(xi: BigUint) -> Nonce {
+        Nonce { xi }
     }
 
     pub fn zero() -> Nonce {
-        Nonce{xi: BigUint::zero()}
+        Nonce {
+            xi: BigUint::zero(),
+        }
     }
 }
 
@@ -151,10 +153,7 @@ impl JointElectionPublicKey {
             .joint_election_public_key
             .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
 
-        Ciphertext {
-            alpha,
-            beta,
-        }
+        Ciphertext { alpha, beta }
     }
 
     /// Reads a `JointElectionPublicKey` from a `std::io::Read` and validates it.

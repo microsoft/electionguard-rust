@@ -12,8 +12,11 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
-    election_record::PreVotingData, hash::eg_h, index::Index,
-    joint_election_public_key::{Ciphertext, Nonce}, vec1::HasIndexTypeMarker,
+    election_record::PreVotingData,
+    hash::eg_h,
+    index::Index,
+    joint_election_public_key::{Ciphertext, Nonce},
+    vec1::HasIndexTypeMarker,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

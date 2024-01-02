@@ -13,7 +13,7 @@ use util::csprng::Csprng;
 use crate::{
     ballot_style::BallotStyle,
     confirmation_code::confirmation_code,
-    contest_encrypted::{tally_votes, ContestEncrypted},
+    contest_encrypted::ContestEncrypted,
     contest_selection::ContestSelection,
     device::Device,
     election_manifest::{ContestIndex, ElectionManifest},
@@ -161,33 +161,11 @@ impl BallotEncrypted {
     }
 }
 
-pub fn tally_ballots1(
-    encrypted_ballots: &[BallotEncrypted],
-    manifest: &ElectionManifest,
-) -> Option<BTreeMap<ContestIndex, Vec<Ciphertext>>> {
-    let mut pre_result: BTreeMap<ContestIndex, Vec<ContestEncrypted>> = BTreeMap::new();
-
-    for ballot in encrypted_ballots {
-        for (idx, contest) in &ballot.contests {
-            if let Some(v) = pre_result.get_mut(idx) {
-                v.push(contest.clone());
-            } else {
-                pre_result.insert(*idx, vec![contest.clone()]);
-            }
-        }
-    }
-
-    let mut result = BTreeMap::new();
-
-    for (k, v) in pre_result {
-        let number_of_candidates = manifest.contests.get(k)?.options.len();
-        result.insert(k, tally_votes(&v, number_of_candidates)?);
-    }
-
-    Some(result)
-}
-
-pub fn tally_ballots2(
+/// This function takes a slice of encrypted ballots and tallies up the votes on each option in
+/// each contest. The result is map from `ContestIndex` to `Vec<Ciphertext>` that given a contest
+/// index gives the encrypted result for the contest, namely a vector of encrypted tallies; one for
+/// each option in the contest.
+pub fn tally_ballots(
     encrypted_ballots: &[BallotEncrypted],
     manifest: &ElectionManifest,
 ) -> Option<BTreeMap<ContestIndex, Vec<Ciphertext>>> {
@@ -218,12 +196,26 @@ mod test {
 
     use super::*;
     use crate::{
-        ballot::BallotEncrypted, contest_selection::ContestSelection, device::Device,
-        election_record::PreVotingData, example_election_manifest::example_election_manifest,
+        ballot::BallotEncrypted,
+        contest_selection::ContestSelection,
+        device::Device,
+        election_manifest::{Contest, ContestOption},
+        election_record::PreVotingData,
+        example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters,
-        guardian_secret_key::GuardianSecretKey, hashes::Hashes, hashes_ext::HashesExt,
-        index::Index, joint_election_public_key::JointElectionPublicKey, election_manifest::{Contest, ContestOption},
+        guardian_public_key::GuardianPublicKey,
+        guardian_secret_key::GuardianSecretKey,
+        guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
+        hashes::Hashes,
+        hashes_ext::HashesExt,
+        index::Index,
+        joint_election_public_key::JointElectionPublicKey,
+        verifiable_decryption::{
+            CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption,
+        },
     };
+    use num_bigint::BigUint;
+    use std::iter::zip;
     use util::csprng::Csprng;
 
     fn g_key(i: u32) -> GuardianSecretKey {
@@ -348,13 +340,12 @@ mod test {
         assert!(verify_result)
     }
 
-
     fn short_manifest() -> ElectionManifest {
         let contests = [
             // Contest index 1:
             Contest {
                 label: "Minister of Arcane Sciences".to_string(),
-                selection_limit: 1,
+                selection_limit: 2,
                 options: [
                     ContestOption {
                         label: "Élyria Moonshadow\n(Crystâlheärt)".to_string(),
@@ -368,7 +359,9 @@ mod test {
                     ContestOption {
                         label: "Gávrïel Runëbørne\n(Stärsky)".to_string(),
                     },
-                ].try_into().unwrap(),
+                ]
+                .try_into()
+                .unwrap(),
             },
             // Contest index 2:
             Contest {
@@ -384,7 +377,9 @@ mod test {
                     ContestOption {
                         label: "Tèrra Stonebinder\n(Independent)".to_string(),
                     },
-                ].try_into().unwrap(),
+                ]
+                .try_into()
+                .unwrap(),
             },
             // Contest index 3:
             Contest {
@@ -400,39 +395,34 @@ mod test {
                     ContestOption {
                         label: "Jasper Moonstep\n(Stärsky)".to_string(),
                     },
-                ].try_into().unwrap(),
+                ]
+                .try_into()
+                .unwrap(),
             },
-        ].try_into().unwrap();
+        ]
+        .try_into()
+        .unwrap();
 
         let ballot_styles = [
             // Ballot style index 1:
             BallotStyle {
                 label: "Smoothstone County Ballot".to_string(),
                 contests: BTreeSet::from(
-                    [
-                        1u32, 3,
-                    ]
-                    .map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
+                    [1u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
                 ),
             },
             // Ballot style index 2:
             BallotStyle {
                 label: "Silvërspîre County Ballot".to_string(),
                 contests: BTreeSet::from(
-                    [
-                        2u32, 3
-                    ]
-                    .map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
+                    [2u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
                 ),
             },
             // Ballot style index 3:
             BallotStyle {
                 label: "Another County Ballot".to_string(),
                 contests: BTreeSet::from(
-                    [
-                        1, 2u32, 3
-                    ]
-                    .map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
+                    [1, 2u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
                 ),
             },
         ]
@@ -446,7 +436,76 @@ mod test {
         }
     }
 
+    fn decryption_helper(
+        key_shares: &[GuardianSecretKeyShare],
+        csprng: &mut Csprng,
+        pre_voting_data: &PreVotingData,
+        ciphertext: &Ciphertext,
+        guardian_public_keys: &Vec<GuardianPublicKey>,
+    ) -> VerifiableDecryption {
+        let dec_shares: Vec<_> = key_shares
+            .iter()
+            .map(|ks| {
+                DecryptionShare::from(&pre_voting_data.parameters.fixed_parameters, ks, ciphertext)
+            })
+            .collect();
+        let combined_dec_share =
+            CombinedDecryptionShare::combine(&pre_voting_data.parameters, &dec_shares).unwrap();
+        let mut com_shares = vec![];
+        let mut com_states = vec![];
+        for ks in key_shares.iter() {
+            let (share, state) = DecryptionProof::generate_commit_share(
+                csprng,
+                &pre_voting_data.parameters.fixed_parameters,
+                ciphertext,
+                &ks.i,
+            );
+            com_shares.push(share);
+            com_states.push(state);
+        }
+        let election_parameters = &pre_voting_data.parameters;
+        let joint_election_public_key_clone = &pre_voting_data.public_key;
+        let rsp_shares: Vec<_> = com_states
+            .iter()
+            .zip(key_shares)
+            .map(|(state, key_share)| {
+                DecryptionProof::generate_response_share(
+                    &election_parameters.fixed_parameters,
+                    &pre_voting_data.clone().hashes_ext.h_e,
+                    &joint_election_public_key_clone,
+                    ciphertext,
+                    &combined_dec_share,
+                    &com_shares,
+                    state,
+                    &key_share,
+                )
+                .unwrap()
+            })
+            .collect();
 
+        let proof = DecryptionProof::combine_proof(
+            &election_parameters,
+            &pre_voting_data.clone().hashes_ext.h_e,
+            ciphertext,
+            &dec_shares,
+            &com_shares,
+            &rsp_shares,
+            &guardian_public_keys,
+        )
+        .unwrap();
+
+        let decryption = VerifiableDecryption::new(
+            &election_parameters.fixed_parameters,
+            &joint_election_public_key_clone,
+            ciphertext,
+            &combined_dec_share,
+            &proof,
+        )
+        .unwrap();
+        decryption
+    }
+
+    /// Testing that encrypted tallies decrypt the expected result
     #[test]
     fn test_tally_ballot() {
         let election_manifest = short_manifest();
@@ -464,6 +523,7 @@ mod test {
         let pk4 = sk4.make_public_key();
         let pk5 = sk5.make_public_key();
 
+        let guardian_secret_keys = vec![sk1, sk2, sk3, sk4, sk5];
         let guardian_public_keys = vec![pk1, pk2, pk3, pk4, pk5];
 
         let joint_election_public_key =
@@ -481,19 +541,22 @@ mod test {
 
         let pre_voting_data = PreVotingData {
             manifest: election_manifest.clone(),
-            parameters: election_parameters,
+            parameters: election_parameters.clone(),
             hashes,
             hashes_ext,
-            public_key: joint_election_public_key,
+            public_key: joint_election_public_key.clone(),
         };
-        let device = Device::new("Some encryption device", pre_voting_data);
+        let device = Device::new("Some encryption device", pre_voting_data.clone());
         let seed = vec![0, 1, 2, 3];
         let mut csprng = Csprng::new(&seed);
         let primary_nonce = vec![0, 1, 2, 2, 2, 2, 2, 2, 3];
-        let voter1 = BTreeMap::from([ // Voting on 1 and 3 only, ballot style 1
+        let voter1 = BTreeMap::from([
+            // Voting on 1 and 3 only, ballot style 1
             (
                 Index::from_one_based_index(1).unwrap(),
-                ContestSelection { vote: vec![0, 1, 0, 0] },
+                ContestSelection {
+                    vote: vec![1, 1, 0, 0],
+                },
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
@@ -503,10 +566,13 @@ mod test {
             ),
         ]);
 
-        let voter2 = BTreeMap::from([ // Voting on 2 and 3 only, ballot style 2
+        let voter2 = BTreeMap::from([
+            // Voting on 2 and 3 only, ballot style 2
             (
                 Index::from_one_based_index(2).unwrap(),
-                ContestSelection { vote: vec![0, 1, 0] },
+                ContestSelection {
+                    vote: vec![0, 1, 0],
+                },
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
@@ -515,10 +581,13 @@ mod test {
                 },
             ),
         ]);
-        let voter3 = BTreeMap::from([ // Voting on all three, ballot style 3
+        let voter3 = BTreeMap::from([
+            // Voting on all three, ballot style 3
             (
                 Index::from_one_based_index(1).unwrap(),
-                ContestSelection { vote: vec![1, 0, 0, 0] },
+                ContestSelection {
+                    vote: vec![1, 0, 0, 0],
+                },
             ),
             (
                 Index::from_one_based_index(2).unwrap(),
@@ -550,9 +619,114 @@ mod test {
         assert!(verify_result3);
 
         let encrypted_ballots = vec![ballot_voter1, ballot_voter2, ballot_voter3];
-        let tally1 = tally_ballots1(&encrypted_ballots, &election_manifest).unwrap();
-        let tally2 = tally_ballots2(&encrypted_ballots, &election_manifest).unwrap();
-        let eq = tally1 == tally2;
-        assert!(eq);
+        let tally = tally_ballots(&encrypted_ballots, &election_manifest).unwrap();
+
+        let result_contest_1 = tally.get(&Index::from_one_based_index(1).unwrap()).unwrap();
+        let result_contest_2 = tally.get(&Index::from_one_based_index(2).unwrap()).unwrap();
+        let result_contest_3 = tally.get(&Index::from_one_based_index(3).unwrap()).unwrap();
+
+        // Decryption
+        let share_vecs = guardian_public_keys
+            .iter()
+            .map(|pk| {
+                guardian_secret_keys
+                    .iter()
+                    .map(|dealer_sk| {
+                        GuardianEncryptedShare::new(
+                            &mut csprng,
+                            &election_parameters.clone(),
+                            dealer_sk,
+                            &pk,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let key_shares = zip(&guardian_secret_keys, share_vecs)
+            .map(|(sk, shares)| {
+                GuardianSecretKeyShare::compute(
+                    &election_parameters,
+                    &guardian_public_keys,
+                    &shares,
+                    &sk,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let decryption_contest_1: Vec<_> = result_contest_1
+            .iter()
+            .map(|ct| {
+                let dec = decryption_helper(
+                    &key_shares,
+                    &mut csprng,
+                    &pre_voting_data,
+                    ct,
+                    &guardian_public_keys,
+                );
+                assert!(dec.verify(
+                    &pre_voting_data.parameters.fixed_parameters,
+                    &pre_voting_data.hashes_ext.h_e,
+                    &pre_voting_data.public_key,
+                    ct
+                ));
+                dec.plain_text
+            })
+            .collect();
+        assert_eq!(
+            decryption_contest_1,
+            vec![
+                BigUint::from(2u8),
+                BigUint::from(1u8),
+                BigUint::from(0u8),
+                BigUint::from(0u8)
+            ]
+        );
+        let decryption_contest_2: Vec<_> = result_contest_2
+            .iter()
+            .map(|ct| {
+                let dec = decryption_helper(
+                    &key_shares,
+                    &mut csprng,
+                    &pre_voting_data,
+                    ct,
+                    &guardian_public_keys,
+                );
+                assert!(dec.verify(
+                    &pre_voting_data.parameters.fixed_parameters,
+                    &pre_voting_data.hashes_ext.h_e,
+                    &pre_voting_data.public_key,
+                    ct
+                ));
+                dec.plain_text
+            })
+            .collect();
+        assert_eq!(
+            decryption_contest_2,
+            vec![BigUint::from(1u8), BigUint::from(1u8), BigUint::from(0u8)]
+        );
+        let decryption_contest_3: Vec<_> = result_contest_3
+            .iter()
+            .map(|ct| {
+                let dec = decryption_helper(
+                    &key_shares,
+                    &mut csprng,
+                    &pre_voting_data,
+                    ct,
+                    &guardian_public_keys,
+                );
+                assert!(dec.verify(
+                    &pre_voting_data.parameters.fixed_parameters,
+                    &pre_voting_data.hashes_ext.h_e,
+                    &pre_voting_data.public_key,
+                    ct
+                ));
+                dec.plain_text
+            })
+            .collect();
+        assert_eq!(
+            decryption_contest_3,
+            vec![BigUint::from(1u8), BigUint::from(2u8), BigUint::from(0u8)]
+        );
     }
 }

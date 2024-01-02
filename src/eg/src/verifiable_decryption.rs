@@ -646,13 +646,13 @@ mod test {
         guardian_secret_key::GuardianSecretKey,
         guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
         hash::HValue,
-        joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+        joint_election_public_key::JointElectionPublicKey,
         varying_parameters::{BallotChaining, VaryingParameters},
         verifiable_decryption::ShareCombinationError,
     };
 
     use super::{
-        CombinedDecryptionShare, DecryptionProof, DecryptionProofCommitShare, DecryptionShare,
+        CombinedDecryptionShare, DecryptionProof, DecryptionShare,
         VerifiableDecryption,
     };
 

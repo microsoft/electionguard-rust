@@ -76,11 +76,14 @@ impl ContestEncrypted {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let o_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
             let nonce = nonce(header, primary_nonce, contest_index, o_idx);
-            vote.push((header.public_key.encrypt_with(
-                &header.parameters.fixed_parameters,
-                &nonce,
-                pt_vote.vote[j - 1] as usize,
-            ), Nonce::new(nonce)));
+            vote.push((
+                header.public_key.encrypt_with(
+                    &header.parameters.fixed_parameters,
+                    &nonce,
+                    pt_vote.vote[j - 1] as usize,
+                ),
+                Nonce::new(nonce),
+            ));
         }
         vote
     }
@@ -95,7 +98,10 @@ impl ContestEncrypted {
     ) -> ContestEncrypted {
         let selection_and_nonce =
             Self::encrypt_selection(&device.header, primary_nonce, contest_index, pt_vote);
-        let selection = selection_and_nonce.iter().map(|(ct, _)| ct.clone()).collect::<Vec<_>>();
+        let selection = selection_and_nonce
+            .iter()
+            .map(|(ct, _)| ct.clone())
+            .collect::<Vec<_>>();
         let contest_hash = contest_hash::contest_hash(&device.header, contest_index, &selection);
 
         let mut proof_ballot_correctness = Vec1::new();
@@ -232,22 +238,4 @@ impl ContestEncrypted {
 
         self.verify_selection_limit(header, selection_limit)
     }
-}
-
-pub fn tally_votes(
-    encrypted_contests: &[ContestEncrypted],
-    number_of_candidates: usize,
-) -> Option<Vec<Ciphertext>> {
-    let mut result = vec![Ciphertext::one(); number_of_candidates];
-    for contest in encrypted_contests {
-        if contest.selection.len() != number_of_candidates {
-            return None;
-        }
-        for (j, encryption) in contest.selection.iter().enumerate() {
-            result[j].alpha = &result[j].alpha * &encryption.alpha;
-            result[j].beta = &result[j].beta * &encryption.beta;
-        }
-    }
-
-    Some(result)
 }

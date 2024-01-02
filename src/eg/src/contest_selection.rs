@@ -10,8 +10,12 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
-    election_manifest::Contest, election_record::PreVotingData, index::Index,
-    joint_election_public_key::{Ciphertext, Nonce}, vec1::HasIndexType, zk::ProofRange,
+    election_manifest::Contest,
+    election_record::PreVotingData,
+    index::Index,
+    joint_election_public_key::{Ciphertext, Nonce},
+    vec1::HasIndexType,
+    zk::ProofRange,
 };
 
 // An encrypted option in a contest.
