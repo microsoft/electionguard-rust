@@ -110,25 +110,17 @@ impl BallotEncrypted {
         }
     }
 
-    pub fn contests(&self) -> &BTreeMap<ContestIndex, ContestEncrypted> {
-        &self.contests
-    }
+    pub fn contests(&self) -> &BTreeMap<ContestIndex, ContestEncrypted> { &self.contests }
 
-    pub fn confirmation_code(&self) -> &HValue {
-        &self.confirmation_code
-    }
+    pub fn confirmation_code(&self) -> &HValue { &self.confirmation_code }
 
-    pub fn date(&self) -> &String {
-        &self.date
-    }
+    pub fn date(&self) -> &String { &self.date }
 
-    pub fn device(&self) -> &String {
-        &self.device
-    }
+    pub fn device(&self) -> &String { &self.device }
 
-    /// Verify all of the [`ContestEncrypted`] in the [`BallotEncrypted`]. Given a ballot style it checks
-    /// that all contests are voted on in the ballot style, and that all of the vote proofs are
-    /// correct.
+    /// Verify all of the [`ContestEncrypted`] in the [`BallotEncrypted`]. Given
+    /// a ballot style it checks that all contests are voted on in the
+    /// ballot style, and that all of the vote proofs are correct.
     pub fn verify(&self, header: &PreVotingData, ballot_style_index: Index<BallotStyle>) -> bool {
         let Some(ballot_style) = header.manifest.ballot_styles.get(ballot_style_index) else {
             return false;
@@ -161,32 +153,64 @@ impl BallotEncrypted {
     }
 }
 
-/// This function takes a slice of encrypted ballots and tallies up the votes on each option in
-/// each contest. The result is map from `ContestIndex` to `Vec<Ciphertext>` that given a contest
-/// index gives the encrypted result for the contest, namely a vector of encrypted tallies; one for
-/// each option in the contest.
+/// This function takes an iterator over encrypted ballots and tallies up the
+/// votes on each option in each contest. The result is map from `ContestIndex`
+/// to `Vec<Ciphertext>` that given a contest index gives the encrypted result
+/// for the contest, namely a vector of encrypted tallies; one for each option
+/// in the contest.
 pub fn tally_ballots(
-    encrypted_ballots: &[BallotEncrypted],
+    encrypted_ballots: impl IntoIterator<Item = BallotEncrypted>,
     manifest: &ElectionManifest,
 ) -> Option<BTreeMap<ContestIndex, Vec<Ciphertext>>> {
-    let mut result: BTreeMap<ContestIndex, Vec<Ciphertext>> = BTreeMap::new();
+    let mut result = BallotTallyBuilder::new(manifest);
 
     for ballot in encrypted_ballots {
-        for (idx, contest) in &ballot.contests {
-            if contest.selection.len() != manifest.contests.get(*idx)?.options.len() {
-                return None;
+        if !result.update(ballot) {
+            return None;
+        }
+    }
+    Some(result.finalize())
+}
+
+/// A builder to tally ballots incrementally.
+pub struct BallotTallyBuilder<'a> {
+    manifest: &'a ElectionManifest,
+    state:    BTreeMap<ContestIndex, Vec<Ciphertext>>,
+}
+
+impl<'a> BallotTallyBuilder<'a> {
+    pub fn new(manifest: &'a ElectionManifest) -> Self {
+        Self {
+            manifest,
+            state: BTreeMap::new(),
+        }
+    }
+
+    /// Conclude the tallying and get the result.
+    pub fn finalize(self) -> BTreeMap<ContestIndex, Vec<Ciphertext>> { self.state }
+
+    /// Update the tally with a new ballot. Returns whether the
+    /// new ballot was compatible with the tally. If `false` is returned then
+    /// the tally is not updated.
+    pub fn update(&mut self, ballot: BallotEncrypted) -> bool {
+        for (idx, contest) in ballot.contests {
+            let Some(manifest_contest) = self.manifest.contests.get(idx) else {
+                return false;
+            };
+            if contest.selection.len() != manifest_contest.options.len() {
+                return false;
             }
-            if let Some(v) = result.get_mut(idx) {
+            if let Some(v) = self.state.get_mut(&idx) {
                 for (j, encryption) in contest.selection.iter().enumerate() {
                     v[j].alpha = &v[j].alpha * &encryption.alpha;
                     v[j].beta = &v[j].beta * &encryption.beta;
                 }
             } else {
-                result.insert(*idx, contest.selection.clone());
+                self.state.insert(idx, contest.selection);
             }
         }
+        true
     }
-    Some(result)
 }
 
 #[cfg(test)]
@@ -279,54 +303,36 @@ mod test {
         let mut csprng = Csprng::new(&seed);
         let primary_nonce = vec![0, 1, 2, 2, 2, 2, 2, 2, 3];
         let selections = BTreeMap::from([
-            (
-                Index::from_one_based_index(1).unwrap(),
-                ContestSelection { vote: vec![1, 0] },
-            ),
-            (
-                Index::from_one_based_index(2).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 0, 1],
-                },
-            ),
-            (
-                Index::from_one_based_index(4).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(5).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(6).unwrap(),
-                ContestSelection { vote: vec![1, 0] },
-            ),
-            (
-                Index::from_one_based_index(7).unwrap(),
-                ContestSelection { vote: vec![0, 0] },
-            ),
-            (
-                Index::from_one_based_index(8).unwrap(),
-                ContestSelection { vote: vec![0, 1] },
-            ),
-            (
-                Index::from_one_based_index(9).unwrap(),
-                ContestSelection { vote: vec![1, 0] },
-            ),
-            (
-                Index::from_one_based_index(11).unwrap(),
-                ContestSelection { vote: vec![0, 1] },
-            ),
+            (Index::from_one_based_index(1).unwrap(), ContestSelection {
+                vote: vec![1, 0],
+            }),
+            (Index::from_one_based_index(2).unwrap(), ContestSelection {
+                vote: vec![0, 1, 0, 0],
+            }),
+            (Index::from_one_based_index(3).unwrap(), ContestSelection {
+                vote: vec![0, 0, 1],
+            }),
+            (Index::from_one_based_index(4).unwrap(), ContestSelection {
+                vote: vec![1, 0, 0],
+            }),
+            (Index::from_one_based_index(5).unwrap(), ContestSelection {
+                vote: vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+            }),
+            (Index::from_one_based_index(6).unwrap(), ContestSelection {
+                vote: vec![1, 0],
+            }),
+            (Index::from_one_based_index(7).unwrap(), ContestSelection {
+                vote: vec![0, 0],
+            }),
+            (Index::from_one_based_index(8).unwrap(), ContestSelection {
+                vote: vec![0, 1],
+            }),
+            (Index::from_one_based_index(9).unwrap(), ContestSelection {
+                vote: vec![1, 0],
+            }),
+            (Index::from_one_based_index(11).unwrap(), ContestSelection {
+                vote: vec![0, 1],
+            }),
         ]);
 
         let ballot_from_selections =
@@ -344,9 +350,9 @@ mod test {
         let contests = [
             // Contest index 1:
             Contest {
-                label: "Minister of Arcane Sciences".to_string(),
+                label:           "Minister of Arcane Sciences".to_string(),
                 selection_limit: 2,
-                options: [
+                options:         [
                     ContestOption {
                         label: "Élyria Moonshadow\n(Crystâlheärt)".to_string(),
                     },
@@ -365,9 +371,9 @@ mod test {
             },
             // Contest index 2:
             Contest {
-                label: "Minister of Elemental Resources".to_string(),
+                label:           "Minister of Elemental Resources".to_string(),
                 selection_limit: 1,
-                options: [
+                options:         [
                     ContestOption {
                         label: "Tïtus Stormforge\n(Ætherwïng)".to_string(),
                     },
@@ -383,9 +389,9 @@ mod test {
             },
             // Contest index 3:
             Contest {
-                label: "Minister of Dance".to_string(),
+                label:           "Minister of Dance".to_string(),
                 selection_limit: 1,
-                options: [
+                options:         [
                     ContestOption {
                         label: "Äeliana Sunsong\n(Crystâlheärt)".to_string(),
                     },
@@ -406,21 +412,21 @@ mod test {
         let ballot_styles = [
             // Ballot style index 1:
             BallotStyle {
-                label: "Smoothstone County Ballot".to_string(),
+                label:    "Smoothstone County Ballot".to_string(),
                 contests: BTreeSet::from(
                     [1u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
                 ),
             },
             // Ballot style index 2:
             BallotStyle {
-                label: "Silvërspîre County Ballot".to_string(),
+                label:    "Silvërspîre County Ballot".to_string(),
                 contests: BTreeSet::from(
                     [2u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
                 ),
             },
             // Ballot style index 3:
             BallotStyle {
-                label: "Another County Ballot".to_string(),
+                label:    "Another County Ballot".to_string(),
                 contests: BTreeSet::from(
                     [1, 2u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
                 ),
@@ -552,55 +558,34 @@ mod test {
         let primary_nonce = vec![0, 1, 2, 2, 2, 2, 2, 2, 3];
         let voter1 = BTreeMap::from([
             // Voting on 1 and 3 only, ballot style 1
-            (
-                Index::from_one_based_index(1).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 1, 0, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0],
-                },
-            ),
+            (Index::from_one_based_index(1).unwrap(), ContestSelection {
+                vote: vec![1, 1, 0, 0],
+            }),
+            (Index::from_one_based_index(3).unwrap(), ContestSelection {
+                vote: vec![0, 1, 0],
+            }),
         ]);
 
         let voter2 = BTreeMap::from([
             // Voting on 2 and 3 only, ballot style 2
-            (
-                Index::from_one_based_index(2).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0],
-                },
-            ),
+            (Index::from_one_based_index(2).unwrap(), ContestSelection {
+                vote: vec![0, 1, 0],
+            }),
+            (Index::from_one_based_index(3).unwrap(), ContestSelection {
+                vote: vec![0, 1, 0],
+            }),
         ]);
         let voter3 = BTreeMap::from([
             // Voting on all three, ballot style 3
-            (
-                Index::from_one_based_index(1).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(2).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0],
-                },
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0],
-                },
-            ),
+            (Index::from_one_based_index(1).unwrap(), ContestSelection {
+                vote: vec![1, 0, 0, 0],
+            }),
+            (Index::from_one_based_index(2).unwrap(), ContestSelection {
+                vote: vec![1, 0, 0],
+            }),
+            (Index::from_one_based_index(3).unwrap(), ContestSelection {
+                vote: vec![1, 0, 0],
+            }),
         ]);
         let ballot_voter1 =
             BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter1);
@@ -619,7 +604,7 @@ mod test {
         assert!(verify_result3);
 
         let encrypted_ballots = vec![ballot_voter1, ballot_voter2, ballot_voter3];
-        let tally = tally_ballots(&encrypted_ballots, &election_manifest).unwrap();
+        let tally = tally_ballots(encrypted_ballots, &election_manifest).unwrap();
 
         let result_contest_1 = tally.get(&Index::from_one_based_index(1).unwrap()).unwrap();
         let result_contest_2 = tally.get(&Index::from_one_based_index(2).unwrap()).unwrap();
@@ -673,15 +658,12 @@ mod test {
                 dec.plain_text
             })
             .collect();
-        assert_eq!(
-            decryption_contest_1,
-            vec![
-                BigUint::from(2u8),
-                BigUint::from(1u8),
-                BigUint::from(0u8),
-                BigUint::from(0u8)
-            ]
-        );
+        assert_eq!(decryption_contest_1, vec![
+            BigUint::from(2u8),
+            BigUint::from(1u8),
+            BigUint::from(0u8),
+            BigUint::from(0u8)
+        ]);
         let decryption_contest_2: Vec<_> = result_contest_2
             .iter()
             .map(|ct| {
@@ -701,10 +683,11 @@ mod test {
                 dec.plain_text
             })
             .collect();
-        assert_eq!(
-            decryption_contest_2,
-            vec![BigUint::from(1u8), BigUint::from(1u8), BigUint::from(0u8)]
-        );
+        assert_eq!(decryption_contest_2, vec![
+            BigUint::from(1u8),
+            BigUint::from(1u8),
+            BigUint::from(0u8)
+        ]);
         let decryption_contest_3: Vec<_> = result_contest_3
             .iter()
             .map(|ct| {
@@ -724,9 +707,10 @@ mod test {
                 dec.plain_text
             })
             .collect();
-        assert_eq!(
-            decryption_contest_3,
-            vec![BigUint::from(1u8), BigUint::from(2u8), BigUint::from(0u8)]
-        );
+        assert_eq!(decryption_contest_3, vec![
+            BigUint::from(1u8),
+            BigUint::from(2u8),
+            BigUint::from(0u8)
+        ]);
     }
 }
