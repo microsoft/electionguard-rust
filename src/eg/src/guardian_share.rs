@@ -522,13 +522,14 @@ mod test {
         let pk_one = sk_one.make_public_key();
         let pk_two = sk_two.make_public_key();
 
-        let encrypted_share =
+        let encrypted_result =
             GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_one, &pk_two);
 
-        let result =
-            encrypted_share
-                .ciphertext
-                .decrypt_and_validate(&election_parameters, &pk_one, &sk_two);
+        let result = encrypted_result.ciphertext.decrypt_and_validate(
+            &election_parameters,
+            &pk_one,
+            &sk_two,
+        );
 
         assert!(result.is_ok(), "The decrypted share should be valid");
     }
@@ -600,5 +601,57 @@ mod test {
         let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.q);
 
         assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.")
+    }
+
+    #[test]
+    fn test_public_validation() {
+        let mut csprng = Csprng::new(b"test_proof_generation");
+
+        let election_parameters = example_election_parameters();
+
+        let index_one = GuardianIndex::from_one_based_index(1).unwrap();
+        let index_two = GuardianIndex::from_one_based_index(2).unwrap();
+        let sk_one =
+            GuardianSecretKey::generate(&mut csprng, &election_parameters, index_one, None);
+        let sk_two =
+            GuardianSecretKey::generate(&mut csprng, &election_parameters, index_two, None);
+        let pk_one = sk_one.make_public_key();
+        let pk_two = sk_two.make_public_key();
+
+        let enc_res_1 =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_one, &pk_two);
+
+        let enc_res_2 =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_one, &pk_one);
+        let enc_res_3 =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_two, &pk_one);
+
+        assert!(
+            enc_res_1.ciphertext.public_validation(
+                &election_parameters,
+                &pk_one,
+                &pk_two,
+                &enc_res_1.secret
+            ),
+            "The ciphertext should be valid"
+        );
+        assert!(
+            !enc_res_2.ciphertext.public_validation(
+                &election_parameters,
+                &pk_one,
+                &pk_two,
+                &enc_res_1.secret
+            ),
+            "The ciphertext should not be valid"
+        );
+        assert!(
+            !enc_res_3.ciphertext.public_validation(
+                &election_parameters,
+                &pk_one,
+                &pk_two,
+                &enc_res_1.secret
+            ),
+            "The ciphertext should not be valid"
+        );
     }
 }
