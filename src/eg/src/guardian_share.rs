@@ -8,6 +8,7 @@
 //! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
 
 use num_bigint::BigUint;
+use num_traits::One;
 use serde::{Deserialize, Serialize};
 use std::iter::zip;
 use thiserror::Error;
@@ -53,6 +54,9 @@ pub enum DecryptionError {
     /// Occurs if the mac is invalid.
     #[error("The MAC does not verify.")]
     InvalidMAC,
+    /// Occurs if the decrypted share is invalid with respect to the dealer's public key.
+    #[error("The share does not validate against the dealer's public key.")]
+    InvalidShare,
 }
 
 impl GuardianEncryptedShare {
@@ -226,9 +230,30 @@ impl GuardianEncryptedShare {
             return Err(DecryptionError::InvalidMAC);
         }
 
+        // Decryption as in Equation `20`
         let p_l_bytes = xor(self.c1.0.as_slice(), k1.0.as_slice());
+        let p_l = BigUint::from_bytes_be(p_l_bytes.as_slice());
 
-        Ok(BigUint::from_bytes_be(p_l_bytes.as_slice()))
+
+        // Share validity check 
+        let g_p_l = fixed_parameters.g.modpow(&p_l, p);
+        // RHS of Equation `21`
+        let l = &BigUint::from(l);
+        let vec_k_i_j = &dealer_public_key.coefficient_commitments.0;
+        let rhs = vec_k_i_j.iter().enumerate().fold(
+            BigUint::one(),
+            |prod, (j, k_i_j)| {
+                //This is fine as j < k
+                #[allow(clippy::unwrap_used)]
+                let j: u32 = j.try_into().unwrap();
+                (prod * k_i_j.0.modpow(&l.pow(j), p)) % p
+            },
+        );
+        if g_p_l != rhs {
+            return Err(DecryptionError::InvalidShare);
+        }
+
+        Ok(p_l)
     }
 }
 
