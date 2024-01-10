@@ -389,7 +389,7 @@ mod test {
                             &mut csprng,
                             &election_parameters,
                             dealer_sk,
-                            &pk,
+                            pk,
                         )
                     })
                     .collect::<Vec<_>>()
@@ -401,7 +401,7 @@ mod test {
                     &election_parameters,
                     &guardian_public_keys,
                     &shares,
-                    &sk,
+                    sk,
                 )
                 .unwrap()
             })

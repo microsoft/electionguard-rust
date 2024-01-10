@@ -250,13 +250,12 @@ mod test {
 
         let mut csprng = Csprng::new(&seed);
 
-        let secret_key = GuardianSecretKey::generate(
+        GuardianSecretKey::generate(
             &mut csprng,
             &example_election_parameters(),
             Index::from_one_based_index_const(i).unwrap(),
             None,
-        );
-        secret_key
+        )
     }
 
     #[test]
@@ -292,7 +291,7 @@ mod test {
         );
 
         let pre_voting_data = PreVotingData {
-            manifest: election_manifest.clone(),
+            manifest: election_manifest,
             parameters: election_parameters,
             hashes,
             hashes_ext,
@@ -477,38 +476,37 @@ mod test {
             .map(|(state, key_share)| {
                 DecryptionProof::generate_response_share(
                     &election_parameters.fixed_parameters,
-                    &pre_voting_data.clone().hashes_ext.h_e,
-                    &joint_election_public_key_clone,
+                    &pre_voting_data.clone().hashes_ext,
+                    joint_election_public_key_clone,
                     ciphertext,
                     &combined_dec_share,
                     &com_shares,
                     state,
-                    &key_share,
+                    key_share,
                 )
                 .unwrap()
             })
             .collect();
 
         let proof = DecryptionProof::combine_proof(
-            &election_parameters,
-            &pre_voting_data.clone().hashes_ext.h_e,
+            election_parameters,
+            &pre_voting_data.clone().hashes_ext,
             ciphertext,
             &dec_shares,
             &com_shares,
             &rsp_shares,
-            &guardian_public_keys,
+            guardian_public_keys,
         )
         .unwrap();
 
-        let decryption = VerifiableDecryption::new(
+        VerifiableDecryption::new(
             &election_parameters.fixed_parameters,
-            &joint_election_public_key_clone,
+            joint_election_public_key_clone,
             ciphertext,
             &combined_dec_share,
             &proof,
         )
-        .unwrap();
-        decryption
+        .unwrap()
     }
 
     /// Testing that encrypted tallies decrypt the expected result
@@ -550,7 +548,7 @@ mod test {
             parameters: election_parameters.clone(),
             hashes,
             hashes_ext,
-            public_key: joint_election_public_key.clone(),
+            public_key: joint_election_public_key,
         };
         let device = Device::new("Some encryption device", pre_voting_data.clone());
         let seed = vec![0, 1, 2, 3];
@@ -621,7 +619,7 @@ mod test {
                             &mut csprng,
                             &election_parameters.clone(),
                             dealer_sk,
-                            &pk,
+                            pk,
                         )
                     })
                     .collect::<Vec<_>>()
@@ -633,7 +631,7 @@ mod test {
                     &election_parameters,
                     &guardian_public_keys,
                     &shares,
-                    &sk,
+                    sk,
                 )
                 .unwrap()
             })
@@ -651,7 +649,7 @@ mod test {
                 );
                 assert!(dec.verify(
                     &pre_voting_data.parameters.fixed_parameters,
-                    &pre_voting_data.hashes_ext.h_e,
+                    &pre_voting_data.hashes_ext,
                     &pre_voting_data.public_key,
                     ct
                 ));
@@ -676,7 +674,7 @@ mod test {
                 );
                 assert!(dec.verify(
                     &pre_voting_data.parameters.fixed_parameters,
-                    &pre_voting_data.hashes_ext.h_e,
+                    &pre_voting_data.hashes_ext,
                     &pre_voting_data.public_key,
                     ct
                 ));
@@ -700,7 +698,7 @@ mod test {
                 );
                 assert!(dec.verify(
                     &pre_voting_data.parameters.fixed_parameters,
-                    &pre_voting_data.hashes_ext.h_e,
+                    &pre_voting_data.hashes_ext,
                     &pre_voting_data.public_key,
                     ct
                 ));
