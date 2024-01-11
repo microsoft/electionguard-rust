@@ -7,7 +7,6 @@
 //!
 //! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
 
-use digest::typenum::False;
 use num_bigint::BigUint;
 use num_traits::One;
 use serde::{Deserialize, Serialize};
@@ -476,7 +475,7 @@ impl GuardianSecretKeyShare {
                 Ok(share) => shares.push(share),
             }
         }
-        if issues.len() > 0 {
+        if !issues.is_empty() {
             let info = issues.iter().fold(String::new(), |acc, (i,_)| {
                 if acc.is_empty() {
                     i.get_one_based_usize().to_string()
