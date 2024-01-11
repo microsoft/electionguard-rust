@@ -401,9 +401,9 @@ pub enum ShareCombinationError {
     /// Occurs if the public key of a guardian is missing.
     #[error("The public key of guardian {0} is missing.")]
     MissingGuardian(String),
-    /// Occurs if a share could not be decrypted.
-    #[error("Could not decrypt and validate share from guardian {0}: {1}")]
-    DecryptionError(GuardianIndex, DecryptionError),
+    /// Occurs if any share could not be decrypted.
+    #[error("Could not decrypt and validate all shares. There are issues with shares from the following guardians: {0}")]
+    DecryptionError(String),
 }
 
 impl GuardianSecretKeyShare {
@@ -468,12 +468,23 @@ impl GuardianSecretKeyShare {
 
         // Decrypt and validate shares
         let mut shares = vec![];
+        let mut issues = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
             let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
             match res {
-                Err(e) => return Err(ShareCombinationError::DecryptionError(pk.i, e)),
+                Err(e) => issues.push((pk.i, e)),
                 Ok(share) => shares.push(share),
             }
+        }
+        if issues.len() > 0 {
+            let info = issues.iter().fold(String::new(), |acc, (i,_)| {
+                if acc.is_empty() {
+                    i.get_one_based_usize().to_string()
+                } else {
+                    acc + "," + &i.get_one_based_usize().to_string()
+                }
+            });            
+            return Err(ShareCombinationError::DecryptionError(info));
         }
 
         let key = shares.iter().fold(BigUint::from(0_u8), |mut acc, share| {
