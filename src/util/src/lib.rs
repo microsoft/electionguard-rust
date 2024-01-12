@@ -15,3 +15,5 @@ pub mod hex_dump;
 pub mod integer_util;
 pub mod logging;
 pub mod prime;
+pub mod algebra;
+
