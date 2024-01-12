@@ -5,7 +5,7 @@
 
 //! This module provides wrappers around `BigUnit` to separate group and field elements in the code.
 
-use crate::{csprng::Csprng, prime::is_prime};
+use crate::{csprng::Csprng, prime::is_prime, integer_util::{cnt_bits_repr, to_be_bytes_left_pad}};
 use num_bigint::BigUint;
 
 /// A field element, i.e. an element of `Z_q`.
@@ -46,7 +46,7 @@ impl FieldElement {
     /// 
     /// The encoding follows Section 5.1.2 in the specs. 
     pub fn to_be_bytes_left_pad(&self, field: &ScalarField) -> Vec<u8>{
-
+        to_be_bytes_left_pad(&self.0, field.l_q())
     }
 }
 
@@ -78,8 +78,13 @@ impl ScalarField {
     }
 
     /// Returns the order of the field
-    pub fn order() -> BigUint {
+    pub fn order(&self) -> BigUint {
         todo!()
+    }
+
+    /// Returns the length of the byte array representation of `q`
+    pub fn l_q(&self) -> usize {
+        (cnt_bits_repr(&self.q) + 7) / 8
     }
 }
 
@@ -122,8 +127,8 @@ impl GroupElement {
     /// Returns the left padded big-endian encoding of the group element.
     /// 
     /// The encoding follows Section 5.1.1 in the specs. 
-    pub fn to_be_bytes_left_pad(&self, field: &ScalarField) -> Vec<u8>{
-
+    pub fn to_be_bytes_left_pad(&self, group: &Group) -> Vec<u8>{
+        to_be_bytes_left_pad(&self.0, group.l_p())
     }
 }
 
@@ -145,14 +150,19 @@ impl Group {
     }
 
     /// Returns the order of the group
-    pub fn order() -> BigUint {
+    pub fn order(&self) -> BigUint {
         todo!()
     }
 
     /// Returns a generator of the group
-    pub fn generator() -> GroupElement {
+    pub fn generator(&self) -> GroupElement {
         todo!()
     }
+
+    /// Returns the length of the byte array representation of `p`
+    pub fn l_p(&self) -> usize {
+        (cnt_bits_repr(&self.p) + 7) / 8
+    }  
 }
 
 /// This function checks if the given group and field have the same order.
