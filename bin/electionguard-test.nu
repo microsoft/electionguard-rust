@@ -18,25 +18,16 @@ def main [
     --erase-artifacts # Erase the artifacts directory before running electionguard.exe tests.
     --no-egtest       # Do not run electionguard.exe tests.
     --no-insecure-deterministic # Do not use the --insecure-deterministic flag.
+    --dump-imports    # Dump the imports of the resulting binary (currently windows only)
 ] {
-    let electionguard_root_dir = ($env.FILE_PWD | path dirname)
-
-    std log info $"Started ($env.CURRENT_FILE | path relative-to $electionguard_root_dir)"
-    std log info $"electionguard_root_dir=($electionguard_root_dir)"
+    figure_eg_top_dir
+    std log info $"Started ($env.CURRENT_FILE | path relative-to (eg_top_dir))"
+    std log info $"Checkout top dir: (eg_top_dir)"
     
-    let electionguard_bin_dir = ($electionguard_root_dir | path join bin)
-    std log info $"electionguard_bin_dir=($electionguard_bin_dir)"
+    figure_artifacts_dir
 
-    let $electionguard_artifacts_dir = $env.ELECTIONGUARD_ARTIFACTS_DIR?
-    std log info $"electionguard_artifacts_dir=($electionguard_artifacts_dir)"
-    if $"($electionguard_artifacts_dir)" == "" {
-        std log error "Env var ELECTIONGUARD_ARTIFACTS_DIR is not set."
-        exit 1
-    }
-    if ($electionguard_artifacts_dir | path type) != dir {
-        std log error $"ELECTIONGUARD_ARTIFACTS_DIR is not a directory: ($electionguard_artifacts_dir)"
-        exit 1
-    }
+    let electionguard_bin_dir = (eg_top_dir | path join bin)
+    std log info $"electionguard_bin_dir=($electionguard_bin_dir)"
 
     # Specify the election parameters.
     let election_parameters = {
@@ -46,22 +37,21 @@ def main [
         info: $"The United Realms of Imaginaria General Election ((date now | date to-record).year)"
     }
 
-    let $electionguard_src_dir = ($electionguard_root_dir | path join src)
+    let $electionguard_src_dir = (eg_top_dir | path join src)
     std log info $"electionguard_src_dir=($electionguard_src_dir)"
     cd $electionguard_src_dir
 
     # Figure the cargo profile build flag and the cargo target directory.
 
     let cargo_profile_build_flag = if $release { '--release' } else { null }
-    let cargo_target_reldir = if $release {
-        ([ target release ] | path join)
-    } else {
-        ([ target debug ] | path join)
-    }
+    let rel_deb: string = if $release { 'release' } else { 'debug' }
+    let cargo_target_dir: string = ([
+            $electionguard_src_dir,
+            'target',
+            $rel_deb
+        ] | path join)
 
-    let binary_name = "electionguard"
-    let binary = ($cargo_target_reldir | path join $binary_name)
-    log info $"binary=($binary)"
+    figure_eg_exe $cargo_target_dir
 
     #  Figure out RUSTFLAGS
     # 
@@ -75,16 +65,18 @@ def main [
     # 
     if $clean {
         run-subprocess [ cargo clean $cargo_profile_build_flag ]
-
-        #if $target_platform == "windows" {
-        #    dumpbin /imports $electionguard_exe
-        #}
     }
+
+    let cargo_build_flag_vv = null
 
     #  Cargo build
     # 
     if not $no_build {
-        run-subprocess [ cargo build -vv $cargo_profile_build_flag ]
+        run-subprocess [ cargo build $cargo_build_flag_vv $cargo_profile_build_flag ]
+
+        if $dump_imports and (target_is_windows) {
+            dumpbin /imports (eg_exe)
+        }
     }
 
     #  Cargo check
@@ -114,7 +106,7 @@ def main [
         let build_docs = ($electionguard_bin_dir | path join build-docs.cmd)
         std log info $"build_docs: ($build_docs)"
         std log info $"env.PWD: ($env.PWD)"
-        let build_docs_relto_root = ($build_docs | path relative-to $electionguard_root_dir)
+        let build_docs_relto_root = ($build_docs | path relative-to (eg_top_dir))
         std log info $"build_docs_relto_root: ($build_docs_relto_root)"
         let build_docs = ('..' | path join $build_docs_relto_root)
         std log info $"build_docs: ($build_docs)"
@@ -126,18 +118,17 @@ def main [
     #  Erase ELECTIONGUARD_ARTIFACTS_DIR
     #
     if $erase_artifacts {
-        if ($electionguard_artifacts_dir | path exists) {
+        if (artifacts_dir | path exists) {
             log info $"Removing artifacts directory."
-            rm -rf $electionguard_artifacts_dir
+            rm -rf (artifacts_dir)
         }
     }
 
     #  Run ElectionGuard tests
     # 
     if not $no_egtest {
-        (egtests $binary $election_parameters
-            --cargo_profile_build_flag $cargo_profile_build_flag
-            --electionguard_artifacts_dir $electionguard_artifacts_dir)
+        (egtests $election_parameters
+            --cargo_profile_build_flag $cargo_profile_build_flag)
     }
 
     #  Success!
@@ -145,11 +136,81 @@ def main [
     log info "Success!"
 }
 
+def --env figure_eg_top_dir [] {
+    let dir = ($env.FILE_PWD | path dirname)
+    $env._eg_eg_eg_top_dir = $dir
+}
+
+def eg_top_dir [] -> string {    
+    $env._eg_eg_eg_top_dir
+}
+
+def --env figure_artifacts_dir [] {
+    let dir: string = $env.ELECTIONGUARD_ARTIFACTS_DIR?
+    std log info $"ELECTIONGUARD_ARTIFACTS_DIR: ($dir)"
+    if $dir == "" {
+        std log error "Env var ELECTIONGUARD_ARTIFACTS_DIR is not set."
+        exit 1
+    }
+
+    $env._eg_artifacts_dir = $dir
+}
+
+def artifacts_dir [] -> string {
+    let dir = $env._eg_artifacts_dir
+
+    if ($dir | path exists) {
+        let type = $dir | path type;
+        if $type != dir {
+            std log error $"ELECTIONGUARD_ARTIFACTS_DIR exists \(\"($dir)\"\), but it's a '($type)', not a directory."
+            exit 1
+        }
+    } else {
+        log info $"Creating artifacts directory: ($dir)"
+        mkdir $dir
+    }
+
+    $env._eg_artifacts_dir
+}
+
+def artifacts_public_dir [] -> string {
+    let dir = artifacts_dir | path join "public"
+    if ($dir | path exists) {
+        let type = $dir | path type;
+        if $type != dir {
+            std log error $"Artifacts public dir exists \(\"($dir)\"\), but it's a '($type)', not a directory."
+            exit 1
+        }
+    } else {
+        log info $"Creating artifacts public dir: ($dir)"
+        mkdir $dir
+    }
+
+    $dir
+}
+
+def target_is_windows [] -> bool {
+    (sys).host.name =~ '(?i)^\s*windows\b.*'
+}
+
+def --env figure_eg_exe [$cargo_target_dir] {
+    mut eg_exe_name = "electionguard"
+    if (target_is_windows) {
+        $eg_exe_name = ([$eg_exe_name, ".exe"] | str join)
+    }
+
+    $env._eg_exe = ($cargo_target_dir | path join $eg_exe_name)
+
+    log info $"electionguard executable: ($env._eg_exe)"
+}
+
+def eg_exe [] -> string {    
+    $env._eg_exe
+}
+
 def egtests [
-    binary: string
     election_parameters: record<n: int, k: int, date: string, info: string>
     --cargo_profile_build_flag: string
-    --electionguard_artifacts_dir: string
 ] {
     #  Build electionguard.exe and its dependents
     # 
@@ -157,35 +218,25 @@ def egtests [
         cargo build $cargo_profile_build_flag -p electionguard
     ]
 
-    if not ($binary | path exists) {
-        log error $"ERROR: binary does not exist: ($binary)"
+    if not (eg_exe | path exists) {
+        log error $"ERROR: executable does not exist: (eg_exe)"
         exit
-    }
-
-    # 
-    #  ensure ELECTIONGUARD_ARTIFACTS_DIR exists
-    # 
-    let electionguard_artifacts_public_dir = $electionguard_artifacts_dir | path join "public"
-
-    if not ($electionguard_artifacts_public_dir | path exists) {
-        log info $"Creating artifacts directory."
-        mkdir $electionguard_artifacts_public_dir
     }
 
     # 
     #  Write random seed
     # 
-    if not ($electionguard_artifacts_public_dir | path join "pseudorandom_seed_defeats_all_secrecy.bin" | path exists) {
-        run-subprocess [ $binary write-random-seed ]
+    if not (artifacts_public_dir | path join "pseudorandom_seed_defeats_all_secrecy.bin" | path exists) {
+        run-subprocess [ (eg_exe) write-random-seed ]
     }
 
     # 
     #  Verify standard parameters
     # 
-    let standard_parameters_verified_file = $electionguard_artifacts_public_dir | path join "standard_parameters_verified.txt"
+    let standard_parameters_verified_file = artifacts_public_dir | path join "standard_parameters_verified.txt"
     if ($standard_parameters_verified_file | path exists) {
         run-subprocess [
-            $binary --insecure-deterministic verify-standard-parameters
+            (eg_exe) --insecure-deterministic verify-standard-parameters
         ]
 
         log info $"Standard parameters: Verified! >($standard_parameters_verified_file)"
@@ -194,25 +245,25 @@ def egtests [
     # 
     #  Write election manifest (canonical)
     # 
-    if not ($electionguard_artifacts_public_dir | path join "election_manifest_canonical.bin" | path exists) {
+    if not (artifacts_public_dir | path join "election_manifest_canonical.bin" | path exists) {
         run-subprocess [
-            $binary write-manifest --in-example --out-format canonical
+            (eg_exe) write-manifest --in-example --out-format canonical
         ]
     }
 
     # 
     #  Write election manifest (pretty)
     # 
-    if not ($electionguard_artifacts_public_dir | path join "election_manifest_pretty.json" | path exists) {
-        run-subprocess [ $binary write-manifest --out-format pretty ]
+    if not (artifacts_public_dir | path join "election_manifest_pretty.json" | path exists) {
+        run-subprocess [ (eg_exe) write-manifest --out-format pretty ]
     }
 
     # 
     #  Write election parameters
     # 
-    if not ($electionguard_artifacts_public_dir | path join "election_parameters.json" | path exists) {
+    if not (artifacts_public_dir | path join "election_parameters.json" | path exists) {
         run-subprocess [
-            $binary write-parameters
+            (eg_exe) write-parameters
                 --n $election_parameters.n
                 --k $election_parameters.k
                 --date $election_parameters.date
@@ -224,9 +275,9 @@ def egtests [
     # 
     #  Write hashes
     # 
-    if not ($electionguard_artifacts_public_dir | path join "hashes.json" | path exists) {
+    if not (artifacts_public_dir | path join "hashes.json" | path exists) {
         run-subprocess [
-            $binary --insecure-deterministic write-hashes
+            (eg_exe) --insecure-deterministic write-hashes
         ]
     }
 
@@ -234,9 +285,7 @@ def egtests [
     #  For each guardian
     #
     for $i in 1..$election_parameters.n {
-        (egtest_per_guardian $binary $i
-            --electionguard_artifacts_dir $electionguard_artifacts_dir
-            --electionguard_artifacts_public_dir $electionguard_artifacts_public_dir)
+        egtest_per_guardian $i
     }
 
     log info ""
@@ -245,17 +294,17 @@ def egtests [
     # 
     #  Write joint election public key
     # 
-    if not ($electionguard_artifacts_public_dir | path join "joint_election_public_key.json" | path exists) {
+    if not (artifacts_public_dir | path join "joint_election_public_key.json" | path exists) {
         run-subprocess [
-            $binary --insecure-deterministic write-joint-election-public-key
+            (eg_exe) --insecure-deterministic write-joint-election-public-key
         ]
     }
 
     # 
     #  Write HashesExt
     # 
-    if not ($electionguard_artifacts_public_dir | path join "hashes_ext.json" | path exists) {
-        run-subprocess [ $binary --insecure-deterministic write-hashes-ext ]
+    if not (artifacts_public_dir | path join "hashes_ext.json" | path exists) {
+        run-subprocess [ (eg_exe) --insecure-deterministic write-hashes-ext ]
     }
 
     # 
@@ -265,23 +314,31 @@ def egtests [
     log info "ElectionGuard tests successful!"
     log info ""
     log info "Resulting artifact files:"
+    log_artifact_files
+}
 
-    ls $electionguard_artifacts_dir
+def log_artifact_files [] {
+    cd (artifacts_dir)
+    let cnt = glob -D **/* | reduce --fold 0 { |it, acc|
+        let fn = ($it | path relative-to (artifacts_dir))
+        let n = $acc | fill -a right -w 3
+        log info $"[($n) ] ($fn)"
+        $acc + 1
+    }
+    log info $"($cnt) artifact files."
+    cd -
 }
 
 def egtest_per_guardian [
-    binary: string
     i: int
-    --electionguard_artifacts_dir: string
-    --electionguard_artifacts_public_dir: string
 ] {
-    let guardian_secret_dir = $electionguard_artifacts_dir | path join $"SECRET_for_guardian_($i)"
+    let guardian_secret_dir = (artifacts_dir) | path join $"SECRET_for_guardian_($i)"
     if not ($guardian_secret_dir | path exists) {
         mkdir $guardian_secret_dir
     }
 
     let guardian_secret_key_file = $guardian_secret_dir | path join $"guardian_($i).SECRET_key.json"
-    let guardian_public_key_file = $electionguard_artifacts_public_dir | path join $"guardian_($i).public_key.json"
+    let guardian_public_key_file = artifacts_public_dir | path join $"guardian_($i).public_key.json"
     let guardian_name = $"Guardian ($i)"
 
     log info ""
@@ -296,7 +353,7 @@ def egtest_per_guardian [
         }
 
         run-subprocess [
-            $binary --insecure-deterministic guardian-secret-key-generate --i $i --name $guardian_name
+            (eg_exe) --insecure-deterministic guardian-secret-key-generate --i $i --name $guardian_name
         ]
 
         if not ($guardian_secret_key_file | path exists) {
@@ -307,7 +364,7 @@ def egtest_per_guardian [
 
     if not ($guardian_public_key_file | path exists) {
         run-subprocess [
-            $binary --insecure-deterministic guardian-secret-key-write-public-key --i $i
+            (eg_exe) --insecure-deterministic guardian-secret-key-write-public-key --i $i
         ]
 
         if not ($guardian_public_key_file | path exists) {
@@ -337,7 +394,7 @@ def run-subprocess [
         print $"vvvvvvvvvvvvvvvvvvvvvvvvvvvv ($argv_str) vvvvvvvvvvvvvvvvvvvvvvvvvvvv"
     }
 
-    ^$argv_0 $argv_1_n
+    ^$argv_0 ...$argv_1_n
 
     if $delimit {
         print $"^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ($argv_str) ^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
