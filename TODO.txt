@@ -69,8 +69,6 @@ serialize format wrapped in version
 
 ensure SecretCoefficient is serialized in a fixed-length format
 
-electionguard-test script: finish rewrite in nu
-
 Election parameters: add a type field initally set to 'HomomorphicTallying'
 
 a trait for fn to_canonical_json()
