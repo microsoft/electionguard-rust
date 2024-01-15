@@ -13,6 +13,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
 use util::{
+    algebra::{Group, ScalarField},
     csprng::Csprng,
     integer_util::{cnt_bits_repr, to_be_bytes_left_pad},
     prime::{is_prime, BigUintPrime},
@@ -86,6 +87,12 @@ pub struct FixedParameters {
 
     /// Parameters used to generate the parameters.
     pub generation_parameters: FixedParameterGenerationParameters,
+
+    /// Prime field
+    pub field: ScalarField,
+
+    /// Group
+    pub group: Group,
 
     /// Prime modulus.
     pub p: BigUintPrime,

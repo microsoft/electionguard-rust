@@ -50,7 +50,7 @@ impl HashesExt {
             for public_key in guardian_public_keys.iter() {
                 let coefficient_commitments = public_key.coefficient_commitments();
                 for coefficient_commitment in coefficient_commitments.0.iter() {
-                    v.append(&mut coefficient_commitment.to_be_bytes_len_p(fixed_parameters));
+                    v.append(&mut coefficient_commitment.to_be_bytes_left_pad(fixed_parameters));
                 }
             }
 

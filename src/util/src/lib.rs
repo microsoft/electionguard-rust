@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+pub mod algebra;
 pub mod array_ascii;
 pub mod base16;
 pub mod biguint_serde;
@@ -15,5 +16,3 @@ pub mod hex_dump;
 pub mod integer_util;
 pub mod logging;
 pub mod prime;
-pub mod algebra;
-
