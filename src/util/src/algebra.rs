@@ -6,11 +6,9 @@
 //! This module provides wrappers around `BigUnit` to separate group and field elements in the code.
 
 use crate::{csprng::Csprng, prime::is_prime, integer_util::{cnt_bits_repr, to_be_bytes_left_pad, mod_inverse}};
-use num_bigint::{BigInt, BigUint, Sign};
+use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Serialize, Deserialize};
-use std::mem;
-
 
 /// A field element, i.e. an element of `Z_q`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -93,11 +91,18 @@ impl ScalarField {
     ///
     /// This function returns `None` if the given order is not prime.
     pub fn new(order: BigUint, csprng: &mut Csprng) -> Option<Self> {
-        if is_prime(&order, csprng) {
-            Some(ScalarField { q: order })
-        } else {
-            None
+        let f = ScalarField { q: order };
+        if f.is_valid(csprng) {
+            return Some(f)
         }
+        None
+    }
+
+    /// The function validates the given field.
+    /// 
+    /// That is the function checks that the modulus is prime.
+    pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
+        is_prime(&self.q, csprng)
     }
 
     /// Constructs a new scalar field from a given order.
@@ -195,37 +200,54 @@ impl GroupElement {
 impl Group {
     /// Constructs a new group
     ///
-    /// This function checks that modulus is prime, that the order is prime, and that generator is a valid, non-one, group element (and thus a generator)
+    /// This function checks that the group is valid.
     pub fn new(modulus: BigUint, cofactor: BigUint, generator: BigUint, csprng: &mut Csprng) -> Option<Self> {
-        if cofactor.is_zero(){
-            return None
-        }
-        if !is_prime(&modulus, csprng) {
-            return None
-        }
-        let order = (modulus.clone() - BigUint::one()) / cofactor.clone();
-        if !is_prime(&order, csprng) {
-            return None
-        }
-        // This ensures that the order of generator is at most `order`
-        if !generator.modpow(&order, &modulus).is_one() {
-            return None
-        }
-        // If generator is not one (and `order` is prime) => order of generator is `order`
-        if !generator.is_one() {
-            return None
-        }
-        // `order` should not divide `cofactor`
-        if (&cofactor % order).is_zero() {
-            return None
-        }
-        Some(Group {
+        let group = Group {
             p: modulus,
             r: cofactor,
             g: generator
-           })
+           };
+        if group.is_valid(csprng) {
+            return Some(group)
+        }
+        None
     }
 
+    /// This function checks that the given group is valid.
+    /// 
+    /// That is it checks that 
+    /// - the modulus is prime
+    /// - the order is prime
+    /// - the generator is a proper generator
+    /// - the order does not divide the co-factor
+    /// - the co-factor is non-zero
+    pub fn is_valid(&self, csprng: &mut Csprng) -> bool { 
+        if self.r.is_zero(){
+            return false
+        }
+        if !is_prime(&self.p, csprng) {
+            return false
+        }
+        let order = (&self.p - BigUint::one()) / &self.r;
+        if !is_prime(&order, csprng) {
+            return false
+        }
+        // This ensures that the order of generator is at most `order`
+        if !self.g.modpow(&order, &self.p).is_one() {
+            return false
+        }
+        // If generator is not one (and `order` is prime) => order of generator is `order`
+        if !self.g.is_one() {
+            return false
+        }
+        // `order` should not divide `cofactor`
+        if (&self.r % order).is_zero() {
+            return false
+        } 
+        true       
+    }
+
+    /// Constructs a new group without validity check
     pub fn new_unchecked(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
         Group {
             p: modulus,
