@@ -63,16 +63,13 @@ impl CoefficientProof {
         h: &GroupElement,
     ) -> HValue {
         let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
-        // v = 0x10 | b(i,4) | b(j,4) | b(coefficient,512) | b(h,512)
+        let group = &fixed_parameters.group;
+        // v = 0x10 | b(i,4) | b(j,4) | b(coefficient,512) | b(h,512) for standard parameters
         let mut v = vec![0x10];
         v.extend_from_slice(i.to_be_bytes().as_slice());
         v.extend_from_slice(j.to_be_bytes().as_slice());
-        v.extend_from_slice(
-            coefficient
-                .to_be_bytes_left_pad(&fixed_parameters.group)
-                .as_slice(),
-        );
-        v.extend_from_slice(h.to_be_bytes_left_pad(&fixed_parameters.group).as_slice());
+        v.extend_from_slice(coefficient.to_be_bytes_left_pad(&group).as_slice());
+        v.extend_from_slice(h.to_be_bytes_left_pad(&group).as_slice());
         //The challenge is not reduced modulo q (cf. Section 5.4)
         eg_h(&h_p, &v)
     }
@@ -103,10 +100,7 @@ impl CoefficientProof {
         // Compute challenge
         let c = Self::challenge(fixed_parameters, i, j, commitment, &h);
         // Get field element from challenge, here the challenge is reduced mod `q`
-        let c_val = FieldElement::from_biguint(
-            BigUint::from_bytes_be(c.0.as_slice()),
-            &fixed_parameters.field,
-        );
+        let c_val = FieldElement::from_bytes_be(c.0.as_slice(), &field);
         // Compute response
         let s = c_val.mul(coefficient, field);
         let v = u.sub(&s, field);
@@ -132,10 +126,6 @@ impl CoefficientProof {
         commitment: &CoefficientCommitment,
     ) -> Result<(), ProofValidationError> {
         let commitment = &commitment.0;
-        let one = BigUint::from(1u8);
-        let p = fixed_parameters.p.as_ref();
-        let q = fixed_parameters.q.as_ref();
-        let g = &fixed_parameters.g;
 
         let group = &fixed_parameters.group;
         let field = &fixed_parameters.field;
@@ -149,10 +139,7 @@ impl CoefficientProof {
             return Err(ProofValidationError::ResponseNotInField);
         }
         // Equation (2.1)
-        let c_val = FieldElement::from_biguint(
-            BigUint::from_bytes_be(self.challenge.0.as_slice()),
-            &fixed_parameters.field,
-        );
+        let c_val = FieldElement::from_bytes_be(self.challenge.0.as_slice(), &field);
         let h = group
             .g_exp(&self.response)
             .mul(&commitment.exp(&c_val, group), group);
@@ -167,6 +154,7 @@ impl CoefficientProof {
 
 #[cfg(test)]
 mod test {
+
     use util::csprng::Csprng;
 
     use crate::{
