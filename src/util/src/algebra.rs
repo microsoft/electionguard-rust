@@ -5,7 +5,7 @@
 
 //! This module provides wrappers around `BigUnit` to separate group and field elements in the code.
 
-use crate::{csprng::Csprng, prime::is_prime, integer_util::{cnt_bits_repr, to_be_bytes_left_pad}};
+use crate::{csprng::Csprng, prime::is_prime, integer_util::{cnt_bits_repr, to_be_bytes_left_pad, mod_inverse}};
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{One, Zero};
 use serde::{Serialize, Deserialize};
@@ -20,7 +20,7 @@ pub struct FieldElement(BigUint);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScalarField {
     /// Subgroup order.
-    pub q: BigUint,
+    q: BigUint,
 }
 
 impl FieldElement {
@@ -29,6 +29,11 @@ impl FieldElement {
 
     pub fn from_biguint(x: BigUint, field: &ScalarField) -> Self {
         FieldElement(x % &field.q)
+    }
+
+    pub fn from_bytes_be(x: &[u8], field: &ScalarField) -> Self {
+        let x_int = BigUint::from_bytes_be(x);
+        FieldElement(x_int % &field.q)
     }
 
     /// Performs field addition modulo prime q.
@@ -57,32 +62,10 @@ impl FieldElement {
     ///
     // Returns the inverse of self mod field.q iff gcd(self,q) == 1
     pub fn inv(&self, field: &ScalarField) -> Option<Self> {
-        if field.q.is_zero() {
-            return None;
-        }
-        let m = BigInt::from_biguint(Sign::Plus, field.q.clone());
-        let mut t = (BigInt::zero(), BigInt::one());
-        let mut r = (m.clone(), BigInt::from_biguint(Sign::Plus, self.0.clone()));
-        while !r.1.is_zero() {
-            let q = &r.0 / &r.1;
-            //https://docs.rs/num-integer/0.1.45/src/num_integer/lib.rs.html#353
-            let f = |mut r: (BigInt, BigInt)| {
-                mem::swap(&mut r.0, &mut r.1);
-                r.1 -= &q * &r.0;
-                r
-            };
-            r = f(r);
-            t = f(t);
-        }
-        if r.0.is_one() {
-            if t.0 < BigInt::zero() {
-                return Some(FieldElement((t.0 + m).magnitude().clone()));
-            }
-            return Some(FieldElement(t.0.magnitude().clone()));
-        }
-    
-        None
-        
+        match mod_inverse(&self.0,&field.q) {
+            Some(x) => Some(FieldElement(x)),
+            None => None,
+        } 
     }
 
     /// Returns the left padded big-endian encoding of the field element.
@@ -96,7 +79,12 @@ impl FieldElement {
     ///
     /// This method return true iff 0 <= self < field.q.
     pub fn is_valid(&self, field: &ScalarField) -> bool {
+        // It is enough to check the upper bound as self.0 is unsigned.
         self.0 < field.q
+    }
+
+    pub fn remove_at_the_end_biguint(&self) -> BigUint {
+        self.0.clone()
     }
 }
 
@@ -166,32 +154,10 @@ impl GroupElement {
     ///
     // Returns the inverse of self mod field.q iff gcd(self,q) == 1
     pub fn inv(&self, group: &Group) -> Option<Self> {
-        if group.p.is_zero() {
-            return None;
-        }
-        let m = BigInt::from_biguint(Sign::Plus, group.p.clone());
-        let mut t = (BigInt::zero(), BigInt::one());
-        let mut r = (m.clone(), BigInt::from_biguint(Sign::Plus, self.0.clone()));
-        while !r.1.is_zero() {
-            let q = &r.0 / &r.1;
-            //https://docs.rs/num-integer/0.1.45/src/num_integer/lib.rs.html#353
-            let f = |mut r: (BigInt, BigInt)| {
-                mem::swap(&mut r.0, &mut r.1);
-                r.1 -= &q * &r.0;
-                r
-            };
-            r = f(r);
-            t = f(t);
-        }
-        if r.0.is_one() {
-            if t.0 < BigInt::zero() {
-                return Some(GroupElement((t.0 + m).magnitude().clone()));
-            }
-            return Some(GroupElement(t.0.magnitude().clone()));
-        }
-    
-        None
-        
+        match mod_inverse(&self.0,&group.p) {
+            Some(x) => Some(GroupElement(x)),
+            None => None,
+        } 
     }
 
     /// Computes the `exponent`-power of the given group element, where exponent is a BigUint.
@@ -204,13 +170,11 @@ impl GroupElement {
         GroupElement(self.0.modpow(&exponent.0, &group.p))
     }
     
-    
-
     /// Checks if the element is a valid member of the given group.
     ///
     /// This method return true iff 0 <= self < group.p and self^group.order() % p == 1
     pub fn is_valid(&self, group: &Group) -> bool {
-        //let order_as_field_elem = FieldElement(group.order());
+        // It is enough to check the upper bound as self.0 is unsigned.
         let elem_less_than_p = self.0 < group.p;
         let elem_has_order_q = self.pow(&group.order(), group).0.is_one();
         elem_less_than_p && elem_has_order_q
@@ -222,6 +186,10 @@ impl GroupElement {
     pub fn to_be_bytes_left_pad(&self, group: &Group) -> Vec<u8>{
         to_be_bytes_left_pad(&self.0, group.l_p())
     }
+
+    pub fn remove_at_the_end_biguint(&self) -> BigUint {
+        self.0.clone()
+    }
 }
 
 impl Group {
@@ -230,23 +198,32 @@ impl Group {
     /// This function checks that modulus is prime, that the order is prime, and that generator is a valid, non-one, group element (and thus a generator)
     pub fn new(modulus: BigUint, cofactor: BigUint, generator: BigUint, csprng: &mut Csprng) -> Option<Self> {
         if cofactor.is_zero(){
-            return None;
+            return None
         }
-        let modulus_is_prime = is_prime(&modulus, csprng);
+        if !is_prime(&modulus, csprng) {
+            return None
+        }
         let order = (modulus.clone() - BigUint::one()) / cofactor.clone();
-        let order_is_prime = is_prime(&order, csprng);
-        let gen_has_order_q = generator.modpow(&order, &modulus).is_one();
-        let gen_is_valid = gen_has_order_q && !generator.is_one();
-        let all_checks_passed  = modulus_is_prime && order_is_prime && gen_is_valid;
-        if all_checks_passed {
-            Some(Group {
-                 p: modulus,
-                 r: cofactor,
-                 g: generator
-                })
-        } else {
-            None
+        if !is_prime(&order, csprng) {
+            return None
         }
+        // This ensures that the order of generator is at most `order`
+        if !generator.modpow(&order, &modulus).is_one() {
+            return None
+        }
+        // If generator is not one (and `order` is prime) => order of generator is `order`
+        if !generator.is_one() {
+            return None
+        }
+        // `order` should not divide `cofactor`
+        if (&cofactor % order).is_zero() {
+            return None
+        }
+        Some(Group {
+            p: modulus,
+            r: cofactor,
+            g: generator
+           })
     }
 
     pub fn new_unchecked(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
@@ -272,10 +249,7 @@ impl Group {
 
     /// Returns the order of the group
     pub fn order(&self) -> BigUint {
-        let p = self.p.clone();
-        let r = self.r.clone();
-        let order = (p - BigUint::one()) / r;
-        return order; 
+        (&self.p - BigUint::one()) / &self.r
     }
 
     /// Returns a generator of the group
