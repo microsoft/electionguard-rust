@@ -7,24 +7,32 @@
 
 use crate::{csprng::Csprng, prime::is_prime, integer_util::{cnt_bits_repr, to_be_bytes_left_pad}};
 use num_bigint::BigUint;
+use serde::{Serialize, Deserialize};
 
 /// A field element, i.e. an element of `Z_q`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FieldElement(BigUint);
 
 /// The finite field `Z_q` of integers modulo q.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScalarField {
     /// Subgroup order.
     pub q: BigUint,
 }
 
 impl FieldElement {
+
+    pub fn from_biguint(x: BigUint, field: &ScalarField) -> Self {
+        FieldElement(x % &field.q)
+    }
+
     /// Performs field addition modulo prime q.
-    pub fn add(&self, other: &FieldElement, field: &ScalarField) -> FieldElement {
+    pub fn add(&self, other: &FieldElement, field: &ScalarField) -> Self {
         FieldElement((&self.0 + &other.0) % &field.q)
     }
 
     /// Performs field subtraction modulo prime q.
-    pub fn sub(&self, other: &FieldElement, field: &ScalarField) -> FieldElement {
+    pub fn sub(&self, other: &FieldElement, field: &ScalarField) -> Self {
         if self.0 > other.0 {
             FieldElement((&self.0 - &other.0) % &field.q)
         } else {
@@ -33,12 +41,12 @@ impl FieldElement {
     }
 
     /// Performs field multiplication modulo prime q.
-    pub fn mul(&self, other: &FieldElement, field: &ScalarField) -> FieldElement {
+    pub fn mul(&self, other: &FieldElement, field: &ScalarField) -> Self {
         FieldElement((&self.0 * &other.0) % &field.q)
     }
 
     /// Computes the multiplicative inverse of a field element if it exists
-    pub fn inv(&self, field: &ScalarField) -> Option<FieldElement> {
+    pub fn inv(&self, field: &ScalarField) -> Option<Self> {
         todo!()
     }
 
@@ -89,9 +97,11 @@ impl ScalarField {
 }
 
 /// A group element, i.e. an element of `Z_p^r`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GroupElement(BigUint);
 
 /// The group `Z_p^r`, a multiplicative subgroup of `Z_p`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Group {
     /// Prime modulus.
     pub p: BigUint,
@@ -136,11 +146,11 @@ impl Group {
     /// Constructs a new group
     ///
     /// This function checks that modulus is prime, that the order is prime, and that generator is a valid, non-one, group element (and thus a generator)
-    pub fn new(modulus: &BigUint, cofactor: &BigUint, generator: &BigUint) -> Self {
+    pub fn new(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
         todo!()
     }
 
-    pub fn new_unchecked(modulus: &BigUint, cofactor: &BigUint, generator: &BigUint) -> Self {
+    pub fn new_unchecked(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
         todo!()
     }
 
