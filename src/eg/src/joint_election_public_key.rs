@@ -110,7 +110,9 @@ impl JointElectionPublicKey {
         let joint_election_public_key = guardian_public_keys.iter().fold(
             BigUint::one(),
             |mut acc, guardian_public_key| -> BigUint {
-                acc *= guardian_public_key.public_key_k_i_0();
+                acc *= guardian_public_key
+                    .public_key_k_i_0()
+                    .remove_at_the_end_biguint();
                 acc % fixed_parameters.p.as_ref()
             },
         );

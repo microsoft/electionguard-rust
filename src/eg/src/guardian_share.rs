@@ -447,10 +447,15 @@ mod test {
         // Compute joint secret key from shares
         let xs = guardian_public_keys
             .iter()
-            .map(|pk| BigUint::from(pk.i.get_one_based_u32()))
+            .map(|pk| {
+                FieldElement::from_biguint(
+                    BigUint::from(pk.i.get_one_based_u32()),
+                    &fixed_parameters.field,
+                )
+            })
             .collect::<Vec<_>>();
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
-        let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.q);
+        let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.field);
 
         assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.")
     }

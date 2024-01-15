@@ -200,6 +200,53 @@ fn hex_to_biguint(s: &str) -> BigUint {
 }
 
 #[cfg(test)]
+pub mod test_parameter_do_not_use_in_production {
+    use lazy_static::lazy_static;
+    use util::{
+        algebra::{Group, ScalarField},
+        prime::BigUintPrime,
+    };
+
+    use crate::fixed_parameters::{
+        FixedParameterGenerationParameters, FixedParameters, NumsNumber,
+    };
+
+    use super::hex_to_biguint;
+
+    lazy_static! {
+        /// Standard parameters, ElectionGuard latest (currently v2.0).
+        pub static ref TOY_PARAMETERS_01: FixedParameters = make_toy_parameters_1();
+    }
+
+    pub fn make_toy_parameters_1() -> FixedParameters {
+        FixedParameters {
+            opt_ElectionGuard_Design_Specification: None,
+            generation_parameters: FixedParameterGenerationParameters {
+                q_bits_total: 7,
+                p_bits_total: 16,
+                p_bits_msb_fixed_1: 0,
+                p_middle_bits_source: NumsNumber::ln_2,
+                p_bits_lsb_fixed_1: 0,
+            },
+            field: ScalarField::new_unchecked(hex_to_biguint("007F")),
+            group: Group::new_unchecked(
+                hex_to_biguint("E72F"),
+                hex_to_biguint("01D2"),
+                hex_to_biguint("7F68"),
+            ),
+            p: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+                hex_to_biguint("007F"),
+            ),
+            q: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
+                hex_to_biguint("E72F"),
+            ),
+            r: hex_to_biguint("01D2"),
+            g: hex_to_biguint("7F68"),
+        }
+    }
+}
+
+#[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
     use super::*;

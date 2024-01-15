@@ -22,6 +22,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use util::{
+    algebra::{FieldElement, GroupElement},
     csprng::Csprng,
     integer_util::{
         get_single_coefficient_at_zero, group_lagrange_at_zero, mod_inverse, to_be_bytes_left_pad,
@@ -56,9 +57,10 @@ impl DecryptionShare {
         secret_key_share: &GuardianSecretKeyShare,
         ciphertext: &Ciphertext,
     ) -> Self {
-        let m_i = ciphertext
-            .alpha
-            .modpow(&secret_key_share.p_i, fixed_parameters.p.as_ref());
+        let m_i = ciphertext.alpha.modpow(
+            &secret_key_share.p_i.remove_at_the_end_biguint(),
+            fixed_parameters.p.as_ref(),
+        );
         DecryptionShare {
             i: secret_key_share.i,
             m_i,
@@ -129,16 +131,26 @@ impl CombinedDecryptionShare {
 
         let xs: Vec<_> = decryption_shares
             .iter()
-            .map(|s| BigUint::from(s.i.get_one_based_u32()))
+            .map(|s| {
+                FieldElement::from_biguint(
+                    BigUint::from(s.i.get_one_based_u32()),
+                    &fixed_parameters.field,
+                )
+            })
             .collect();
-        let ys: Vec<_> = decryption_shares.iter().map(|s| s.m_i.clone()).collect();
+        let ys: Vec<_> = decryption_shares
+            .iter()
+            .map(|s| {
+                GroupElement::remove_at_the_end_from_biguint(s.m_i.clone(), &fixed_parameters.group)
+            })
+            .collect();
 
-        let m = group_lagrange_at_zero(&xs, &ys, &fixed_parameters.q, &fixed_parameters.p);
+        let m = group_lagrange_at_zero(&xs, &ys, &fixed_parameters.field, &fixed_parameters.group);
 
         match m {
             // This should not happen
             None => Err(ShareCombinationError::InterpolationFailure),
-            Some(m) => Ok(CombinedDecryptionShare(m)),
+            Some(m) => Ok(CombinedDecryptionShare(m.remove_at_the_end_biguint())),
         }
     }
 }
@@ -346,13 +358,17 @@ impl DecryptionProof {
             });
 
         let c = Self::challenge(h_e, k, ciphertext, &a, &b, m);
-        let i_big = BigUint::from(proof_commit_state.i.get_one_based_u32());
-        let xs: Vec<BigUint> = proof_commit_shares
+        let i_big = FieldElement::from_biguint(
+            BigUint::from(proof_commit_state.i.get_one_based_u32()),
+            &fixed_parameters.field,
+        );
+        let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
             .map(|s| BigUint::from(s.i.get_one_based_u32()))
+            .map(|x| FieldElement::from_biguint(x, &fixed_parameters.field))
             .collect();
-        let w_i = match get_single_coefficient_at_zero(&xs, &i_big, &fixed_parameters.q) {
-            Some(w_i) => w_i,
+        let w_i = match get_single_coefficient_at_zero(&xs, &i_big, &fixed_parameters.field) {
+            Some(w_i) => w_i.remove_at_the_end_biguint(),
             None => return Err(ResponseShareError::CoefficientFailure),
         };
 
@@ -360,7 +376,7 @@ impl DecryptionProof {
 
         let v_i = fixed_parameters.q.subtract_group_elem(
             &proof_commit_state.u_i,
-            &(c_i * secret_key_share.p_i.clone()),
+            &(c_i * secret_key_share.p_i.clone().remove_at_the_end_biguint()),
         );
         Ok(DecryptionProofResponseShare {
             i: proof_commit_state.i,
@@ -436,18 +452,20 @@ impl DecryptionProof {
             });
         let c = Self::challenge(h_e, &joint_key, ciphertext, &a, &b, &m);
 
-        let xs: Vec<BigUint> = proof_commit_shares
+        let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
             .map(|s| BigUint::from(s.i.get_one_based_u32()))
+            .map(|x| FieldElement::from_biguint(x, &fixed_parameters.field))
             .collect();
         let mut c_i_vec = vec![];
         for cs in proof_commit_shares {
             let i = BigUint::from(cs.i.get_one_based_u32());
-            let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.q) {
+            let i = FieldElement::from_biguint(i, &fixed_parameters.field);
+            let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.field) {
                 Some(w_i) => w_i,
                 None => return Err(CombineProofError::CoefficientFailure),
             };
-            let c_i = (c.clone() * w_i) % q;
+            let c_i = (c.clone() * w_i.remove_at_the_end_biguint()) % q;
             c_i_vec.push(c_i);
         }
 
@@ -469,7 +487,7 @@ impl DecryptionProof {
                             //This is fine as m < k
                             #[allow(clippy::unwrap_used)]
                             let m: u32 = m.try_into().unwrap();
-                            (prod * k_m.0.modpow(&i.pow(m), p)) % p
+                            (prod * k_m.0.remove_at_the_end_biguint().modpow(&i.pow(m), p)) % p
                         },
                     );
                     (prod * inner_p) % p
@@ -647,6 +665,7 @@ mod test {
         guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
         hash::HValue,
         joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+        standard_parameters::test_parameter_do_not_use_in_production::TOY_PARAMETERS_01,
         varying_parameters::{BallotChaining, VaryingParameters},
         verifiable_decryption::ShareCombinationError,
     };
@@ -701,31 +720,11 @@ mod test {
         (joint_key, guardian_public_keys, key_shares)
     }
 
-    fn get_toy_parameters() -> FixedParameters {
-        FixedParameters {
-            opt_ElectionGuard_Design_Specification: None,
-            generation_parameters: FixedParameterGenerationParameters {
-                q_bits_total: 7,
-                p_bits_total: 16,
-                p_bits_msb_fixed_1: 0,
-                p_middle_bits_source: NumsNumber::ln_2,
-                p_bits_lsb_fixed_1: 0,
-            },
-            p: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
-                BigUint::from(59183_u32),
-            ),
-            q: BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime(
-                BigUint::from(127_u8),
-            ),
-            r: BigUint::from(466_u32),
-            g: BigUint::from(32616_u32),
-        }
-    }
-
     #[test]
     fn test_decryption_share_combination() {
         // Toy parameters according to specs
-        let fixed_parameters = get_toy_parameters();
+        let fixed_parameters: FixedParameters = (*TOY_PARAMETERS_01).clone();
+
         let varying_parameters = VaryingParameters {
             n: GuardianIndex::from_one_based_index(3).unwrap(),
             k: GuardianIndex::from_one_based_index(3).unwrap(),

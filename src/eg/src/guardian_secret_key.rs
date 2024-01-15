@@ -49,7 +49,7 @@ impl SecretCoefficients {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
-        let field = fixed_parameters.field;
+        let field = &fixed_parameters.field;
         let k = varying_parameters.k;
 
         SecretCoefficients(
