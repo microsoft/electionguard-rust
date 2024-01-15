@@ -159,6 +159,11 @@ impl Group {
         todo!()
     }
 
+    /// Returns generator `g` raised to the power of `x` mod `p`.
+    pub fn g_exp(&self, x: &FieldElement) -> GroupElement {
+        GroupElement(self.g.modpow(&x.0, &self.p))
+    }
+
     /// Returns the order of the group
     pub fn order(&self) -> BigUint {
         todo!()
