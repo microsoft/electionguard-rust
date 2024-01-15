@@ -56,6 +56,13 @@ impl FieldElement {
     pub fn to_be_bytes_left_pad(&self, field: &ScalarField) -> Vec<u8>{
         to_be_bytes_left_pad(&self.0, field.l_q())
     }
+
+    /// Checks if the element is a valid member of the given field.
+    ///
+    /// This method return true iff 0 <= self < field.q.
+    pub fn is_valid(&self, field: &ScalarField) -> bool {
+        todo!()
+    }
 }
 
 impl ScalarField {
@@ -97,7 +104,7 @@ impl ScalarField {
 }
 
 /// A group element, i.e. an element of `Z_p^r`.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GroupElement(BigUint);
 
 /// The group `Z_p^r`, a multiplicative subgroup of `Z_p`.
