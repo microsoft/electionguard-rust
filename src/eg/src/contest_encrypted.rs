@@ -6,7 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::csprng::Csprng;
 
 use crate::{
     contest_hash,
@@ -106,7 +106,6 @@ impl ContestEncrypted {
                     &device.header,
                     csprng,
                     pt_vote.vote[i] == 1u8,
-                    &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         }
@@ -117,7 +116,6 @@ impl ContestEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            &device.header.parameters.fixed_parameters.q,
             &selection,
             num_selections as usize,
             contest.selection_limit,
@@ -141,7 +139,6 @@ impl ContestEncrypted {
     pub fn proof_selection_limit(
         header: &PreVotingData,
         csprng: &mut Csprng,
-        q: &BigUintPrime,
         selection: &[Ciphertext],
         num_selections: usize,
         selection_limit: usize,
@@ -151,7 +148,6 @@ impl ContestEncrypted {
         ProofRange::new(
             header,
             csprng,
-            q,
             &combined_ct,
             num_selections,
             selection_limit,
@@ -174,6 +170,8 @@ impl ContestEncrypted {
         fixed_parameters: &FixedParameters,
         selection: &[Ciphertext],
     ) -> Ciphertext {
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
         // First element in the selection
 
         // let mut sum_ct = selection[0].clone();
@@ -187,10 +185,9 @@ impl ContestEncrypted {
 
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         for sel in selection.iter().skip(1) {
-            sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
-            sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
-
-            sum_nonce = (sum_nonce + sel.nonce.as_ref().unwrap()) % fixed_parameters.q.as_ref();
+            sum_ct.alpha = sum_ct.alpha.mul(&sel.alpha, group);
+            sum_ct.beta = sum_ct.beta.mul(&sel.beta, group);
+            sum_nonce = sum_nonce.add(sel.nonce.as_ref().unwrap(), field);
         }
 
         sum_ct.nonce = Some(sum_nonce);

@@ -17,7 +17,7 @@ use eg::{
 };
 
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::csprng::Csprng;
 
 use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
 
@@ -145,14 +145,13 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         csprng: &mut Csprng,
         sequence_order: usize,
-        q: &BigUintPrime,
     ) -> Vec1<ProofRange> {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
         self.selections.iter().enumerate().for_each(|(i, c)| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(c.proof_ballot_correctness(pvd, csprng, sequence_order == i, q))
+                .try_push(c.proof_ballot_correctness(pvd, csprng, sequence_order == i))
                 .unwrap();
         });
         proofs

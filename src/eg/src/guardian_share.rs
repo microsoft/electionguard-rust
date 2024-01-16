@@ -346,10 +346,14 @@ impl GuardianSecretKeyShare {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
-    use num_bigint::BigUint;
     use std::iter::zip;
-    use util::{algebra::{FieldElement, ScalarField}, csprng::Csprng, integer_util::field_lagrange_at_zero};
+    use util::{
+        algebra::{FieldElement, ScalarField},
+        csprng::Csprng,
+        integer_util::field_lagrange_at_zero,
+    };
 
     use crate::{
         example_election_parameters::example_election_parameters, guardian::GuardianIndex,
@@ -369,7 +373,6 @@ mod test {
         let mut csprng = Csprng::new(b"test_proof_generation");
 
         let election_parameters = example_election_parameters();
-
         let index_one = GuardianIndex::from_one_based_index(1).unwrap();
         let index_two = GuardianIndex::from_one_based_index(2).unwrap();
         let sk_one =
@@ -417,7 +420,7 @@ mod test {
                             &mut csprng,
                             &election_parameters,
                             dealer_sk,
-                            &pk,
+                            pk,
                         )
                     })
                     .collect::<Vec<_>>()
@@ -429,27 +432,23 @@ mod test {
                     &election_parameters,
                     &guardian_public_keys,
                     &shares,
-                    &sk,
+                    sk,
                 )
                 .unwrap()
             })
             .collect::<Vec<_>>();
 
         // Compute joint secret key from secret keys
-        let joint_key_1 = guardian_secret_keys.iter().fold(
-            ScalarField::zero(),
-            |acc, share| acc.add(share.secret_s(), &fixed_parameters.field),
-        );
+        let joint_key_1 = guardian_secret_keys
+            .iter()
+            .fold(ScalarField::zero(), |acc, share| {
+                acc.add(share.secret_s(), &fixed_parameters.field)
+            });
 
         // Compute joint secret key from shares
         let xs = guardian_public_keys
             .iter()
-            .map(|pk| {
-                FieldElement::from(
-                    pk.i.get_one_based_u32(),
-                    &fixed_parameters.field,
-                )
-            })
+            .map(|pk| FieldElement::from(pk.i.get_one_based_u32(), &fixed_parameters.field))
             .collect::<Vec<_>>();
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
         let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.field);

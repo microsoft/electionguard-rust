@@ -22,20 +22,21 @@ pub fn contest_hash(
     contest_index: ContestIndex,
     vote: &[Ciphertext],
 ) -> HValue {
-    let mut v = vec![0x23];
+    let group = &header.parameters.fixed_parameters.group;
 
+    // B1 = 0x23 | b(one_based_index, 4) | b(K, 512) | b(alpha_1, 512) | · · · | b(beta_m, 512)
+    let mut v = vec![0x23];
     v.extend_from_slice(&contest_index.get_one_based_u32().to_be_bytes());
     v.extend_from_slice(
         header
             .public_key
             .joint_election_public_key
-            .to_bytes_be()
+            .to_be_bytes_left_pad(group)
             .as_slice(),
     );
-
     vote.iter().for_each(|vote_i| {
-        v.extend_from_slice(vote_i.alpha.to_bytes_be().as_slice());
-        v.extend_from_slice(vote_i.beta.to_bytes_be().as_slice());
+        v.extend_from_slice(vote_i.alpha.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(vote_i.beta.to_be_bytes_left_pad(group).as_slice());
     });
 
     eg_h(&header.hashes_ext.h_e, &v)

@@ -23,6 +23,8 @@ pub fn contest_hash(
     contest_index: ContestIndex,
     selections: &Vec1<ContestSelectionPreEncrypted>,
 ) -> HValue {
+    let group = &header.parameters.fixed_parameters.group;
+    
     let mut v = vec![0x41];
 
     v.extend_from_slice(contest_index.get_one_based_u32().to_be_bytes().as_slice());
@@ -30,7 +32,7 @@ pub fn contest_hash(
         header
             .public_key
             .joint_election_public_key
-            .to_bytes_be()
+            .to_be_bytes_left_pad(group)
             .as_slice(),
     );
 

@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::csprng::Csprng;
 
 use crate::{
     election_manifest::Contest, election_record::PreVotingData, index::Index,
@@ -89,9 +89,8 @@ impl Ciphertext {
         header: &PreVotingData,
         csprng: &mut Csprng,
         selected: bool,
-        q: &BigUintPrime,
     ) -> ProofRange {
-        ProofRange::new(header, csprng, q, self, selected as usize, 1)
+        ProofRange::new(header, csprng, self, selected as usize, 1)
     }
 
     /// Verify the proof that the cipher text is an encryption of 0 or 1.

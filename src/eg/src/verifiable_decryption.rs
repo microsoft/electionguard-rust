@@ -18,14 +18,13 @@ use crate::{
 };
 use itertools::izip;
 use num_bigint::BigUint;
-use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use util::{
-    algebra::{FieldElement, GroupElement},
+    algebra::{FieldElement, Group, GroupElement, ScalarField},
     csprng::Csprng,
     integer_util::{
-        get_single_coefficient_at_zero, group_lagrange_at_zero, mod_inverse, to_be_bytes_left_pad,
+        get_single_coefficient_at_zero, group_lagrange_at_zero,
     },
 };
 
@@ -36,12 +35,8 @@ use util::{
 pub struct DecryptionShare {
     /// The guardian's index
     pub i: GuardianIndex,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
     /// The decryption share value
-    pub m_i: BigUint,
+    pub m_i: GroupElement,
 }
 
 impl DecryptionShare {
@@ -57,10 +52,8 @@ impl DecryptionShare {
         secret_key_share: &GuardianSecretKeyShare,
         ciphertext: &Ciphertext,
     ) -> Self {
-        let m_i = ciphertext.alpha.modpow(
-            &secret_key_share.p_i.remove_at_the_end_biguint(),
-            fixed_parameters.p.as_ref(),
-        );
+        let group = &fixed_parameters.group;
+        let m_i = ciphertext.alpha.exp(&secret_key_share.p_i, group);
         DecryptionShare {
             i: secret_key_share.i,
             m_i,
@@ -72,7 +65,7 @@ impl DecryptionShare {
 ///
 /// This corresponds to the `M` in Section `3.6.2`.
 #[derive(Debug)]
-pub struct CombinedDecryptionShare(BigUint);
+pub struct CombinedDecryptionShare(GroupElement);
 
 /// Represents errors occurring while combining [`DecryptionShare`]s into a [`CombinedDecryptionShare`].
 #[derive(Error, Debug, PartialEq)]
@@ -108,6 +101,8 @@ impl CombinedDecryptionShare {
         let n = varying_parameters.n.get_one_based_usize();
         let k = varying_parameters.k.get_one_based_u32();
 
+        let field = &fixed_parameters.field;
+
         let l = decryption_shares.len();
         // Ensure that we have at least k decryption shares
         if l < k as usize {
@@ -131,26 +126,15 @@ impl CombinedDecryptionShare {
 
         let xs: Vec<_> = decryption_shares
             .iter()
-            .map(|s| {
-                FieldElement::from(
-                    s.i.get_one_based_u32(),
-                    &fixed_parameters.field,
-                )
-            })
+            .map(|s| FieldElement::from(s.i.get_one_based_u32(), field))
             .collect();
-        let ys: Vec<_> = decryption_shares
-            .iter()
-            .map(|s| {
-                GroupElement::remove_at_the_end_from_biguint(s.m_i.clone(), &fixed_parameters.group)
-            })
-            .collect();
+        let ys: Vec<_> = decryption_shares.iter().map(|s| s.m_i.clone()).collect();
 
         let m = group_lagrange_at_zero(&xs, &ys, &fixed_parameters.field, &fixed_parameters.group);
-
         match m {
             // This should not happen
             None => Err(ShareCombinationError::InterpolationFailure),
-            Some(m) => Ok(CombinedDecryptionShare(m.remove_at_the_end_biguint())),
+            Some(m) => Ok(CombinedDecryptionShare(m)),
         }
     }
 }
@@ -162,18 +146,10 @@ impl CombinedDecryptionShare {
 pub struct DecryptionProofCommitShare {
     /// The guardian's index
     pub i: GuardianIndex,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
     /// First part of the commit share
-    pub a_i: BigUint,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
+    pub a_i: GroupElement,
     /// Second part of the commit share
-    pub b_i: BigUint,
+    pub b_i: GroupElement,
 }
 
 /// The secret state for a commitment share of a single guardian for a [`DecryptionProof`].
@@ -183,12 +159,8 @@ pub struct DecryptionProofCommitShare {
 pub struct DecryptionProofStateShare {
     /// The guardian's index
     pub i: GuardianIndex,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
     /// The commit state
-    pub u_i: BigUint,
+    pub u_i: FieldElement,
 }
 
 /// The response share of a single guardian for a [`DecryptionProof`].
@@ -198,12 +170,8 @@ pub struct DecryptionProofStateShare {
 pub struct DecryptionProofResponseShare {
     /// The guardian's index
     pub i: GuardianIndex,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
     /// The response share
-    pub v_i: BigUint,
+    pub v_i: FieldElement,
 }
 
 /// Represents errors occurring while computing a response share.
@@ -246,17 +214,9 @@ pub enum CombineProofError {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProof {
     /// Challenge
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub challenge: BigUint,
+    pub challenge: FieldElement,
     /// Response
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub response: BigUint,
+    pub response: FieldElement,
 }
 
 impl DecryptionProof {
@@ -275,12 +235,12 @@ impl DecryptionProof {
         ciphertext: &Ciphertext,
         i: &GuardianIndex,
     ) -> (DecryptionProofCommitShare, DecryptionProofStateShare) {
-        let p = fixed_parameters.p.as_ref();
-        let q = fixed_parameters.q.as_ref();
-        let g = &fixed_parameters.g;
-        let u_i = csprng.next_biguint_lt(q);
-        let a_i = g.modpow(&u_i, p);
-        let b_i = ciphertext.alpha.modpow(&u_i, p);
+        let group = &fixed_parameters.group;
+        let field = &fixed_parameters.field;
+
+        let u_i = field.random_field_elem(csprng);
+        let a_i = group.g_exp(&u_i);
+        let b_i = ciphertext.alpha.exp(&u_i, group);
         let dcs = DecryptionProofCommitShare { i: *i, a_i, b_i };
         let dss = DecryptionProofStateShare { i: *i, u_i };
         (dcs, dss)
@@ -291,6 +251,7 @@ impl DecryptionProof {
     /// The computation corresponds to Equation `71`.
     ///
     /// The arguments are
+    /// - `fixed_parameters` - the fixed parameters
     /// - `h_e` - the extended bash hash
     /// - `k` - the joint election public key
     /// - `c` - the ciphertext
@@ -298,24 +259,31 @@ impl DecryptionProof {
     /// - `b` - second part of the commit message
     /// - `m` - combined decryption share
     fn challenge(
+        fixed_parameters: &FixedParameters,
         h_e: &HValue,
         k: &JointElectionPublicKey,
         c: &Ciphertext,
-        a: &BigUint,
-        b: &BigUint,
+        a: &GroupElement,
+        b: &GroupElement,
         m: &CombinedDecryptionShare,
-    ) -> BigUint {
+    ) -> FieldElement {
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
         // v = 0x30 | b(k,512) | b(c.A,512)| b(c.B,512) | b(a,512) | b(b,512) | b(m,512)
         let mut v = vec![0x30];
-        v.extend_from_slice(to_be_bytes_left_pad(&k.joint_election_public_key, 512).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(&c.alpha, 512).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(&c.beta, 512).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(a, 512).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(b, 512).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(&m.0, 512).as_slice());
+        v.extend_from_slice(
+            k.joint_election_public_key
+                .to_be_bytes_left_pad(group)
+                .as_slice(),
+        );
+        v.extend_from_slice(c.alpha.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(c.beta.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(a.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(b.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(m.0.to_be_bytes_left_pad(group).as_slice());
         let c = eg_h(h_e, &v);
         //The challenge is not reduced modulo q (cf. Section 5.4)
-        BigUint::from_bytes_be(c.0.as_slice())
+        FieldElement::from_bytes_be(c.0.as_slice(), field)
     }
 
     /// This function computes a guardian's response share for the decryption NIZK.
@@ -348,36 +316,31 @@ impl DecryptionProof {
                 j: secret_key_share.i,
             });
         }
-
-        let p = fixed_parameters.p.as_ref();
-        let q = fixed_parameters.q.as_ref();
-
+        let group = &fixed_parameters.group;
+        let field = &fixed_parameters.field;
+        // Equation `70`
         let (a, b) = proof_commit_shares
             .iter()
-            .fold((BigUint::one(), BigUint::one()), |(a, b), share| {
-                ((a * share.a_i.clone()) % p, (b * share.b_i.clone()) % p)
+            .fold((Group::one(), Group::one()), |(a, b), share| {
+                (a.mul(&share.a_i, group), b.mul(&share.b_i, group))
             });
-
-        let c = Self::challenge(h_e, k, ciphertext, &a, &b, m);
-        let i_big = FieldElement::from(
-            proof_commit_state.i.get_one_based_u32(),
-            &fixed_parameters.field,
-        );
+        // Equation `71`
+        let c = Self::challenge(fixed_parameters, h_e, k, ciphertext, &a, &b, m);
+        // Equation `72` c_i = (c*w_i)
+        let i_scalar = FieldElement::from(proof_commit_state.i.get_one_based_u32(), field);
         let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
-            .map(|s| FieldElement::from(s.i.get_one_based_u32(),&fixed_parameters.field))
+            .map(|s| FieldElement::from(s.i.get_one_based_u32(), field))
             .collect();
-        let w_i = match get_single_coefficient_at_zero(&xs, &i_big, &fixed_parameters.field) {
-            Some(w_i) => w_i.remove_at_the_end_biguint(),
+        let w_i = match get_single_coefficient_at_zero(&xs, &i_scalar, field) {
+            Some(w_i) => w_i,
             None => return Err(ResponseShareError::CoefficientFailure),
         };
-
-        let c_i = (c * w_i) % q;
-
-        let v_i = fixed_parameters.q.subtract_group_elem(
-            &proof_commit_state.u_i,
-            &(c_i * secret_key_share.p_i.clone().remove_at_the_end_biguint()),
-        );
+        let c_i = c.mul(&w_i, field);
+        // Equation `73` v_i = (u_i - c_i*P(i))
+        let v_i = proof_commit_state
+            .u_i
+            .sub(&c_i.mul(&secret_key_share.p_i, field), field);
         Ok(DecryptionProofResponseShare {
             i: proof_commit_state.i,
             v_i,
@@ -441,30 +404,29 @@ impl DecryptionProof {
             Err(e) => return Err(CombineProofError::ShareCombinationError(e)),
         };
 
-        let p = fixed_parameters.p.as_ref();
-        let q = fixed_parameters.q.as_ref();
-        let g = &fixed_parameters.g;
+        let group = &fixed_parameters.group;
+        let field = &fixed_parameters.field;
 
         let (a, b) = proof_commit_shares
             .iter()
-            .fold((BigUint::one(), BigUint::one()), |(a, b), share| {
-                ((a * share.a_i.clone()) % p, (b * share.b_i.clone()) % p)
+            .fold((Group::one(), Group::one()), |(a, b), share| {
+                (a.mul(&share.a_i, group), b.mul(&share.b_i, group))
             });
-        let c = Self::challenge(h_e, &joint_key, ciphertext, &a, &b, &m);
+        let c = Self::challenge(fixed_parameters, h_e, &joint_key, ciphertext, &a, &b, &m);
 
         let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
-            .map(|s| FieldElement::from(s.i.get_one_based_u32(),&fixed_parameters.field))
+            .map(|s| FieldElement::from(s.i.get_one_based_u32(), field))
             .collect();
         let mut c_i_vec = vec![];
         for cs in proof_commit_shares {
             let i = cs.i.get_one_based_u32();
-            let i = FieldElement::from(i, &fixed_parameters.field);
+            let i = FieldElement::from(i, field);
             let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.field) {
                 Some(w_i) => w_i,
                 None => return Err(CombineProofError::CoefficientFailure),
             };
-            let c_i = (c.clone() * w_i.remove_at_the_end_biguint()) % q;
+            let c_i = c.mul(&w_i, field);
             c_i_vec.push(c_i);
         }
 
@@ -475,27 +437,23 @@ impl DecryptionProof {
             proof_response_shares,
             c_i_vec
         ) {
-            let g_v = g.modpow(&rs.v_i, p);
-            let i = BigUint::from(ds.i.get_one_based_u32());
-            let k_prod = guardian_public_keys
-                .iter()
-                .fold(BigUint::one(), |prod, pk| {
-                    let inner_p = pk.coefficient_commitments.0.iter().enumerate().fold(
-                        BigUint::one(),
-                        |prod, (m, k_m)| {
-                            //This is fine as m < k
-                            #[allow(clippy::unwrap_used)]
-                            let m: u32 = m.try_into().unwrap();
-                            (prod * k_m.0.remove_at_the_end_biguint().modpow(&i.pow(m), p)) % p
-                        },
-                    );
-                    (prod * inner_p) % p
-                });
-            let a_i = (g_v * k_prod.modpow(&c_i, p)) % p;
+            let g_v = group.g_exp(&rs.v_i);
+            let i_scalar = FieldElement::from(ds.i.get_one_based_u32(), field);
+            let k_prod = guardian_public_keys.iter().fold(Group::one(), |prod, pk| {
+                let inner_p = pk.coefficient_commitments.0.iter().enumerate().fold(
+                    Group::one(),
+                    |prod, (m, k_m)| {
+                        let i_pow_m = i_scalar.pow(m, field);
+                        prod.mul(&k_m.0.exp(&i_pow_m, group), group)
+                    },
+                );
+                prod.mul(&inner_p, group)
+            });
+            let a_i = g_v.mul(&k_prod.exp(&c_i, group), group);
 
-            let a_v = ciphertext.alpha.modpow(&rs.v_i, p);
-            let m_c = ds.m_i.modpow(&c_i, p);
-            let b_i = (a_v * m_c) % p;
+            let a_v = ciphertext.alpha.exp(&rs.v_i, group);
+            let m_c = ds.m_i.exp(&c_i, group);
+            let b_i = a_v.mul(&m_c, group);
 
             if a_i != cs.a_i {
                 return Err(CombineProofError::CommitInconsistency(
@@ -513,7 +471,7 @@ impl DecryptionProof {
 
         let v = proof_response_shares
             .iter()
-            .fold(BigUint::zero(), |sum, rs| (sum + rs.v_i.clone()) % q);
+            .fold(ScalarField::zero(), |sum, rs| sum.add(&rs.v_i, field));
 
         Ok(DecryptionProof {
             challenge: c,
@@ -538,20 +496,23 @@ impl DecryptionProof {
         ciphertext: &Ciphertext,
         m: &CombinedDecryptionShare,
     ) -> bool {
-        let g = &fixed_parameters.g;
-        let p = fixed_parameters.p.as_ref();
-        let q = fixed_parameters.q.as_ref();
+        let group = &fixed_parameters.group;
+        let field = &fixed_parameters.field;
 
         let key = &joint_key.joint_election_public_key;
 
-        let a = (g.modpow(&self.response, p) * key.modpow(&self.challenge, p)) % p;
-        let b = (ciphertext.alpha.modpow(&self.response, p) * m.0.modpow(&self.challenge, p)) % p;
+        let a = group
+            .g_exp(&self.response)
+            .mul(&key.exp(&self.challenge, group), group);
+        let a_v = ciphertext.alpha.exp(&self.response, group);
+        let m_c = m.0.exp(&self.challenge, group);
+        let b = a_v.mul(&m_c, group);
 
         //Check (9.A)
-        if &self.response >= q {
+        if !self.response.is_valid(field) {
             return false;
         }
-        let c = Self::challenge(h_e, joint_key, ciphertext, &a, &b, m);
+        let c = Self::challenge(fixed_parameters, h_e, joint_key, ciphertext, &a, &b, m);
         //Check (9.B)
         if c != self.challenge {
             return false;
@@ -597,15 +558,17 @@ impl VerifiableDecryption {
         m: &CombinedDecryptionShare,
         proof: &DecryptionProof,
     ) -> Result<Self, DecryptionError> {
-        let m_inv = mod_inverse(&m.0, fixed_parameters.p.as_ref());
-        let group_msg = match m_inv {
+        let group = &fixed_parameters.group;
+        let group_msg = match m.0.inv(group) {
             None => return Err(DecryptionError::NoInverse),
-            Some(m_inv) => (ciphertext.beta.clone() * m_inv) % fixed_parameters.p.as_ref(),
+            Some(m_inv) => ciphertext.beta.mul(&m_inv, group),
         };
-        let base = &joint_key.joint_election_public_key;
+        let base = &joint_key
+            .joint_election_public_key
+            .remove_at_the_end_biguint();
         let p = fixed_parameters.p.as_ref();
         let dlog = DiscreteLog::new(base, p);
-        let plain_text = match dlog.find(base, p, &group_msg) {
+        let plain_text = match dlog.find(base, p, &group_msg.remove_at_the_end_biguint()) {
             None => return Err(DecryptionError::NoDlog),
             Some(x) => x,
         };
@@ -630,13 +593,13 @@ impl VerifiableDecryption {
         joint_key: &JointElectionPublicKey,
         ciphertext: &Ciphertext,
     ) -> bool {
+        let group = &fixed_parameters.group;
         let t = joint_key
             .joint_election_public_key
-            .modpow(&self.plain_text, fixed_parameters.p.as_ref());
-        let t_inv = mod_inverse(&t, fixed_parameters.p.as_ref());
-        let m = match t_inv {
+            .pow(&self.plain_text, group);
+        let m = match t.inv(group) {
             None => return false,
-            Some(t_inv) => (ciphertext.beta.clone() * t_inv) % fixed_parameters.p.as_ref(),
+            Some(t_inv) => ciphertext.beta.mul(&t_inv, group),
         };
         self.proof.validate(
             fixed_parameters,
@@ -649,10 +612,11 @@ impl VerifiableDecryption {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use num_bigint::BigUint;
     use std::iter::zip;
-    use util::csprng::Csprng;
+    use util::{algebra::FieldElement, csprng::Csprng};
 
     use crate::{
         election_parameters::ElectionParameters,
@@ -732,25 +696,25 @@ mod test {
             fixed_parameters,
             varying_parameters,
         };
-        let p = &election_parameters.fixed_parameters.p;
-        let g = &election_parameters.fixed_parameters.g;
+        let field = &election_parameters.fixed_parameters.field;
+        let group = &election_parameters.fixed_parameters.group;
 
         // Using x^2-1 as polynomial
         let decryption_shares = [
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(1).unwrap(),
-                m_i: g.modpow(&BigUint::from(0_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(0_u8, field)),
             },
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(2).unwrap(),
-                m_i: g.modpow(&BigUint::from(3_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(3_u8, field)),
             },
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(3).unwrap(),
-                m_i: g.modpow(&BigUint::from(8_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(8_u8, field)),
             },
         ];
-        let exp_m = CombinedDecryptionShare(g.modpow(&BigUint::from(126_u8), p.as_ref()));
+        let exp_m = CombinedDecryptionShare(group.g_exp(&FieldElement::from(126_u8, field)));
 
         assert_eq!(
             CombinedDecryptionShare::combine(&election_parameters, &decryption_shares)
@@ -768,15 +732,15 @@ mod test {
         let decryption_shares = [
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(1).unwrap(),
-                m_i: g.modpow(&BigUint::from(0_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(0_u8, field)),
             },
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(2).unwrap(),
-                m_i: g.modpow(&BigUint::from(3_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(3_u8, field)),
             },
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(4).unwrap(),
-                m_i: g.modpow(&BigUint::from(8_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(8_u8, field)),
             },
         ];
         assert_eq!(
@@ -790,15 +754,15 @@ mod test {
         let decryption_shares = [
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(1).unwrap(),
-                m_i: g.modpow(&BigUint::from(0_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(0_u8, field)),
             },
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(2).unwrap(),
-                m_i: g.modpow(&BigUint::from(3_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(3_u8, field)),
             },
             DecryptionShare {
                 i: GuardianIndex::from_one_based_index(2).unwrap(),
-                m_i: g.modpow(&BigUint::from(8_u8), p.as_ref()),
+                m_i: group.g_exp(&FieldElement::from(8_u8, field)),
             },
         ];
         assert_eq!(
@@ -817,10 +781,12 @@ mod test {
         //The exact value does not matter
         let h_e = HValue::default();
 
+        let field = &fixed_parameters.field;
+
         let (joint_key, public_keys, key_shares) = key_setup(&mut csprng, &election_parameters);
 
         let message: usize = 42;
-        let nonce = csprng.next_biguint_lt(fixed_parameters.q.as_ref());
+        let nonce = field.random_field_elem(&mut csprng);
         let ciphertext = joint_key.encrypt_with(fixed_parameters, &nonce, message, false);
 
         let dec_shares: Vec<_> = key_shares

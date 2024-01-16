@@ -5,7 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use num_bigint::BigUint;
+
+use util::algebra::FieldElement;
 
 use crate::{
     election_manifest::{ContestIndex, ContestOptionIndex},
@@ -23,7 +24,8 @@ pub fn encrypted(
     primary_nonce: &[u8],
     label_i: ContestIndex,
     label_j: ContestOptionIndex,
-) -> BigUint {
+) -> FieldElement {
+    let field = &header.parameters.fixed_parameters.field;
     let mut v = vec![0x20];
 
     v.extend_from_slice(primary_nonce);
@@ -31,6 +33,5 @@ pub fn encrypted(
     v.extend_from_slice(&label_j.get_one_based_u32().to_be_bytes());
 
     let nonce = eg_h(&header.hashes_ext.h_e, &v);
-
-    BigUint::from_bytes_be(nonce.0.as_slice()) % header.parameters.fixed_parameters.q.as_ref()
+    FieldElement::from_bytes_be(nonce.0.as_slice(), field)
 }

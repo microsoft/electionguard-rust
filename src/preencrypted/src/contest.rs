@@ -130,7 +130,6 @@ impl ContestPreEncrypted {
                     pvd,
                     csprng,
                     i.get_one_based_usize(),
-                    &pvd.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         });
@@ -144,6 +143,9 @@ impl ContestPreEncrypted {
         selection_limit: usize,
     ) -> Vec<Ciphertext> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
+
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
 
         let mut selections = <Vec<&Vec<Ciphertext>>>::new();
 
@@ -176,16 +178,12 @@ impl ContestPreEncrypted {
                 let combined_selection_j = &mut combined_selection[j];
                 let selections_i_j = &selections[i][j];
 
-                combined_selection_j.alpha = (&combined_selection_j.alpha * &selections_i_j.alpha)
-                    % fixed_parameters.p.as_ref();
-
-                combined_selection_j.beta = (&combined_selection_j.beta * &selections_i_j.beta)
-                    % fixed_parameters.p.as_ref();
+                combined_selection_j.alpha = combined_selection_j.alpha.mul(&selections_i_j.alpha, group);
+                combined_selection_j.beta = combined_selection_j.beta.mul(&selections_i_j.beta, group);
 
                 #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-                let cs_j_nonce = (combined_selection_j.nonce.as_ref().unwrap()
-                    + selections_i_j.nonce.as_ref().unwrap())
-                    % fixed_parameters.q.as_ref();
+                let cs_j_nonce = combined_selection_j.nonce.as_ref().unwrap()
+                    .add(selections_i_j.nonce.as_ref().unwrap(), field);
                 combined_selection_j.nonce = Some(cs_j_nonce);
             }
         }
@@ -216,7 +214,6 @@ impl ContestPreEncrypted {
                     &device.header,
                     csprng,
                     voter_selections[i] == 1u8,
-                    &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         }
@@ -227,7 +224,6 @@ impl ContestPreEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            &device.header.parameters.fixed_parameters.q,
             &selection,
             num_selections as usize,
             selection_limit,

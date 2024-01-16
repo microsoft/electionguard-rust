@@ -45,7 +45,7 @@ impl HashesExt {
             let mut v = vec![0x12];
 
             // K = election public key
-            v.append(&mut joint_election_public_key.to_be_bytes_len_p(fixed_parameters));
+            v.append(&mut joint_election_public_key.to_be_bytes_left_pad(fixed_parameters));
 
             for public_key in guardian_public_keys.iter() {
                 let coefficient_commitments = public_key.coefficient_commitments();
@@ -164,7 +164,9 @@ mod test {
         let joint_election_public_key =
             JointElectionPublicKey::compute(&election_parameters, &guardian_public_keys).unwrap();
 
-        assert!(joint_election_public_key.as_ref() < fixed_parameters.p.borrow());
+        assert!(joint_election_public_key
+            .as_ref()
+            .is_valid(&fixed_parameters.group));
 
         let hashes_ext = HashesExt::compute(
             &election_parameters,

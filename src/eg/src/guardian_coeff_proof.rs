@@ -6,10 +6,10 @@
 //! This module provides the implementation of the coefficient proof of knowledge for [`CoefficientCommitment`]s.
 //! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
 
+use crate::hash::eg_h;
 use crate::{
     fixed_parameters::FixedParameters,
     guardian_secret_key::{CoefficientCommitment, SecretCoefficient},
-    hash::{eg_h, HValue},
     hashes::ParameterBaseHash,
 };
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ use util::{
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientProof {
     /// Challenge
-    pub challenge: HValue,
+    pub challenge: FieldElement,
     /// Response
     pub response: FieldElement,
 }
@@ -60,7 +60,7 @@ impl CoefficientProof {
         j: u32,
         coefficient: &GroupElement,
         h: &GroupElement,
-    ) -> HValue {
+    ) -> FieldElement {
         let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
         let group = &fixed_parameters.group;
         // v = 0x10 | b(i,4) | b(j,4) | b(coefficient,512) | b(h,512) for standard parameters
@@ -69,8 +69,9 @@ impl CoefficientProof {
         v.extend_from_slice(j.to_be_bytes().as_slice());
         v.extend_from_slice(coefficient.to_be_bytes_left_pad(group).as_slice());
         v.extend_from_slice(h.to_be_bytes_left_pad(group).as_slice());
-        //The challenge is not reduced modulo q (cf. Section 5.4)
-        eg_h(&h_p, &v)
+        let c_bytes = eg_h(&h_p, &v);
+        //Get field element from challenge, here the challenge is reduced mod `q`
+        FieldElement::from_bytes_be(c_bytes.0.as_slice(), &fixed_parameters.field)
     }
 
     /// This function computes a [`CoefficientProof`] from given [`SecretCoefficient`] and [`CoefficientCommitment`].
@@ -98,10 +99,8 @@ impl CoefficientProof {
         let h = fixed_parameters.group.g_exp(&u);
         // Compute challenge
         let c = Self::challenge(fixed_parameters, i, j, commitment, &h);
-        // Get field element from challenge, here the challenge is reduced mod `q`
-        let c_val = FieldElement::from_bytes_be(c.0.as_slice(), field);
         // Compute response
-        let s = c_val.mul(coefficient, field);
+        let s = c.mul(coefficient, field);
         let v = u.sub(&s, field);
         CoefficientProof {
             challenge: c,
@@ -138,10 +137,9 @@ impl CoefficientProof {
             return Err(ProofValidationError::ResponseNotInField);
         }
         // Equation (2.1)
-        let c_val = FieldElement::from_bytes_be(self.challenge.0.as_slice(), field);
         let h = group
             .g_exp(&self.response)
-            .mul(&commitment.exp(&c_val, group), group);
+            .mul(&commitment.exp(&self.challenge, group), group);
         // Verification check (2.C)
         if self.challenge != Self::challenge(fixed_parameters, i, j, commitment, &h) {
             return Err(ProofValidationError::ChallengeMismatch);

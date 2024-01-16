@@ -5,10 +5,12 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides the implementation of the [`JointElectionPublicKey`] and [`Ciphertext`] for ballot encryption.
+//! For more details see Sections `3.2.2` and `3.3` of the Electionguard specification `2.0.0`.
+
 use anyhow::{bail, ensure, Context, Result};
-use num_bigint::BigUint;
-use num_traits::One;
 use serde::{Deserialize, Serialize};
+use util::algebra::{FieldElement, Group, GroupElement};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
@@ -18,11 +20,7 @@ use crate::{
 /// The joint election public key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct JointElectionPublicKey {
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub joint_election_public_key: BigUint,
+    pub joint_election_public_key: GroupElement,
 }
 
 /// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`crate::contest_encrypted::ContestEncrypted`].
@@ -31,18 +29,10 @@ pub type CiphertextIndex = Index<Ciphertext>;
 /// The ciphertext used to store a vote value corresponding to one option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ciphertext {
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub alpha: BigUint,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub beta: BigUint,
+    pub alpha: GroupElement,
+    pub beta: GroupElement,
     #[serde(skip)]
-    pub nonce: Option<BigUint>,
+    pub nonce: Option<FieldElement>,
 }
 
 /// Does not match nonces if either nonce is None.
@@ -65,6 +55,7 @@ impl JointElectionPublicKey {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
         let n = varying_parameters.n.get_one_based_usize();
+        let group = &fixed_parameters.group;
 
         // Validate every supplied guardian public key.
         for guardian_public_key in guardian_public_keys {
@@ -108,12 +99,9 @@ impl JointElectionPublicKey {
         }
 
         let joint_election_public_key = guardian_public_keys.iter().fold(
-            BigUint::one(),
-            |mut acc, guardian_public_key| -> BigUint {
-                acc *= guardian_public_key
-                    .public_key_k_i_0()
-                    .remove_at_the_end_biguint();
-                acc % fixed_parameters.p.as_ref()
+            Group::one(),
+            |acc, guardian_public_key| -> GroupElement {
+                acc.mul(guardian_public_key.public_key_k_i_0(), group)
             },
         );
 
@@ -125,16 +113,16 @@ impl JointElectionPublicKey {
     pub fn encrypt_with(
         &self,
         fixed_parameters: &FixedParameters,
-        nonce: &BigUint,
+        nonce: &FieldElement,
         vote: usize,
         store_nonce: bool,
     ) -> Ciphertext {
-        let alpha = fixed_parameters
-            .g
-            .modpow(nonce, fixed_parameters.p.as_ref());
-        let beta = self
-            .joint_election_public_key
-            .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
+
+        let alpha = group.g_exp(nonce);
+        let exponent = &nonce.add(&FieldElement::from(vote, field), field);
+        let beta = self.joint_election_public_key.exp(exponent, group);
 
         if store_nonce {
             Ciphertext {
@@ -167,18 +155,16 @@ impl JointElectionPublicKey {
     /// Verifies that the `JointElectionPublicKey` conforms to the election parameters.
     /// Useful after deserialization.
     pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
-        ensure!(
-            election_parameters
-                .fixed_parameters
-                .is_valid_modp(&self.joint_election_public_key),
-            "JointElectionPublicKey is not valid mod p"
-        );
+        let group = &election_parameters.fixed_parameters.group;
+        ensure!(self.joint_election_public_key.is_valid(group));
+        ensure!(self.joint_election_public_key != Group::one());
         Ok(())
     }
 
     /// Returns the `JointElectionPublicKey` as a big-endian byte array of the correct length for `mod p`.
-    pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
-        fixed_parameters.biguint_to_be_bytes_len_p(&self.joint_election_public_key)
+    pub fn to_be_bytes_left_pad(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
+        self.joint_election_public_key
+            .to_be_bytes_left_pad(&fixed_parameters.group)
     }
 
     /// Writes a `JointElectionPublicKey` to a `std::io::Write`.
@@ -192,9 +178,9 @@ impl JointElectionPublicKey {
     }
 }
 
-impl AsRef<BigUint> for JointElectionPublicKey {
+impl AsRef<GroupElement> for JointElectionPublicKey {
     #[inline]
-    fn as_ref(&self) -> &BigUint {
+    fn as_ref(&self) -> &GroupElement {
         &self.joint_election_public_key
     }
 }
