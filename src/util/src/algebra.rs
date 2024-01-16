@@ -62,14 +62,16 @@ impl FieldElement {
     ///
     // Returns the inverse of self mod field.q iff gcd(self,q) == 1
     pub fn inv(&self, field: &ScalarField) -> Option<Self> {
-        match mod_inverse(&self.0, &field.q) {
-            Some(x) => Some(FieldElement(x)),
-            None => None,
-        }
+        mod_inverse(&self.0, &field.q).map(FieldElement)
     }
 
-    /// Creates a field element from a [`BigUint`] by reducing it modulo the field order.
-    pub fn from_biguint(x: BigUint, field: &ScalarField) -> Self {
+    /// Creates a field element from a given integer.
+    /// 
+    /// This function supports any type `T` that can be converted into a [`BigUint`].
+    pub fn from<T>(x: T, field: &ScalarField) -> Self 
+    where BigUint: From<T>,
+    {
+        let x = BigUint::from(x);
         FieldElement(x % &field.q)
     }
 
@@ -208,15 +210,12 @@ impl GroupElement {
     ///
     // Returns the inverse of self mod field.q iff gcd(self,q) == 1
     pub fn inv(&self, group: &Group) -> Option<Self> {
-        match mod_inverse(&self.0, &group.p) {
-            Some(x) => Some(GroupElement(x)),
-            None => None,
-        }
+        mod_inverse(&self.0, &group.p).map(GroupElement)
     }
 
     /// Computes the `exponent`-power of the given group element, where exponent is a BigUint.
     pub fn pow(&self, exponent: &BigUint, group: &Group) -> GroupElement {
-        GroupElement(self.0.modpow(&exponent, &group.p))
+        GroupElement(self.0.modpow(exponent, &group.p))
     }
 
     /// Computes the `exponent`-power of the given group element, where exponent is a FieldElement.
@@ -319,8 +318,7 @@ impl Group {
     pub fn random_group_elem(&self, csprng: &mut Csprng) -> GroupElement {
         let q = self.order();
         let field_elem = FieldElement(csprng.next_biguint_lt(&q));
-        let group_elem = self.g_exp(&field_elem);
-        group_elem
+        self.g_exp(&field_elem)
     }
 
     /// Returns generator `g` raised to the power of `x` mod `p`.
