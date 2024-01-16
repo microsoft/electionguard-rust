@@ -594,7 +594,7 @@ impl VerifiableDecryption {
         let group = &fixed_parameters.group;
         let t = joint_key
             .joint_election_public_key
-            .pow(&self.plain_text, group);
+            .pow(self.plain_text.clone(), group);
         let m = match t.inv(group) {
             None => return false,
             Some(t_inv) => ciphertext.beta.mul(&t_inv, group),

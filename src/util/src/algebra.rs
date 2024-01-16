@@ -244,7 +244,7 @@ impl GroupElement {
     pub fn is_valid(&self, group: &Group) -> bool {
         // It is enough to check the upper bound as self.0 is unsigned.
         let elem_less_than_p = self.0 < group.p;
-        let elem_has_order_q = self.pow(&group.order(), group).0.is_one();
+        let elem_has_order_q = self.pow(group.order(), group).0.is_one();
         elem_less_than_p && elem_has_order_q
     }
 
@@ -449,7 +449,7 @@ mod test {
         assert_eq!(g1.mul(&g1_inv, &group), Group::one());
 
         let g = group.generator();
-        assert_eq!(g.pow(&BigUint::from(14_u32), &group), g2);
+        assert_eq!(g.pow(14_u32, &group), g2);
 
         for _ in 0..100 {
             let u = group.random_group_elem(&mut csprng);
