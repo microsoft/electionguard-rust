@@ -295,12 +295,12 @@ impl Group {
     ///
     /// That is it checks that
     /// - the modulus is prime
-    /// - the order is prime
+    /// - the order is prime and < modulus-1
     /// - the generator is a proper generator
     /// - the order does not divide the co-factor
     /// - the co-factor is non-zero
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
-        if self.r.is_zero() {
+        if self.r.is_zero() || self.r.is_one() {
             return false;
         }
         if !is_prime(&self.p, csprng) {

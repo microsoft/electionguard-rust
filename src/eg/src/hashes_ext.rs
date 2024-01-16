@@ -41,6 +41,7 @@ impl HashesExt {
         // Computation of the extended base hash H_E.
 
         let h_e = {
+            // TODO: Check that the formula below matches the specification
             // B1 = 12 ∥ b(K, 512) ∥ b(K1,0, 512) ∥ b(K1,1, 512) ∥ · · · ∥ b(Kn,k−1, 512)
             let mut v = vec![0x12];
 
@@ -56,7 +57,7 @@ impl HashesExt {
 
             // len(B1) = 1 + (n · k + 1) · 512
             let expected_mod_p_values = 1 + n * k;
-            let expected_len = 1 + expected_mod_p_values * fixed_parameters.l_p_bytes();
+            let expected_len = 1 + expected_mod_p_values * fixed_parameters.group.l_p();
             debug_assert_eq!(v.len(), expected_len);
 
             // HE = H(HB; 12, K, K1,0, K1,1, . . . , Kn,k−2, Kn,k−1) (20)
