@@ -132,8 +132,8 @@ impl CombinedDecryptionShare {
         let xs: Vec<_> = decryption_shares
             .iter()
             .map(|s| {
-                FieldElement::from_biguint(
-                    BigUint::from(s.i.get_one_based_u32()),
+                FieldElement::from(
+                    s.i.get_one_based_u32(),
                     &fixed_parameters.field,
                 )
             })
@@ -359,14 +359,13 @@ impl DecryptionProof {
             });
 
         let c = Self::challenge(h_e, k, ciphertext, &a, &b, m);
-        let i_big = FieldElement::from_biguint(
-            BigUint::from(proof_commit_state.i.get_one_based_u32()),
+        let i_big = FieldElement::from(
+            proof_commit_state.i.get_one_based_u32(),
             &fixed_parameters.field,
         );
         let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
-            .map(|s| BigUint::from(s.i.get_one_based_u32()))
-            .map(|x| FieldElement::from_biguint(x, &fixed_parameters.field))
+            .map(|s| FieldElement::from(s.i.get_one_based_u32(),&fixed_parameters.field))
             .collect();
         let w_i = match get_single_coefficient_at_zero(&xs, &i_big, &fixed_parameters.field) {
             Some(w_i) => w_i.remove_at_the_end_biguint(),
@@ -455,13 +454,12 @@ impl DecryptionProof {
 
         let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
-            .map(|s| BigUint::from(s.i.get_one_based_u32()))
-            .map(|x| FieldElement::from_biguint(x, &fixed_parameters.field))
+            .map(|s| FieldElement::from(s.i.get_one_based_u32(),&fixed_parameters.field))
             .collect();
         let mut c_i_vec = vec![];
         for cs in proof_commit_shares {
-            let i = BigUint::from(cs.i.get_one_based_u32());
-            let i = FieldElement::from_biguint(i, &fixed_parameters.field);
+            let i = cs.i.get_one_based_u32();
+            let i = FieldElement::from(i, &fixed_parameters.field);
             let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.field) {
                 Some(w_i) => w_i,
                 None => return Err(CombineProofError::CoefficientFailure),
@@ -654,27 +652,24 @@ impl VerifiableDecryption {
 mod test {
     use num_bigint::BigUint;
     use std::iter::zip;
-    use util::{csprng::Csprng, prime::BigUintPrime};
+    use util::csprng::Csprng;
 
     use crate::{
         election_parameters::ElectionParameters,
         example_election_parameters::example_election_parameters,
-        fixed_parameters::{FixedParameterGenerationParameters, FixedParameters, NumsNumber},
+        fixed_parameters::FixedParameters,
         guardian::GuardianIndex,
         guardian_public_key::GuardianPublicKey,
         guardian_secret_key::GuardianSecretKey,
         guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
         hash::HValue,
-        joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+        joint_election_public_key::JointElectionPublicKey,
         standard_parameters::test_parameter_do_not_use_in_production::TOY_PARAMETERS_01,
         varying_parameters::{BallotChaining, VaryingParameters},
         verifiable_decryption::ShareCombinationError,
     };
 
-    use super::{
-        CombinedDecryptionShare, DecryptionProof, DecryptionProofCommitShare, DecryptionShare,
-        VerifiableDecryption,
-    };
+    use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption};
 
     fn key_setup(
         csprng: &mut Csprng,

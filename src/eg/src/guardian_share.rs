@@ -7,12 +7,11 @@
 //!
 //! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
 
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::iter::zip;
 use thiserror::Error;
 use util::{
-    algebra::{FieldElement, GroupElement},
+    algebra::{FieldElement, GroupElement, ScalarField},
     bitwise::xor,
     csprng::Csprng,
 };
@@ -162,8 +161,8 @@ impl GuardianEncryptedShare {
         let (k0, k1) = Self::mac_and_encryption_key(i, l, &k_i_l);
 
         //Generate key share as P(l) (cf. Equations 9 and 18) using Horner's method
-        let x = FieldElement::from_biguint(BigUint::from(l), field);
-        let mut p_l = FieldElement::from_biguint(BigUint::from(0_u8), field);
+        let x = FieldElement::from(l, field);
+        let mut p_l = ScalarField::zero();
         for coeff in dealer_private_key.secret_coefficients.0.iter().rev() {
             p_l = p_l.mul(&x, field).add(&coeff.0, field);
         }
@@ -211,6 +210,7 @@ impl GuardianEncryptedShare {
         }
 
         let fixed_parameters = &election_parameters.fixed_parameters;
+        let field = &fixed_parameters.field;
         let group = &fixed_parameters.group;
 
         let i = self.dealer.get_one_based_u32();
@@ -229,10 +229,7 @@ impl GuardianEncryptedShare {
         }
 
         let p_l_bytes = xor(self.c1.0.as_slice(), k1.0.as_slice());
-        let p_l = FieldElement::from_biguint(
-            BigUint::from_bytes_be(p_l_bytes.as_slice()),
-            &fixed_parameters.field,
-        );
+        let p_l = FieldElement::from_bytes_be(&p_l_bytes, field);
 
         Ok(p_l)
     }
@@ -337,7 +334,7 @@ impl GuardianSecretKeyShare {
         }
 
         let key = shares.iter().fold(
-            FieldElement::from_biguint(BigUint::from(0_u8), &fixed_parameters.field),
+            FieldElement::from(0_u8, &fixed_parameters.field),
             |acc, share| acc.add(share, &fixed_parameters.field),
         );
 
@@ -352,7 +349,7 @@ impl GuardianSecretKeyShare {
 mod test {
     use num_bigint::BigUint;
     use std::iter::zip;
-    use util::{algebra::FieldElement, csprng::Csprng, integer_util::field_lagrange_at_zero};
+    use util::{algebra::{FieldElement, ScalarField}, csprng::Csprng, integer_util::field_lagrange_at_zero};
 
     use crate::{
         example_election_parameters::example_election_parameters, guardian::GuardianIndex,
@@ -440,16 +437,16 @@ mod test {
 
         // Compute joint secret key from secret keys
         let joint_key_1 = guardian_secret_keys.iter().fold(
-            FieldElement::from_biguint(BigUint::from(0_u8), &fixed_parameters.field),
-            |mut acc, share| acc.add(share.secret_s(), &fixed_parameters.field),
+            ScalarField::zero(),
+            |acc, share| acc.add(share.secret_s(), &fixed_parameters.field),
         );
 
         // Compute joint secret key from shares
         let xs = guardian_public_keys
             .iter()
             .map(|pk| {
-                FieldElement::from_biguint(
-                    BigUint::from(pk.i.get_one_based_u32()),
+                FieldElement::from(
+                    pk.i.get_one_based_u32(),
                     &fixed_parameters.field,
                 )
             })
