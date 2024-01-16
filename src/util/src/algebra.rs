@@ -66,8 +66,11 @@ impl FieldElement {
     }
 
     /// Computes the `exponent`-power of the given field element, where exponent is a BigUint.
-    pub fn pow(&self, exponent: &BigUint, field: &ScalarField) -> FieldElement {
-        FieldElement(self.0.modpow(exponent, &field.q))
+    pub fn pow<T>(&self, exponent: T, field: &ScalarField) -> FieldElement 
+    where BigUint: From<T>,
+    {
+        let x = BigUint::from(exponent);
+        FieldElement(self.0.modpow(&x, &field.q))
     }
 
     /// Creates a field element from a given integer.
