@@ -369,17 +369,6 @@ mod test {
         )
     }
 
-    fn get_toy_elements() -> (ScalarField, Group) {
-        (
-            ScalarField::new_unchecked(BigUint::from(127_u8)),
-            Group::new_unchecked(
-                BigUint::from(59183_u32),
-                BigUint::from(466_u32),
-                BigUint::from(32616_u32),
-            ),
-        )
-    }
-
     #[test]
     fn test_field_basic_operations() {
         // Toy parameters according to specs
@@ -404,7 +393,6 @@ mod test {
         assert_eq!(a.mul(&b, &field), FieldElement::from(64_u8, &field));
 
         // 115 * 74 = 1 mod 127
-        let b = a.inv(&field).unwrap();
-        assert_eq!(b, FieldElement::from(74_u8, &field));
+        assert_eq!(a.inv(&field), Some(FieldElement::from(74_u8, &field)));
     }
 }
