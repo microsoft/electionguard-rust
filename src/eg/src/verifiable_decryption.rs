@@ -23,9 +23,7 @@ use thiserror::Error;
 use util::{
     algebra::{FieldElement, Group, GroupElement, ScalarField},
     csprng::Csprng,
-    integer_util::{
-        get_single_coefficient_at_zero, group_lagrange_at_zero,
-    },
+    integer_util::{get_single_coefficient_at_zero, group_lagrange_at_zero},
 };
 
 /// A decryption share is a guardian's partial decryption of a given ciphertext.

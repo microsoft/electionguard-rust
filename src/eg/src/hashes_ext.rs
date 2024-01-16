@@ -136,7 +136,6 @@ mod test {
     };
     use anyhow::Result;
     use hex_literal::hex;
-    use std::borrow::Borrow;
     use util::csprng::Csprng;
 
     #[test]

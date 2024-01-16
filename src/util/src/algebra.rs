@@ -65,19 +65,21 @@ impl FieldElement {
         mod_inverse(&self.0, &field.q).map(FieldElement)
     }
 
-    /// Computes the `exponent`-power of the given field element, where exponent is a BigUint.
-    pub fn pow<T>(&self, exponent: T, field: &ScalarField) -> FieldElement 
-    where BigUint: From<T>,
+    /// Computes the `exponent`-power of the given field element, where exponent is an integer.
+    pub fn pow<T>(&self, exponent: T, field: &ScalarField) -> FieldElement
+    where
+        BigUint: From<T>,
     {
         let x = BigUint::from(exponent);
         FieldElement(self.0.modpow(&x, &field.q))
     }
 
     /// Creates a field element from a given integer.
-    /// 
+    ///
     /// This function supports any type `T` that can be converted into a [`BigUint`].
-    pub fn from<T>(x: T, field: &ScalarField) -> Self 
-    where BigUint: From<T>,
+    pub fn from<T>(x: T, field: &ScalarField) -> Self
+    where
+        BigUint: From<T>,
     {
         let x = BigUint::from(x);
         FieldElement(x % &field.q)
@@ -221,16 +223,21 @@ impl GroupElement {
         mod_inverse(&self.0, &group.p).map(GroupElement)
     }
 
-    /// Computes the `exponent`-power of the given group element, where exponent is a BigUint.
-    pub fn pow(&self, exponent: &BigUint, group: &Group) -> GroupElement {
-        GroupElement(self.0.modpow(exponent, &group.p))
+    /// Computes the `exponent`-power of the given group element, where exponent is an integer.
+    pub fn pow<T>(&self, exponent: T, group: &Group) -> GroupElement
+    where
+        BigUint: From<T>,
+    {
+        let x = BigUint::from(exponent);
+        GroupElement(self.0.modpow(&x, &group.p))
     }
+
 
     /// Computes the `exponent`-power of the given group element, where exponent is a FieldElement.
     pub fn exp(&self, exponent: &FieldElement, group: &Group) -> GroupElement {
         GroupElement(self.0.modpow(&exponent.0, &group.p))
     }
-    
+
     /// Checks if the element is a valid member of the given group.
     ///
     /// This method return true iff 0 <= self < group.p and self^group.order() % p == 1
@@ -252,10 +259,6 @@ impl GroupElement {
         self.0.clone()
     }
 
-    /// Creates a field element from a [`BigUint`] by reducing it modulo the field order.
-    pub fn remove_at_the_end_from_biguint(x: BigUint, group: &Group) -> Self {
-        GroupElement(x % &group.p)
-    }
 }
 
 impl Group {
@@ -344,6 +347,11 @@ impl Group {
         (&self.p - BigUint::one()) / &self.r
     }
 
+    /// Returns the modulus of the group
+    pub fn modulus(&self) -> BigUint {
+        self.p.clone()
+    }
+
     /// Returns a generator of the group
     pub fn generator(&self) -> GroupElement {
         GroupElement(self.g.clone())
@@ -363,10 +371,10 @@ pub fn group_matches_field(group: &Group, field: &ScalarField) -> bool {
 // Unit tests for algebra.
 #[cfg(test)]
 mod test {
-    use num_bigint::BigUint;
-    use crate::algebra::{FieldElement, Group, ScalarField, GroupElement};
-    use crate::csprng::Csprng;
     use super::group_matches_field;
+    use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
+    use crate::csprng::Csprng;
+    use num_bigint::BigUint;
 
     fn get_toy_algebras() -> (ScalarField, Group) {
         (
@@ -383,14 +391,14 @@ mod test {
     fn test_field_operations() {
         // Toy parameters according to specs
         let (field, _) = get_toy_algebras();
-        
+
         let a = FieldElement::from(115_u8, &field);
         let b = FieldElement::from(37_u8, &field);
 
         // 242 =  115 mod 127
         assert_eq!(a, FieldElement::from(242_u8, &field));
 
-        // 25 = (115 + 37) mod 127 
+        // 25 = (115 + 37) mod 127
         assert_eq!(a.add(&b, &field), FieldElement::from(25_u8, &field));
 
         // 78 = (115 - 37) mod 127
@@ -415,22 +423,22 @@ mod test {
         let mut csprng = Csprng::new(b"testing group operations");
         // Toy parameters according to specs
         let (field, group) = get_toy_algebras();
-        
+
         let a = FieldElement::from(115_u8, &field);
         let g1 = group.g_exp(&a);
 
         // g2 = group.g^{14} computed from sage
         let g2 = GroupElement(BigUint::from(38489_u32));
-        
+
         // g3 = g1*g2 computed from sage
         let g3 = GroupElement(BigUint::from(48214_u32));
 
         // h is not a group element
         let h = GroupElement(BigUint::from(12345_u32));
-        
+
         // Multiplicative inverse of g1 computed from sage
-        let g1_inv = GroupElement(BigUint::from(58095_u32)); 
-        
+        let g1_inv = GroupElement(BigUint::from(58095_u32));
+
         // Testing correctness
         assert!(g1.is_valid(&group));
         assert!(g2.is_valid(&group));
@@ -450,11 +458,10 @@ mod test {
 
         // Testing soundness
         assert!(!h.is_valid(&group));
-
     }
 
     #[test]
-    fn test_field_group_validity(){
+    fn test_field_group_validity() {
         let mut csprng = Csprng::new(b"testing field/group validity");
         let (field, group) = get_toy_algebras();
         let invalid_field = ScalarField::new_unchecked(BigUint::from(125_u8));
@@ -468,24 +475,42 @@ mod test {
             BigUint::from(466_u32),
             BigUint::from(1_u32),
         );
-        
+
         // order = 68890/830 = 83 is prime, but does not divide the cofactor!
         let invalid_cofactor_group = Group::new_unchecked(
             BigUint::from(68891_u32),
             BigUint::from(830_u32),
             BigUint::from(59398_u32),
         );
-        
+
         // Testing correctness
-        assert!(field.is_valid(&mut csprng), "Prime order fields should validate!");
-        assert!(group.is_valid(&mut csprng), "Prime order groups with proper parameters should validate!");
+        assert!(
+            field.is_valid(&mut csprng),
+            "Prime order fields should validate!"
+        );
+        assert!(
+            group.is_valid(&mut csprng),
+            "Prime order groups with proper parameters should validate!"
+        );
         assert!(group_matches_field(&group, &field));
 
         // Testing soundness
-        assert!(!invalid_field.is_valid(&mut csprng), "Non-prime order fields should fail!");
+        assert!(
+            !invalid_field.is_valid(&mut csprng),
+            "Non-prime order fields should fail!"
+        );
         assert!(!group_matches_field(&group, &invalid_field));
-        assert!(!invalid_modulus_group.is_valid(&mut csprng), "Groups with a non-prime modulus should fail!");
-        assert!(!invalid_generator_group.is_valid(&mut csprng), "Groups with an invalid generator should fail!");
-        assert!(!invalid_cofactor_group.is_valid(&mut csprng), "Groups with an invalid cofactor should fail!");
+        assert!(
+            !invalid_modulus_group.is_valid(&mut csprng),
+            "Groups with a non-prime modulus should fail!"
+        );
+        assert!(
+            !invalid_generator_group.is_valid(&mut csprng),
+            "Groups with an invalid generator should fail!"
+        );
+        assert!(
+            !invalid_cofactor_group.is_valid(&mut csprng),
+            "Groups with an invalid cofactor should fail!"
+        );
     }
 }

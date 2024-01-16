@@ -126,11 +126,7 @@ impl ContestPreEncrypted {
             let selection = self.selections.get(i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(selection.proof_ballot_correctness(
-                    pvd,
-                    csprng,
-                    i.get_one_based_usize(),
-                ))
+                .try_push(selection.proof_ballot_correctness(pvd, csprng, i.get_one_based_usize()))
                 .unwrap();
         });
         proofs
@@ -178,11 +174,16 @@ impl ContestPreEncrypted {
                 let combined_selection_j = &mut combined_selection[j];
                 let selections_i_j = &selections[i][j];
 
-                combined_selection_j.alpha = combined_selection_j.alpha.mul(&selections_i_j.alpha, group);
-                combined_selection_j.beta = combined_selection_j.beta.mul(&selections_i_j.beta, group);
+                combined_selection_j.alpha =
+                    combined_selection_j.alpha.mul(&selections_i_j.alpha, group);
+                combined_selection_j.beta =
+                    combined_selection_j.beta.mul(&selections_i_j.beta, group);
 
                 #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-                let cs_j_nonce = combined_selection_j.nonce.as_ref().unwrap()
+                let cs_j_nonce = combined_selection_j
+                    .nonce
+                    .as_ref()
+                    .unwrap()
                     .add(selections_i_j.nonce.as_ref().unwrap(), field);
                 combined_selection_j.nonce = Some(cs_j_nonce);
             }

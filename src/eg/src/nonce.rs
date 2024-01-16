@@ -5,7 +5,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-
 use util::algebra::FieldElement;
 
 use crate::{
