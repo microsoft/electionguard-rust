@@ -356,7 +356,55 @@ pub fn group_matches_field(group: &Group, field: &ScalarField) -> bool {
 #[cfg(test)]
 mod test {
     use num_bigint::BigUint;
+    use crate::algebra::{FieldElement, Group, ScalarField};
+
+    fn get_toy_algebras() -> (ScalarField, Group) {
+        (
+            ScalarField::new_unchecked(BigUint::from(127_u8)),
+            Group::new_unchecked(
+                BigUint::from(59183_u32),
+                BigUint::from(466_u32),
+                BigUint::from(32616_u32),
+            ),
+        )
+    }
+
+    fn get_toy_elements() -> (ScalarField, Group) {
+        (
+            ScalarField::new_unchecked(BigUint::from(127_u8)),
+            Group::new_unchecked(
+                BigUint::from(59183_u32),
+                BigUint::from(466_u32),
+                BigUint::from(32616_u32),
+            ),
+        )
+    }
 
     #[test]
-    fn test_1() {}
+    fn test_field_basic_operations() {
+        // Toy parameters according to specs
+        let (field, _) = get_toy_algebras();
+        
+        let a = FieldElement::from(115_u8, &field);
+        let b = FieldElement::from(37_u8, &field);
+
+        // 242 =  115 mod 127
+        assert_eq!(a, FieldElement::from(242_u8, &field));
+
+        // 25 = (115 + 37) mod 127 
+        assert_eq!(a.add(&b, &field), FieldElement::from(25_u8, &field));
+
+        // 78 = (115 - 37) mod 127
+        assert_eq!(a.sub(&b, &field), FieldElement::from(78_u8, &field));
+
+        // -78 = 49 mod 127
+        assert_eq!(b.sub(&a, &field), FieldElement::from(49_u8, &field));
+
+        // 4255 = 64 mod 127
+        assert_eq!(a.mul(&b, &field), FieldElement::from(64_u8, &field));
+
+        // 115 * 74 = 1 mod 127
+        let b = a.inv(&field).unwrap();
+        assert_eq!(b, FieldElement::from(74_u8, &field));
+    }
 }

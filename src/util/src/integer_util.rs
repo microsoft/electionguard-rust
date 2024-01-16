@@ -299,18 +299,18 @@ mod tests {
 
         // Test polynomial x^2 -1
         let xs = [
-            FieldElement::from_biguint(BigUint::from(1_u8), &field),
-            FieldElement::from_biguint(BigUint::from(2_u8), &field),
-            FieldElement::from_biguint(BigUint::from(3_u8), &field),
+            FieldElement::from(BigUint::from(1_u8), &field),
+            FieldElement::from(BigUint::from(2_u8), &field),
+            FieldElement::from(BigUint::from(3_u8), &field),
         ];
         let ys = [
-            FieldElement::from_biguint(BigUint::from(0_u8), &field),
-            FieldElement::from_biguint(BigUint::from(3_u8), &field),
-            FieldElement::from_biguint(BigUint::from(8_u8), &field),
+            FieldElement::from(BigUint::from(0_u8), &field),
+            FieldElement::from(BigUint::from(3_u8), &field),
+            FieldElement::from(BigUint::from(8_u8), &field),
         ];
         let group_ys: Vec<_> = ys.iter().map(|x| group.g_exp(x)).collect();
         // -1 mod q
-        let x_0 = FieldElement::from_biguint(BigUint::from(126_u8), &field);
+        let x_0 = FieldElement::from(BigUint::from(126_u8), &field);
         let g_x_0 = group.g_exp(&x_0);
 
         assert_eq!(field_lagrange_at_zero(&xs, &ys, &field), Some(x_0));
@@ -332,9 +332,9 @@ mod tests {
         );
         // Repeated nodes
         let xs = [
-            FieldElement::from_biguint(BigUint::from(1_u8), &field),
-            FieldElement::from_biguint(BigUint::from(2_u8), &field),
-            FieldElement::from_biguint(BigUint::from(2_u8), &field),
+            FieldElement::from(BigUint::from(1_u8), &field),
+            FieldElement::from(BigUint::from(2_u8), &field),
+            FieldElement::from(BigUint::from(2_u8), &field),
         ];
         assert_eq!(field_lagrange_at_zero(&xs, &ys, &field), None);
         assert_eq!(group_lagrange_at_zero(&xs, &group_ys, &field, &group), None);
@@ -346,19 +346,19 @@ mod tests {
         let (field, _) = get_toy_algebras();
         // Test polynomial x^2 -1
         let xs = [
-            FieldElement::from_biguint(BigUint::from(1_u8), &field),
-            FieldElement::from_biguint(BigUint::from(2_u8), &field),
-            FieldElement::from_biguint(BigUint::from(3_u8), &field),
+            FieldElement::from(BigUint::from(1_u8), &field),
+            FieldElement::from(BigUint::from(2_u8), &field),
+            FieldElement::from(BigUint::from(3_u8), &field),
         ];
-        let x = FieldElement::from_biguint(BigUint::from(1_u8), &field);
-        let exp_c = FieldElement::from_biguint(BigUint::from(3_u8), &field);
+        let x = FieldElement::from(BigUint::from(1_u8), &field);
+        let exp_c = FieldElement::from(BigUint::from(3_u8), &field);
         assert_eq!(
             get_single_coefficient_at_zero(&xs, &x, &field),
             Some(exp_c),
             "The coefficient at 1 should be 3."
         );
 
-        let x = FieldElement::from_biguint(BigUint::from(4_u8), &field);
+        let x = FieldElement::from(BigUint::from(4_u8), &field);
         assert_eq!(
             get_single_coefficient_at_zero(&xs, &x, &field),
             None,
@@ -366,11 +366,11 @@ mod tests {
         );
         // Repeated nodes
         let xs = [
-            FieldElement::from_biguint(BigUint::from(1_u8), &field),
-            FieldElement::from_biguint(BigUint::from(2_u8), &field),
-            FieldElement::from_biguint(BigUint::from(2_u8), &field),
+            FieldElement::from(BigUint::from(1_u8), &field),
+            FieldElement::from(BigUint::from(2_u8), &field),
+            FieldElement::from(BigUint::from(2_u8), &field),
         ];
-        let x = FieldElement::from_biguint(BigUint::from(1_u8), &field);
+        let x = FieldElement::from(BigUint::from(1_u8), &field);
         assert_eq!(
             get_single_coefficient_at_zero(&xs, &x, &field),
             None,
