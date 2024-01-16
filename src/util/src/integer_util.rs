@@ -71,6 +71,19 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     v
 }
 
+/// Computes the leading ones of a ['BigUInt']
+pub fn leading_ones(x: BigUint) -> u64 {
+    let mut leading_ones = 0;
+    for limb in x.iter_u64_digits().rev() {
+    let ones = limb.leading_ones();
+    leading_ones += ones;
+    if ones < 64 {
+        break;
+    }
+    }
+    leading_ones as u64
+}
+
 /// Computes the inverse of `a_u` modulo `m_u` (if it exists).
 ///
 /// The arguments are

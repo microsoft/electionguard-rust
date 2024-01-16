@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use util::{
     algebra::{Group, ScalarField, group_matches_field},
     csprng::Csprng,
-    integer_util::cnt_bits_repr,
+    integer_util::{cnt_bits_repr, leading_ones},
     prime::BigUintPrime,
 };
 
@@ -134,10 +134,17 @@ impl FixedParameters {
             "Fixed parameters: modulus p wrong number of bits"
         );
 
+        //TODO check this method of computing leading ones
+        let leading_ones = leading_ones(group.modulus()) as usize;
+        println!("{:?}", leading_ones);
+        ensure!(leading_ones >= self.generation_parameters.p_bits_msb_fixed_1);
+        let trailing_ones = group.modulus().trailing_ones() as usize;
+        println!("{:?}", trailing_ones);
+        ensure!(trailing_ones >= self.generation_parameters.p_bits_lsb_fixed_1);
+
         //TODO Maybe check that the parameters are consistent with the spec version
-        //TODO verify p_bits_msb_fixed_1
         //TODO verify p_middle_bits_source
-        //TODO verify p_bits_lsb_fixed_1
+
 
         Ok(())
     }
