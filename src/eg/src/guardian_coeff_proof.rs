@@ -12,7 +12,6 @@ use crate::{
     hash::{eg_h, HValue},
     hashes::ParameterBaseHash,
 };
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use util::{
@@ -68,8 +67,8 @@ impl CoefficientProof {
         let mut v = vec![0x10];
         v.extend_from_slice(i.to_be_bytes().as_slice());
         v.extend_from_slice(j.to_be_bytes().as_slice());
-        v.extend_from_slice(coefficient.to_be_bytes_left_pad(&group).as_slice());
-        v.extend_from_slice(h.to_be_bytes_left_pad(&group).as_slice());
+        v.extend_from_slice(coefficient.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(h.to_be_bytes_left_pad(group).as_slice());
         //The challenge is not reduced modulo q (cf. Section 5.4)
         eg_h(&h_p, &v)
     }
@@ -100,7 +99,7 @@ impl CoefficientProof {
         // Compute challenge
         let c = Self::challenge(fixed_parameters, i, j, commitment, &h);
         // Get field element from challenge, here the challenge is reduced mod `q`
-        let c_val = FieldElement::from_bytes_be(c.0.as_slice(), &field);
+        let c_val = FieldElement::from_bytes_be(c.0.as_slice(), field);
         // Compute response
         let s = c_val.mul(coefficient, field);
         let v = u.sub(&s, field);
@@ -139,7 +138,7 @@ impl CoefficientProof {
             return Err(ProofValidationError::ResponseNotInField);
         }
         // Equation (2.1)
-        let c_val = FieldElement::from_bytes_be(self.challenge.0.as_slice(), &field);
+        let c_val = FieldElement::from_bytes_be(self.challenge.0.as_slice(), field);
         let h = group
             .g_exp(&self.response)
             .mul(&commitment.exp(&c_val, group), group);

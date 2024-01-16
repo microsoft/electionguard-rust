@@ -338,7 +338,7 @@ impl GuardianSecretKeyShare {
 
         let key = shares.iter().fold(
             FieldElement::from_biguint(BigUint::from(0_u8), &fixed_parameters.field),
-            |mut acc, share| acc.add(share, &fixed_parameters.field),
+            |acc, share| acc.add(share, &fixed_parameters.field),
         );
 
         Ok(Self {

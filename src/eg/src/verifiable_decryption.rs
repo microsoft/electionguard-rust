@@ -331,6 +331,7 @@ impl DecryptionProof {
     /// - `proof_commit_shares` - the shares of the commit message
     /// - `proof_commit_state` - the guardian's commit state
     /// - `secret_key_share` - the guardian's key share
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_response_share(
         fixed_parameters: &FixedParameters,
         h_e: &HValue,

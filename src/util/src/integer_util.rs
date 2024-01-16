@@ -14,10 +14,7 @@ use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_traits::{One, Zero};
 
-use crate::{
-    algebra::{FieldElement, Group, GroupElement, ScalarField},
-    prime::BigUintPrime,
-};
+use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
 
 /// Returns the number of bits required to encode the given number.
 pub fn cnt_bits_repr_usize(n: usize) -> usize {
@@ -130,7 +127,7 @@ fn get_single_coefficient_at_zero_unchecked(
             let inv_l_minus_i = l_minus_i.inv(field)?;
             Some(l.mul(&inv_l_minus_i, field))
         })
-        .fold(ScalarField::one(), |mut acc, s| acc.mul(&s, field))
+        .fold(ScalarField::one(), |acc, s| acc.mul(&s, field))
 }
 
 /// Computes a single Lagrange coefficient mod q.
@@ -193,7 +190,7 @@ pub fn field_lagrange_at_zero(
     let coeffs = get_lagrange_coefficients_at_zero_unchecked(xs, field);
     let y0 = zip(coeffs, ys)
         .map(|(c, y)| c.mul(y, field))
-        .fold(ScalarField::zero(), |mut acc, s| acc.add(&s, field));
+        .fold(ScalarField::zero(), |acc, s| acc.add(&s, field));
     Some(y0)
 }
 
@@ -218,7 +215,7 @@ pub fn group_lagrange_at_zero(
     let coeffs = get_lagrange_coefficients_at_zero_unchecked(xs, field);
     let y0 = zip(coeffs, ys)
         .map(|(c, y)| y.exp(&c, group))
-        .fold(Group::one(), |mut acc, s| acc.mul(&s, group));
+        .fold(Group::one(), |acc, s| acc.mul(&s, group));
     Some(y0)
 }
 

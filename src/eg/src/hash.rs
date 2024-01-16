@@ -21,8 +21,8 @@ type HValueByteArray = [u8; HVALUE_BYTE_LEN];
 pub struct HValue(pub HValueByteArray);
 
 impl HValue {
-    const HVALUE_SERIALIZE_PREFIX: &[u8] = b"H(";
-    const HVALUE_SERIALIZE_SUFFIX: &[u8] = b")";
+    const HVALUE_SERIALIZE_PREFIX: &'static [u8] = b"H(";
+    const HVALUE_SERIALIZE_SUFFIX: &'static [u8] = b")";
     const HVALUE_SERIALIZE_LEN: usize = HValue::HVALUE_SERIALIZE_PREFIX.len()
         + HVALUE_BYTE_LEN * 2
         + HValue::HVALUE_SERIALIZE_SUFFIX.len();
