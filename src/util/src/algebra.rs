@@ -412,28 +412,46 @@ mod test {
 
     #[test]
     fn test_group_operations() {
+        let mut csprng = Csprng::new(b"testing group operations");
         // Toy parameters according to specs
         let (field, group) = get_toy_algebras();
         
         let a = FieldElement::from(115_u8, &field);
         let g1 = group.g_exp(&a);
 
-        // g2 is defined so that it is a valid group element
+        // g2 = group.g^{14} computed from sage
         let g2 = GroupElement(BigUint::from(38489_u32));
         
-        // g3 = g1 * g2
+        // g3 = g1*g2 computed from sage
         let g3 = GroupElement(BigUint::from(48214_u32));
+
+        // h is not a group element
+        let h = GroupElement(BigUint::from(12345_u32));
         
-        // g1_inv is the multiplicative inverse of g1
+        // Multiplicative inverse of g1 computed from sage
         let g1_inv = GroupElement(BigUint::from(58095_u32)); 
         
+        // Testing correctness
         assert!(g1.is_valid(&group));
         assert!(g2.is_valid(&group));
 
         assert_eq!(g1.mul(&g2, &group), g3);
 
-        assert_eq!(g1.inv(&group), Some(g1_inv));
-}
+        assert_eq!(g1.inv(&group), Some(g1_inv.clone()));
+        assert_eq!(g1.mul(&g1_inv, &group), Group::one());
+
+        let g = group.generator();
+        assert_eq!(g.pow(&BigUint::from(14_u32), &group), g2);
+
+        for _ in 0..100 {
+            let u = group.random_group_elem(&mut csprng);
+            assert!(u.is_valid(&group));
+        }
+
+        // Testing soundness
+        assert!(!h.is_valid(&group));
+
+    }
 
     #[test]
     fn test_field_group_validity(){
@@ -458,18 +476,16 @@ mod test {
             BigUint::from(59398_u32),
         );
         
+        // Testing correctness
         assert!(field.is_valid(&mut csprng), "Prime order fields should validate!");
         assert!(group.is_valid(&mut csprng), "Prime order groups with proper parameters should validate!");
         assert!(group_matches_field(&group, &field));
 
-        
+        // Testing soundness
         assert!(!invalid_field.is_valid(&mut csprng), "Non-prime order fields should fail!");
         assert!(!group_matches_field(&group, &invalid_field));
         assert!(!invalid_modulus_group.is_valid(&mut csprng), "Groups with a non-prime modulus should fail!");
         assert!(!invalid_generator_group.is_valid(&mut csprng), "Groups with an invalid generator should fail!");
         assert!(!invalid_cofactor_group.is_valid(&mut csprng), "Groups with an invalid cofactor should fail!");
-
-
-
     }
 }
