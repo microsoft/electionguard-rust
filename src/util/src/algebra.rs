@@ -543,6 +543,7 @@ mod test {
         assert_eq!(v, v_from);
         assert_eq!(v, v_from_bytes);
 
+        // Testing encoding of field elements as bytes.
         assert_eq!(u.to_be_bytes_left_pad(&field), vec![65_u8]);
         assert_eq!(v.to_be_bytes_left_pad(&field), vec![69_u8]);
     }
