@@ -14,7 +14,7 @@ use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
-/// A field element, i.e. an element of `Z_q`.
+/// A an element of field `Z_q`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct FieldElement(
     #[serde(
@@ -24,7 +24,7 @@ pub struct FieldElement(
     BigUint,
 );
 
-/// The finite field `Z_q` of integers modulo q.
+/// The finite field `Z_q` of integers modulo prime `q`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScalarField {
     /// Subgroup order.
@@ -36,12 +36,16 @@ pub struct ScalarField {
 }
 
 impl FieldElement {
-    /// Performs field addition modulo prime q.
+    /// Performs field addition.
+    /// 
+    /// That is the function computes `(self + other) % q` where `q` is the field order.
     pub fn add(&self, other: &FieldElement, field: &ScalarField) -> Self {
         FieldElement((&self.0 + &other.0) % &field.q)
     }
 
-    /// Performs field subtraction modulo prime q.
+    /// Performs field subtraction.
+    /// 
+    /// That is the function computes `(self - other) % q` where `q` is the field order.
     pub fn sub(&self, other: &FieldElement, field: &ScalarField) -> Self {
         if self.0 >= other.0 {
             FieldElement((&self.0 - &other.0) % &field.q)
@@ -50,7 +54,9 @@ impl FieldElement {
         }
     }
 
-    /// Performs field multiplication modulo prime q.
+    /// Performs field multiplication.
+    /// 
+    /// That is the function computes `(self * other) % q` where `q` is the field order.
     pub fn mul(&self, other: &FieldElement, field: &ScalarField) -> Self {
         FieldElement((&self.0 * &other.0) % &field.q)
     }
@@ -60,12 +66,12 @@ impl FieldElement {
     /// - self - a field element
     /// - field - the scalar field
     ///
-    // Returns the inverse of self mod field.q iff gcd(self,q) == 1
+    // Returns the inverse in `Z_q` if it exist, i.e., iff `gcd(self,q) == 1`
     pub fn inv(&self, field: &ScalarField) -> Option<Self> {
         mod_inverse(&self.0, &field.q).map(FieldElement)
     }
 
-    /// Computes the `exponent`-power of the given field element, where exponent is an integer.
+    /// Performs modular exponentiation of the field element with a given integer exponent.
     pub fn pow<T>(&self, exponent: T, field: &ScalarField) -> FieldElement
     where
         BigUint: From<T>,
@@ -75,8 +81,6 @@ impl FieldElement {
     }
 
     /// Creates a field element from a given integer.
-    ///
-    /// This function supports any type `T` that can be converted into a [`BigUint`].
     pub fn from<T>(x: T, field: &ScalarField) -> Self
     where
         BigUint: From<T>,
@@ -87,8 +91,7 @@ impl FieldElement {
 
     /// Creates a field element from a bytes vector.
     ///
-    /// This method does not check the length of the vector.
-    /// Bytes interpreted as an big-endian encoded integer that is then reduced modulo field order.
+    /// Bytes interpreted as an big-endian encoded integer that is then reduced modulo order `q`.
     pub fn from_bytes_be(x: &[u8], field: &ScalarField) -> Self {
         let x_int = BigUint::from_bytes_be(x);
         FieldElement(x_int % &field.q)
@@ -96,7 +99,7 @@ impl FieldElement {
 
     /// Returns the left padded big-endian encoding of the field element.
     ///
-    /// The encoding follows Section 5.1.2 in the specs.
+    /// The encoding follows Section 5.1.2 in the specs. 
     pub fn to_be_bytes_left_pad(&self, field: &ScalarField) -> Vec<u8> {
         to_be_bytes_left_pad(&self.0, field.l_q())
     }
@@ -108,14 +111,10 @@ impl FieldElement {
 
     /// Checks if the element is a valid member of the given field.
     ///
-    /// This method return true iff 0 <= self < field.q.
+    /// This method return true iff `0 <= self < q` where `q` is the field order.
     pub fn is_valid(&self, field: &ScalarField) -> bool {
         // It is enough to check the upper bound as self.0 is unsigned.
         self.0 < field.q
-    }
-
-    pub fn remove_at_the_end_biguint(&self) -> BigUint {
-        self.0.clone()
     }
 }
 
@@ -131,17 +130,14 @@ impl ScalarField {
         None
     }
 
-    /// Constructs a new scalar field from a given order.
+    /// Constructs a new scalar field from a given order without checking primality. 
     ///
     /// This function *assumes* that the given order is prime.
-    /// The behavior may be undefined if the order is not prime.
     pub fn new_unchecked(order: BigUint) -> Self {
         ScalarField { q: order }
     }
 
-    /// The function validates the given field.
-    ///
-    /// That is the function checks that the modulus is prime.
+    /// The function validates the given field by checking that the modulus is prime.
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
         is_prime(&self.q, csprng)
     }
@@ -156,25 +152,27 @@ impl ScalarField {
         FieldElement(BigUint::zero())
     }
 
-    /// Returns a random field element, i.e. a uniform random integer in [0,q).
+    /// Returns a random field element, i.e., a uniform random integer in `[0,q)` where `q` is the field order.
     ///
     /// The given `csprng` is assumed to be a secure randomness generator.
     pub fn random_field_elem(&self, csprng: &mut Csprng) -> FieldElement {
         FieldElement(csprng.next_biguint_lt(&self.q))
     }
 
-    /// Returns the order of the field
+    /// Returns the order `q` of the field
     pub fn order(&self) -> BigUint {
         self.q.clone()
     }
 
-    /// Returns the length of the byte array representation of `q`
+    /// Returns the length of the byte-array representation of field order `q`.
+    /// 
+    /// For the standard parameter field this is `32`.
     pub fn l_q(&self) -> usize {
         (cnt_bits_repr(&self.q) + 7) / 8
     }
 }
 
-/// A group element, i.e. an element of `Z_p^r`.
+/// An element of the multiplicative group `Z_p^r`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GroupElement(
     #[serde(
@@ -187,19 +185,19 @@ pub struct GroupElement(
 /// The group `Z_p^r`, a multiplicative subgroup of `Z_p`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Group {
-    /// Prime modulus.
+    /// Prime modulus `p`.
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     p: BigUint,
-    /// Cofactor of q in p − 1.
+    /// Cofactor of `q` in `p − 1``.
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     r: BigUint,
-    /// Subgroup generator.
+    /// Subgroup generator `g`.
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
@@ -208,22 +206,21 @@ pub struct Group {
 }
 
 impl GroupElement {
-    /// Performs group operation modulo prime p.
+    /// Multiplies the group element with another group element.
+    /// 
+    /// That is the function computes `(self * other) mod p` where `p` is the group modulus.
     pub fn mul(&self, other: &GroupElement, group: &Group) -> GroupElement {
         GroupElement((&self.0 * &other.0) % &group.p)
     }
 
-    /// Computes the multiplicative inverse of a group element if it exists
-    /// The arguments are
-    /// - self - a group element
-    /// - group - the group
-    ///
-    // Returns the inverse of self mod field.q iff gcd(self,q) == 1
+    /// Computes the (multiplicative) inverse of a group element.
+    /// 
+    /// For valid group elements this function will always return some value.
     pub fn inv(&self, group: &Group) -> Option<Self> {
         mod_inverse(&self.0, &group.p).map(GroupElement)
     }
 
-    /// Computes the `exponent`-power of the given group element, where exponent is an integer.
+    /// Performs modular exponentiation of the group element with a given integer exponent.
     pub fn pow<T>(&self, exponent: T, group: &Group) -> GroupElement
     where
         BigUint: From<T>,
@@ -232,14 +229,16 @@ impl GroupElement {
         GroupElement(self.0.modpow(&x, &group.p))
     }
 
-    /// Computes the `exponent`-power of the given group element, where exponent is a FieldElement.
+    /// Performs modular exponentiation of the group element with a given field element.
+    /// 
+    /// This defines an action of the field over the group.
     pub fn exp(&self, exponent: &FieldElement, group: &Group) -> GroupElement {
         GroupElement(self.0.modpow(&exponent.0, &group.p))
     }
 
     /// Checks if the element is a valid member of the given group.
     ///
-    /// This method return true iff 0 <= self < group.p and self^group.order() % p == 1
+    /// This method return true iff `0 <= self < p` and `self^q % p == 1` where `p` is the group modulus and `q` the group order.
     pub fn is_valid(&self, group: &Group) -> bool {
         // It is enough to check the upper bound as self.0 is unsigned.
         let elem_less_than_p = self.0 < group.p;
@@ -260,9 +259,14 @@ impl GroupElement {
 }
 
 impl Group {
-    /// Constructs a new group
+    /// Constructs a new multiplicative integer group `Z_p^r`.
+    /// 
+    /// The arguments are 
+    /// - `modulus` - the modulus `p`
+    /// - `cofactor`- the cofactor `r`
+    /// - `generator` - a generator `g`
     ///
-    /// This function checks that the group is valid.
+    /// This function checks that the group is valid according to [`Group::is_valid`].
     pub fn new(
         modulus: BigUint,
         cofactor: BigUint,
@@ -280,7 +284,7 @@ impl Group {
         None
     }
 
-    /// Constructs a new group without validity check
+    /// Constructs a new group without checking the validity according to [`Group::is_valid`].
     pub fn new_unchecked(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
         Group {
             p: modulus,
@@ -291,21 +295,23 @@ impl Group {
 
     /// This function checks that the given group is valid.
     ///
-    /// That is it checks that
-    /// - the modulus is prime
-    /// - the order is prime and < modulus-1
-    /// - the generator is a proper generator
-    /// - the order does not divide the co-factor
-    /// - the co-factor is non-zero
+    /// A group is considered valid if:
+    /// - the `modulus` is prime,
+    /// - the `order` is prime, `< modulus-1`, and does not divide the `co-factor`,
+    /// - the `generator` has order `order`,
+    /// - the `co-factor` is non-zero,
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
-        if self.r.is_zero() || self.r.is_one() {
-            return false;
-        }
+        // modulus must be prime
         if !is_prime(&self.p, csprng) {
             return false;
         }
+        // the co-factor must be non-zero
+        if self.r.is_zero() {
+            return false;
+        }
         let order = (&self.p - BigUint::one()) / &self.r;
-        if !is_prime(&order, csprng) {
+        // the order must be prime, < modulus-1, and must not divide the co-factor
+        if !is_prime(&order, csprng) || self.r.is_one() || (&self.r % &order).is_zero() {
             return false;
         }
         // This ensures that the order of generator is at most `order`
@@ -316,21 +322,22 @@ impl Group {
         if self.g.is_one() {
             return false;
         }
-        // `order` should not divide `cofactor`
-        if (&self.r % order).is_zero() {
-            return false;
-        }
         true
     }
 
     /// Returns a uniform random group element
+    /// 
+    /// The element is generated by selecting a random integer in `[0,q)` 
+    /// and computing `g^q % p` where `q` is the group order, `g` a generator, and `p` the modulus.
+    /// 
+    /// The given `csprng` is assumed to be a secure randomness generator.
     pub fn random_group_elem(&self, csprng: &mut Csprng) -> GroupElement {
         let q = self.order();
         let field_elem = FieldElement(csprng.next_biguint_lt(&q));
         self.g_exp(&field_elem)
     }
 
-    /// Returns generator `g` raised to the power of `x` mod `p`.
+    /// Returns generator `g` raised to the power of `x` mod modulus `p`.
     pub fn g_exp(&self, x: &FieldElement) -> GroupElement {
         GroupElement(self.g.modpow(&x.0, &self.p))
     }
@@ -355,7 +362,9 @@ impl Group {
         GroupElement(self.g.clone())
     }
 
-    /// Returns the length of the byte array representation of `p`
+    /// Returns the length of the byte array representation of modulus `p`.
+    /// 
+    /// For the standard parameter group this is `512`.
     pub fn l_p(&self) -> usize {
         (cnt_bits_repr(&self.p) + 7) / 8
     }
