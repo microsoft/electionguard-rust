@@ -78,7 +78,7 @@ impl GuardianPublicKey {
     }
 
     /// This function returns the actual public key as a big-endian byte vector
-    /// of length [`l_p_bytes`](crate::fixed_parameters::FixedParameters::l_p_bytes).
+    /// of length [`l_p`](util::algebra::Group::l_p).
     pub fn to_be_bytes_left_pad(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         self.public_key_k_i_0()
             .to_be_bytes_left_pad(&fixed_parameters.group)

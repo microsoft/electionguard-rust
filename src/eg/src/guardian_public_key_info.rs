@@ -14,8 +14,8 @@ use crate::{
 };
 use thiserror::Error;
 
-/// Trait for read access to data from a [`GuardianPublicKey`], which is common to
-/// both [`GuardianPublicKey`] and [`GuardianSecretKey`].
+/// Trait for read access to data from a [`crate::guardian_public_key::GuardianPublicKey`], which is common to
+/// both [`crate::guardian_public_key::GuardianPublicKey`] and [`crate::guardian_secret_key::GuardianSecretKey`].
 ///
 /// It also allows to validate both types of keys (cf. Verification `2` in Section `3.2.2`).
 pub trait GuardianPublicKeyInfo {

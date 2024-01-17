@@ -26,7 +26,7 @@ use crate::{
     contest_selection::{ContestSelectionPreEncrypted, ContestSelectionPreEncryptedIndex},
 };
 
-/// A 1-based index of a [`ContestPreEncrypted`] in the order it is defined in the [`BallotPreEncrypted`].
+/// A 1-based index of a [`ContestPreEncrypted`] in the order it is defined in the [`crate::ballot::BallotPreEncrypted`].
 pub type ContestPreEncryptedIndex = Index<ContestPreEncrypted>;
 
 /// A contest in a pre-encrypted ballot.

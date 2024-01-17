@@ -21,7 +21,7 @@ use util::csprng::Csprng;
 
 use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
 
-/// A 1-based index of a [`ContestSelectionPreEncrypted`] in the order it is defined in the [`ContestPreEncrypted`].
+/// A 1-based index of a [`ContestSelectionPreEncrypted`] in the order it is defined in the [`crate::contest::ContestPreEncrypted`].
 pub type ContestSelectionPreEncryptedIndex = Index<ContestSelectionPreEncrypted>;
 
 /// A contest option in a pre-encrypted ballot.
