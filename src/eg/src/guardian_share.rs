@@ -352,7 +352,7 @@ mod test {
     use util::{
         algebra::{FieldElement, ScalarField},
         csprng::Csprng,
-        integer_util::field_lagrange_at_zero,
+        algebra_utils::field_lagrange_at_zero,
     };
 
     use crate::{

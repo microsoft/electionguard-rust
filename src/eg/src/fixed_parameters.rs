@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use util::{
     algebra::{Group, ScalarField, group_matches_field},
     csprng::Csprng,
-    integer_util::{cnt_bits_repr, leading_ones},
+    algebra_utils::{cnt_bits_repr, leading_ones},
     prime::BigUintPrime,
 };
 

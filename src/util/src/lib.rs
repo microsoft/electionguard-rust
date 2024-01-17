@@ -13,6 +13,6 @@ pub mod bitwise;
 pub mod csprng;
 pub mod file;
 pub mod hex_dump;
-pub mod integer_util;
+pub mod algebra_utils;
 pub mod logging;
 pub mod prime;

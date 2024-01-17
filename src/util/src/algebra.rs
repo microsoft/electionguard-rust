@@ -7,7 +7,7 @@
 
 use crate::{
     csprng::Csprng,
-    integer_util::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad},
+    algebra_utils::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad},
     prime::is_prime,
 };
 use num_bigint::BigUint;

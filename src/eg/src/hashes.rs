@@ -3,7 +3,7 @@ use std::vec;
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use util::integer_util::to_be_bytes_left_pad;
+use util::algebra_utils::to_be_bytes_left_pad;
 
 use crate::{
     election_manifest::ElectionManifest,
