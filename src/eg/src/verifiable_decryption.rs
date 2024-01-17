@@ -608,7 +608,6 @@ impl VerifiableDecryption {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
-    use num_bigint::BigUint;
     use std::iter::zip;
     use util::{algebra::FieldElement, csprng::Csprng};
 
@@ -641,7 +640,7 @@ mod test {
         //Setup some keys
         let guardian_secret_keys = varying_parameters
             .each_guardian_i()
-            .map(|i| GuardianSecretKey::generate(csprng, &election_parameters, i, None))
+            .map(|i| GuardianSecretKey::generate(csprng, election_parameters, i, None))
             .collect::<Vec<_>>();
         let guardian_public_keys = guardian_secret_keys
             .iter()
@@ -653,7 +652,7 @@ mod test {
                 guardian_secret_keys
                     .iter()
                     .map(|dealer_sk| {
-                        GuardianEncryptedShare::new(csprng, &election_parameters, dealer_sk, &pk)
+                        GuardianEncryptedShare::new(csprng, election_parameters, dealer_sk, pk)
                     })
                     .collect::<Vec<_>>()
             })
@@ -661,10 +660,10 @@ mod test {
         let key_shares = zip(&guardian_secret_keys, share_vecs)
             .map(|(sk, shares)| {
                 GuardianSecretKeyShare::compute(
-                    &election_parameters,
+                    election_parameters,
                     &guardian_public_keys,
                     &shares,
-                    &sk,
+                    sk,
                 )
                 .unwrap()
             })
@@ -814,7 +813,7 @@ mod test {
                     &combined_dec_share,
                     &com_shares,
                     state,
-                    &key_share,
+                    key_share,
                 )
                 .unwrap()
             })
@@ -842,7 +841,7 @@ mod test {
 
         assert_eq!(
             decryption.plain_text,
-            BigUint::from(message),
+            FieldElement::from(message, field),
             "Decryption should match the message."
         );
         assert!(decryption.verify(fixed_parameters, &h_e, &joint_key, &ciphertext))

@@ -10,9 +10,9 @@ use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use util::{
-    algebra::{Group, ScalarField, group_matches_field},
-    csprng::Csprng,
+    algebra::{group_matches_field, Group, ScalarField},
     algebra_utils::{cnt_bits_repr, leading_ones},
+    csprng::Csprng,
     prime::BigUintPrime,
 };
 
@@ -113,17 +113,18 @@ pub struct FixedParameters {
 }
 
 impl FixedParameters {
-
     /// Verifies that the `FixedParameters` meet some basic validity requirements.
     #[allow(clippy::nonminimal_bool)]
     pub fn validate(&self, csprng: &mut Csprng) -> Result<()> {
-        
         let field = &self.field;
         let group = &self.group;
 
         ensure!(field.is_valid(csprng), "The field order q is not prime!");
         ensure!(group.is_valid(csprng), "The group is invalid!");
-        ensure!(group_matches_field(group, field), "The orders of group and field are different!");
+        ensure!(
+            group_matches_field(group, field),
+            "The orders of group and field are different!"
+        );
 
         ensure!(
             cnt_bits_repr(&field.order()) == self.generation_parameters.q_bits_total,
@@ -144,7 +145,6 @@ impl FixedParameters {
 
         //TODO Maybe check that the parameters are consistent with the spec version
         //TODO verify p_middle_bits_source
-
 
         Ok(())
     }

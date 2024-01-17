@@ -351,8 +351,8 @@ mod test {
     use std::iter::zip;
     use util::{
         algebra::{FieldElement, ScalarField},
-        csprng::Csprng,
         algebra_utils::field_lagrange_at_zero,
+        csprng::Csprng,
     };
 
     use crate::{

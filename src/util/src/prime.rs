@@ -19,8 +19,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::biguint_serde;
 use crate::{
-    csprng::Csprng,
     algebra_utils::{cnt_bits_repr_usize, largest_integer_a_such_that_2_to_a_divides_even_n},
+    csprng::Csprng,
 };
 
 pub const PRIMES_TABLE_U8: [u8; 54] = [

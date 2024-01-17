@@ -368,6 +368,7 @@ pub fn group_matches_field(group: &Group, field: &ScalarField) -> bool {
 
 // Unit tests for algebra.
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::group_matches_field;
     use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
