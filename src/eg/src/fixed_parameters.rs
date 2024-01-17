@@ -5,15 +5,15 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides fixed parameter type.
+
 use anyhow::{ensure, Result};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use util::{
     algebra::{group_matches_field, Group, ScalarField},
     algebra_utils::{cnt_bits_repr, leading_ones},
     csprng::Csprng,
-    prime::BigUintPrime,
 };
 
 // "Nothing up my sleeve" numbers for use in fixed parameters.
@@ -36,12 +36,18 @@ pub enum NumsNumber {
     ln_2,
 }
 
+/// Properties of the fixed parameters
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameterGenerationParameters {
+    /// number of bits of the field order `q`
     pub q_bits_total: usize,
+    /// number of bits of the group modulus `p`
     pub p_bits_total: usize,
+    // number of leading bits set to 1 for `p`
     pub p_bits_msb_fixed_1: usize,
-    pub p_middle_bits_source: NumsNumber,
+    // source of the middle bits
+    pub p_middle_bits_source: Option<NumsNumber>,
+    // number of trailing bits set to 1 for `p`
     pub p_bits_lsb_fixed_1: usize,
 }
 
@@ -70,6 +76,7 @@ pub enum ElectionGuardDesignSpecificationVersion {
     Other(String),
 }
 
+/// The fixed parameters define the used field and group.
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
@@ -85,31 +92,11 @@ pub struct FixedParameters {
     /// Parameters used to generate the parameters.
     pub generation_parameters: FixedParameterGenerationParameters,
 
-    /// Prime field
+    /// Prime field `Z_q`.
     pub field: ScalarField,
 
-    /// Group
+    /// Group `Z_p^r` of the same order as `Z_q` including generator `g`.
     pub group: Group,
-
-    /// Prime modulus.
-    pub p: BigUintPrime,
-
-    /// Subgroup order.
-    pub q: BigUintPrime,
-
-    /// Cofactor of q in p − 1.
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub r: BigUint,
-
-    /// Subgroup generator.
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub g: BigUint,
 }
 
 impl FixedParameters {
