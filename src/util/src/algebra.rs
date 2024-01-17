@@ -6,8 +6,8 @@
 //! This module provides wrappers around `BigUnit` to separate group and field elements in the code.
 
 use crate::{
-    csprng::Csprng,
     algebra_utils::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad},
+    csprng::Csprng,
     prime::is_prime,
 };
 use num_bigint::BigUint;
@@ -232,7 +232,6 @@ impl GroupElement {
         GroupElement(self.0.modpow(&x, &group.p))
     }
 
-
     /// Computes the `exponent`-power of the given group element, where exponent is a FieldElement.
     pub fn exp(&self, exponent: &FieldElement, group: &Group) -> GroupElement {
         GroupElement(self.0.modpow(&exponent.0, &group.p))
@@ -255,10 +254,9 @@ impl GroupElement {
         to_be_bytes_left_pad(&self.0, group.l_p())
     }
 
-    pub fn remove_at_the_end_biguint(&self) -> BigUint {
+    pub fn to_biguint(&self) -> BigUint {
         self.0.clone()
     }
-
 }
 
 impl Group {

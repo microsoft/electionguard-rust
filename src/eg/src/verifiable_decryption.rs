@@ -7,7 +7,6 @@
 //! For more details see Section `3.6` of the Electionguard specification `2.0.0`.
 
 use crate::{
-    discrete_log::DiscreteLog,
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
     guardian::GuardianIndex,
@@ -17,13 +16,12 @@ use crate::{
     joint_election_public_key::{Ciphertext, JointElectionPublicKey},
 };
 use itertools::izip;
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use util::{
     algebra::{FieldElement, Group, GroupElement, ScalarField},
+    algebra_utils::{get_single_coefficient_at_zero, group_lagrange_at_zero, DiscreteLog},
     csprng::Csprng,
-    algebra_utils::{get_single_coefficient_at_zero, group_lagrange_at_zero},
 };
 
 /// A decryption share is a guardian's partial decryption of a given ciphertext.
@@ -535,7 +533,7 @@ pub enum DecryptionError {
 /// This corresponds to `t` and `(c,v)` as in Section `3.6.3`.
 pub struct VerifiableDecryption {
     /// The decrypted plain-text
-    pub plain_text: BigUint,
+    pub plain_text: FieldElement,
     /// The proof of correctness
     pub proof: DecryptionProof,
 }
@@ -556,17 +554,15 @@ impl VerifiableDecryption {
         m: &CombinedDecryptionShare,
         proof: &DecryptionProof,
     ) -> Result<Self, DecryptionError> {
+        let field = &fixed_parameters.field;
         let group = &fixed_parameters.group;
         let group_msg = match m.0.inv(group) {
             None => return Err(DecryptionError::NoInverse),
             Some(m_inv) => ciphertext.beta.mul(&m_inv, group),
         };
-        let base = &joint_key
-            .joint_election_public_key
-            .remove_at_the_end_biguint();
-        let p = fixed_parameters.p.as_ref();
-        let dlog = DiscreteLog::new(base, p);
-        let plain_text = match dlog.find(base, p, &group_msg.remove_at_the_end_biguint()) {
+        let base = &joint_key.joint_election_public_key;
+        let dlog = DiscreteLog::from_group(base, group);
+        let plain_text = match dlog.ff_find(&group_msg, field) {
             None => return Err(DecryptionError::NoDlog),
             Some(x) => x,
         };
@@ -594,7 +590,7 @@ impl VerifiableDecryption {
         let group = &fixed_parameters.group;
         let t = joint_key
             .joint_election_public_key
-            .pow(self.plain_text.clone(), group);
+            .exp(&self.plain_text, group);
         let m = match t.inv(group) {
             None => return false,
             Some(t_inv) => ciphertext.beta.mul(&t_inv, group),

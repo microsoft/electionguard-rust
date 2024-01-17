@@ -5,10 +5,10 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-//! This module provides various utility functions for integers, field and group elements.
+//! This module provides various utility functions for field and group elements.
 
 use itertools::Itertools;
-use std::{borrow::Borrow, iter::zip, mem};
+use std::{borrow::Borrow, collections::HashMap, iter::zip, mem};
 
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
@@ -75,11 +75,11 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
 pub fn leading_ones(x: BigUint) -> u64 {
     let mut leading_ones = 0;
     for limb in x.iter_u64_digits().rev() {
-    let ones = limb.leading_ones();
-    leading_ones += ones;
-    if ones < 64 {
-        break;
-    }
+        let ones = limb.leading_ones();
+        leading_ones += ones;
+        if ones < 64 {
+            break;
+        }
     }
     leading_ones as u64
 }
@@ -117,6 +117,78 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
     }
 
     None
+}
+
+/// Holds a hash table of the Baby-step giant-step algorithm for computing discrete logarithms with respect to `base` and `modulus`.
+pub struct DiscreteLog {
+    /// The hash table
+    table: HashMap<BigUint, u32>,
+    /// The modulus defining Z_modulus
+    modulus: BigUint,
+    //  The base an integer in Z_modulus
+    base: BigUint,
+}
+
+impl DiscreteLog {
+    /// Constructs a new pre-computation table for a given base and modulus
+    pub fn new(base: BigUint, modulus: BigUint) -> Self {
+        let base = base % &modulus;
+        let mut table = HashMap::new();
+        let mut k = BigUint::from(1u8);
+        for j in 0..(1 << 16) {
+            table.insert(k.clone(), j);
+            k = (k * &base) % &modulus;
+        }
+        DiscreteLog {
+            table,
+            modulus,
+            base,
+        }
+    }
+
+    /// Constructs a new pre-computation table for a given base and group
+    pub fn from_group(base: &GroupElement, group: &Group) -> Self {
+        Self::new(base.to_biguint(), group.modulus())
+    }
+
+    /// Tries to find the discrete logarithm of given `y` with respect to fixed base and modulus using the Baby-step giant-step algorithm.
+    pub fn find(&self, y: &BigUint) -> Option<BigUint> {
+        let mut gamma = y.clone();
+        let m = (1 << 16) as u32;
+        let alpha_to_minus_m = match mod_inverse(
+            &self.base.modpow(&BigUint::from(m), &self.modulus),
+            &self.modulus,
+        ) {
+            Some(x) => x,
+            None => return None,
+        };
+        for i in 0..m {
+            match self.table.get(&gamma) {
+                Some(j) => {
+                    return Some(BigUint::from(i * m + j));
+                }
+                None => {
+                    gamma = (gamma * &alpha_to_minus_m) % &self.modulus;
+                }
+            }
+        }
+        None
+    }
+
+    /// Tries to find the discrete logarithm of given group element `y` with respect to fixed base using the Baby-step giant-step algorithm.
+    pub fn ff_find(&self, y: &GroupElement, field: &ScalarField) -> Option<FieldElement> {
+        let y = y.to_biguint();
+        // The given integer must be small enough
+        if y >= self.modulus {
+            return None;
+        }
+        // The base should have an order < field.order
+        if self.base.modpow(&field.order(), &self.modulus) != BigUint::one() {
+            return None;
+        }
+        let maybe_x = self.find(&y);
+        maybe_x.map(|x| FieldElement::from(x, field))
+    }
 }
 
 /// Computes a single Lagrange coefficient mod q.
@@ -235,8 +307,11 @@ pub fn group_lagrange_at_zero(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use crate::csprng::Csprng;
+
     use super::*;
     use num_integer::Integer;
+    use num_traits::Num;
 
     #[test]
     fn test_cnt_bits_repr_usize() {
@@ -305,12 +380,41 @@ mod tests {
         )
     }
 
+    fn get_medium_toy_algebras() -> (ScalarField, Group) {
+        (
+            ScalarField::new_unchecked(BigUint::from(4294967291_u32)),
+            Group::new_unchecked(
+                BigUint::from_str_radix("FFFFFFFF93C46B0FB6C381D8FFFFFFFF", 16).unwrap(),
+                BigUint::from_str_radix("000000010000000493C46B269999999A", 16).unwrap(),
+                BigUint::from_str_radix("29D995240DFB12B36FD0F8CCE06B657D", 16).unwrap(),
+            ),
+        )
+    }
+
+    #[test]
+    fn test_group_dlog() {
+        let mut csprng = Csprng::new(&[0u8]);
+        let (field, group) = get_medium_toy_algebras();
+
+        let h = group.random_group_elem(&mut csprng);
+        let dl = DiscreteLog::from_group(&h, &group);
+
+        for _ in 0..10 {
+            let i = csprng.next_u32();
+            let y = h.pow(i, &group);
+            assert_eq!(
+                dl.ff_find(&y, &field).unwrap(),
+                FieldElement::from(i, &field)
+            );
+        }
+    }
+
     #[test]
     fn test_lagrange_interpolation() {
         // Toy parameters according to specs
         let (field, group) = get_toy_algebras();
 
-        // Test polynomial x^2 -1
+        // Test polynomial x^2-1
         let xs = [
             FieldElement::from(1_u8, &field),
             FieldElement::from(2_u8, &field),
