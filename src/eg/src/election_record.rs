@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ballot::BallotEncrypted, election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters, hashes::Hashes, hashes_ext::HashesExt,
-    joint_election_public_key::JointElectionPublicKey,
+    election_parameters::ElectionParameters, guardian_public_key::GuardianPublicKey,
+    hashes::Hashes, hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey,
 };
 
 /// The header of the election record, generated before the election begins.
@@ -74,9 +74,35 @@ impl PreVotingData {
         }
     }
 
-    pub fn set_manifest(&mut self, manifest: ElectionManifest) {
-        self.manifest = manifest;
+    pub fn compute(
+        manifest: ElectionManifest,
+        parameters: ElectionParameters,
+        guardian_public_keys: &[GuardianPublicKey],
+    ) -> Result<Self> {
+        let joint_election_public_key =
+            JointElectionPublicKey::compute(&parameters, guardian_public_keys)?;
+
+        let hashes = Hashes::compute(&parameters, &manifest)
+            .context("Could not compute hashes from election context")?;
+
+        let hashes_ext = HashesExt::compute(
+            &parameters,
+            &hashes,
+            &joint_election_public_key,
+            guardian_public_keys,
+        );
+
+        let pre_voting_data = PreVotingData::new(
+            manifest,
+            parameters,
+            hashes,
+            hashes_ext,
+            joint_election_public_key,
+        );
+        Ok(pre_voting_data)
     }
+
+    pub fn set_manifest(&mut self, manifest: ElectionManifest) { self.manifest = manifest; }
 
     pub fn set_parameters(&mut self, parameters: ElectionParameters) {
         self.parameters = parameters;

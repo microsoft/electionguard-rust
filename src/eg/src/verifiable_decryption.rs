@@ -585,7 +585,7 @@ pub struct VerifiableDecryption {
 }
 
 /// Decryption posted by the guardian together with a commitment.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct DecryptionShareResult {
     pub share:        DecryptionShare,
     pub proof_commit: DecryptionProofCommitShare,
