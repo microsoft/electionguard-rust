@@ -356,13 +356,9 @@ impl GuardianEncryptedShare {
         // RHS of Equation `21`
         let l = &BigUint::from(l);
         let vec_k_i_j = &dealer_public_key.coefficient_commitments.0;
-        let rhs = vec_k_i_j
-            .iter()
-            .enumerate()
+        let rhs = (0u32..).zip(&vec_k_i_j)
             .fold(BigUint::one(), |prod, (j, k_i_j)| {
                 //This is fine as j < k
-                #[allow(clippy::unwrap_used)]
-                let j: u32 = j.try_into().unwrap();
                 (prod * k_i_j.0.modpow(&l.pow(j), p)) % p
             });
         if g_p_l != rhs {
