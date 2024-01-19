@@ -97,6 +97,14 @@ impl FieldElement {
         FieldElement(x_int % &field.q)
     }
 
+    /// Returns the big-endian encoding of the field element left-padded to 32 bytes.
+    ///
+    /// This function will panic the field element encoding requires more than 32 bytes.
+    /// All fields defined in the specification require <= 32 bytes to encode an element.
+    pub fn to_32_be_bytes(&self) -> Vec<u8> {
+        to_be_bytes_left_pad(&self.0, 32)
+    }
+
     /// Returns the left padded big-endian encoding of the field element.
     ///
     /// The encoding follows Section 5.1.2 in the specs.
@@ -546,5 +554,8 @@ mod test {
         // Testing encoding of field elements as bytes.
         assert_eq!(u.to_be_bytes_left_pad(&field), vec![65_u8]);
         assert_eq!(v.to_be_bytes_left_pad(&field), vec![69_u8]);
+
+        // Testing length of encoding
+        assert_eq!(u.to_32_be_bytes().len(), 32)
     }
 }
