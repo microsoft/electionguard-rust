@@ -3,11 +3,12 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-//! This module provides the implementation of guardian key shares. 
-//! 
+//! This module provides the implementation of guardian key shares.
+//!
 //! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
 
 use num_bigint::BigUint;
+use num_traits::One;
 use serde::{Deserialize, Serialize};
 use std::iter::zip;
 use thiserror::Error;
@@ -15,6 +16,7 @@ use util::{bitwise::xor, csprng::Csprng, integer_util::to_be_bytes_left_pad};
 
 use crate::{
     election_parameters::ElectionParameters,
+    fixed_parameters::FixedParameters,
     guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey,
     guardian_secret_key::GuardianSecretKey,
@@ -23,7 +25,7 @@ use crate::{
 };
 
 /// An encrypted share for sending shares to other guardians.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct GuardianEncryptedShare {
     /// The sender of the share
     pub dealer: GuardianIndex,
@@ -41,6 +43,28 @@ pub struct GuardianEncryptedShare {
     pub c2: HValue,
 }
 
+/// The secret input used to generate a [`GuardianEncryptedShare`].
+///
+/// This object is used in case there is a dispute about the validity of a given [`GuardianEncryptedShare`].
+pub struct GuardianEncryptionSecret {
+    /// The sender of the share
+    pub dealer: GuardianIndex,
+    /// The recipient of the share
+    pub recipient: GuardianIndex,
+    /// The share in plain
+    pub share: BigUint,
+    /// The used encryption nonce    
+    pub nonce: BigUint,
+}
+
+/// A tuple consisting of a [`GuardianEncryptedShare`] and the corresponding [`GuardianEncryptionSecret`].
+pub struct ShareEncryptionResult {
+    // The encrypted share
+    pub ciphertext: GuardianEncryptedShare,
+    // The corresponding secrets
+    pub secret: GuardianEncryptionSecret,
+}
+
 /// Represents errors occurring while decrypting a [`GuardianEncryptedShare`].
 #[derive(Error, Debug)]
 pub enum DecryptionError {
@@ -53,11 +77,14 @@ pub enum DecryptionError {
     /// Occurs if the mac is invalid.
     #[error("The MAC does not verify.")]
     InvalidMAC,
+    /// Occurs if the decrypted share is invalid with respect to the dealer's public key.
+    #[error("The share does not validate against the dealer's public key.")]
+    InvalidShare,
 }
 
 impl GuardianEncryptedShare {
     /// This function computes the share encryption secret key as defined in Equation `15`.
-    /// 
+    ///
     /// The arguments are
     /// - `h_p` - the parameter base hash
     /// - `i` - the dealer index
@@ -84,7 +111,7 @@ impl GuardianEncryptedShare {
     }
 
     /// This function computes the MAC key (Equation `16`) and the encryption key (Equation `17`).
-    /// 
+    ///
     /// The arguments are
     /// - `i` - the dealer index
     /// - `l` - the recipient index
@@ -117,7 +144,7 @@ impl GuardianEncryptedShare {
     }
 
     /// This function computes the MAC as in Equation `19`.
-    /// 
+    ///
     /// The arguments are
     /// - `k0` - the MAC key
     /// - `c0` - ciphertext part 1
@@ -128,53 +155,46 @@ impl GuardianEncryptedShare {
         eg_hmac(&k0, &v)
     }
 
-    /// This function creates a new [`GuardianEncryptedShare`] of the dealer's secret key for a given recipient.
-    /// 
+    /// This function computes a [`GuardianEncryptedShare`] of a share for a given recipient and nonce.
+    ///
     /// The arguments are
-    /// - `csprng` - secure randomness generator
-    /// - `election_parameters` - the election parameters
-    /// - `h_p` - the parameter base hash
-    /// - `dealer_private_key` - the dealer's [`GuardianSecretKey`]
-    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
-    pub fn new(
-        csprng: &mut Csprng,
-        election_parameters: &ElectionParameters,
-        dealer_private_key: &GuardianSecretKey,
+    /// - `fixed_parameters` - the fixed parameters
+    /// - 'dealer' - the dealer index
+    /// - `nonce` - the encryption nonce
+    /// - `share` - the secret key share
+    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]    
+    ///
+    /// This function is deterministic.
+    fn new(
+        fixed_parameters: &FixedParameters,
+        dealer: &GuardianIndex,
+        nonce: &BigUint,
+        share: &BigUint,
         recipient_public_key: &GuardianPublicKey,
     ) -> Self {
-        let fixed_parameters = &election_parameters.fixed_parameters;
         let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
 
-        let i = dealer_private_key.i.get_one_based_u32();
+        let i = dealer.get_one_based_u32();
         let l = recipient_public_key.i.get_one_based_u32();
-        let q: &BigUint = fixed_parameters.q.as_ref();
         let p: &BigUint = fixed_parameters.p.as_ref();
         let capital_k = recipient_public_key.public_key_k_i_0();
 
         //Generate alpha and beta (Equation 14)
-        let xi = csprng.next_biguint_lt(q);
-        let alpha = fixed_parameters.g.modpow(&xi, p);
-        let beta = capital_k.modpow(&xi, p);
+        let alpha = fixed_parameters.g.modpow(nonce, p);
+        let beta = capital_k.modpow(nonce, p);
 
         let k_i_l = Self::secret_key(h_p, i, l, capital_k, &alpha, &beta);
         let (k0, k1) = Self::mac_and_encryption_key(i, l, &k_i_l);
 
-        //Generate key share as P(l) (cf. Equations 9 and 18) using Horner's method
-        let x = &BigUint::from(l);
-        let mut p_l = BigUint::from(0_u8);
-        for coeff in dealer_private_key.secret_coefficients.0.iter().rev() {
-            p_l = (p_l * x + &coeff.0) % q;
-        }
-
         //Ciphertext as in Equation (19)
-        let c1 = xor(to_be_bytes_left_pad(&p_l, 32).as_slice(), k1.0.as_slice());
-        //The unwrap is justified as the output the XOR will always be 32 bytes.
+        let c1 = xor(to_be_bytes_left_pad(share, 32).as_slice(), k1.0.as_slice());
+        //The unwrap is justified as the output of the XOR will always be 32 bytes.
         #[allow(clippy::unwrap_used)]
         let c1 = HValue(c1[0..32].try_into().unwrap());
         let c2 = Self::share_mac(k0, to_be_bytes_left_pad(&alpha, 512).as_slice(), &c1);
 
         GuardianEncryptedShare {
-            dealer: dealer_private_key.i,
+            dealer: *dealer,
             recipient: recipient_public_key.i,
             c0: alpha,
             c1,
@@ -182,8 +202,51 @@ impl GuardianEncryptedShare {
         }
     }
 
+    /// This function creates a new [`ShareEncryptionResult`] given the dealer's secret key for a given recipient.
+    ///
+    /// The arguments are
+    /// - `csprng` - secure randomness generator
+    /// - `election_parameters` - the election parameters
+    /// - `dealer_private_key` - the dealer's [`GuardianSecretKey`]
+    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
+    pub fn encrypt(
+        csprng: &mut Csprng,
+        election_parameters: &ElectionParameters,
+        dealer_private_key: &GuardianSecretKey,
+        recipient_public_key: &GuardianPublicKey,
+    ) -> ShareEncryptionResult {
+        let fixed_parameters = &election_parameters.fixed_parameters;
+        let l = recipient_public_key.i.get_one_based_u32();
+        let q: &BigUint = fixed_parameters.q.as_ref();
+
+        //Generate key share as P(l) (cf. Equations 9 and 18) using Horner's method
+        let x = &BigUint::from(l);
+        let mut p_l = BigUint::from(0_u8);
+        for coeff in dealer_private_key.secret_coefficients.0.iter().rev() {
+            p_l = (p_l * x + &coeff.0) % q;
+        }
+        //Generate a fresh nonce
+        let nonce = csprng.next_biguint_lt(q);
+        // Encrypt the share
+        let ciphertext = Self::new(
+            fixed_parameters,
+            &dealer_private_key.i,
+            &nonce,
+            &p_l,
+            recipient_public_key,
+        );
+        let secret = GuardianEncryptionSecret {
+            dealer: dealer_private_key.i,
+            recipient: recipient_public_key.i,
+            share: p_l,
+            nonce,
+        };
+
+        ShareEncryptionResult { ciphertext, secret }
+    }
+
     /// This function decrypts and validates a [`GuardianEncryptedShare`].
-    /// 
+    ///
     /// The arguments are
     /// - `self` - the encrypted share
     /// - `election_parameters` - the election parameters
@@ -226,14 +289,90 @@ impl GuardianEncryptedShare {
             return Err(DecryptionError::InvalidMAC);
         }
 
+        // Decryption as in Equation `20`
         let p_l_bytes = xor(self.c1.0.as_slice(), k1.0.as_slice());
+        let p_l = BigUint::from_bytes_be(p_l_bytes.as_slice());
 
-        Ok(BigUint::from_bytes_be(p_l_bytes.as_slice()))
+        // Share validity check
+        let g_p_l = fixed_parameters.g.modpow(&p_l, p);
+        // RHS of Equation `21`
+        let l = &BigUint::from(l);
+        let vec_k_i_j = &dealer_public_key.coefficient_commitments.0;
+        let rhs = vec_k_i_j
+            .iter()
+            .enumerate()
+            .fold(BigUint::one(), |prod, (j, k_i_j)| {
+                //This is fine as j < k
+                #[allow(clippy::unwrap_used)]
+                let j: u32 = j.try_into().unwrap();
+                (prod * k_i_j.0.modpow(&l.pow(j), p)) % p
+            });
+        if g_p_l != rhs {
+            return Err(DecryptionError::InvalidShare);
+        }
+
+        Ok(p_l)
+    }
+
+    /// This function validates a [`GuardianEncryptedShare`] with respect to given [`GuardianEncryptionSecret`] and [`GuardianPublicKey`] of dealer and recipient in case of a dispute.
+    ///
+    /// The arguments are
+    /// - `self` - the encrypted share
+    /// - `election_parameters` - the election parameters
+    /// - `dealer_public_key` - the dealer's [`GuardianPublicKey`]
+    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
+    /// - `secret` - the published [`GuardianEncryptionSecret`]
+    /// 
+    /// This function returns false if the dealer's published secrets do not match the published ciphertext, or Equation `21`. 
+    /// If they match, the function returns true, meaning the recipient's claim about the wrongdoing by the dealer is dismissed.
+    pub fn public_validation(
+        &self,
+        election_parameters: &ElectionParameters,
+        dealer_public_key: &GuardianPublicKey,
+        recipient_public_key: &GuardianPublicKey,
+        secret: &GuardianEncryptionSecret,
+    ) -> bool {
+        if self.recipient != secret.recipient || self.dealer != secret.dealer {
+            return false;
+        }
+
+        let fixed_parameters = &election_parameters.fixed_parameters;
+
+        // Check that the ciphertext was computed correctly
+        let expected_ciphertext = Self::new(
+            fixed_parameters,
+            &dealer_public_key.i,
+            &secret.nonce,
+            &secret.share,
+            recipient_public_key,
+        );
+        if *self != expected_ciphertext {
+            return false;
+        }
+
+        let p: &BigUint = fixed_parameters.p.as_ref();
+        let l = self.recipient.get_one_based_u32();
+
+        // Share validity check
+        let g_p_l = fixed_parameters.g.modpow(&secret.share, p);
+        // RHS of Equation `21`
+        let l = &BigUint::from(l);
+        let vec_k_i_j = &dealer_public_key.coefficient_commitments.0;
+        let rhs = (0u32..).zip(vec_k_i_j)
+            .fold(BigUint::one(), |prod, (j, k_i_j)| {
+                //This is fine as j < k
+                (prod * k_i_j.0.modpow(&l.pow(j), p)) % p
+            });
+        if g_p_l != rhs {
+            return false;
+        }
+
+        true
     }
 }
 
 /// A guardian's share of the joint secret key, it corresponds to `P(i)` in Equation `22`.
-/// 
+///
 /// The corresponding public key is never computed explicitly.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianSecretKeyShare {
@@ -247,7 +386,6 @@ pub struct GuardianSecretKeyShare {
     pub p_i: BigUint,
 }
 
-
 /// Represents errors occurring while combining shares to compute a [`GuardianSecretKeyShare`].
 #[derive(Error, Debug)]
 pub enum ShareCombinationError {
@@ -260,21 +398,21 @@ pub enum ShareCombinationError {
     /// Occurs if the public key of a guardian is missing.
     #[error("The public key of guardian {0} is missing.")]
     MissingGuardian(String),
-    /// Occurs if a share could not be decrypted.
-    #[error("Could not decrypt and validate share from guardian {0}: {1}")]
-    DecryptionError(GuardianIndex, DecryptionError),
+    /// Occurs if any share could not be decrypted.
+    #[error("Could not decrypt and validate all shares. There are issues with shares from the following guardians: {0}")]
+    DecryptionError(String),
 }
 
 impl GuardianSecretKeyShare {
     /// This function computes a new [`GuardianSecretKeyShare`] from a list of [`GuardianEncryptedShare`].
-    /// 
+    ///
     /// The arguments are
     /// - `election_parameters` - the election parameters
     /// - `h_p` - the parameter base hash
     /// - `guardian_public_keys` - a list of [`GuardianPublicKey`]
     /// - `encrypted_shares` - a list of [`GuardianEncryptedShare`]
     /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
-    /// 
+    ///
     /// This function assumes that i-th encrypted_share and the i-th guardian_public_key are from the same guardian.
     pub fn compute(
         election_parameters: &ElectionParameters,
@@ -327,12 +465,23 @@ impl GuardianSecretKeyShare {
 
         // Decrypt and validate shares
         let mut shares = vec![];
+        let mut issues = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
             let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
             match res {
-                Err(e) => return Err(ShareCombinationError::DecryptionError(pk.i, e)),
+                Err(e) => issues.push((pk.i, e)),
                 Ok(share) => shares.push(share),
             }
+        }
+        if !issues.is_empty() {
+            let info = issues.iter().fold(String::new(), |acc, (i,_)| {
+                if acc.is_empty() {
+                    i.get_one_based_usize().to_string()
+                } else {
+                    acc + "," + &i.get_one_based_usize().to_string()
+                }
+            });            
+            return Err(ShareCombinationError::DecryptionError(info));
         }
 
         let key = shares.iter().fold(BigUint::from(0_u8), |mut acc, share| {
@@ -381,10 +530,14 @@ mod test {
         let pk_one = sk_one.make_public_key();
         let pk_two = sk_two.make_public_key();
 
-        let encrypted_share =
-            GuardianEncryptedShare::new(&mut csprng, &election_parameters, &sk_one, &pk_two);
+        let encrypted_result =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_one, &pk_two);
 
-        let result = encrypted_share.decrypt_and_validate(&election_parameters, &pk_one, &sk_two);
+        let result = encrypted_result.ciphertext.decrypt_and_validate(
+            &election_parameters,
+            &pk_one,
+            &sk_two,
+        );
 
         assert!(result.is_ok(), "The decrypted share should be valid");
     }
@@ -415,12 +568,13 @@ mod test {
                 guardian_secret_keys
                     .iter()
                     .map(|dealer_sk| {
-                        GuardianEncryptedShare::new(
+                        GuardianEncryptedShare::encrypt(
                             &mut csprng,
                             &election_parameters,
                             dealer_sk,
                             &pk,
                         )
+                        .ciphertext
                     })
                     .collect::<Vec<_>>()
             })
@@ -455,5 +609,57 @@ mod test {
         let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.q);
 
         assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.")
+    }
+
+    #[test]
+    fn test_public_validation() {
+        let mut csprng = Csprng::new(b"test_public_validation");
+
+        let election_parameters = example_election_parameters();
+
+        let index_one = GuardianIndex::from_one_based_index(1).unwrap();
+        let index_two = GuardianIndex::from_one_based_index(2).unwrap();
+        let sk_one =
+            GuardianSecretKey::generate(&mut csprng, &election_parameters, index_one, None);
+        let sk_two =
+            GuardianSecretKey::generate(&mut csprng, &election_parameters, index_two, None);
+        let pk_one = sk_one.make_public_key();
+        let pk_two = sk_two.make_public_key();
+
+        let enc_res_1 =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_one, &pk_two);
+
+        let enc_res_2 =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_one, &pk_one);
+        let enc_res_3 =
+            GuardianEncryptedShare::encrypt(&mut csprng, &election_parameters, &sk_two, &pk_one);
+
+        assert!(
+            enc_res_1.ciphertext.public_validation(
+                &election_parameters,
+                &pk_one,
+                &pk_two,
+                &enc_res_1.secret
+            ),
+            "The ciphertext should be valid"
+        );
+        assert!(
+            !enc_res_2.ciphertext.public_validation(
+                &election_parameters,
+                &pk_one,
+                &pk_two,
+                &enc_res_1.secret
+            ),
+            "The ciphertext should not be valid"
+        );
+        assert!(
+            !enc_res_3.ciphertext.public_validation(
+                &election_parameters,
+                &pk_one,
+                &pk_two,
+                &enc_res_1.secret
+            ),
+            "The ciphertext should not be valid"
+        );
     }
 }
