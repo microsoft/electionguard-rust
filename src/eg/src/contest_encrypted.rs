@@ -5,6 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, prime::BigUintPrime};
 
@@ -60,6 +61,12 @@ pub struct ContestEncrypted {
 
     // Proof of satisfying the selection limit.
     pub proof_selection_limit: ProofRange,
+}
+
+/// A scaled version of [`ContestEncrypted`].
+pub struct ScaledContestEncrypted {
+    /// Scaled encrypted voter selection vector.
+    pub selection: Vec<Ciphertext>,
 }
 
 impl ContestEncrypted {
@@ -237,5 +244,10 @@ impl ContestEncrypted {
         }
 
         self.verify_selection_limit(header, selection_limit)
+    }
+
+    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> ScaledContestEncrypted {
+        let selection = self.selection.iter().map(|ct| ct.scale(fixed_parameters, factor.clone())).collect();
+        ScaledContestEncrypted{selection}
     }
 }

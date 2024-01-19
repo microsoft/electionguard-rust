@@ -14,7 +14,7 @@ use eg::{
     fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext,
+    joint_election_public_key::{Ciphertext, Nonce},
     vec1::{HasIndexType, HasIndexTypeMarker, Vec1},
     zk::ProofRange,
 };
@@ -142,10 +142,10 @@ impl ContestPreEncrypted {
         fixed_parameters: &FixedParameters,
         voter_selections: &Vec<ContestSelectionPlaintext>,
         selection_limit: usize,
-    ) -> Vec<Ciphertext> {
+    ) -> Vec<(Ciphertext, Nonce)> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
 
-        let mut selections = <Vec<&Vec<Ciphertext>>>::new();
+        let mut selections = <Vec<&Vec<(Ciphertext, Option<Nonce>)>>>::new();
 
         voter_selections.iter().enumerate().for_each(|(i, v)| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
@@ -176,20 +176,26 @@ impl ContestPreEncrypted {
                 let combined_selection_j = &mut combined_selection[j];
                 let selections_i_j = &selections[i][j];
 
-                combined_selection_j.alpha = (&combined_selection_j.alpha * &selections_i_j.alpha)
+                combined_selection_j.0.alpha = (&combined_selection_j.0.alpha
+                    * &selections_i_j.0.alpha)
                     % fixed_parameters.p.as_ref();
 
-                combined_selection_j.beta = (&combined_selection_j.beta * &selections_i_j.beta)
+                combined_selection_j.0.beta = (&combined_selection_j.0.beta
+                    * &selections_i_j.0.beta)
                     % fixed_parameters.p.as_ref();
 
                 #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-                let cs_j_nonce = (combined_selection_j.nonce.as_ref().unwrap()
-                    + selections_i_j.nonce.as_ref().unwrap())
+                let cs_j_nonce = (&combined_selection_j.1.as_ref().unwrap().xi
+                    + &selections_i_j.1.as_ref().unwrap().xi)
                     % fixed_parameters.q.as_ref();
-                combined_selection_j.nonce = Some(cs_j_nonce);
+                combined_selection_j.1 = Some(Nonce::new(cs_j_nonce));
             }
         }
-        combined_selection
+        let result = combined_selection
+            .iter()
+            .map(|(ct, maybe_nonce)| (ct.clone(), maybe_nonce.as_ref().unwrap().clone()))
+            .collect();
+        result
     }
 
     pub fn finalize(
@@ -210,12 +216,14 @@ impl ContestPreEncrypted {
         assert!(num_options == voter_selections.len());
 
         for i in 0..num_options {
+            let nonce = &selection[i].1;
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proof_ballot_correctness
-                .try_push(selection[i].proof_ballot_correctness(
+                .try_push(selection[i].0.proof_ballot_correctness(
                     &device.header,
                     csprng,
                     voter_selections[i] == 1u8,
+                    nonce,
                     &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
@@ -232,6 +240,7 @@ impl ContestPreEncrypted {
             num_selections as usize,
             selection_limit,
         );
+        let selection = selection.iter().map(|(ct, _)| ct.clone()).collect();
 
         // TODO: Change crypto hash
         ContestEncrypted {

@@ -11,7 +11,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
+    election_parameters::ElectionParameters, fixed_parameters::{FixedParameters, self},
     guardian_public_key::GuardianPublicKey, index::Index,
 };
 
@@ -68,6 +68,12 @@ impl Ciphertext {
             alpha: BigUint::one(),
             beta: BigUint::one(),
         }
+    }
+
+    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> Ciphertext {
+        let alpha = self.alpha.modpow(&factor, fixed_parameters.p.as_ref());
+        let beta = self.beta.modpow(&factor, fixed_parameters.p.as_ref());
+        Ciphertext{alpha, beta}
     }
 }
 
