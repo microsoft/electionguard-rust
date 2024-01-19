@@ -158,9 +158,8 @@ impl GuardianEncryptedShare {
     /// This function computes a [`GuardianEncryptedShare`] of a share for a given recipient and nonce.
     ///
     /// The arguments are
-    /// - `election_parameters` - the election parameters
-    /// - `h_p` - the parameter base hash
-    /// - 'i' - the dealer's index
+    /// - `fixed_parameters` - the fixed parameters
+    /// - 'dealer' - the dealer index
     /// - `nonce` - the encryption nonce
     /// - `share` - the secret key share
     /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]    
@@ -189,7 +188,7 @@ impl GuardianEncryptedShare {
 
         //Ciphertext as in Equation (19)
         let c1 = xor(to_be_bytes_left_pad(share, 32).as_slice(), k1.0.as_slice());
-        //The unwrap is justified as the output the XOR will always be 32 bytes.
+        //The unwrap is justified as the output of the XOR will always be 32 bytes.
         #[allow(clippy::unwrap_used)]
         let c1 = HValue(c1[0..32].try_into().unwrap());
         let c2 = Self::share_mac(k0, to_be_bytes_left_pad(&alpha, 512).as_slice(), &c1);
@@ -323,6 +322,9 @@ impl GuardianEncryptedShare {
     /// - `dealer_public_key` - the dealer's [`GuardianPublicKey`]
     /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
     /// - `secret` - the published [`GuardianEncryptionSecret`]
+    /// 
+    /// This function returns false if the dealer's published secrets do not match the published ciphertext, or Equation `21`. 
+    /// If they match, the function returns true, meaning the recipient's claim about the wrongdoing by the dealer is dismissed.
     pub fn public_validation(
         &self,
         election_parameters: &ElectionParameters,
@@ -356,7 +358,7 @@ impl GuardianEncryptedShare {
         // RHS of Equation `21`
         let l = &BigUint::from(l);
         let vec_k_i_j = &dealer_public_key.coefficient_commitments.0;
-        let rhs = (0u32..).zip(&vec_k_i_j)
+        let rhs = (0u32..).zip(vec_k_i_j)
             .fold(BigUint::one(), |prod, (j, k_i_j)| {
                 //This is fine as j < k
                 (prod * k_i_j.0.modpow(&l.pow(j), p)) % p
@@ -611,7 +613,7 @@ mod test {
 
     #[test]
     fn test_public_validation() {
-        let mut csprng = Csprng::new(b"test_proof_generation");
+        let mut csprng = Csprng::new(b"test_public_validation");
 
         let election_parameters = example_election_parameters();
 
