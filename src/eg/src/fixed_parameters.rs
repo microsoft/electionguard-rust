@@ -11,7 +11,7 @@ use anyhow::{ensure, Result};
 use serde::{Deserialize, Serialize};
 
 use util::{
-    algebra::{group_matches_field, Group, ScalarField},
+    algebra::{Group, ScalarField},
     algebra_utils::{cnt_bits_repr, leading_ones},
     csprng::Csprng,
 };
@@ -101,7 +101,6 @@ pub struct FixedParameters {
 
 impl FixedParameters {
     /// Verifies that the `FixedParameters` meet some basic validity requirements.
-    #[allow(clippy::nonminimal_bool)]
     pub fn validate(&self, csprng: &mut Csprng) -> Result<()> {
         let field = &self.field;
         let group = &self.group;
@@ -109,7 +108,7 @@ impl FixedParameters {
         ensure!(field.is_valid(csprng), "The field order q is not prime!");
         ensure!(group.is_valid(csprng), "The group is invalid!");
         ensure!(
-            group_matches_field(group, field),
+            group.matches_field(field),
             "The orders of group and field are different!"
         );
 
@@ -122,12 +121,10 @@ impl FixedParameters {
             "Fixed parameters: modulus p wrong number of bits"
         );
 
-        //TODO check this method of computing leading ones
         let leading_ones = leading_ones(group.modulus()) as usize;
-        println!("{:?}", leading_ones);
         ensure!(leading_ones >= self.generation_parameters.p_bits_msb_fixed_1);
+
         let trailing_ones = group.modulus().trailing_ones() as usize;
-        println!("{:?}", trailing_ones);
         ensure!(trailing_ones >= self.generation_parameters.p_bits_lsb_fixed_1);
 
         //TODO Maybe check that the parameters are consistent with the spec version

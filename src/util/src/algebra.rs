@@ -14,7 +14,7 @@ use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
-/// A an element of field `Z_q`.
+/// A an element of field `Z_q` as defined by [`ScalarField`].
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct FieldElement(
     #[serde(
@@ -129,7 +129,11 @@ impl FieldElement {
 impl ScalarField {
     /// Constructs a new scalar field from a given order.
     ///
-    /// This function returns `None` if the given order is not prime.
+    /// This function returns `None` if the given order is not prime. 
+    /// Checking the validity of inputs is expensive. 
+    /// A field should therefore be constructed once and then reused as much as possible.
+    /// 
+    /// Alternatively, one can use fixed, *trusted/tested* parameters with [`ScalarField::new_unchecked`].
     pub fn new(order: BigUint, csprng: &mut Csprng) -> Option<Self> {
         let f = ScalarField { q: order };
         if f.is_valid(csprng) {
@@ -145,17 +149,17 @@ impl ScalarField {
         ScalarField { q: order }
     }
 
-    /// The function validates the given field by checking that the modulus is prime.
+    /// The function validates the given field by checking that the modulus is prime. The call is expensive.
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
         is_prime(&self.q, csprng)
     }
 
-    /// Returns one as a field element.
+    /// Returns one, the neutral element of multiplication, as a field element.
     pub fn one() -> FieldElement {
         FieldElement(BigUint::one())
     }
 
-    /// Returns zero as a field element.
+    /// Returns zero, the neutral element of addition, as a field element.
     pub fn zero() -> FieldElement {
         FieldElement(BigUint::zero())
     }
@@ -211,6 +215,8 @@ pub struct Group {
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     g: BigUint,
+
+    
 }
 
 impl GroupElement {
@@ -274,7 +280,11 @@ impl Group {
     /// - `cofactor`- the cofactor `r`
     /// - `generator` - a generator `g`
     ///
-    /// This function checks that the group is valid according to [`Group::is_valid`].
+    /// This function checks that the group is valid according to [`Group::is_valid`]. 
+    /// Checking the validity of inputs is expensive. 
+    /// A group should therefore be constructed once and then reused as much as possible.
+    /// 
+    /// Alternatively, one can use fixed, *trusted/tested* parameters with [`Group::new_unchecked`].
     pub fn new(
         modulus: BigUint,
         cofactor: BigUint,
@@ -301,7 +311,7 @@ impl Group {
         }
     }
 
-    /// This function checks that the given group is valid.
+    /// This function checks that the given group is valid. The call is expensive.
     ///
     /// A group is considered valid if:
     /// - the `modulus` is prime,
@@ -317,7 +327,7 @@ impl Group {
         if self.r.is_zero() {
             return false;
         }
-        let order = (&self.p - BigUint::one()) / &self.r;
+        let order = self.order();
         // the order must be prime, < modulus-1, and must not divide the co-factor
         if !is_prime(&order, csprng) || self.r.is_one() || (&self.r % &order).is_zero() {
             return false;
@@ -350,7 +360,7 @@ impl Group {
         GroupElement(self.g.modpow(&x.0, &self.p))
     }
 
-    /// Returns one as a group element.
+    /// Returns one, the neutral element, as a group element.
     pub fn one() -> GroupElement {
         GroupElement(BigUint::one())
     }
@@ -376,18 +386,18 @@ impl Group {
     pub fn l_p(&self) -> usize {
         (cnt_bits_repr(&self.p) + 7) / 8
     }
+
+    /// This function checks if the group and the given field have the same order.
+    pub fn matches_field(self: &Group, field: &ScalarField) -> bool {
+        self.order() == field.q
+    }
 }
 
-/// This function checks if the given group and field have the same order.
-pub fn group_matches_field(group: &Group, field: &ScalarField) -> bool {
-    group.order() == field.q
-}
 
 // Unit tests for algebra.
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
-    use super::group_matches_field;
     use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
     use crate::csprng::Csprng;
     use num_bigint::BigUint;
@@ -511,14 +521,14 @@ mod test {
             group.is_valid(&mut csprng),
             "Prime order groups with proper parameters should validate!"
         );
-        assert!(group_matches_field(&group, &field));
+        assert!(group.matches_field(&field));
 
         // Testing soundness
         assert!(
             !invalid_field.is_valid(&mut csprng),
             "Non-prime order fields should fail!"
         );
-        assert!(!group_matches_field(&group, &invalid_field));
+        assert!(!group.matches_field(&invalid_field));
         assert!(
             !invalid_modulus_group.is_valid(&mut csprng),
             "Groups with a non-prime modulus should fail!"

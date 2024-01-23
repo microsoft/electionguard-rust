@@ -35,9 +35,10 @@ const MILLER_RABIN_ITERATIONS: usize = 50;
 //? TODO Would prefer to use AsRef instead of Borrow, but it doesn't have
 // an automatic `impl AsRef<T> for T`, and we can't `impl AsRef<BigUint> for BigUint`
 // since it's in a cargo crate.
-// `Borrow` does have a blanket implementation, but now we have to ensure that
-// the hash, ord, and eq traits work exactly the same between BigUintPrime and BigUint.
 
+/// This function provides a probabilistic primality test. For large numbers this call is expensive.
+/// 
+/// Internally, the function uses the Miller-Rabin test.
 pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
     //? OPT: Maybe somehow we could defer Csprng creation until we know that we need randomized primality testing.
 
