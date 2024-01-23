@@ -156,10 +156,15 @@ impl std::fmt::Display for Hashes {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
+    use std::collections::BTreeSet;
+
     use super::*;
     use crate::{
-        example_election_manifest::example_election_manifest,
-        example_election_parameters::example_election_parameters,
+        ballot_style::BallotStyle,
+        election_manifest::{Contest, ContestIndex, ContestOption},
+        guardian::GuardianIndex,
+        standard_parameters::STANDARD_PARAMETERS,
+        varying_parameters::{BallotChaining, VaryingParameters}, example_election_parameters::example_election_parameters,
     };
     use hex_literal::hex;
 
@@ -173,10 +178,72 @@ mod test {
         assert_eq!(hash.h_p, expected_h_p);
     }
 
+    fn simple_election_manifest() -> ElectionManifest {
+        let contests = [
+            // Contest index 1:
+            Contest {
+                label: "Contest01".to_string(),
+                selection_limit: 1,
+                options: [
+                    ContestOption {
+                        label: "SelectionA".to_string(),
+                    },
+                    ContestOption {
+                        label: "SelectionB".to_string(),
+                    },
+                ]
+                .try_into()
+                .unwrap(),
+            },
+        ]
+        .try_into()
+        .unwrap();
+        let ballot_styles = [BallotStyle {
+            label: "BallotStyle01".to_string(),
+            contests: BTreeSet::from(
+                [1u32].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
+            ),
+        }]
+        .try_into()
+        .unwrap();
+
+        ElectionManifest {
+            label: "AElection".to_string(),
+            contests,
+            ballot_styles,
+        }
+    }
+
+    fn simple_election_parameters() -> ElectionParameters {
+        let fixed_parameters: FixedParameters = (*STANDARD_PARAMETERS).clone();
+
+        let n = 5;
+        let k = 3;
+
+        // `unwrap()` is justified here because these values are fixed.
+        #[allow(clippy::unwrap_used)]
+        let n = GuardianIndex::from_one_based_index(n).unwrap();
+        #[allow(clippy::unwrap_used)]
+        let k = GuardianIndex::from_one_based_index(k).unwrap();
+
+        let varying_parameters = VaryingParameters {
+            n,
+            k,
+            date: "1212-12-12".to_string(),
+            info: "Testing".to_string(),
+            ballot_chaining: BallotChaining::Prohibited,
+        };
+
+        ElectionParameters {
+            fixed_parameters,
+            varying_parameters,
+        }
+    }
+
     #[test]
     fn test_hashes() -> Result<()> {
-        let election_parameters = example_election_parameters();
-        let election_manifest = example_election_manifest();
+        let election_parameters = simple_election_parameters();
+        let election_manifest = simple_election_manifest();
 
         let hashes = Hashes::compute(&election_parameters, &election_manifest)?;
 
@@ -184,10 +251,10 @@ mod test {
             "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296"
         ));
         let expected_h_m = HValue::from(hex!(
-            "2FE7EA3C2E3C42F88647B4727254F960F1BB7B0D00A6A60C21D2F8984F5090B7"
+            "242568E9ECD120DA2CD7C86FB7F8504996FBAE934A558CF28D22DC8529C7C487"
         ));
         let expected_h_b = HValue::from(hex!(
-            "A522FFB66B7D0A950BB560FD48F176F0AAA5CB1A6FA9E5BA9F0543CCB945572F"
+            "9D9A936241784D8D0B926579B6A7E7036AC2DE91B0EAC48ACC157A75EB179A79"
         ));
 
         #[cfg(test_hash_mismatch_warn_only)]
