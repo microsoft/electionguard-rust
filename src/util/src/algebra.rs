@@ -184,7 +184,7 @@ impl ScalarField {
     }
 }
 
-/// An element of the multiplicative group `Z_p^r`.
+/// An element of the multiplicative group `Z_p^r` as defined by [`Group`].
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GroupElement(
     #[serde(
@@ -215,8 +215,12 @@ pub struct Group {
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     g: BigUint,
-
-
+    /// Group order `q`. Constructors computed it from the other fields.
+    #[serde(
+        serialize_with = "crate::biguint_serde::biguint_serialize",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+    )]
+    q: BigUint,
 }
 
 impl GroupElement {
@@ -256,7 +260,7 @@ impl GroupElement {
     pub fn is_valid(&self, group: &Group) -> bool {
         // It is enough to check the upper bound as self.0 is unsigned.
         let elem_less_than_p = self.0 < group.p;
-        let elem_has_order_q = self.pow(group.order(), group).0.is_one();
+        let elem_has_order_q = self.0.modpow(&group.q, &group.p).is_one();
         elem_less_than_p && elem_has_order_q
     }
 
@@ -291,10 +295,12 @@ impl Group {
         generator: BigUint,
         csprng: &mut Csprng,
     ) -> Option<Self> {
+        let order = Self::compute_order(&modulus, &cofactor);
         let group = Group {
             p: modulus,
             r: cofactor,
             g: generator,
+            q: order,
         };
         if group.is_valid(csprng) {
             return Some(group);
@@ -304,11 +310,17 @@ impl Group {
 
     /// Constructs a new group without checking the validity according to [`Group::is_valid`].
     pub fn new_unchecked(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
+        let order = Self::compute_order(&modulus, &cofactor);
         Group {
             p: modulus,
             r: cofactor,
             g: generator,
+            q: order,
         }
+    }
+
+    fn compute_order(modulus: &BigUint, cofactor: &BigUint) -> BigUint {
+        (modulus - BigUint::one()) / cofactor
     }
 
     /// This function checks that the given group is valid. The call is expensive.
@@ -328,14 +340,13 @@ impl Group {
         if self.g.is_one() {
             return false;
         }
-        let order = self.order();
-        // This ensures that the order of generator is at most `order`
-        // and if `order` is prime => order of generator = `order`
-        if !self.g.modpow(&order, &self.p).is_one() {
+        // This ensures that the order of generator is at most `q`
+        // and if `q` is prime => order of generator = `q`
+        if !self.g.modpow(&self.q, &self.p).is_one() {
             return false;
         }
         // the order must be < modulus-1, must not divide the co-factor, and must be prime
-        if  self.r.is_one() || (&self.r % &order).is_zero() || !is_prime(&order, csprng){
+        if  self.r.is_one() || (&self.r % &self.q).is_zero() || !is_prime(&self.q, csprng){
             return false;
         }
         // modulus must be prime ()
@@ -352,8 +363,7 @@ impl Group {
     ///
     /// The given `csprng` is assumed to be a secure randomness generator.
     pub fn random_group_elem(&self, csprng: &mut Csprng) -> GroupElement {
-        let q = self.order();
-        let field_elem = FieldElement(csprng.next_biguint_lt(&q));
+        let field_elem = FieldElement(csprng.next_biguint_lt(&self.q));
         self.g_exp(&field_elem)
     }
 
@@ -367,14 +377,14 @@ impl Group {
         GroupElement(BigUint::one())
     }
 
-    /// Returns the order of the group
-    pub fn order(&self) -> BigUint {
-        (&self.p - BigUint::one()) / &self.r
+    /// Returns a reference to the order of the group
+    pub fn order(&self) -> &BigUint {
+        &self.q
     }
 
-    /// Returns the modulus of the group
-    pub fn modulus(&self) -> BigUint {
-        self.p.clone()
+    /// Returns a reference to the modulus of the group
+    pub fn modulus(&self) -> &BigUint {
+        &self.p
     }
 
     /// Returns a generator of the group
@@ -391,7 +401,7 @@ impl Group {
 
     /// This function checks if the group and the given field have the same order.
     pub fn matches_field(self: &Group, field: &ScalarField) -> bool {
-        self.order() == field.q
+        self.q == field.q
     }
 }
 

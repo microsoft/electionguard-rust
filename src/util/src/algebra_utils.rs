@@ -72,7 +72,7 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
 }
 
 /// Computes the leading ones of a ['BigUInt']
-pub fn leading_ones(x: BigUint) -> u64 {
+pub fn leading_ones(x: &BigUint) -> u64 {
     let mut leading_ones = 0;
     for limb in x.iter_u64_digits().rev() {
         let ones = limb.leading_ones();
@@ -148,7 +148,7 @@ impl DiscreteLog {
 
     /// Constructs a new pre-computation table for a given base and group
     pub fn from_group(base: &GroupElement, group: &Group) -> Self {
-        Self::new(base.to_biguint(), group.modulus())
+        Self::new(base.to_biguint(), group.modulus().clone())
     }
 
     /// Tries to find the discrete logarithm of given `y` with respect to fixed base and modulus using the Baby-step giant-step algorithm.
