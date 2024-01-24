@@ -216,7 +216,7 @@ pub struct Group {
     )]
     g: BigUint,
 
-    
+
 }
 
 impl GroupElement {
@@ -319,25 +319,27 @@ impl Group {
     /// - the `generator` has order `order`,
     /// - the `co-factor` is non-zero,
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
-        // modulus must be prime
-        if !is_prime(&self.p, csprng) {
-            return false;
-        }
+        // Tests ordered according how expensive they are
         // the co-factor must be non-zero
         if self.r.is_zero() {
             return false;
         }
-        let order = self.order();
-        // the order must be prime, < modulus-1, and must not divide the co-factor
-        if !is_prime(&order, csprng) || self.r.is_one() || (&self.r % &order).is_zero() {
+        // If generator must not be one 
+        if self.g.is_one() {
             return false;
         }
+        let order = self.order();
         // This ensures that the order of generator is at most `order`
+        // and if `order` is prime => order of generator = `order`
         if !self.g.modpow(&order, &self.p).is_one() {
             return false;
         }
-        // If generator is not one (and `order` is prime) => order of generator is `order`
-        if self.g.is_one() {
+        // the order must be < modulus-1, must not divide the co-factor, and must be prime
+        if  self.r.is_one() || (&self.r % &order).is_zero() || !is_prime(&order, csprng){
+            return false;
+        }
+        // modulus must be prime ()
+        if !is_prime(&self.p, csprng) {
             return false;
         }
         true
