@@ -260,7 +260,7 @@ mod test {
         joint_election_public_key::JointElectionPublicKey,
         verifiable_decryption::{
             CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption,
-        }, fixed_parameters,
+        },
     };
     use num_bigint::BigUint;
     use std::iter::zip;
