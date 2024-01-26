@@ -213,7 +213,6 @@ mod test {
             &election_parameters,
             &hashes,
             &joint_election_public_key,
-            guardian_public_keys.as_slice(),
         );
 
         let pre_voting_data = PreVotingData {
