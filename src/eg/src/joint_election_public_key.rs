@@ -70,6 +70,8 @@ impl Ciphertext {
         }
     }
 
+    /// Scale a ciphertext by a factor. The scaling of an encryption of `x` with a factor `k` 
+    /// gives an encryption of `k*x`.
     pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> Ciphertext {
         let alpha = self.alpha.modpow(&factor, fixed_parameters.p.as_ref());
         let beta = self.beta.modpow(&factor, fixed_parameters.p.as_ref());

@@ -63,7 +63,10 @@ pub struct ContestEncrypted {
     pub proof_selection_limit: ProofRange,
 }
 
-/// A scaled version of [`ContestEncrypted`].
+/// A scaled version of [`ContestEncrypted`]. This means that each encrypted vote on the contest
+/// has been scaled by a factor. It is trusted that the encrypted ciphertexts in a
+/// [`ScaledContestEncrypted`] really are the ones from a [`ContestEncrypted`] scaled by a factor.
+/// Contains no proofs.
 pub struct ScaledContestEncrypted {
     /// Scaled encrypted voter selection vector.
     pub selection: Vec<Ciphertext>,
@@ -246,6 +249,7 @@ impl ContestEncrypted {
         self.verify_selection_limit(header, selection_limit)
     }
 
+    /// Scales all the encrypted votes on the contest by the same factor.
     pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> ScaledContestEncrypted {
         let selection = self.selection.iter().map(|ct| ct.scale(fixed_parameters, factor.clone())).collect();
         ScaledContestEncrypted{selection}

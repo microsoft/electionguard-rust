@@ -51,7 +51,8 @@ pub struct BallotEncrypted {
     // TODO: Have an optional field to store election record data for pre-encrypted ballots
 }
 
-/// Scaled version of [`BallotEncrypted`]
+/// Scaled version of [`BallotEncrypted`]. This means that each encrypted vote in the ballot
+/// has been scaled by factor. A [`ScaledBallotEncrypted`] does not contain any proofs.
 pub struct ScaledBallotEncrypted {
     /// Contests in this ballot
     pub contests: BTreeMap<ContestIndex, ScaledContestEncrypted>,
@@ -133,8 +134,6 @@ impl BallotEncrypted {
         &self.device
     }
 
-    
-
     /// Verify all of the [`ContestEncrypted`] in the [`BallotEncrypted`]. Given
     /// a ballot style it checks that all contests are voted on in the
     /// ballot style, and that all of the vote proofs are correct.
@@ -169,6 +168,8 @@ impl BallotEncrypted {
             .context("Error writing serialized voter selection to file")
     }
 
+    /// Scale a [`BallotEncrypted`] by a factor, producing a [`ScaledBallotEncrypted`].
+    /// Each encrypted vote in the ballot gets scaled by the same factor.
     pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> ScaledBallotEncrypted {
         let contests = self.contests.iter().map(|(idx, ballot)| (*idx, ballot.scale(fixed_parameters, factor.clone()))).collect();
         ScaledBallotEncrypted{contests}

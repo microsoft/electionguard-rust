@@ -191,11 +191,10 @@ impl ContestPreEncrypted {
                 combined_selection_j.1 = Some(Nonce::new(cs_j_nonce));
             }
         }
-        let result = combined_selection
+        combined_selection
             .iter()
             .map(|(ct, maybe_nonce)| (ct.clone(), maybe_nonce.as_ref().unwrap().clone()))
-            .collect();
-        result
+            .collect()
     }
 
     pub fn finalize(
