@@ -21,7 +21,7 @@ use crate::{
     election_record::PreVotingData,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext, fixed_parameters::FixedParameters,
+    joint_election_public_key::Ciphertext, fixed_parameters::FixedParameters, election_parameters::ElectionParameters,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,8 +184,9 @@ impl BallotEncrypted {
 pub fn tally_ballots(
     encrypted_ballots: impl IntoIterator<Item = ScaledBallotEncrypted>,
     manifest: &ElectionManifest,
+    parameters: &ElectionParameters,
 ) -> Option<BTreeMap<ContestIndex, Vec<Ciphertext>>> {
-    let mut result = BallotTallyBuilder::new(manifest);
+    let mut result = BallotTallyBuilder::new(manifest, parameters);
 
     for ballot in encrypted_ballots {
         if !result.update(ballot) {
@@ -198,13 +199,15 @@ pub fn tally_ballots(
 /// A builder to tally ballots incrementally.
 pub struct BallotTallyBuilder<'a> {
     manifest: &'a ElectionManifest,
+    parameters: &'a ElectionParameters,
     state: BTreeMap<ContestIndex, Vec<Ciphertext>>,
 }
 
 impl<'a> BallotTallyBuilder<'a> {
-    pub fn new(manifest: &'a ElectionManifest) -> Self {
+    pub fn new(manifest: &'a ElectionManifest, parameters: &'a ElectionParameters) -> Self {
         Self {
             manifest,
+            parameters,
             state: BTreeMap::new(),
         }
     }
@@ -218,6 +221,7 @@ impl<'a> BallotTallyBuilder<'a> {
     /// new ballot was compatible with the tally. If `false` is returned then
     /// the tally is not updated.
     pub fn update(&mut self, ballot: ScaledBallotEncrypted) -> bool {
+        let modulus = self.parameters.fixed_parameters.p.as_ref();
         for (idx, contest) in ballot.contests {
             let Some(manifest_contest) = self.manifest.contests.get(idx) else {
                 return false;
@@ -227,8 +231,8 @@ impl<'a> BallotTallyBuilder<'a> {
             }
             if let Some(v) = self.state.get_mut(&idx) {
                 for (j, encryption) in contest.selection.iter().enumerate() {
-                    v[j].alpha = &v[j].alpha * &encryption.alpha;
-                    v[j].beta = &v[j].beta * &encryption.beta;
+                    v[j].alpha = (&v[j].alpha * &encryption.alpha) % modulus;
+                    v[j].beta = &v[j].beta * &encryption.beta % modulus;
                 }
             } else {
                 self.state.insert(idx, contest.selection);
@@ -667,7 +671,7 @@ mod test {
         assert!(verify_result3);
 
         let encrypted_ballots = vec![ballot_voter1.scale(fixed_parameters, BigUint::from(1u8)), ballot_voter2.scale(fixed_parameters, BigUint::from(1u8)), ballot_voter3.scale(fixed_parameters, BigUint::from(1u8))];
-        let tally = tally_ballots(encrypted_ballots, &election_manifest).unwrap();
+        let tally = tally_ballots(encrypted_ballots, &election_manifest, &election_parameters).unwrap();
 
         let result_contest_1 = tally.get(&Index::from_one_based_index(1).unwrap()).unwrap();
         let result_contest_2 = tally.get(&Index::from_one_based_index(2).unwrap()).unwrap();
