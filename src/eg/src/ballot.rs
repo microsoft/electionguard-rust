@@ -684,12 +684,12 @@ mod test {
                 guardian_secret_keys
                     .iter()
                     .map(|dealer_sk| {
-                        GuardianEncryptedShare::new(
+                        GuardianEncryptedShare::encrypt(
                             &mut csprng,
                             &election_parameters.clone(),
                             dealer_sk,
                             pk,
-                        )
+                        ).ciphertext
                     })
                     .collect::<Vec<_>>()
             })
