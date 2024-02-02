@@ -29,7 +29,7 @@ pub struct JointElectionPublicKey {
 pub type CiphertextIndex = Index<Ciphertext>;
 
 /// The ciphertext used to store a vote value corresponding to one option.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq)]
 pub struct Ciphertext {
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
@@ -55,6 +55,7 @@ impl Nonce {
         Nonce { xi }
     }
 
+    /// The nonce with xi equal to 0.
     pub fn zero() -> Nonce {
         Nonce {
             xi: BigUint::zero(),
@@ -63,6 +64,8 @@ impl Nonce {
 }
 
 impl Ciphertext {
+    /// The ciphertext with alpha and beta equal to 1. This is the neutral element
+    /// of ciphertexts with respect to compenent-wise multiplication.
     pub fn one() -> Ciphertext {
         Ciphertext {
             alpha: BigUint::one(),

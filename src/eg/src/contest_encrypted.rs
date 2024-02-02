@@ -67,9 +67,18 @@ pub struct ContestEncrypted {
 /// has been scaled by a factor. It is trusted that the encrypted ciphertexts in a
 /// [`ScaledContestEncrypted`] really are the ones from a [`ContestEncrypted`] scaled by a factor.
 /// Contains no proofs.
+#[derive(PartialEq, Eq)]
 pub struct ScaledContestEncrypted {
     /// Scaled encrypted voter selection vector.
     pub selection: Vec<Ciphertext>,
+}
+
+impl ScaledContestEncrypted {
+    /// Verify that the [`ScaledContestEncrypted`] stems from a given [`ContestEncrypted`] by
+    /// scaling with a given factor.
+    pub fn verify(&self, origin: ContestEncrypted, factor: BigUint, fixed_parameters: &FixedParameters) -> bool {
+        origin.scale(fixed_parameters, factor) == *self
+    }
 }
 
 impl ContestEncrypted {
@@ -189,20 +198,18 @@ impl ContestEncrypted {
         )
     }
 
+    /// Sum up the encrypted votes on a contest and their nonces. The sum of the nonces can be used
+    /// to proof properties about the sum of the ciphertexts, e.g. that it satisfies the selection
+    /// limit.
     pub fn sum_selection_nonce_vector(
         fixed_parameters: &FixedParameters,
         selection_with_nonces: &[(Ciphertext, Nonce)],
     ) -> (Ciphertext, Nonce) {
-        // First element in the selection
+        let mut sum_ct = Ciphertext::one();
 
-        // let mut sum_ct = selection[0].clone();
-        let mut sum_ct = selection_with_nonces[0].0.clone();
+        let mut sum_nonce = Nonce::zero();
 
-        let mut sum_nonce = selection_with_nonces[0].1.clone();
-
-        // Subsequent elements in the selection
-
-        for (sel, nonce) in selection_with_nonces.iter().skip(1) {
+        for (sel, nonce) in selection_with_nonces {
             sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
             sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
 
@@ -212,18 +219,15 @@ impl ContestEncrypted {
         (sum_ct, sum_nonce)
     }
 
+    /// Sum up the encrypted votes on a contest. The sum is needed when checking that the selection
+    /// limit is satisfied.
     pub fn sum_selection_vector(
         fixed_parameters: &FixedParameters,
         selection: &[Ciphertext],
     ) -> Ciphertext {
-        // First element in the selection
+        let mut sum_ct = Ciphertext::one();
 
-        // let mut sum_ct = selection[0].clone();
-        let mut sum_ct = selection[0].clone();
-
-        // Subsequent elements in the selection
-
-        for sel in selection.iter().skip(1) {
+        for sel in selection {
             sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
             sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
         }
