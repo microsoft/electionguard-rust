@@ -3,6 +3,10 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides the implementation of the coefficient proof of knowledge for [`CoefficientCommitment`]s. 
+//! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
+
+
 use crate::{
     fixed_parameters::FixedParameters,
     guardian_secret_key::{CoefficientCommitment, SecretCoefficient},
@@ -14,7 +18,9 @@ use thiserror::Error;
 use util::{csprng::Csprng, integer_util::to_be_bytes_left_pad};
 
 /// Proof of possession for a single coefficient
-/// This is a Sigma protocol for the dlog relation (also known as a Schnor proof)
+/// 
+/// This is a Sigma protocol for the dlog relation (also known as a Schnorr proof)
+/// It corresponds to the tuple `(c_{i,j},v_{i,j})` in Section `3.2.2`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientProof {
     /// Challenge
@@ -31,24 +37,29 @@ pub struct CoefficientProof {
     pub response: BigUint,
 }
 
+/// Represents errors occurring during the validation of a coefficient proof.
 #[derive(Error, Debug)]
 pub enum ProofValidationError {
+    /// Occurs if the commitment is not a valid group element.
     #[error("The commitment is not a valid element in Z_p^r.")]
     CommitmentNotInGroup,
+    /// Occurs if the response is not a valid field element.
     #[error("The proof response is not a valid element in Z_q.")]
     ResponseNotInField,
+    /// Occurs if the computed challenge does not match the given one.
     #[error("The computed challenge does not match the given one.")]
     ChallengeMismatch,
 }
 
 impl CoefficientProof {
-    /// This function computes the challenge for the coefficient NIZK as specified in Equation (12)
+    /// This function computes the challenge for the coefficient NIZK as specified in Equation `12`.
+    /// 
     /// The arguments are
-    /// - h_p - the parameter base hash
-    /// - i - the guardian index
-    /// - j - the coefficient index
-    /// - coefficient - the coefficient commitment (capital_k_i_j in the reference)
-    /// - h - the commit message (h_i_j in the reference)
+    /// - `h_p` - the parameter base hash
+    /// - `i` - the guardian index
+    /// - `j` - the coefficient index
+    /// - `coefficient` - the coefficient commitment (`K_i_j` in the reference)
+    /// - `h` - the commit message (`h_i_j` in the reference)
     fn challenge(h_p: HValue, i: u32, j: u32, coefficient: &BigUint, h: &BigUint) -> BigUint {
         // v = 0x10 | b(i,4) | b(j,4) | b(coefficient,512) | b(h,512)
         let mut v = vec![0x10];
@@ -61,15 +72,16 @@ impl CoefficientProof {
         BigUint::from_bytes_be(c.0.as_slice())
     }
 
-    /// This function computes a single coefficient NIZK proof as specified in Section 3.2.2
+    /// This function computes a [`CoefficientProof`] from given [`SecretCoefficient`] and [`CoefficientCommitment`].
+    /// 
     /// The arguments are
-    /// - csprng - secure randomness generator
-    /// - fixed_parameters - the fixed parameters
-    /// - h_p - the parameter base hash
-    /// - i - the guardian index
-    /// - j - the coefficient index
-    /// - coefficient - the guardian's secret coefficient
-    /// - commitment - the coefficient commitment
+    /// - `csprng` - secure randomness generator
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `h_p` - the parameter base hash
+    /// - `i` - the guardian index
+    /// - `j` - the coefficient index
+    /// - `coefficient` - the guardian's secret coefficient
+    /// - `commitment` - the coefficient commitment
     pub fn new(
         csprng: &mut Csprng,
         fixed_parameters: &FixedParameters,
@@ -95,14 +107,15 @@ impl CoefficientProof {
         }
     }
 
-    /// This function verifies a [`CoefficientProof`] with respect to a given [`CoefficientCommitment`] and context
+    /// This function verifies a [`CoefficientProof`] with respect to a given [`CoefficientCommitment`] and context.
+    /// 
     /// The arguments are
-    /// - self - the `CoefficientProof`
-    /// - fixed_parameters - the fixed parameters
-    /// - h_p - the parameter base hash
-    /// - i - the guardian index
-    /// - j - the coefficient index
-    /// - commitment - the coefficient commitment
+    /// - `self` - the `CoefficientProof`
+    /// - `fixed_parameters` - the fixed parameters
+    /// - `h_p` - the parameter base hash
+    /// - `i` - the guardian index
+    /// - `j` - the coefficient index
+    /// - `commitment` - the coefficient commitment
     pub fn validate(
         &self,
         fixed_parameters: &FixedParameters,

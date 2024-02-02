@@ -782,7 +782,13 @@ mod test {
                 guardian_secret_keys
                     .iter()
                     .map(|dealer_sk| {
-                        GuardianEncryptedShare::new(csprng, election_parameters, dealer_sk, pk)
+                        GuardianEncryptedShare::encrypt(
+                            csprng,
+                            election_parameters,
+                            dealer_sk,
+                            &pk,
+                        )
+                        .ciphertext
                     })
                     .collect::<Vec<_>>()
             })

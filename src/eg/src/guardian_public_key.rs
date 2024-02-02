@@ -5,10 +5,11 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides implementation of guardian public keys. For more details see Section `3.2` of the Electionguard specification `2.0.0`.
+
 use anyhow::{Context, Result};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-
 use util::integer_util::to_be_bytes_left_pad;
 
 use crate::{
@@ -22,10 +23,12 @@ use crate::{
     guardian_secret_key::CoefficientCommitments,
 };
 
-/// Public key for a guardian.
+/// The public key for a guardian.
+/// 
+/// See Section `3.2.2` for details on the generation of public keys.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianPublicKey {
-    /// Guardian number, 1 <= i <= n.
+    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
     pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
@@ -35,6 +38,7 @@ pub struct GuardianPublicKey {
     /// "Published" polynomial coefficient commitments.
     pub coefficient_commitments: CoefficientCommitments,
 
+    /// Proofs of knowledge for secret coefficients.
     pub coefficient_proofs: Vec<CoefficientProof>,
 }
 
@@ -57,7 +61,7 @@ impl GuardianPublicKeyInfo for GuardianPublicKey {
 }
 
 impl GuardianPublicKey {
-    /// Verifies that the [`GuardianPublicKey`] is well-formed
+    /// This function verifies that the [`GuardianPublicKey`] is well-formed
     /// and conforms to the election parameters.
     /// Useful after deserialization.
     pub fn validate(
@@ -67,19 +71,22 @@ impl GuardianPublicKey {
         validate_guardian_public_key_info(self, election_parameters)
     }
 
-    /// "commitment K_i,0 will serve as the public key for guardian G_i"
+    /// This function returns the actual public key of the [`GuardianPublicKey`].
+    /// 
+    /// The return value corresponds to commitment `K_i,0` in Section `3.2.2`.
     pub fn public_key_k_i_0(&self) -> &BigUint {
         &self.coefficient_commitments.0[0].0
     }
 
-    /// Returns the public key `K_i,0` as a big-endian byte vector of length l_p_bytes.
+    /// This function returns the actual public key as a big-endian byte vector 
+    /// of length [`l_p_bytes`](crate::fixed_parameters::FixedParameters::l_p_bytes).
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         //? TODO: Sure would be nice if we could avoid this allocation, but since we
         // store a BigUint representation, its length in bytes may be less than `l_p_bytes`.
         to_be_bytes_left_pad(&self.public_key_k_i_0(), fixed_parameters.l_p_bytes())
     }
 
-    /// Writes a `GuardianPublicKey` to a `std::io::Write`.
+    /// Writes a [`GuardianPublicKey`] to a [`std::io::Write`].
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 
@@ -89,7 +96,7 @@ impl GuardianPublicKey {
             .context("Writing GuardianPublicKey")
     }
 
-    /// Reads a `GuardianPublicKey` from a `std::io::Read` and validates it.
+    /// Reads a [`GuardianPublicKey`] from a [`std::io::Read`] and validates it.
     pub fn from_stdioread_validated(
         stdioread: &mut dyn std::io::Read,
         election_parameters: &ElectionParameters,
@@ -102,7 +109,7 @@ impl GuardianPublicKey {
         Ok(self_)
     }
 
-    /// Returns a pretty JSON `String` representation of the `GuardianPublicKey`.
+    /// Returns a pretty JSON `String` representation of the [`GuardianPublicKey`].
     /// The final line will end with a newline.
     pub fn to_json(&self) -> String {
         // `unwrap()` is justified here because why would JSON serialization fail?
