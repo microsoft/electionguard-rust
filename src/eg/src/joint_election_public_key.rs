@@ -7,7 +7,7 @@
 
 use anyhow::{bail, ensure, Context, Result};
 use num_bigint::BigUint;
-use num_traits::One;
+use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -29,7 +29,7 @@ pub struct JointElectionPublicKey {
 pub type CiphertextIndex = Index<Ciphertext>;
 
 /// The ciphertext used to store a vote value corresponding to one option.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq)]
 pub struct Ciphertext {
     #[serde(
         serialize_with = "util::biguint_serde::biguint_serialize",
@@ -41,18 +41,49 @@ pub struct Ciphertext {
         deserialize_with = "util::biguint_serde::biguint_deserialize"
     )]
     pub beta: BigUint,
-    #[serde(skip)]
-    pub nonce: Option<BigUint>,
 }
 
-/// Does not match nonces if either nonce is None.
+/// The encryption nonce used to produce a [`Ciphertext`]
+/// Relevant for producing proofs about the plaintext.
+#[derive(Debug, Clone)]
+pub struct Nonce {
+    pub xi: BigUint,
+}
+
+impl Nonce {
+    pub fn new(xi: BigUint) -> Nonce {
+        Nonce { xi }
+    }
+
+    /// The nonce with xi equal to 0.
+    pub fn zero() -> Nonce {
+        Nonce {
+            xi: BigUint::zero(),
+        }
+    }
+}
+
+impl Ciphertext {
+    /// The ciphertext with alpha and beta equal to 1. This is the neutral element
+    /// of ciphertexts with respect to compenent-wise multiplication.
+    pub fn one() -> Ciphertext {
+        Ciphertext {
+            alpha: BigUint::one(),
+            beta: BigUint::one(),
+        }
+    }
+
+    /// Scale a ciphertext by a factor. The scaling of an encryption of `x` with a factor `k` 
+    /// gives an encryption of `k*x`.
+    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> Ciphertext {
+        let alpha = self.alpha.modpow(&factor, fixed_parameters.p.as_ref());
+        let beta = self.beta.modpow(&factor, fixed_parameters.p.as_ref());
+        Ciphertext{alpha, beta}
+    }
+}
+
 impl PartialEq for Ciphertext {
     fn eq(&self, other: &Self) -> bool {
-        if self.nonce.is_some() && other.nonce.is_some() {
-            return self.alpha == other.alpha
-                && self.beta == other.beta
-                && self.nonce == other.nonce;
-        }
         self.alpha == other.alpha && self.beta == other.beta
     }
 }
@@ -125,7 +156,6 @@ impl JointElectionPublicKey {
         fixed_parameters: &FixedParameters,
         nonce: &BigUint,
         vote: usize,
-        store_nonce: bool,
     ) -> Ciphertext {
         let alpha = fixed_parameters
             .g
@@ -134,19 +164,7 @@ impl JointElectionPublicKey {
             .joint_election_public_key
             .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
 
-        if store_nonce {
-            Ciphertext {
-                alpha,
-                beta,
-                nonce: Some(nonce.clone()),
-            }
-        } else {
-            Ciphertext {
-                alpha,
-                beta,
-                nonce: None,
-            }
-        }
+        Ciphertext { alpha, beta }
     }
 
     /// Reads a `JointElectionPublicKey` from a `std::io::Read` and validates it.
@@ -194,5 +212,70 @@ impl AsRef<BigUint> for JointElectionPublicKey {
     #[inline]
     fn as_ref(&self) -> &BigUint {
         &self.joint_election_public_key
+    }
+}
+
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod test {
+    use num_bigint::BigUint;
+    use num_traits::{Zero, One};
+    use util::{csprng::Csprng, integer_util::mod_inverse};
+
+    use crate::{example_election_parameters::example_election_parameters, guardian_secret_key::{GuardianSecretKey, SecretCoefficient}, index::Index, fixed_parameters::FixedParameters, discrete_log::DiscreteLog};
+
+    use super::{JointElectionPublicKey, Ciphertext};
+
+    fn g_key(i: u32) -> GuardianSecretKey {
+        let mut seed = Vec::new();
+        let customization_data = format!("GuardianSecretKeyGenerate({})", i.clone());
+        seed.extend_from_slice(&(customization_data.as_bytes().len() as u64).to_be_bytes());
+        seed.extend_from_slice(customization_data.as_bytes());
+
+        let mut csprng = Csprng::new(&seed);
+
+        let secret_key = GuardianSecretKey::generate(
+            &mut csprng,
+            &example_election_parameters(),
+            Index::from_one_based_index_const(i).unwrap(),
+            None,
+        );
+        secret_key
+    }
+
+    fn decrypt_ciphertext(ciphertext: &Ciphertext, joint_key: &JointElectionPublicKey, s: &SecretCoefficient, fixed_parameters: &FixedParameters) -> BigUint {
+        let s = &s.0;
+        let p = fixed_parameters.p.as_ref();
+        let alpha_s = ciphertext.alpha.modpow(s, p);
+        let alpha_s_inv = mod_inverse(&alpha_s, fixed_parameters.p.as_ref()).unwrap();
+
+        let group_msg = &ciphertext.beta * &alpha_s_inv % p;
+        let base = &joint_key.joint_election_public_key;
+        let dlog = DiscreteLog::new(base, p);
+        let plain_text = dlog.find(base, p, &group_msg).unwrap();
+        plain_text
+    }
+
+    #[test]
+    pub fn test_scaling_ciphertext(){
+        let election_parameters = example_election_parameters();
+        let sks: Vec<_> = (1..6).map(|i|g_key(i)).collect();
+        let guardian_public_keys: Vec<_> = sks.iter().map(|sk|sk.make_public_key()).collect();
+
+        let sk = sks.iter().fold(BigUint::zero(), |a,b| a+&b.secret_coefficients.0[0].0);
+        let s = SecretCoefficient(sk);
+
+        let joint_election_public_key =
+            JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())
+                .unwrap();
+        let nonce = BigUint::from(5u8);
+        let encryption = joint_election_public_key.encrypt_with(&election_parameters.fixed_parameters, &nonce, 1);
+        let factor = BigUint::new(vec![0, 64u32]); // 2^38
+        let factor = factor - BigUint::one(); // 2^38 - 1
+        let encryption = encryption.scale(&election_parameters.fixed_parameters, factor.clone());
+        let result = decrypt_ciphertext(&encryption, &joint_election_public_key, &s, &election_parameters.fixed_parameters);
+
+        assert_eq!(result, factor);
     }
 }

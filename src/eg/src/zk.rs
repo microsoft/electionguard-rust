@@ -12,8 +12,11 @@ use serde::{Deserialize, Serialize};
 use util::{csprng::Csprng, prime::BigUintPrime};
 
 use crate::{
-    election_record::PreVotingData, hash::eg_h, index::Index,
-    joint_election_public_key::Ciphertext, vec1::HasIndexTypeMarker,
+    election_record::PreVotingData,
+    hash::eg_h,
+    index::Index,
+    joint_election_public_key::{Ciphertext, Nonce},
+    vec1::HasIndexTypeMarker,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +76,7 @@ impl ProofRange {
         csprng: &mut Csprng,
         q: &BigUintPrime,
         ct: &Ciphertext,
+        nonce: &Nonce,
         small_l: usize,
         big_l: usize,
     ) -> Self {
@@ -122,8 +126,7 @@ impl ProofRange {
             }
         }
         for j in 0..big_l + 1 {
-            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            v.push(q.subtract_group_elem(&u[j], &(&c[j] * ct.nonce.as_ref().unwrap())));
+            v.push(q.subtract_group_elem(&u[j], &(&c[j] * &nonce.xi)));
             // v.push(&u[j] - &(&c[j] * ct.nonce.as_ref().unwrap()));
         }
 

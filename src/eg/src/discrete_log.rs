@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use num_bigint::BigUint;
 
-pub struct DiscreteLog(pub HashMap<BigUint, u32>);
+pub struct DiscreteLog(pub HashMap<BigUint, u64>);
 
 /// Returns the multiplicative inverse of a mod p where p is prime and (a, p) are co-prime.
 fn mul_inv(a: &BigUint, p: &BigUint) -> BigUint {
@@ -21,19 +21,21 @@ impl DiscreteLog {
     pub fn new(base: &BigUint, modulus: &BigUint) -> DiscreteLog {
         let mut hmap = HashMap::new();
         let mut k = BigUint::from(1u8);
-        for j in 0..(1 << 16) {
+        for j in 0..(1 << 20) {
             hmap.insert(k.clone(), j);
             k = (k * base) % modulus;
         }
         DiscreteLog(hmap)
     }
 
-    /// Uses the Baby-step giant-step algorithm.
+    /// Uses the Baby-step giant-step algorithm. It can find `x` from `g^x` if `0 <= x < n`, where
+    /// currently `n = 2^38`.
     pub fn find(&self, base: &BigUint, modulus: &BigUint, y: &BigUint) -> Option<BigUint> {
         let mut gamma = y.clone();
-        let m = (1 << 16) as u32;
+        let m = (1 << 20) as u64; // The size of the pre-computed table.
+        let n_over_m = (1 << 18) as u64; // n/m = 2^38/2^20 = 2^18.
         let alpha_to_minus_m = mul_inv(&base.modpow(&BigUint::from(m), modulus), modulus);
-        for i in 0..m {
+        for i in 0..n_over_m {
             match self.0.get(&gamma) {
                 Some(j) => {
                     return Some(BigUint::from(i * m + j));

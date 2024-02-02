@@ -408,7 +408,6 @@ impl GuardianSecretKeyShare {
     ///
     /// The arguments are
     /// - `election_parameters` - the election parameters
-    /// - `h_p` - the parameter base hash
     /// - `guardian_public_keys` - a list of [`GuardianPublicKey`]
     /// - `encrypted_shares` - a list of [`GuardianEncryptedShare`]
     /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
@@ -572,7 +571,7 @@ mod test {
                             &mut csprng,
                             &election_parameters,
                             dealer_sk,
-                            &pk,
+                            pk,
                         )
                         .ciphertext
                     })
@@ -585,7 +584,7 @@ mod test {
                     &election_parameters,
                     &guardian_public_keys,
                     &shares,
-                    &sk,
+                    sk,
                 )
                 .unwrap()
             })
