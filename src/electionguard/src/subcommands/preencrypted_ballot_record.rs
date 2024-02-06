@@ -9,7 +9,7 @@ use anyhow::{bail, Context, Result};
 
 use eg::{
     ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData, hash::HValue,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
 };
 use preencrypted::{
     ballot::{BallotPreEncrypted, VoterSelection},
@@ -156,7 +156,7 @@ impl Subcommand for PreEncryptedBallotRecord {
                 )?;
 
                 encrypted_ballot
-                    .to_stdiowrite(bx_write.as_mut())
+                    .to_stdiowrite_pretty(bx_write.as_mut())
                     .with_context(|| format!("Writing encrypted ballot to: {}", path.display()))?;
                 drop(bx_write);
             } else {

@@ -19,7 +19,7 @@ use crate::{
     guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey,
     guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

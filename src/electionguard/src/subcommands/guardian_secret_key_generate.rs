@@ -10,7 +10,8 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 
 use eg::{
-    guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey, serialize::SerializablePretty,
+    guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey,
+    serializable::SerializablePretty,
 };
 
 use crate::{
@@ -74,7 +75,7 @@ impl Subcommand for GuardianSecretKeyGenerate {
         let description = format!("secret key for guardian {} to: {}", self.i, path.display());
 
         secret_key
-            .to_stdiowrite(stdiowrite.as_mut())
+            .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| format!("Writing {description}"))?;
 
         drop(stdiowrite);

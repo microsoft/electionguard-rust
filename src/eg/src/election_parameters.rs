@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
 
 use crate::{
-    fixed_parameters::FixedParameters, serialize::SerializablePretty,
+    fixed_parameters::FixedParameters, serializable::SerializablePretty,
     varying_parameters::VaryingParameters,
 };
 

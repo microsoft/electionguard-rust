@@ -14,7 +14,7 @@ use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     hash::{eg_h, HValue},
-    serialize::{SerializableCanonical, SerializablePretty},
+    serializable::{SerializableCanonical, SerializablePretty},
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

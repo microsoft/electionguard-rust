@@ -17,7 +17,7 @@ use crate::{
     guardian::GuardianIndex,
     guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
     guardian_secret_key::CoefficientCommitments,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
 };
 
 /// Public key for a guardian.

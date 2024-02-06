@@ -15,7 +15,7 @@ use crate::{
     device::Device,
     election_manifest::ContestIndex,
     hash::HValue,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
     vec1::Vec1,
 };
 

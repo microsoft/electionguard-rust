@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian_public_key::GuardianPublicKey, index::Index, serialize::SerializablePretty,
+    guardian_public_key::GuardianPublicKey, index::Index, serializable::SerializablePretty,
 };
 
 /// The joint election public key.
