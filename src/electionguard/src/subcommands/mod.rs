@@ -12,8 +12,8 @@ mod none;
 mod preencrypted_ballot_generate;
 mod preencrypted_ballot_record;
 mod verify_standard_parameters;
-//? TODO mod voter_write_random_selections;
 mod voter_write_confirmation_code;
+mod voter_write_random_selections;
 mod write_hashes;
 mod write_hashes_ext;
 mod write_joint_election_public_key;
@@ -86,9 +86,11 @@ pub(crate) enum Subcommands {
         crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode,
     ),
 
-    //TODO /// Write random ballot selections to a file for testing.
-    //TODO VoterWriteRandomSelections(crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection),
-    //
+    /// Write random ballot selections to a file for testing.
+    VoterWriteRandomSelections(
+        crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection,
+    ),
+
     /// Compute the joint election public key from the guardian public keys and write it to a file.
     WriteJointElectionPublicKey(
         crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
@@ -119,7 +121,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             //TODO GuardianSecretKeyWriteEncryptedShare(a) => a,
             PreEncryptedBallotGenerate(a) => a,
             PreEncryptedBallotRecord(a) => a,
-            //TODO VoterWriteRandomSelections(a) => a,
+            VoterWriteRandomSelections(a) => a,
             VoterWriteConfirmationCode(a) => a,
             WriteJointElectionPublicKey(a) => a,
             WriteHashesExt(a) => a,
