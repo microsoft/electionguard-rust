@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::joint_election_public_key::JointElectionPublicKey;
+use eg::{joint_election_public_key::JointElectionPublicKey, serializable::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -53,7 +53,7 @@ impl Subcommand for WriteJointElectionPublicKey {
             .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::JointElectionPublicKey))?;
 
         joint_election_public_key
-            .to_stdiowrite(stdiowrite.as_mut())
+            .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| format!("Writing joint election public key to: {}", path.display()))?;
 
         drop(stdiowrite);

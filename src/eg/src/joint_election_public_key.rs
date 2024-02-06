@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian_public_key::GuardianPublicKey, index::Index,
+    guardian_public_key::GuardianPublicKey, index::Index, serializable::SerializablePretty,
 };
 
 /// The joint election public key.
@@ -178,17 +178,9 @@ impl JointElectionPublicKey {
     pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
         fixed_parameters.biguint_to_be_bytes_len_p(&self.joint_election_public_key)
     }
-
-    /// Writes a `JointElectionPublicKey` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing JointElectionPublicKey")
-    }
 }
+
+impl SerializablePretty for JointElectionPublicKey {}
 
 impl AsRef<BigUint> for JointElectionPublicKey {
     #[inline]

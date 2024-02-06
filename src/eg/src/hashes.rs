@@ -14,6 +14,7 @@ use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     hash::{eg_h, HValue},
+    serializable::{SerializableCanonical, SerializablePretty},
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,21 +114,13 @@ impl Hashes {
         Ok(())
     }
 
-    /// Writes a `Hashes` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing Hashes")
-    }
-
     /// Reads `Hashes` from a `std::io::Read`.
     pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<Hashes> {
         serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing Hashes: {}", e))
     }
 }
+
+impl SerializablePretty for Hashes {}
 
 impl std::fmt::Debug for Hashes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {

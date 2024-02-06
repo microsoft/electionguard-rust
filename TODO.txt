@@ -51,6 +51,10 @@ doc/CODE_OF_CONDUCT.md: complete
 doc/BUILDING.md: complete
 Complete all planned code reorganization/renaming
 docs/implementation guide/References: complete
+a trait for fn to_canonical_json()
+many to_stdiowrite() methods have common code that could be factored into a common function
+a trait for types that have to_stdiowrite()
+a trait for types that have to_stdiowrite() and perhaps _pretty() and _canonical() variants
 
 ====^^^^====^^^^====^^^^====^^^^====^^^^==== DONE merged to main ====^^^^====^^^^====^^^^====^^^^====^^^^====
 
@@ -70,8 +74,6 @@ serialize format wrapped in version
 ensure SecretCoefficient is serialized in a fixed-length format
 
 Election parameters: add a type field initally set to 'HomomorphicTallying'
-
-a trait for fn to_canonical_json()
 
 [Security: out of scope] TOCTOU bug with --insecure-deterministic flag electionguard.exe main.rs. Should be fixed, but in practice if that filesystem is writable by a malicious party then you likely have much, much bigger concerns.
 
@@ -146,10 +148,6 @@ open issues for any remaining TODO items for 1.0
 BallotDefinition doc for write-in option
 
 would be nice to support a PartySelection type vote, rather than rely on the vendor to give us the correct selections explicitly
-
-many to_stdiowrite() methods have common code that could be factored into a common function
-a trait for types that have to_stdiowrite()
-a trait for types that have to_stdiowrite() and perhaps _pretty() and _canonical() variants
 
 a trait for types that have pub fn validate(&Self)
 a trait for types that have pub fn validate(&Self, &ElectionParameters)
