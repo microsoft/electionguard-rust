@@ -501,7 +501,7 @@ impl DecryptionProof {
 
         Ok(DecryptionProof {
             challenge: c,
-            response: v,
+            response:  v,
         })
     }
 
@@ -566,13 +566,13 @@ pub struct VerifiableDecryption {
     /// The decrypted plain-text
     pub plain_text: FieldElement,
     /// The proof of correctness
-    pub proof: DecryptionProof,
+    pub proof:      DecryptionProof,
 }
 
 /// Decryption posted by the guardian together with a commitment.
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct DecryptionShareResult {
-    pub share: DecryptionShare,
+    pub share:        DecryptionShare,
     pub proof_commit: DecryptionProofCommitShare,
 }
 
@@ -784,10 +784,10 @@ mod test {
         let fixed_parameters: FixedParameters = (*TOY_PARAMETERS_01).clone();
 
         let varying_parameters = VaryingParameters {
-            n: GuardianIndex::from_one_based_index(3).unwrap(),
-            k: GuardianIndex::from_one_based_index(3).unwrap(),
-            date: "2023-05-02".to_string(),
-            info: "The test election".to_string(),
+            n:               GuardianIndex::from_one_based_index(3).unwrap(),
+            k:               GuardianIndex::from_one_based_index(3).unwrap(),
+            date:            "2023-05-02".to_string(),
+            info:            "The test election".to_string(),
             ballot_chaining: BallotChaining::Prohibited,
         };
         let election_parameters = ElectionParameters {
