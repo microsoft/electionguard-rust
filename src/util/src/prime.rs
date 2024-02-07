@@ -37,7 +37,7 @@ const MILLER_RABIN_ITERATIONS: usize = 50;
 // since it's in a cargo crate.
 
 /// This function provides a probabilistic primality test. For large numbers this call is expensive.
-/// 
+///
 /// Internally, the function uses the Miller-Rabin test.
 pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
     //? OPT: Maybe somehow we could defer Csprng creation until we know that we need randomized primality testing.

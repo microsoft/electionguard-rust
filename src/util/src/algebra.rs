@@ -129,10 +129,10 @@ impl FieldElement {
 impl ScalarField {
     /// Constructs a new scalar field from a given order.
     ///
-    /// This function returns `None` if the given order is not prime. 
-    /// Checking the validity of inputs is expensive. 
+    /// This function returns `None` if the given order is not prime.
+    /// Checking the validity of inputs is expensive.
     /// A field should therefore be constructed once and then reused as much as possible.
-    /// 
+    ///
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`ScalarField::new_unchecked`].
     pub fn new(order: BigUint, csprng: &mut Csprng) -> Option<Self> {
         let f = ScalarField { q: order };
@@ -284,10 +284,10 @@ impl Group {
     /// - `cofactor`- the cofactor `r`
     /// - `generator` - a generator `g`
     ///
-    /// This function checks that the group is valid according to [`Group::is_valid`]. 
-    /// Checking the validity of inputs is expensive. 
+    /// This function checks that the group is valid according to [`Group::is_valid`].
+    /// Checking the validity of inputs is expensive.
     /// A group should therefore be constructed once and then reused as much as possible.
-    /// 
+    ///
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`Group::new_unchecked`].
     pub fn new(
         modulus: BigUint,
@@ -336,7 +336,7 @@ impl Group {
         if self.r.is_zero() {
             return false;
         }
-        // If generator must not be one 
+        // If generator must not be one
         if self.g.is_one() {
             return false;
         }
@@ -346,7 +346,7 @@ impl Group {
             return false;
         }
         // the order must be < modulus-1, must not divide the co-factor, and must be prime
-        if  self.r.is_one() || (&self.r % &self.q).is_zero() || !is_prime(&self.q, csprng){
+        if self.r.is_one() || (&self.r % &self.q).is_zero() || !is_prime(&self.q, csprng) {
             return false;
         }
         // modulus must be prime ()
@@ -404,7 +404,6 @@ impl Group {
         self.q == field.q
     }
 }
-
 
 // Unit tests for algebra.
 #[cfg(test)]

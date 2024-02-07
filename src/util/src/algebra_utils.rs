@@ -122,7 +122,7 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
 /// Holds a hash table of the Baby-step giant-step algorithm for computing discrete logarithms with respect to `base` and `modulus`.
 pub struct DiscreteLog {
     /// The hash table
-    table: HashMap<BigUint, u32>,
+    table: HashMap<BigUint, u64>,
     /// The modulus defining Z_modulus
     modulus: BigUint,
     //  The base an integer in Z_modulus
@@ -135,7 +135,7 @@ impl DiscreteLog {
         let base = base % &modulus;
         let mut table = HashMap::new();
         let mut k = BigUint::from(1u8);
-        for j in 0..(1 << 16) {
+        for j in 0..(1 << 20) {
             table.insert(k.clone(), j);
             k = (k * &base) % &modulus;
         }
@@ -152,9 +152,11 @@ impl DiscreteLog {
     }
 
     /// Tries to find the discrete logarithm of given `y` with respect to fixed base and modulus using the Baby-step giant-step algorithm.
+    /// It can find `x` from `g^x` if `0 <= x < n`, where currently `n = 2^38`.
     pub fn find(&self, y: &BigUint) -> Option<BigUint> {
         let mut gamma = y.clone();
-        let m = (1 << 16) as u32;
+        let m = (1 << 20) as u64; // The size of the pre-computed table.
+        let n_over_m = (1 << 18) as u64; // n/m = 2^38/2^20 = 2^18.
         let alpha_to_minus_m = match mod_inverse(
             &self.base.modpow(&BigUint::from(m), &self.modulus),
             &self.modulus,
@@ -162,7 +164,7 @@ impl DiscreteLog {
             Some(x) => x,
             None => return None,
         };
-        for i in 0..m {
+        for i in 0..n_over_m {
             match self.table.get(&gamma) {
                 Some(j) => {
                     return Some(BigUint::from(i * m + j));
