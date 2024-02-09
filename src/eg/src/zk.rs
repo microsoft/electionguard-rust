@@ -44,7 +44,6 @@ impl ProofRange {
     /// The arguments are
     /// - `pvd` - the pre voting data
     /// - `ct` - the ciphertext
-    /// - `j` - the coefficient index
     /// - `a` - the a vector of the commit message
     /// - `b` - the b vector of the commit message
     pub fn challenge(

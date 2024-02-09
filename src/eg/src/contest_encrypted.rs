@@ -212,15 +212,15 @@ impl ContestEncrypted {
         let field = &fixed_parameters.field;
 
         let mut sum_ct = Ciphertext::one();
-        let mut sum_nonce = ScalarField::zero();
+        let mut sum_nonce = Nonce::zero();
 
         for (sel, nonce) in selection_with_nonces {
             sum_ct.alpha = sum_ct.alpha.mul(&sel.alpha, group);
             sum_ct.beta = sum_ct.beta.mul(&sel.beta, group);
-            sum_nonce = sum_nonce.add(&nonce.xi, field);
+            sum_nonce.xi = sum_nonce.xi.add(&nonce.xi, field);
         }
 
-        (sum_ct, Nonce::new(sum_nonce))
+        (sum_ct, sum_nonce)
     }
 
     /// Sum up the encrypted votes on a contest. The sum is needed when checking that the selection
