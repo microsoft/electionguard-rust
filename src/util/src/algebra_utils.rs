@@ -34,15 +34,6 @@ pub fn cnt_bits_repr<T: Borrow<BigUint>>(n: &T) -> usize {
     }
 }
 
-// Returns the smallest integer `b` such that `b > a && b | n`.
-pub fn round_to_next_multiple(a: usize, x: usize) -> usize {
-    if a % x == 0 {
-        a
-    } else {
-        a + (x - (a % x))
-    }
-}
-
 /// Encodes [`BigUint`] in big-endian as a left-padded byte-string of length `len`.
 pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     let n: &BigUint = n.borrow();

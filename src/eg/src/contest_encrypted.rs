@@ -6,10 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use serde::{Deserialize, Serialize};
-use util::{
-    algebra::{FieldElement, ScalarField},
-    csprng::Csprng,
-};
+use util::{algebra::FieldElement, csprng::Csprng};
 
 use crate::{
     contest_hash,

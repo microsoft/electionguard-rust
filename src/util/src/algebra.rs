@@ -207,7 +207,7 @@ pub struct Group {
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     g: BigUint,
-    /// Group order `q`. 
+    /// Group order `q`.
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
