@@ -314,6 +314,8 @@ impl Group {
         }
     }
 
+    /// Computes the group order from the modulus and the co-factor. 
+    /// The result makes no sense if the co-factor does not divide modulus-1
     fn compute_order(modulus: &BigUint, cofactor: &BigUint) -> BigUint {
         (modulus - BigUint::one()) / cofactor
     }
