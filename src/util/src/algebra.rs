@@ -207,7 +207,7 @@ pub struct Group {
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     g: BigUint,
-    /// Group order `q`. Constructors compute it from the other fields.
+    /// Group order `q`. 
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
@@ -271,7 +271,7 @@ impl Group {
     ///
     /// The arguments are
     /// - `modulus` - the modulus `p`
-    /// - `cofactor`- the cofactor `r`
+    /// - `order`- the order `q`
     /// - `generator` - a generator `g`
     ///
     /// This function checks that the group is valid according to [`Group::is_valid`].
