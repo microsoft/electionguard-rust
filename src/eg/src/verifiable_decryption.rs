@@ -501,7 +501,7 @@ impl DecryptionProof {
 
         Ok(DecryptionProof {
             challenge: c,
-            response:  v,
+            response: v,
         })
     }
 
@@ -566,13 +566,13 @@ pub struct VerifiableDecryption {
     /// The decrypted plain-text
     pub plain_text: FieldElement,
     /// The proof of correctness
-    pub proof:      DecryptionProof,
+    pub proof: DecryptionProof,
 }
 
 /// Decryption posted by the guardian together with a commitment.
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct DecryptionShareResult {
-    pub share:        DecryptionShare,
+    pub share: DecryptionShare,
     pub proof_commit: DecryptionProofCommitShare,
 }
 
@@ -727,7 +727,20 @@ mod test {
     use util::{algebra::FieldElement, csprng::Csprng};
 
     use crate::{
-        election_parameters::ElectionParameters, example_election_manifest, example_election_parameters::example_election_parameters, fixed_parameters::FixedParameters, guardian::GuardianIndex, guardian_public_key::GuardianPublicKey, guardian_secret_key::GuardianSecretKey, guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare}, hashes::Hashes, hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey, standard_parameters::test_parameter_do_not_use_in_production::TOY_PARAMETERS_01, varying_parameters::{BallotChaining, VaryingParameters}, verifiable_decryption::ShareCombinationError
+        election_parameters::ElectionParameters,
+        example_election_manifest,
+        example_election_parameters::example_election_parameters,
+        fixed_parameters::FixedParameters,
+        guardian::GuardianIndex,
+        guardian_public_key::GuardianPublicKey,
+        guardian_secret_key::GuardianSecretKey,
+        guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
+        hashes::Hashes,
+        hashes_ext::HashesExt,
+        joint_election_public_key::JointElectionPublicKey,
+        standard_parameters::test_parameter_do_not_use_in_production::TOY_PARAMETERS_01,
+        varying_parameters::{BallotChaining, VaryingParameters},
+        verifiable_decryption::ShareCombinationError,
     };
 
     use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption};
@@ -784,10 +797,10 @@ mod test {
         let fixed_parameters: FixedParameters = (*TOY_PARAMETERS_01).clone();
 
         let varying_parameters = VaryingParameters {
-            n:               GuardianIndex::from_one_based_index(3).unwrap(),
-            k:               GuardianIndex::from_one_based_index(3).unwrap(),
-            date:            "2023-05-02".to_string(),
-            info:            "The test election".to_string(),
+            n: GuardianIndex::from_one_based_index(3).unwrap(),
+            k: GuardianIndex::from_one_based_index(3).unwrap(),
+            date: "2023-05-02".to_string(),
+            info: "The test election".to_string(),
             ballot_chaining: BallotChaining::Prohibited,
         };
         let election_parameters = ElectionParameters {

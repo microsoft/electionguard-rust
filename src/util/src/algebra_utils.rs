@@ -35,15 +35,6 @@ pub fn cnt_bits_repr<T: Borrow<BigUint>>(n: &T) -> usize {
     }
 }
 
-pub fn largest_integer_a_such_that_2_to_a_divides_even_n(n: &BigUint) -> u64 {
-    assert!(n.is_even(), "requires n even");
-    assert!(!n.is_zero(), "requires n > 1");
-
-    // `unwrap()` is justified here because we just verified that 2 <= `n`.
-    #[allow(clippy::unwrap_used)]
-    n.trailing_zeros().unwrap()
-}
-
 // Returns the smallest integer `b` such that `b > a && b | n`.
 pub fn round_to_next_multiple(a: usize, x: usize) -> usize {
     if a % x == 0 {
@@ -148,7 +139,7 @@ impl DiscreteLog {
 
     /// Constructs a new pre-computation table for a given base and group
     pub fn from_group(base: &GroupElement, group: &Group) -> Self {
-        Self::new(base.to_biguint(), group.modulus().clone())
+        Self::new(base.as_biguint().clone(), group.modulus().clone())
     }
 
     /// Tries to find the discrete logarithm of given `y` with respect to fixed base and modulus using the Baby-step giant-step algorithm.
@@ -179,16 +170,16 @@ impl DiscreteLog {
 
     /// Tries to find the discrete logarithm of given group element `y` with respect to fixed base using the Baby-step giant-step algorithm.
     pub fn ff_find(&self, y: &GroupElement, field: &ScalarField) -> Option<FieldElement> {
-        let y = y.to_biguint();
+        let y = y.as_biguint();
         // The given integer must be small enough
-        if y >= self.modulus {
+        if y >= &self.modulus {
             return None;
         }
         // The base should have an order < field.order
-        if self.base.modpow(&field.order(), &self.modulus) != BigUint::one() {
+        if self.base.modpow(field.order(), &self.modulus) != BigUint::one() {
             return None;
         }
-        let maybe_x = self.find(&y);
+        let maybe_x = self.find(y);
         maybe_x.map(|x| FieldElement::from(x, field))
     }
 }
@@ -312,7 +303,6 @@ mod tests {
     use crate::csprng::Csprng;
 
     use super::*;
-    use num_integer::Integer;
     use num_traits::Num;
 
     #[test]
@@ -320,27 +310,6 @@ mod tests {
         for (n, expected) in [1, 1, 2, 2, 3, 3, 3, 3, 4].into_iter().enumerate() {
             assert_eq!(cnt_bits_repr_usize(n), expected);
             assert_eq!(cnt_bits_repr(&BigUint::from(n)), expected);
-        }
-    }
-
-    #[test]
-    fn test_largest_integer_a_such_that_2_to_a_divides_even_n() {
-        for half_n in 1_usize..1000 {
-            let n = half_n * 2;
-
-            let a = largest_integer_a_such_that_2_to_a_divides_even_n(&BigUint::from(n));
-            assert!(a < 32);
-            let two_to_a = 1_usize << a;
-
-            assert!(n.is_multiple_of(&two_to_a));
-
-            for invalid_a in (a + 1)..32 {
-                let two_to_invalid_a = 1_usize << invalid_a;
-                if n.is_multiple_of(&two_to_invalid_a) {
-                    println!("\n\nn={n}, a={a}, invalid_a={invalid_a}, two_to_invalid_a={two_to_invalid_a}\n");
-                }
-                assert!(!n.is_multiple_of(&two_to_invalid_a));
-            }
         }
     }
 

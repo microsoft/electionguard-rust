@@ -72,11 +72,8 @@ impl FieldElement {
     }
 
     /// Performs modular exponentiation of the field element with a given integer exponent.
-    pub fn pow<T>(&self, exponent: T, field: &ScalarField) -> FieldElement
-    where
-        BigUint: From<T>,
-    {
-        let x = BigUint::from(exponent);
+    pub fn pow(&self, exponent: impl Into<BigUint>, field: &ScalarField) -> FieldElement {
+        let x = exponent.into();
         FieldElement(self.0.modpow(&x, &field.q))
     }
 
@@ -172,8 +169,8 @@ impl ScalarField {
     }
 
     /// Returns the order `q` of the field
-    pub fn order(&self) -> BigUint {
-        self.q.clone()
+    pub fn order(&self) -> &BigUint {
+        &self.q
     }
 
     /// Returns the length of the byte-array representation of field order `q`.
@@ -215,7 +212,7 @@ pub struct Group {
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     g: BigUint,
-    /// Group order `q`. Constructors computed it from the other fields.
+    /// Group order `q`. Constructors compute it from the other fields.
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
@@ -239,11 +236,8 @@ impl GroupElement {
     }
 
     /// Performs modular exponentiation of the group element with a given integer exponent.
-    pub fn pow<T>(&self, exponent: T, group: &Group) -> GroupElement
-    where
-        BigUint: From<T>,
-    {
-        let x = BigUint::from(exponent);
+    pub fn pow(&self, exponent: impl Into<BigUint>, group: &Group) -> GroupElement {
+        let x = exponent.into();
         GroupElement(self.0.modpow(&x, &group.p))
     }
 
@@ -271,8 +265,9 @@ impl GroupElement {
         to_be_bytes_left_pad(&self.0, group.l_p())
     }
 
-    pub fn to_biguint(&self) -> BigUint {
-        self.0.clone()
+    /// Returns a reference to group element as BigUint
+    pub fn as_biguint(&self) -> &BigUint {
+        &self.0
     }
 }
 
@@ -329,7 +324,8 @@ impl Group {
     /// - the `modulus` is prime,
     /// - the `order` is prime, `< modulus-1`, and does not divide the `co-factor`,
     /// - the `generator` has order `order`,
-    /// - the `co-factor` is non-zero,
+    /// - the `co-factor` is non-zero and `co-factor/2` is prime,
+    /// - the `modulus = co-factor * order`
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
         // Tests ordered according how expensive they are
         // the co-factor must be non-zero
@@ -338,6 +334,10 @@ impl Group {
         }
         // If generator must not be one
         if self.g.is_one() {
+            return false;
+        }
+        // The order 'q` times co-factor `r` must be equal to `p-1` for modulus `p`
+        if &self.r * &self.q != &self.p - BigUint::one() {
             return false;
         }
         // This ensures that the order of generator is at most `q`
@@ -349,11 +349,13 @@ impl Group {
         if self.r.is_one() || (&self.r % &self.q).is_zero() || !is_prime(&self.q, csprng) {
             return false;
         }
-        // modulus must be prime ()
-        if !is_prime(&self.p, csprng) {
+        // the cofactor/2 must be prime
+        let r_2 = &self.r / BigUint::from(2_u8);
+        if !is_prime(&r_2, csprng) {
             return false;
         }
-        true
+        // modulus must be prime ()
+        is_prime(&self.p, csprng)
     }
 
     /// Returns a uniform random group element
@@ -552,6 +554,15 @@ mod test {
             !invalid_cofactor_group.is_valid(&mut csprng),
             "Groups with an invalid cofactor should fail!"
         );
+
+        // The co-factor does not divide p-1
+        let invalid_group = Group::new(
+            BigUint::from(19_u8),
+            BigUint::from(5_u8),
+            BigUint::from(7_u8),
+            &mut csprng,
+        );
+        assert_eq!(invalid_group, None);
     }
 
     #[test]
