@@ -11,6 +11,7 @@ use crate::{
     prime::is_prime,
 };
 use num_bigint::BigUint;
+use num_integer::Integer;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
@@ -200,12 +201,6 @@ pub struct Group {
         deserialize_with = "crate::biguint_serde::biguint_deserialize"
     )]
     p: BigUint,
-    /// Cofactor of `q` in `p − 1``.
-    #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
-    )]
-    r: BigUint,
     /// Subgroup generator `g`.
     #[serde(
         serialize_with = "crate::biguint_serde::biguint_serialize",
@@ -286,14 +281,12 @@ impl Group {
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`Group::new_unchecked`].
     pub fn new(
         modulus: BigUint,
-        cofactor: BigUint,
+        order: BigUint,
         generator: BigUint,
         csprng: &mut Csprng,
     ) -> Option<Self> {
-        let order = Self::compute_order(&modulus, &cofactor);
         let group = Group {
             p: modulus,
-            r: cofactor,
             g: generator,
             q: order,
         };
@@ -304,60 +297,45 @@ impl Group {
     }
 
     /// Constructs a new group without checking the validity according to [`Group::is_valid`].
-    pub fn new_unchecked(modulus: BigUint, cofactor: BigUint, generator: BigUint) -> Self {
-        let order = Self::compute_order(&modulus, &cofactor);
+    pub fn new_unchecked(modulus: BigUint, order: BigUint, generator: BigUint) -> Self {
         Group {
             p: modulus,
-            r: cofactor,
             g: generator,
             q: order,
         }
-    }
-
-    /// Computes the group order from the modulus and the co-factor. 
-    /// The result makes no sense if the co-factor does not divide modulus-1
-    fn compute_order(modulus: &BigUint, cofactor: &BigUint) -> BigUint {
-        (modulus - BigUint::one()) / cofactor
     }
 
     /// This function checks that the given group is valid. The call is expensive.
     ///
     /// A group is considered valid if:
     /// - the `modulus` is prime,
-    /// - the `order` is prime, `< modulus-1`, and does not divide the `co-factor`,
+    /// - the `order` is prime, divides `modulus-1`, but not `(modulus-1)/order`,
     /// - the `generator` has order `order`,
-    /// - the `co-factor` is non-zero and `co-factor/2` is prime,
-    /// - the `modulus = co-factor * order`
+    /// - and `(modulus-1)/ 2order` is prime
     pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
-        // Tests ordered according how expensive they are
-        // the co-factor must be non-zero
-        if self.r.is_zero() {
+        // Expensive primality testing is done last
+
+        // The order `q` must divide `p-1` but not `(p-1)/q` for modulus `p`.
+        let p_minus_1 = &self.p - BigUint::one();
+        let cofactor = &p_minus_1 / &self.q;
+        if !(p_minus_1 % &self.q).is_zero() || (&cofactor % &self.q).is_zero() {
             return false;
         }
-        // If generator must not be one
-        if self.g.is_one() {
+
+        // This ensures that the order of generator `g` is at most `q` and `g != 1`
+        // and if `q` is prime => order of generator is `q`
+        if self.g.is_one() || !self.g.modpow(&self.q, &self.p).is_one() {
             return false;
         }
-        // The order 'q` times co-factor `r` must be equal to `p-1` for modulus `p`
-        if &self.r * &self.q != &self.p - BigUint::one() {
+
+        // The cofactor should be even otherwise (p-1)/2q is not prime
+        // (this rules out cases like p=7 and q=2)
+        if cofactor.is_odd() {
             return false;
         }
-        // This ensures that the order of generator is at most `q`
-        // and if `q` is prime => order of generator = `q`
-        if !self.g.modpow(&self.q, &self.p).is_one() {
-            return false;
-        }
-        // the order must be < modulus-1, must not divide the co-factor, and must be prime
-        if self.r.is_one() || (&self.r % &self.q).is_zero() || !is_prime(&self.q, csprng) {
-            return false;
-        }
-        // the cofactor/2 must be prime
-        let r_2 = &self.r / BigUint::from(2_u8);
-        if !is_prime(&r_2, csprng) {
-            return false;
-        }
-        // modulus must be prime ()
-        is_prime(&self.p, csprng)
+        let r_2 = cofactor / BigUint::from(2_u8);
+        // All primality testing
+        is_prime(&self.q, csprng) || is_prime(&self.p, csprng) || is_prime(&r_2, csprng)
     }
 
     /// Returns a uniform random group element
@@ -422,7 +400,7 @@ mod test {
             ScalarField::new_unchecked(BigUint::from(127_u8)),
             Group::new_unchecked(
                 BigUint::from(59183_u32),
-                BigUint::from(466_u32),
+                BigUint::from(127_u8),
                 BigUint::from(32616_u32),
             ),
         )
@@ -511,19 +489,18 @@ mod test {
         let invalid_field = ScalarField::new_unchecked(BigUint::from(125_u8));
         let invalid_modulus_group = Group::new_unchecked(
             BigUint::from(59185_u32),
-            BigUint::from(466_u32),
+            BigUint::from(127_u8),
             BigUint::from(32616_u32),
         );
         let invalid_generator_group = Group::new_unchecked(
             BigUint::from(59183_u32),
-            BigUint::from(466_u32),
+            BigUint::from(127_u8),
             BigUint::from(1_u32),
         );
-
         // order = 68890/830 = 83 is prime, but does not divide the cofactor!
         let invalid_cofactor_group = Group::new_unchecked(
             BigUint::from(68891_u32),
-            BigUint::from(830_u32),
+            BigUint::from(83_u32),
             BigUint::from(59398_u32),
         );
 
@@ -560,7 +537,7 @@ mod test {
         // The co-factor does not divide p-1
         let invalid_group = Group::new(
             BigUint::from(19_u8),
-            BigUint::from(5_u8),
+            BigUint::from(3_u8),
             BigUint::from(7_u8),
             &mut csprng,
         );

@@ -11,7 +11,6 @@ use itertools::Itertools;
 use std::{borrow::Borrow, collections::HashMap, iter::zip, mem};
 
 use num_bigint::{BigInt, BigUint, Sign};
-use num_integer::Integer;
 use num_traits::{One, Zero};
 
 use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
