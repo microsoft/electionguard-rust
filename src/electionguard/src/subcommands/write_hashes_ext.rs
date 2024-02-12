@@ -13,10 +13,7 @@ use eg::hashes_ext::HashesExt;
 
 use crate::{
     artifacts_dir::ArtifactFile,
-    common_utils::{
-        load_all_guardian_public_keys, load_election_parameters, load_hashes,
-        load_joint_election_public_key,
-    },
+    common_utils::{load_election_parameters, load_hashes, load_joint_election_public_key},
     subcommand_helper::SubcommandHelper,
     subcommands::Subcommand,
 };
@@ -49,16 +46,8 @@ impl Subcommand for WriteHashesExt {
         let joint_election_public_key =
             load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
 
-        //? TODO: Do we need a command line arg to specify all the guardian public key source files?
-        let guardian_public_keys =
-            load_all_guardian_public_keys(&subcommand_helper.artifacts_dir, &election_parameters)?;
-
-        let hashes_ext = HashesExt::compute(
-            &election_parameters,
-            &hashes,
-            &joint_election_public_key,
-            guardian_public_keys.as_slice(),
-        );
+        let hashes_ext =
+            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
         let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir

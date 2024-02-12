@@ -10,8 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     election_parameters::ElectionParameters,
-    guardian_public_key::GuardianPublicKey,
-    guardian_public_key_info::GuardianPublicKeyInfo,
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
@@ -24,47 +22,21 @@ pub struct HashesExt {
 }
 
 impl HashesExt {
+    /// This function computes the extended base hash
     pub fn compute(
         election_parameters: &ElectionParameters,
         hashes: &Hashes,
         joint_election_public_key: &JointElectionPublicKey,
-        guardian_public_keys: &[GuardianPublicKey],
     ) -> Self {
         let fixed_parameters = &election_parameters.fixed_parameters;
-        let varying_parameters = &election_parameters.varying_parameters;
-
-        let n = varying_parameters.n.as_quantity();
-        let k = varying_parameters.k.as_quantity();
-
-        assert_eq!(guardian_public_keys.len(), n);
-
         // Computation of the extended base hash H_E.
-
         let h_e = {
-            // TODO: Check that the formula below matches the specification
-            // B1 = 12 ∥ b(K, 512) ∥ b(K1,0, 512) ∥ b(K1,1, 512) ∥ · · · ∥ b(Kn,k−1, 512)
+            // B1 = 12 | b(K, 512)
             let mut v = vec![0x12];
-
             // K = election public key
             v.append(&mut joint_election_public_key.to_be_bytes_left_pad(fixed_parameters));
-
-            for public_key in guardian_public_keys.iter() {
-                let coefficient_commitments = public_key.coefficient_commitments();
-                for coefficient_commitment in coefficient_commitments.0.iter() {
-                    v.append(&mut coefficient_commitment.to_be_bytes_left_pad(fixed_parameters));
-                }
-            }
-
-            // len(B1) = 1 + (n · k + 1) · 512
-            let expected_mod_p_values = 1 + n * k;
-            let expected_len = 1 + expected_mod_p_values * fixed_parameters.group.l_p();
-            debug_assert_eq!(v.len(), expected_len);
-
-            // HE = H(HB; 12, K, K1,0, K1,1, . . . , Kn,k−2, Kn,k−1) (20)
-            // B0 = H_B
             eg_h(&hashes.h_b, &v)
         };
-
         Self { h_e }
     }
 
@@ -99,18 +71,6 @@ impl HashesExt {
         serde_json::from_reader(io_read)
             .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
     }
-
-    // /// Writes a `HashesExt` to a `std::io::Write`.
-    // pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-    //     let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-    //     self.serialize(&mut ser)
-    //         .context("Error writing hashes (extended)")?;
-
-    //     ser.into_inner()
-    //         .write_all(b"\n")
-    //         .context("Error writing hashes (extended) file")
-    // }
 }
 
 impl std::fmt::Display for HashesExt {
@@ -168,15 +128,11 @@ mod test {
             .as_ref()
             .is_valid(&fixed_parameters.group));
 
-        let hashes_ext = HashesExt::compute(
-            &election_parameters,
-            &hashes,
-            &joint_election_public_key,
-            guardian_public_keys.as_slice(),
-        );
+        let hashes_ext =
+            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
         let expected_h_e = HValue::from(hex!(
-            "5541670D89498829BD3D78975D67B1B2BBF90449BB72F3B7DE847953BD6B25A8"
+            "84135D7084DC8EC9A6E593EE0D7DF9E8F0444DEEB0B1C72BBCB0184D8D50C3A2"
         ));
 
         #[cfg(test_hash_mismatch_warn_only)]
