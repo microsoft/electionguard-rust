@@ -5,10 +5,12 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+//! This module provides the implementation of the [`JointElectionPublicKey`] and [`Ciphertext`] for ballot encryption.
+//! For more details see Sections `3.2.2` and `3.3` of the Electionguard specification `2.0.0`.
+
 use anyhow::{bail, ensure, Context, Result};
-use num_bigint::BigUint;
-use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
+use util::algebra::{FieldElement, Group, GroupElement, ScalarField};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
@@ -18,11 +20,7 @@ use crate::{
 /// The joint election public key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct JointElectionPublicKey {
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub joint_election_public_key: BigUint,
+    pub joint_election_public_key: GroupElement,
 }
 
 /// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`crate::contest_encrypted::ContestEncrypted`].
@@ -31,54 +29,47 @@ pub type CiphertextIndex = Index<Ciphertext>;
 /// The ciphertext used to store a vote value corresponding to one option.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq)]
 pub struct Ciphertext {
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub alpha: BigUint,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub beta: BigUint,
+    pub alpha: GroupElement,
+    pub beta: GroupElement,
 }
 
 /// The encryption nonce used to produce a [`Ciphertext`]
 /// Relevant for producing proofs about the plaintext.
 #[derive(Debug, Clone)]
 pub struct Nonce {
-    pub xi: BigUint,
+    pub xi: FieldElement,
 }
 
 impl Nonce {
-    pub fn new(xi: BigUint) -> Nonce {
+    pub fn new(xi: FieldElement) -> Nonce {
         Nonce { xi }
     }
 
     /// The nonce with xi equal to 0.
     pub fn zero() -> Nonce {
         Nonce {
-            xi: BigUint::zero(),
+            xi: ScalarField::zero(),
         }
     }
 }
 
 impl Ciphertext {
     /// The ciphertext with alpha and beta equal to 1. This is the neutral element
-    /// of ciphertexts with respect to compenent-wise multiplication.
+    /// of ciphertexts with respect to component-wise multiplication.
     pub fn one() -> Ciphertext {
         Ciphertext {
-            alpha: BigUint::one(),
-            beta: BigUint::one(),
+            alpha: Group::one(),
+            beta: Group::one(),
         }
     }
 
-    /// Scale a ciphertext by a factor. The scaling of an encryption of `x` with a factor `k` 
+    /// Scale a ciphertext by a factor. The scaling of an encryption of `x` with a factor `k`
     /// gives an encryption of `k*x`.
-    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> Ciphertext {
-        let alpha = self.alpha.modpow(&factor, fixed_parameters.p.as_ref());
-        let beta = self.beta.modpow(&factor, fixed_parameters.p.as_ref());
-        Ciphertext{alpha, beta}
+    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: &FieldElement) -> Ciphertext {
+        let alpha = self.alpha.exp(factor, &fixed_parameters.group);
+        let beta = self.beta.exp(factor, &fixed_parameters.group);
+
+        Ciphertext { alpha, beta }
     }
 }
 
@@ -96,6 +87,7 @@ impl JointElectionPublicKey {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
         let n = varying_parameters.n.get_one_based_usize();
+        let group = &fixed_parameters.group;
 
         // Validate every supplied guardian public key.
         for guardian_public_key in guardian_public_keys {
@@ -139,10 +131,9 @@ impl JointElectionPublicKey {
         }
 
         let joint_election_public_key = guardian_public_keys.iter().fold(
-            BigUint::one(),
-            |mut acc, guardian_public_key| -> BigUint {
-                acc *= guardian_public_key.public_key_k_i_0();
-                acc % fixed_parameters.p.as_ref()
+            Group::one(),
+            |acc, guardian_public_key| -> GroupElement {
+                acc.mul(guardian_public_key.public_key_k_i_0(), group)
             },
         );
 
@@ -154,15 +145,15 @@ impl JointElectionPublicKey {
     pub fn encrypt_with(
         &self,
         fixed_parameters: &FixedParameters,
-        nonce: &BigUint,
+        nonce: &FieldElement,
         vote: usize,
     ) -> Ciphertext {
-        let alpha = fixed_parameters
-            .g
-            .modpow(nonce, fixed_parameters.p.as_ref());
-        let beta = self
-            .joint_election_public_key
-            .modpow(&(nonce + vote), fixed_parameters.p.as_ref());
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
+
+        let alpha = group.g_exp(nonce);
+        let exponent = &nonce.add(&FieldElement::from(vote, field), field);
+        let beta = self.joint_election_public_key.exp(exponent, group);
 
         Ciphertext { alpha, beta }
     }
@@ -183,18 +174,16 @@ impl JointElectionPublicKey {
     /// Verifies that the `JointElectionPublicKey` conforms to the election parameters.
     /// Useful after deserialization.
     pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
-        ensure!(
-            election_parameters
-                .fixed_parameters
-                .is_valid_modp(&self.joint_election_public_key),
-            "JointElectionPublicKey is not valid mod p"
-        );
+        let group = &election_parameters.fixed_parameters.group;
+        ensure!(self.joint_election_public_key.is_valid(group));
+        ensure!(self.joint_election_public_key != Group::one());
         Ok(())
     }
 
     /// Returns the `JointElectionPublicKey` as a big-endian byte array of the correct length for `mod p`.
-    pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
-        fixed_parameters.biguint_to_be_bytes_len_p(&self.joint_election_public_key)
+    pub fn to_be_bytes_left_pad(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
+        self.joint_election_public_key
+            .to_be_bytes_left_pad(&fixed_parameters.group)
     }
 
     /// Writes a `JointElectionPublicKey` to a `std::io::Write`.
@@ -208,24 +197,31 @@ impl JointElectionPublicKey {
     }
 }
 
-impl AsRef<BigUint> for JointElectionPublicKey {
+impl AsRef<GroupElement> for JointElectionPublicKey {
     #[inline]
-    fn as_ref(&self) -> &BigUint {
+    fn as_ref(&self) -> &GroupElement {
         &self.joint_election_public_key
     }
 }
-
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
     use num_bigint::BigUint;
-    use num_traits::{Zero, One};
-    use util::{csprng::Csprng, integer_util::mod_inverse};
+    use util::{
+        algebra::{FieldElement, ScalarField},
+        algebra_utils::DiscreteLog,
+        csprng::Csprng,
+    };
 
-    use crate::{example_election_parameters::example_election_parameters, guardian_secret_key::{GuardianSecretKey, SecretCoefficient}, index::Index, fixed_parameters::FixedParameters, discrete_log::DiscreteLog};
+    use crate::{
+        example_election_parameters::example_election_parameters,
+        fixed_parameters::FixedParameters,
+        guardian_secret_key::{GuardianSecretKey, SecretCoefficient},
+        index::Index,
+    };
 
-    use super::{JointElectionPublicKey, Ciphertext};
+    use super::{Ciphertext, JointElectionPublicKey};
 
     fn g_key(i: u32) -> GuardianSecretKey {
         let mut seed = Vec::new();
@@ -244,37 +240,54 @@ mod test {
         secret_key
     }
 
-    fn decrypt_ciphertext(ciphertext: &Ciphertext, joint_key: &JointElectionPublicKey, s: &SecretCoefficient, fixed_parameters: &FixedParameters) -> BigUint {
+    fn decrypt_ciphertext(
+        ciphertext: &Ciphertext,
+        joint_key: &JointElectionPublicKey,
+        s: &SecretCoefficient,
+        fixed_parameters: &FixedParameters,
+    ) -> FieldElement {
+        let group = &fixed_parameters.group;
         let s = &s.0;
-        let p = fixed_parameters.p.as_ref();
-        let alpha_s = ciphertext.alpha.modpow(s, p);
-        let alpha_s_inv = mod_inverse(&alpha_s, fixed_parameters.p.as_ref()).unwrap();
-
-        let group_msg = &ciphertext.beta * &alpha_s_inv % p;
+        let alpha_s = ciphertext.alpha.exp(s, group);
+        let alpha_s_inv = alpha_s.inv(group).unwrap();
+        let group_msg = &ciphertext.beta.mul(&alpha_s_inv, group);
         let base = &joint_key.joint_election_public_key;
-        let dlog = DiscreteLog::new(base, p);
-        let plain_text = dlog.find(base, p, &group_msg).unwrap();
+        let dlog = DiscreteLog::from_group(base, group);
+        let plain_text = dlog.ff_find(&group_msg, &fixed_parameters.field).unwrap();
         plain_text
     }
 
     #[test]
-    pub fn test_scaling_ciphertext(){
+    pub fn test_scaling_ciphertext() {
         let election_parameters = example_election_parameters();
-        let sks: Vec<_> = (1..6).map(|i|g_key(i)).collect();
-        let guardian_public_keys: Vec<_> = sks.iter().map(|sk|sk.make_public_key()).collect();
+        let field = &election_parameters.fixed_parameters.field;
 
-        let sk = sks.iter().fold(BigUint::zero(), |a,b| a+&b.secret_coefficients.0[0].0);
+        let sks: Vec<_> = (1..6).map(|i| g_key(i)).collect();
+        let guardian_public_keys: Vec<_> = sks.iter().map(|sk| sk.make_public_key()).collect();
+
+        let sk = sks.iter().fold(ScalarField::zero(), |a, b| {
+            a.add(&b.secret_coefficients.0[0].0, field)
+        });
         let s = SecretCoefficient(sk);
 
         let joint_election_public_key =
             JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())
                 .unwrap();
-        let nonce = BigUint::from(5u8);
-        let encryption = joint_election_public_key.encrypt_with(&election_parameters.fixed_parameters, &nonce, 1);
-        let factor = BigUint::new(vec![0, 64u32]); // 2^38
-        let factor = factor - BigUint::one(); // 2^38 - 1
-        let encryption = encryption.scale(&election_parameters.fixed_parameters, factor.clone());
-        let result = decrypt_ciphertext(&encryption, &joint_election_public_key, &s, &election_parameters.fixed_parameters);
+        let nonce = FieldElement::from(BigUint::from(5u8), field);
+        let encryption = joint_election_public_key.encrypt_with(
+            &election_parameters.fixed_parameters,
+            &nonce,
+            1,
+        );
+        let factor = FieldElement::from(BigUint::new(vec![0, 64u32]), field); // 2^38
+        let factor = factor.sub(&ScalarField::one(), field); // 2^38 - 1
+        let encryption = encryption.scale(&election_parameters.fixed_parameters, &factor);
+        let result = decrypt_ciphertext(
+            &encryption,
+            &joint_election_public_key,
+            &s,
+            &election_parameters.fixed_parameters,
+        );
 
         assert_eq!(result, factor);
     }

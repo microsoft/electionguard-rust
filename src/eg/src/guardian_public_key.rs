@@ -8,9 +8,8 @@
 //! This module provides implementation of guardian public keys. For more details see Section `3.2` of the Electionguard specification `2.0.0`.
 
 use anyhow::{Context, Result};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::integer_util::to_be_bytes_left_pad;
+use util::algebra::GroupElement;
 
 use crate::{
     election_parameters::ElectionParameters,
@@ -24,7 +23,7 @@ use crate::{
 };
 
 /// The public key for a guardian.
-/// 
+///
 /// See Section `3.2.2` for details on the generation of public keys.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianPublicKey {
@@ -72,18 +71,17 @@ impl GuardianPublicKey {
     }
 
     /// This function returns the actual public key of the [`GuardianPublicKey`].
-    /// 
+    ///
     /// The return value corresponds to commitment `K_i,0` in Section `3.2.2`.
-    pub fn public_key_k_i_0(&self) -> &BigUint {
+    pub fn public_key_k_i_0(&self) -> &GroupElement {
         &self.coefficient_commitments.0[0].0
     }
 
-    /// This function returns the actual public key as a big-endian byte vector 
-    /// of length [`l_p_bytes`](crate::fixed_parameters::FixedParameters::l_p_bytes).
-    pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
-        //? TODO: Sure would be nice if we could avoid this allocation, but since we
-        // store a BigUint representation, its length in bytes may be less than `l_p_bytes`.
-        to_be_bytes_left_pad(&self.public_key_k_i_0(), fixed_parameters.l_p_bytes())
+    /// This function returns the actual public key as a big-endian byte vector
+    /// of length [`l_p`](util::algebra::Group::l_p).
+    pub fn to_be_bytes_left_pad(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
+        self.public_key_k_i_0()
+            .to_be_bytes_left_pad(&fixed_parameters.group)
     }
 
     /// Writes a [`GuardianPublicKey`] to a [`std::io::Write`].
@@ -128,7 +126,6 @@ mod test {
         example_election_parameters::example_election_parameters,
         guardian_secret_key::GuardianSecretKey,
     };
-    use std::borrow::Borrow;
     use util::csprng::Csprng;
 
     #[test]
@@ -156,11 +153,11 @@ mod test {
             assert_eq!(guardian_secret_key.coefficient_commitments.0.len(), k);
 
             for secret_coefficient in guardian_secret_key.secret_coefficients.0.iter() {
-                assert!(&secret_coefficient.0 < fixed_parameters.q.borrow());
+                assert!(&secret_coefficient.0.is_valid(&fixed_parameters.field));
             }
 
             for coefficient_commitment in guardian_secret_key.coefficient_commitments.0.iter() {
-                assert!(&coefficient_commitment.0 < fixed_parameters.p.borrow());
+                assert!(&coefficient_commitment.0.is_valid(&fixed_parameters.group));
             }
         }
 

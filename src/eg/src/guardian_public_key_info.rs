@@ -5,19 +5,18 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-//! This module provides the [`GuardianPublicKeyInfo`] trait 
+//! This module provides the [`GuardianPublicKeyInfo`] trait
 //! which allows read access and validation of public key data.
 
 use crate::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
     guardian_coeff_proof::CoefficientProof, guardian_secret_key::CoefficientCommitments,
-    hashes::ParameterBaseHash,
 };
 use thiserror::Error;
 
-/// Trait for read access to data from a [`GuardianPublicKey`], which is common to
-/// both [`GuardianPublicKey`] and [`GuardianSecretKey`]. 
-/// 
+/// Trait for read access to data from a [`crate::guardian_public_key::GuardianPublicKey`], which is common to
+/// both [`crate::guardian_public_key::GuardianPublicKey`] and [`crate::guardian_secret_key::GuardianSecretKey`].
+///
 /// It also allows to validate both types of keys (cf. Verification `2` in Section `3.2.2`).
 pub trait GuardianPublicKeyInfo {
     /// Guardian number, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
@@ -51,19 +50,18 @@ pub enum PublicKeyValidationError {
 }
 
 /// Verifies that the thing implementing [`GuardianPublicKeyInfo`] is well-formed and conforms
-/// to the election parameters. 
-/// 
+/// to the election parameters.
+///
 /// The arguments are:
 /// - `gpki` - the public key object
 /// - `election_parameters` - the election parameters
-/// 
+///
 /// This corresponds to Verification `2` in Section `3.2.2`. Useful after deserialization.
 pub(crate) fn validate_guardian_public_key_info(
     gpki: &dyn GuardianPublicKeyInfo,
     election_parameters: &ElectionParameters,
 ) -> Result<(), PublicKeyValidationError> {
     let fixed_parameters = &election_parameters.fixed_parameters;
-    let h_p = ParameterBaseHash::compute(fixed_parameters).h_p;
 
     let varying_parameters = &election_parameters.varying_parameters;
     let n = varying_parameters.n.as_quantity();
@@ -92,7 +90,7 @@ pub(crate) fn validate_guardian_public_key_info(
     let proofs = gpki.coefficient_proofs();
     for (j, (proof, commitment)) in proofs.iter().zip(coefficients).enumerate() {
         if proof
-            .validate(fixed_parameters, h_p, i as u32, j as u32, commitment)
+            .validate(fixed_parameters, i as u32, j as u32, commitment)
             .is_err()
         {
             return Err(PublicKeyValidationError::InvalidProof { j });

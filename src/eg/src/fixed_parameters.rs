@@ -5,17 +5,15 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
+//! This module provides fixed parameter type.
 
 use anyhow::{ensure, Result};
-use num_bigint::BigUint;
-use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 
 use util::{
+    algebra::{Group, ScalarField},
+    algebra_utils::{cnt_bits_repr, leading_ones},
     csprng::Csprng,
-    integer_util::{cnt_bits_repr, to_be_bytes_left_pad},
-    prime::{is_prime, BigUintPrime},
 };
 
 // "Nothing up my sleeve" numbers for use in fixed parameters.
@@ -38,12 +36,18 @@ pub enum NumsNumber {
     ln_2,
 }
 
+/// Properties of the fixed parameters
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameterGenerationParameters {
+    /// number of bits of the field order `q`
     pub q_bits_total: usize,
+    /// number of bits of the group modulus `p`
     pub p_bits_total: usize,
+    // number of leading bits set to 1 for `p`
     pub p_bits_msb_fixed_1: usize,
-    pub p_middle_bits_source: NumsNumber,
+    // source of the middle bits
+    pub p_middle_bits_source: Option<NumsNumber>,
+    // number of trailing bits set to 1 for `p`
     pub p_bits_lsb_fixed_1: usize,
 }
 
@@ -72,6 +76,7 @@ pub enum ElectionGuardDesignSpecificationVersion {
     Other(String),
 }
 
+/// The fixed parameters define the used field and group.
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
@@ -87,113 +92,43 @@ pub struct FixedParameters {
     /// Parameters used to generate the parameters.
     pub generation_parameters: FixedParameterGenerationParameters,
 
-    /// Prime modulus.
-    pub p: BigUintPrime,
+    /// Prime field `Z_q`.
+    pub field: ScalarField,
 
-    /// Subgroup order.
-    pub q: BigUintPrime,
-
-    /// Cofactor of q in p − 1.
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub r: BigUint,
-
-    /// Subgroup generator.
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub g: BigUint,
+    /// Group `Z_p^r` of the same order as `Z_q` including generator `g`.
+    pub group: Group,
 }
 
 impl FixedParameters {
-    /// The length of the byte array representation of p.
-    pub fn l_p_bytes(&self) -> usize {
-        let p: &BigUint = self.p.borrow();
-        (cnt_bits_repr(p) + 7) / 8
-    }
-
-    /// The length of the byte array representation of q.
-    pub fn l_q_bytes(&self) -> usize {
-        let q: &BigUint = self.q.borrow();
-        (cnt_bits_repr(q) + 7) / 8
-    }
-
-    /// Returns `true` iff `n` is a valid result of `mod p`.
-    pub fn is_valid_modp<T: Borrow<BigUint>>(&self, n: &T) -> bool {
-        n.borrow() < self.p.borrow()
-    }
-
-    /// Returns `true` iff `n` is a valid result of `mod q`.
-    pub fn is_valid_modq<T: Borrow<BigUint>>(&self, n: &T) -> bool {
-        n.borrow() < self.q.borrow()
-    }
-
-    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod p`.
-    pub fn biguint_to_be_bytes_len_p(&self, u: &BigUint) -> Vec<u8> {
-        to_be_bytes_left_pad(&u, self.l_p_bytes())
-    }
-
-    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod q`.
-    pub fn biguint_to_be_bytes_len_q(&self, u: &BigUint) -> Vec<u8> {
-        to_be_bytes_left_pad(&u, self.l_q_bytes())
-    }
-
     /// Verifies that the `FixedParameters` meet some basic validity requirements.
-    #[allow(clippy::nonminimal_bool)]
     pub fn validate(&self, csprng: &mut Csprng) -> Result<()> {
-        let q: &BigUint = self.q.borrow();
-        let p: &BigUint = self.p.borrow();
+        let field = &self.field;
+        let group = &self.group;
+
+        ensure!(field.is_valid(csprng), "The field order q is not prime!");
+        ensure!(group.is_valid(csprng), "The group is invalid!");
+        ensure!(
+            group.matches_field(field),
+            "The orders of group and field are different!"
+        );
+
+        ensure!(
+            cnt_bits_repr(&field.order()) == self.generation_parameters.q_bits_total,
+            "Fixed parameters: order q wrong number of bits"
+        );
+        ensure!(
+            cnt_bits_repr(&group.modulus()) == self.generation_parameters.p_bits_total,
+            "Fixed parameters: modulus p wrong number of bits"
+        );
+
+        let leading_ones = leading_ones(group.modulus()) as usize;
+        ensure!(leading_ones >= self.generation_parameters.p_bits_msb_fixed_1);
+
+        let trailing_ones = group.modulus().trailing_ones() as usize;
+        ensure!(trailing_ones >= self.generation_parameters.p_bits_lsb_fixed_1);
 
         //TODO Maybe check that the parameters are consistent with the spec version
-        //TODO verify p_bits_msb_fixed_1
         //TODO verify p_middle_bits_source
-        //TODO verify p_bits_lsb_fixed_1
-
-        // p is a prime of the requested number of bits
-        ensure!(is_prime(p, csprng), "Fixed parameters: p is not prime");
-
-        ensure!(
-            cnt_bits_repr(p) == self.generation_parameters.p_bits_total,
-            "Fixed parameters: p wrong number of bits"
-        );
-
-        // q is a prime of the requested number of bits
-        ensure!(is_prime(q, csprng), "Fixed parameters: q is not prime");
-
-        ensure!(
-            cnt_bits_repr(q) == self.generation_parameters.q_bits_total,
-            "Fixed parameters: q wrong number of bits"
-        );
-
-        // q < (p - 1)
-        ensure!(
-            q < &(p - 1_u8),
-            "Fixed parameters failed check: q < (p - 1)"
-        );
-
-        // r = (p − 1)/q
-        ensure!(
-            self.r == ((p - 1_u8) / q),
-            "Fixed parameters failed check: r = (p − 1)/q"
-        );
-
-        // q is not a divisor of r = (p − 1)/q
-        let r: &BigUint = &self.r;
-        ensure!(
-            !(r % q).is_zero(),
-            "Fixed parameters failed check: q is not a divisor of r = (p − 1)/q"
-        );
-
-        // g is in Zmodp and not 0 or 1
-        let g: &BigUint = &self.g;
-        ensure!(
-            &BigUint::one() < g && g < p,
-            "Fixed parameters failed check: g is in Zmodp and not 0 or 1"
-        );
-        ensure!(g < p, "Fixed parameters failed check: g < p");
 
         Ok(())
     }

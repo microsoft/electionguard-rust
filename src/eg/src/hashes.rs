@@ -3,7 +3,7 @@ use std::vec;
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use util::integer_util::to_be_bytes_left_pad;
+use util::algebra_utils::to_be_bytes_left_pad;
 
 use crate::{
     election_manifest::ElectionManifest,
@@ -21,6 +21,9 @@ pub struct ParameterBaseHash {
 
 impl ParameterBaseHash {
     pub fn compute(fixed_parameters: &FixedParameters) -> Self {
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
+
         // H_V = 0x76322E302E30 | b(0, 26)
         let h_v: HValue = [
             // This is the UTF-8 encoding of "v2.0.0"
@@ -32,9 +35,9 @@ impl ParameterBaseHash {
 
         // v = 0x00 | b(p,512)| b(q,32) | b(g,512)
         let mut v = vec![0x00];
-        v.extend_from_slice(to_be_bytes_left_pad(fixed_parameters.p.as_ref(), 512).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(fixed_parameters.q.as_ref(), 32).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(&fixed_parameters.g, 512).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(&group.modulus(), group.l_p()).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(&field.order(), field.l_q()).as_slice());
+        v.extend_from_slice(group.generator().to_be_bytes_left_pad(group).as_slice());
         let h_p = eg_h(&h_v, &v);
 
         Self { h_p }

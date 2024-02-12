@@ -67,7 +67,6 @@ pub mod contest_encrypted;
 pub mod contest_hash;
 pub mod contest_selection;
 pub mod device;
-pub mod discrete_log;
 pub mod election_manifest;
 pub mod election_parameters;
 pub mod election_record;

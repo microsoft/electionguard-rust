@@ -6,10 +6,9 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{Context, Result};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use util::csprng::Csprng;
+use util::{algebra::FieldElement, csprng::Csprng};
 
 use crate::{
     ballot_style::BallotStyle,
@@ -18,10 +17,12 @@ use crate::{
     contest_selection::ContestSelection,
     device::Device,
     election_manifest::{ContestIndex, ElectionManifest},
+    election_parameters::ElectionParameters,
     election_record::PreVotingData,
+    fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext, fixed_parameters::FixedParameters, election_parameters::ElectionParameters,
+    joint_election_public_key::Ciphertext,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,9 +171,17 @@ impl BallotEncrypted {
 
     /// Scale a [`BallotEncrypted`] by a factor, producing a [`ScaledBallotEncrypted`].
     /// Each encrypted vote in the ballot gets scaled by the same factor.
-    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> ScaledBallotEncrypted {
-        let contests = self.contests.iter().map(|(idx, ballot)| (*idx, ballot.scale(fixed_parameters, factor.clone()))).collect();
-        ScaledBallotEncrypted{contests}
+    pub fn scale(
+        &self,
+        fixed_parameters: &FixedParameters,
+        factor: &FieldElement,
+    ) -> ScaledBallotEncrypted {
+        let contests = self
+            .contests
+            .iter()
+            .map(|(idx, ballot)| (*idx, ballot.scale(fixed_parameters, factor)))
+            .collect();
+        ScaledBallotEncrypted { contests }
     }
 }
 
@@ -221,7 +230,7 @@ impl<'a> BallotTallyBuilder<'a> {
     /// new ballot was compatible with the tally. If `false` is returned then
     /// the tally is not updated.
     pub fn update(&mut self, ballot: ScaledBallotEncrypted) -> bool {
-        let modulus = self.parameters.fixed_parameters.p.as_ref();
+        let group = &self.parameters.fixed_parameters.group;
         for (idx, contest) in ballot.contests {
             let Some(manifest_contest) = self.manifest.contests.get(idx) else {
                 return false;
@@ -231,8 +240,8 @@ impl<'a> BallotTallyBuilder<'a> {
             }
             if let Some(v) = self.state.get_mut(&idx) {
                 for (j, encryption) in contest.selection.iter().enumerate() {
-                    v[j].alpha = (&v[j].alpha * &encryption.alpha) % modulus;
-                    v[j].beta = &v[j].beta * &encryption.beta % modulus;
+                    v[j].alpha = v[j].alpha.mul(&encryption.alpha, group);
+                    v[j].beta = v[j].beta.mul(&encryption.beta, group);
                 }
             } else {
                 self.state.insert(idx, contest.selection);
@@ -267,7 +276,6 @@ mod test {
             CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption,
         },
     };
-    use num_bigint::BigUint;
     use std::iter::zip;
     use util::csprng::Csprng;
 
@@ -670,8 +678,14 @@ mod test {
             ballot_voter3.verify(&device.header, Index::from_one_based_index(3).unwrap());
         assert!(verify_result3);
 
-        let encrypted_ballots = vec![ballot_voter1.scale(fixed_parameters, BigUint::from(1u8)), ballot_voter2.scale(fixed_parameters, BigUint::from(1u8)), ballot_voter3.scale(fixed_parameters, BigUint::from(1u8))];
-        let tally = tally_ballots(encrypted_ballots, &election_manifest, &election_parameters).unwrap();
+        let factor = FieldElement::from(1u8, &fixed_parameters.field);
+        let encrypted_ballots = vec![
+            ballot_voter1.scale(fixed_parameters, &factor),
+            ballot_voter2.scale(fixed_parameters, &factor),
+            ballot_voter3.scale(fixed_parameters, &factor),
+        ];
+        let tally =
+            tally_ballots(encrypted_ballots, &election_manifest, &election_parameters).unwrap();
 
         let result_contest_1 = tally.get(&Index::from_one_based_index(1).unwrap()).unwrap();
         let result_contest_2 = tally.get(&Index::from_one_based_index(2).unwrap()).unwrap();
@@ -689,7 +703,8 @@ mod test {
                             &election_parameters.clone(),
                             dealer_sk,
                             pk,
-                        ).ciphertext
+                        )
+                        .ciphertext
                     })
                     .collect::<Vec<_>>()
             })
@@ -728,10 +743,10 @@ mod test {
         assert_eq!(
             decryption_contest_1,
             vec![
-                BigUint::from(2u8),
-                BigUint::from(1u8),
-                BigUint::from(0u8),
-                BigUint::from(0u8)
+                FieldElement::from(2u8, &fixed_parameters.field),
+                FieldElement::from(1u8, &fixed_parameters.field),
+                FieldElement::from(0u8, &fixed_parameters.field),
+                FieldElement::from(0u8, &fixed_parameters.field)
             ]
         );
         let decryption_contest_2: Vec<_> = result_contest_2
@@ -755,7 +770,11 @@ mod test {
             .collect();
         assert_eq!(
             decryption_contest_2,
-            vec![BigUint::from(1u8), BigUint::from(1u8), BigUint::from(0u8)]
+            vec![
+                FieldElement::from(1u8, &fixed_parameters.field),
+                FieldElement::from(1u8, &fixed_parameters.field),
+                FieldElement::from(0u8, &fixed_parameters.field)
+            ]
         );
         let decryption_contest_3: Vec<_> = result_contest_3
             .iter()
@@ -778,7 +797,11 @@ mod test {
             .collect();
         assert_eq!(
             decryption_contest_3,
-            vec![BigUint::from(1u8), BigUint::from(2u8), BigUint::from(0u8)]
+            vec![
+                FieldElement::from(1u8, &fixed_parameters.field),
+                FieldElement::from(2u8, &fixed_parameters.field),
+                FieldElement::from(0u8, &fixed_parameters.field)
+            ]
         );
     }
 }

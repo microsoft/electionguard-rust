@@ -26,7 +26,7 @@ use crate::{
     contest_selection::{ContestSelectionPreEncrypted, ContestSelectionPreEncryptedIndex},
 };
 
-/// A 1-based index of a [`ContestPreEncrypted`] in the order it is defined in the [`BallotPreEncrypted`].
+/// A 1-based index of a [`ContestPreEncrypted`] in the order it is defined in the [`crate::ballot::BallotPreEncrypted`].
 pub type ContestPreEncryptedIndex = Index<ContestPreEncrypted>;
 
 /// A contest in a pre-encrypted ballot.
@@ -126,12 +126,7 @@ impl ContestPreEncrypted {
             let selection = self.selections.get(i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(selection.proof_ballot_correctness(
-                    pvd,
-                    csprng,
-                    i.get_one_based_usize(),
-                    &pvd.parameters.fixed_parameters.q,
-                ))
+                .try_push(selection.proof_ballot_correctness(pvd, csprng, i.get_one_based_usize()))
                 .unwrap();
         });
         proofs
@@ -144,6 +139,9 @@ impl ContestPreEncrypted {
         selection_limit: usize,
     ) -> Vec<(Ciphertext, Nonce)> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
+
+        let field = &fixed_parameters.field;
+        let group = &fixed_parameters.group;
 
         let mut selections = <Vec<&Vec<(Ciphertext, Option<Nonce>)>>>::new();
 
@@ -176,21 +174,26 @@ impl ContestPreEncrypted {
                 let combined_selection_j = &mut combined_selection[j];
                 let selections_i_j = &selections[i][j];
 
-                combined_selection_j.0.alpha = (&combined_selection_j.0.alpha
-                    * &selections_i_j.0.alpha)
-                    % fixed_parameters.p.as_ref();
-
-                combined_selection_j.0.beta = (&combined_selection_j.0.beta
-                    * &selections_i_j.0.beta)
-                    % fixed_parameters.p.as_ref();
+                combined_selection_j.0.alpha = combined_selection_j
+                    .0
+                    .alpha
+                    .mul(&selections_i_j.0.alpha, group);
+                combined_selection_j.0.beta = combined_selection_j
+                    .0
+                    .beta
+                    .mul(&selections_i_j.0.beta, group);
 
                 #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-                let cs_j_nonce = (&combined_selection_j.1.as_ref().unwrap().xi
-                    + &selections_i_j.1.as_ref().unwrap().xi)
-                    % fixed_parameters.q.as_ref();
+                let cs_j_nonce = combined_selection_j
+                    .1
+                    .as_ref()
+                    .unwrap()
+                    .xi
+                    .add(&selections_i_j.1.as_ref().unwrap().xi, field);
                 combined_selection_j.1 = Some(Nonce::new(cs_j_nonce));
             }
         }
+        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         combined_selection
             .iter()
             .map(|(ct, maybe_nonce)| (ct.clone(), maybe_nonce.as_ref().unwrap().clone()))
@@ -223,7 +226,6 @@ impl ContestPreEncrypted {
                     csprng,
                     voter_selections[i] == 1u8,
                     nonce,
-                    &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         }
@@ -234,7 +236,6 @@ impl ContestPreEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            &device.header.parameters.fixed_parameters.q,
             &selection,
             num_selections as usize,
             selection_limit,

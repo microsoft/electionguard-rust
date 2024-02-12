@@ -102,7 +102,9 @@ impl PreVotingData {
         Ok(pre_voting_data)
     }
 
-    pub fn set_manifest(&mut self, manifest: ElectionManifest) { self.manifest = manifest; }
+    pub fn set_manifest(&mut self, manifest: ElectionManifest) {
+        self.manifest = manifest;
+    }
 
     pub fn set_parameters(&mut self, parameters: ElectionParameters) {
         self.parameters = parameters;

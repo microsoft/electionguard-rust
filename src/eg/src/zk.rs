@@ -5,11 +5,14 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
+//! This module provides the implementation of the range proof [`ProofRange`] for [`Ciphertext`]s.
+//! For more details see Section `3.3.5` of the Electionguard specification `2.0.0`.
 
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::{
+    algebra::{FieldElement, GroupElement, ScalarField},
+    csprng::Csprng,
+};
 
 use crate::{
     election_record::PreVotingData,
@@ -21,16 +24,10 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRangeSingle {
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub c: BigUint,
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub v: BigUint,
+    /// Challenge
+    pub c: FieldElement,
+    /// Response
+    pub v: FieldElement,
 }
 
 /// A 1-based index of a [`ProofRange`] in the order it is stored in the [`crate::contest_encrypted::ContestEncrypted`].
@@ -42,93 +39,99 @@ pub struct ProofRange(Vec<ProofRangeSingle>);
 impl HasIndexTypeMarker for ProofRange {}
 
 impl ProofRange {
+    /// This function computes the challenge for the range proof as specified in Equation `46`.
+    ///
+    /// The arguments are
+    /// - `pvd` - the pre voting data
+    /// - `ct` - the ciphertext
+    /// - `a` - the a vector of the commit message
+    /// - `b` - the b vector of the commit message
     pub fn challenge(
         pvd: &PreVotingData,
         ct: &Ciphertext,
-        a: &[BigUint],
-        b: &[BigUint],
-    ) -> BigUint {
-        let mut v = vec![0x21];
+        a: &[GroupElement],
+        b: &[GroupElement],
+    ) -> FieldElement {
+        let field = &pvd.parameters.fixed_parameters.field;
+        let group = &pvd.parameters.fixed_parameters.group;
 
+        // v = 0x21 | b(K,512) | b(alpha,4) | b(beta,512) | b(a_0,512) | ... | b(b_L,512) for standard parameters
+        let mut v = vec![0x21];
         v.extend_from_slice(
             pvd.public_key
                 .joint_election_public_key
-                .to_bytes_be()
+                .to_be_bytes_left_pad(group)
                 .as_slice(),
         );
-        v.extend_from_slice(ct.alpha.to_bytes_be().as_slice());
-        v.extend_from_slice(ct.beta.to_bytes_be().as_slice());
-
+        v.extend_from_slice(ct.alpha.to_be_bytes_left_pad(group).as_slice());
+        v.extend_from_slice(ct.beta.to_be_bytes_left_pad(group).as_slice());
         a.iter().for_each(|a_i| {
-            v.extend_from_slice(a_i.to_bytes_be().as_slice());
+            v.extend_from_slice(a_i.to_be_bytes_left_pad(group).as_slice());
         });
         b.iter().for_each(|b_i| {
-            v.extend_from_slice(b_i.to_bytes_be().as_slice());
+            v.extend_from_slice(b_i.to_be_bytes_left_pad(group).as_slice());
         });
 
-        // Equation 25
+        // Equation `46`
         let c = eg_h(&pvd.hashes_ext.h_e, &v);
-        BigUint::from_bytes_be(c.0.as_slice()) % pvd.parameters.fixed_parameters.q.as_ref()
+        FieldElement::from_bytes_be(c.0.as_slice(), field)
     }
 
+    /// This function computes a [`ProofRange`] from given [`Ciphertext`] and encrypted `small_l`.
+    ///
+    /// The arguments are
+    /// - `pvd` - pre-voting data
+    /// - `csprng` - secure randomness generator
+    /// - `ct` - the ciphertext
+    /// - `small_l` - the encrypted number
+    /// - `big_l` - the range bound
     pub fn new(
         pvd: &PreVotingData,
         csprng: &mut Csprng,
-        q: &BigUintPrime,
         ct: &Ciphertext,
         nonce: &Nonce,
         small_l: usize,
         big_l: usize,
     ) -> Self {
-        let mut c: Vec<BigUint>;
-        let mut v = <Vec<BigUint>>::new();
+        let field = &pvd.parameters.fixed_parameters.field;
+        let group = &pvd.parameters.fixed_parameters.group;
 
+        // Compute commit message and simulated challenges
         let u = (0..big_l + 1)
-            .map(|_| q.random_group_elem(csprng))
-            .collect::<Vec<BigUint>>();
-        c = (0..big_l + 1)
-            .map(|_| q.random_group_elem(csprng))
-            .collect::<Vec<BigUint>>();
-
-        let a: Vec<BigUint> = (0..big_l + 1)
-            .map(|j| {
-                pvd.parameters
-                    .fixed_parameters
-                    .g
-                    .modpow(&u[j], pvd.parameters.fixed_parameters.p.borrow())
-            })
-            .collect();
-
+            .map(|_| field.random_field_elem(csprng))
+            .collect::<Vec<FieldElement>>();
+        let mut c = (0..big_l + 1)
+            .map(|_| field.random_field_elem(csprng))
+            .collect::<Vec<FieldElement>>();
+        let a = (0..big_l + 1)
+            .map(|j| group.g_exp(&u[j]))
+            .collect::<Vec<GroupElement>>();
+        let l_scalar = FieldElement::from(small_l, field);
         let mut t = u.clone();
         for j in 0..big_l + 1 {
             if j != small_l {
-                t[j] = q.subtract_group_elem(
-                    &q.add_group_elem(&t[j], &(&c[j] * &BigUint::from(small_l))),
-                    &(&c[j] * &BigUint::from(j)),
-                );
+                let j_scalar = FieldElement::from(j, field);
+                let c_prod = c[j].mul(&l_scalar.sub(&j_scalar, field), field);
+                t[j] = t[j].add(&c_prod, field)
             }
         }
+        let b = (0..big_l + 1)
+            .map(|j| pvd.public_key.joint_election_public_key.exp(&t[j], group))
+            .collect::<Vec<GroupElement>>();
 
-        let b: Vec<BigUint> = (0..big_l + 1)
-            .map(|j| {
-                pvd.public_key
-                    .joint_election_public_key
-                    .modpow(&t[j], pvd.parameters.fixed_parameters.p.borrow())
-            })
-            .collect();
-
+        // Compute real challenge c_{small_l}
         let challenge = ProofRange::challenge(pvd, ct, &a, &b);
         c[small_l] = challenge;
         for j in 0..big_l + 1 {
             if j != small_l {
-                // c[small_l] = &c[small_l] - &c[j];
-                c[small_l] = q.subtract_group_elem(&c[small_l], &c[j]);
+                c[small_l] = c[small_l].sub(&c[j], field)
             }
         }
-        for j in 0..big_l + 1 {
-            v.push(q.subtract_group_elem(&u[j], &(&c[j] * &nonce.xi)));
-            // v.push(&u[j] - &(&c[j] * ct.nonce.as_ref().unwrap()));
-        }
+
+        // Compute responses
+        let v = (0..big_l + 1)
+            .map(|j| u[j].sub(&c[j].mul(&nonce.xi, field), field))
+            .collect::<Vec<FieldElement>>();
 
         ProofRange(
             (0..big_l + 1)
@@ -140,86 +143,66 @@ impl ProofRange {
         )
     }
 
-    /// Verification 4
+    /// This function verifies a [`ProofRange`] with respect to a given [`Ciphertext`] and context.
+    ///
+    /// The arguments are
+    /// - `self` - the range proof
+    /// - `pvd` - the pre-voting data
+    /// - `ct` - the ciphertext
+    /// - `big_l` - the range bound
+    ///
+    /// This is essentially Verification (5).
     pub fn verify(&self, pvd: &PreVotingData, ct: &Ciphertext, big_l: usize) -> bool {
+        let field = &pvd.parameters.fixed_parameters.field;
+        let group = &pvd.parameters.fixed_parameters.group;
+
+        // (5.1)
         let a = (0..big_l + 1)
             .map(|j| {
-                (pvd.parameters
-                    .fixed_parameters
-                    .g
-                    .modpow(&self.0[j].v, pvd.parameters.fixed_parameters.p.borrow())
-                    * ct.alpha
-                        .modpow(&self.0[j].c, pvd.parameters.fixed_parameters.p.borrow()))
-                    % pvd.parameters.fixed_parameters.p.as_ref()
+                group
+                    .g_exp(&self.0[j].v)
+                    .mul(&ct.alpha.exp(&self.0[j].c, group), group)
             })
-            .collect::<Vec<_>>();
-
-        let mut w = <Vec<BigUint>>::with_capacity(big_l + 1);
-        for j in 0..big_l + 1 {
-            // We should check that c_j >= 0, but that is
-            // enforced by c_j being a BigUint.
-            let c_j_less_than_2_256 = self.0[j].c.bits() <= 256; // c_j < 2^256
-
-            // We should also check that v_j >= 0, but that is
-            // enforced by v_j being a BigUint.
-            let v_j_less_than_q = &self.0[j].v < pvd.parameters.fixed_parameters.q.as_ref(); // v_j < q
-
-            // Check B and C, namely that 0 <= c_j < 2^256 and 0 <= v_j < q (again, 0 <= c_j, v_j follows from them being BigUint's)
-            if !(c_j_less_than_2_256 && v_j_less_than_q) {
-                return false;
-            }
-
-            w.push(self.0[j].v.clone());
-            w[j] = pvd
-                .parameters
-                .fixed_parameters
-                .q
-                .subtract_group_elem(&w[j], &(&self.0[j].c * &BigUint::from(j)));
-        }
-
+            .collect::<Vec<GroupElement>>();
+        // (5.2)
+        let w = (0..big_l + 1)
+            .map(|j| {
+                let j_scalar = FieldElement::from(j, field);
+                self.0[j].v.sub(&j_scalar.mul(&self.0[j].c, field), field)
+            })
+            .collect::<Vec<FieldElement>>();
         let b = (0..big_l + 1)
             .map(|j| {
-                (pvd.public_key
-                    .joint_election_public_key
-                    .modpow(&w[j], pvd.parameters.fixed_parameters.p.borrow())
-                    * ct.beta
-                        .modpow(&self.0[j].c, pvd.parameters.fixed_parameters.p.borrow()))
-                    % pvd.parameters.fixed_parameters.p.as_ref()
+                let k_w = pvd.public_key.joint_election_public_key.exp(&w[j], group);
+                let b_c = ct.beta.exp(&self.0[j].c, group);
+                k_w.mul(&b_c, group)
             })
-            .collect::<Vec<_>>();
-
+            .collect::<Vec<GroupElement>>();
+        // (5.3)
         let c = Self::challenge(pvd, ct, &a, &b);
 
-        let mut rhs = BigUint::from(0u8);
-        for e in self.0.iter() {
-            rhs += &e.c;
+        // Verification check (5.A) alpha, beta are valid group elements
+        if !ct.alpha.is_valid(group) || !ct.beta.is_valid(group) {
+            return false;
+        }
+        for j in 0..big_l + 1 {
+            // Verification check (5.B) 0 <= c_j < 2^256
+            // This is enforced by c_j being a valid field element (q < 2^256 for standard parameter)
+            if !self.0[j].c.is_valid(field) {
+                return false;
+            }
+            // Verification check (5.C) v_j is a valid field element
+            if !self.0[j].v.is_valid(field) {
+                return false;
+            }
         }
 
-        rhs %= pvd.parameters.fixed_parameters.q.as_ref();
-
-        // Check that x in Z_p^r which is equivalent to 0 <= x < p and x^q mod p = 1
-        let check_in_z_p_r = |x: &BigUint| -> bool {
-            // We should check that x >= 0, but that is
-            // enforced by x being a BigUint.
-            let x_less_than_p = x < pvd.parameters.fixed_parameters.p.as_ref();
-            let x_q_mod_p = x.modpow(
-                pvd.parameters.fixed_parameters.q.as_ref(),
-                pvd.parameters.fixed_parameters.p.as_ref(),
-            );
-            let x_q_mod_p_is_1 = x_q_mod_p == BigUint::from(1u8);
-            x_less_than_p && x_q_mod_p_is_1
-        };
-
-        // Since check B and C are handled in the loop above, we only need to check A and D:
-        // Check A
-        let alpha_in_z_p_r = check_in_z_p_r(&ct.alpha);
-        let beta_in_z_p_r = check_in_z_p_r(&ct.beta);
-
-        let check_a = alpha_in_z_p_r && beta_in_z_p_r;
-
-        // Check D
-        let check_d = c == rhs;
-        check_a && check_d
+        // Verification check (5.D)
+        let rhs = self
+            .0
+            .iter()
+            .fold(ScalarField::zero(), |acc, pf| acc.add(&pf.c, field));
+        c == rhs
     }
 }
 

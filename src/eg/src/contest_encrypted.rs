@@ -5,9 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::{algebra::FieldElement, csprng::Csprng};
 
 use crate::{
     contest_hash,
@@ -76,7 +75,12 @@ pub struct ScaledContestEncrypted {
 impl ScaledContestEncrypted {
     /// Verify that the [`ScaledContestEncrypted`] stems from a given [`ContestEncrypted`] by
     /// scaling with a given factor.
-    pub fn verify(&self, origin: ContestEncrypted, factor: BigUint, fixed_parameters: &FixedParameters) -> bool {
+    pub fn verify(
+        &self,
+        origin: ContestEncrypted,
+        factor: &FieldElement,
+        fixed_parameters: &FixedParameters,
+    ) -> bool {
         origin.scale(fixed_parameters, factor) == *self
     }
 }
@@ -132,7 +136,6 @@ impl ContestEncrypted {
                     csprng,
                     pt_vote.vote[i] == 1u8,
                     nonce,
-                    &device.header.parameters.fixed_parameters.q,
                 ))
                 .unwrap();
         }
@@ -143,7 +146,6 @@ impl ContestEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            &device.header.parameters.fixed_parameters.q,
             &selection_and_nonce,
             num_selections as usize,
             contest.selection_limit,
@@ -168,7 +170,6 @@ impl ContestEncrypted {
     pub fn proof_selection_limit(
         header: &PreVotingData,
         csprng: &mut Csprng,
-        q: &BigUintPrime,
         selection: &[(Ciphertext, Nonce)],
         num_selections: usize,
         selection_limit: usize,
@@ -178,7 +179,6 @@ impl ContestEncrypted {
         ProofRange::new(
             header,
             csprng,
-            q,
             &combined_ct,
             &combined_nonce,
             num_selections,
@@ -205,15 +205,16 @@ impl ContestEncrypted {
         fixed_parameters: &FixedParameters,
         selection_with_nonces: &[(Ciphertext, Nonce)],
     ) -> (Ciphertext, Nonce) {
-        let mut sum_ct = Ciphertext::one();
+        let group = &fixed_parameters.group;
+        let field = &fixed_parameters.field;
 
+        let mut sum_ct = Ciphertext::one();
         let mut sum_nonce = Nonce::zero();
 
         for (sel, nonce) in selection_with_nonces {
-            sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
-            sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
-
-            sum_nonce.xi = (&sum_nonce.xi + &nonce.xi) % fixed_parameters.q.as_ref();
+            sum_ct.alpha = sum_ct.alpha.mul(&sel.alpha, group);
+            sum_ct.beta = sum_ct.beta.mul(&sel.beta, group);
+            sum_nonce.xi = sum_nonce.xi.add(&nonce.xi, field);
         }
 
         (sum_ct, sum_nonce)
@@ -225,11 +226,12 @@ impl ContestEncrypted {
         fixed_parameters: &FixedParameters,
         selection: &[Ciphertext],
     ) -> Ciphertext {
-        let mut sum_ct = Ciphertext::one();
+        let group = &fixed_parameters.group;
 
+        let mut sum_ct = Ciphertext::one();
         for sel in selection {
-            sum_ct.alpha = (&sum_ct.alpha * &sel.alpha) % fixed_parameters.p.as_ref();
-            sum_ct.beta = (&sum_ct.beta * &sel.beta) % fixed_parameters.p.as_ref();
+            sum_ct.alpha = sum_ct.alpha.mul(&sel.alpha, group);
+            sum_ct.beta = sum_ct.beta.mul(&sel.beta, group);
         }
 
         sum_ct
@@ -254,8 +256,16 @@ impl ContestEncrypted {
     }
 
     /// Scales all the encrypted votes on the contest by the same factor.
-    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: BigUint) -> ScaledContestEncrypted {
-        let selection = self.selection.iter().map(|ct| ct.scale(fixed_parameters, factor.clone())).collect();
-        ScaledContestEncrypted{selection}
+    pub fn scale(
+        &self,
+        fixed_parameters: &FixedParameters,
+        factor: &FieldElement,
+    ) -> ScaledContestEncrypted {
+        let selection = self
+            .selection
+            .iter()
+            .map(|ct| ct.scale(fixed_parameters, factor))
+            .collect();
+        ScaledContestEncrypted { selection }
     }
 }

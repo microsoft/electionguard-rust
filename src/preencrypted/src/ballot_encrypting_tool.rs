@@ -117,19 +117,21 @@ impl BallotEncryptingTool {
     ///
     /// ψ_i = H(H_E;40,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
     pub fn selection_hash(header: &PreVotingData, selections: &[Ciphertext]) -> HValue {
+        let group = &header.parameters.fixed_parameters.group;
+
         let mut v = vec![0x40];
 
         v.extend_from_slice(
             header
                 .public_key
                 .joint_election_public_key
-                .to_bytes_be()
+                .to_be_bytes_left_pad(group)
                 .as_slice(),
         );
 
         selections.iter().for_each(|s| {
-            v.extend_from_slice(s.alpha.to_bytes_be().as_slice());
-            v.extend_from_slice(s.beta.to_bytes_be().as_slice());
+            v.extend_from_slice(s.alpha.to_be_bytes_left_pad(group).as_slice());
+            v.extend_from_slice(s.beta.to_be_bytes_left_pad(group).as_slice());
         });
 
         eg_h(&header.hashes_ext.h_e, &v)

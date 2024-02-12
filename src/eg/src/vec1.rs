@@ -156,7 +156,7 @@ impl<T: HasIndexType> Default for Vec1<T> {
     }
 }
 
-impl <T>IntoIterator for Vec1<T> {
+impl<T> IntoIterator for Vec1<T> {
     type Item = T;
 
     type IntoIter = std::vec::IntoIter<T>;

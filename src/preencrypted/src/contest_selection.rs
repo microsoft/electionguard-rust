@@ -17,11 +17,11 @@ use eg::{
 };
 
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::csprng::Csprng;
 
 use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
 
-/// A 1-based index of a [`ContestSelectionPreEncrypted`] in the order it is defined in the [`ContestPreEncrypted`].
+/// A 1-based index of a [`ContestSelectionPreEncrypted`] in the order it is defined in the [`crate::contest::ContestPreEncrypted`].
 pub type ContestSelectionPreEncryptedIndex = Index<ContestSelectionPreEncrypted>;
 
 /// A contest option in a pre-encrypted ballot.
@@ -97,7 +97,8 @@ impl ContestSelectionPreEncrypted {
             };
             selections.push((ciphertext, maybe_nonce))
         }
-        let only_ciphertexts: Vec<Ciphertext> = selections.iter().map(|(ct, _)| ct.clone()).collect();
+        let only_ciphertexts: Vec<Ciphertext> =
+            selections.iter().map(|(ct, _)| ct.clone()).collect();
         let selection_hash = BallotEncryptingTool::selection_hash(pvd, &only_ciphertexts);
 
         // Generate pre-encrypted votes for each possible (single) choice
@@ -136,7 +137,8 @@ impl ContestSelectionPreEncrypted {
             };
             selections.push((ciphertext, maybe_nonce));
         }
-        let only_ciphertexts: Vec<Ciphertext> = selections.iter().map(|(ct, _)| ct.clone()).collect();
+        let only_ciphertexts: Vec<Ciphertext> =
+            selections.iter().map(|(ct, _)| ct.clone()).collect();
 
         let selection_hash = BallotEncryptingTool::selection_hash(pvd, &only_ciphertexts);
         let shortcode = BallotEncryptingTool::short_code_last_byte(&selection_hash);
@@ -154,15 +156,15 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         csprng: &mut Csprng,
         sequence_order: usize,
-        q: &BigUintPrime,
     ) -> Vec1<ProofRange> {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
         self.selections.iter().enumerate().for_each(|(i, c)| {
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let nonce = c.1.as_ref().unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce, q))
+                .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce))
                 .unwrap();
         });
         proofs

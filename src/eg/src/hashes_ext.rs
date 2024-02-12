@@ -41,22 +41,23 @@ impl HashesExt {
         // Computation of the extended base hash H_E.
 
         let h_e = {
+            // TODO: Check that the formula below matches the specification
             // B1 = 12 ∥ b(K, 512) ∥ b(K1,0, 512) ∥ b(K1,1, 512) ∥ · · · ∥ b(Kn,k−1, 512)
             let mut v = vec![0x12];
 
             // K = election public key
-            v.append(&mut joint_election_public_key.to_be_bytes_len_p(fixed_parameters));
+            v.append(&mut joint_election_public_key.to_be_bytes_left_pad(fixed_parameters));
 
             for public_key in guardian_public_keys.iter() {
                 let coefficient_commitments = public_key.coefficient_commitments();
                 for coefficient_commitment in coefficient_commitments.0.iter() {
-                    v.append(&mut coefficient_commitment.to_be_bytes_len_p(fixed_parameters));
+                    v.append(&mut coefficient_commitment.to_be_bytes_left_pad(fixed_parameters));
                 }
             }
 
             // len(B1) = 1 + (n · k + 1) · 512
             let expected_mod_p_values = 1 + n * k;
-            let expected_len = 1 + expected_mod_p_values * fixed_parameters.l_p_bytes();
+            let expected_len = 1 + expected_mod_p_values * fixed_parameters.group.l_p();
             debug_assert_eq!(v.len(), expected_len);
 
             // HE = H(HB; 12, K, K1,0, K1,1, . . . , Kn,k−2, Kn,k−1) (20)
@@ -136,7 +137,6 @@ mod test {
     };
     use anyhow::Result;
     use hex_literal::hex;
-    use std::borrow::Borrow;
     use util::csprng::Csprng;
 
     #[test]
@@ -164,7 +164,9 @@ mod test {
         let joint_election_public_key =
             JointElectionPublicKey::compute(&election_parameters, &guardian_public_keys).unwrap();
 
-        assert!(joint_election_public_key.as_ref() < fixed_parameters.p.borrow());
+        assert!(joint_election_public_key
+            .as_ref()
+            .is_valid(&fixed_parameters.group));
 
         let hashes_ext = HashesExt::compute(
             &election_parameters,
