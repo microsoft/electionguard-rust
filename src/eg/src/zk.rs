@@ -15,8 +15,11 @@ use util::{
 };
 
 use crate::{
-    election_record::PreVotingData, hash::eg_h, index::Index,
-    joint_election_public_key::Ciphertext, vec1::HasIndexTypeMarker,
+    election_record::PreVotingData,
+    hash::eg_h,
+    index::Index,
+    joint_election_public_key::{Ciphertext, Nonce},
+    vec1::HasIndexTypeMarker,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +44,6 @@ impl ProofRange {
     /// The arguments are
     /// - `pvd` - the pre voting data
     /// - `ct` - the ciphertext
-    /// - `j` - the coefficient index
     /// - `a` - the a vector of the commit message
     /// - `b` - the b vector of the commit message
     pub fn challenge(
@@ -87,6 +89,7 @@ impl ProofRange {
         pvd: &PreVotingData,
         csprng: &mut Csprng,
         ct: &Ciphertext,
+        nonce: &Nonce,
         small_l: usize,
         big_l: usize,
     ) -> Self {
@@ -126,10 +129,8 @@ impl ProofRange {
         }
 
         // Compute responses
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let nonce = ct.nonce.as_ref().unwrap();
         let v = (0..big_l + 1)
-            .map(|j| u[j].sub(&c[j].mul(nonce, field), field))
+            .map(|j| u[j].sub(&c[j].mul(&nonce.xi, field), field))
             .collect::<Vec<FieldElement>>();
 
         ProofRange(

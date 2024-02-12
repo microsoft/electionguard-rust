@@ -41,6 +41,20 @@ impl<T> std::cmp::PartialEq for Index<T> {
     }
 }
 
+// Convenience for comparing indexes to numeric literals.
+impl<T> std::cmp::PartialEq<u32> for Index<T> {
+    fn eq(&self, other: &u32) -> bool {
+        self.0 == *other
+    }
+}
+
+// Convenience for comparing indexes to numeric literals.
+impl<T> std::cmp::PartialOrd<u32> for Index<T> {
+    fn partial_cmp(&self, other: &u32) -> Option<std::cmp::Ordering> {
+        Some(self.0.cmp(other))
+    }
+}
+
 // PartialOrd trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::cmp::PartialOrd for Index<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {

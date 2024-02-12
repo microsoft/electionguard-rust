@@ -11,7 +11,7 @@ use eg::{
     election_record::PreVotingData,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext,
+    joint_election_public_key::{Ciphertext, Nonce},
     vec1::Vec1,
     zk::ProofRange,
 };
@@ -32,7 +32,7 @@ pub struct ContestSelectionPreEncrypted {
 
     /// Vector of ciphertexts used to represent the selection.
     #[serde(skip)]
-    pub selections: Vec<Ciphertext>,
+    pub selections: Vec<(Ciphertext, Option<Nonce>)>,
 
     /// Selection hash.
     #[serde(skip)]
@@ -58,13 +58,13 @@ impl ContestSelectionPreEncrypted {
     ) {
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         for k in 1..self.selections.len() + 1 {
-            self.selections[k].nonce = Some(option_nonce(
+            self.selections[k].1 = Some(Nonce::new(option_nonce(
                 &device.header,
                 primary_nonce,
                 contest_index,
                 j,
                 ContestOptionIndex::from_one_based_index(k as u32).unwrap(),
-            ));
+            )));
         }
     }
 
@@ -85,15 +85,21 @@ impl ContestSelectionPreEncrypted {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
             let nonce = option_nonce(pvd, primary_nonce, contest_index, j, k);
-            selections.push(pvd.public_key.encrypt_with(
+            let ciphertext = pvd.public_key.encrypt_with(
                 &pvd.parameters.fixed_parameters,
                 &nonce,
                 (j == k) as usize,
-                store_nonces,
-            ))
+            );
+            let maybe_nonce = if store_nonces {
+                Some(Nonce::new(nonce))
+            } else {
+                None
+            };
+            selections.push((ciphertext, maybe_nonce))
         }
-
-        let selection_hash = BallotEncryptingTool::selection_hash(pvd, &selections);
+        let only_ciphertexts: Vec<Ciphertext> =
+            selections.iter().map(|(ct, _)| ct.clone()).collect();
+        let selection_hash = BallotEncryptingTool::selection_hash(pvd, &only_ciphertexts);
 
         // Generate pre-encrypted votes for each possible (single) choice
         ContestSelectionPreEncrypted {
@@ -121,15 +127,20 @@ impl ContestSelectionPreEncrypted {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
             let nonce = option_nonce(pvd, primary_nonce, contest_index, null_index, k);
-            selections.push(pvd.public_key.encrypt_with(
-                &pvd.parameters.fixed_parameters,
-                &nonce,
-                0,
-                store_nonces,
-            ));
+            let ciphertext =
+                pvd.public_key
+                    .encrypt_with(&pvd.parameters.fixed_parameters, &nonce, 0);
+            let maybe_nonce = if store_nonces {
+                Some(Nonce::new(nonce))
+            } else {
+                None
+            };
+            selections.push((ciphertext, maybe_nonce));
         }
+        let only_ciphertexts: Vec<Ciphertext> =
+            selections.iter().map(|(ct, _)| ct.clone()).collect();
 
-        let selection_hash = BallotEncryptingTool::selection_hash(pvd, &selections);
+        let selection_hash = BallotEncryptingTool::selection_hash(pvd, &only_ciphertexts);
         let shortcode = BallotEncryptingTool::short_code_last_byte(&selection_hash);
         ContestSelectionPreEncrypted {
             index,
@@ -150,8 +161,10 @@ impl ContestSelectionPreEncrypted {
         // for (i, selection) in self.selections.iter().enumerate() {
         self.selections.iter().enumerate().for_each(|(i, c)| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
+            let nonce = c.1.as_ref().unwrap();
+            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(c.proof_ballot_correctness(pvd, csprng, sequence_order == i))
+                .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce))
                 .unwrap();
         });
         proofs

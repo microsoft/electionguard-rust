@@ -156,6 +156,16 @@ impl<T: HasIndexType> Default for Vec1<T> {
     }
 }
 
+impl<T> IntoIterator for Vec1<T> {
+    type Item = T;
+
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 /// Attempt to create a [`Vec1<T>`] from a [`Vec<T>`].
 /// This will fail if the source has 2^31 or more elements.
 impl<T: HasIndexType> std::convert::TryFrom<std::vec::Vec<T>> for Vec1<T> {

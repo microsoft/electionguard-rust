@@ -6,7 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use serde::{Deserialize, Serialize};
-use util::csprng::Csprng;
+use util::{algebra::FieldElement, csprng::Csprng};
 
 use crate::{
     contest_hash,
@@ -17,7 +17,7 @@ use crate::{
     fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext,
+    joint_election_public_key::{Ciphertext, Nonce},
     nonce::encrypted as nonce,
     vec1::Vec1,
     zk::ProofRange,
@@ -62,25 +62,50 @@ pub struct ContestEncrypted {
     pub proof_selection_limit: ProofRange,
 }
 
+/// A scaled version of [`ContestEncrypted`]. This means that each encrypted vote on the contest
+/// has been scaled by a factor. It is trusted that the encrypted ciphertexts in a
+/// [`ScaledContestEncrypted`] really are the ones from a [`ContestEncrypted`] scaled by a factor.
+/// Contains no proofs.
+#[derive(PartialEq, Eq)]
+pub struct ScaledContestEncrypted {
+    /// Scaled encrypted voter selection vector.
+    pub selection: Vec<Ciphertext>,
+}
+
+impl ScaledContestEncrypted {
+    /// Verify that the [`ScaledContestEncrypted`] stems from a given [`ContestEncrypted`] by
+    /// scaling with a given factor.
+    pub fn verify(
+        &self,
+        origin: ContestEncrypted,
+        factor: &FieldElement,
+        fixed_parameters: &FixedParameters,
+    ) -> bool {
+        origin.scale(fixed_parameters, factor) == *self
+    }
+}
+
 impl ContestEncrypted {
     fn encrypt_selection(
         header: &PreVotingData,
         primary_nonce: &[u8],
         contest_index: ContestIndex,
         pt_vote: &ContestSelection,
-    ) -> Vec<Ciphertext> {
+    ) -> Vec<(Ciphertext, Nonce)> {
         // TODO: Check if selection limit is satisfied
 
-        let mut vote: Vec<Ciphertext> = Vec::new();
+        let mut vote: Vec<(Ciphertext, Nonce)> = Vec::new();
         for j in 1..pt_vote.vote.len() + 1 {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let o_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
             let nonce = nonce(header, primary_nonce, contest_index, o_idx);
-            vote.push(header.public_key.encrypt_with(
-                &header.parameters.fixed_parameters,
-                &nonce,
-                pt_vote.vote[j - 1] as usize,
-                true,
+            vote.push((
+                header.public_key.encrypt_with(
+                    &header.parameters.fixed_parameters,
+                    &nonce,
+                    pt_vote.vote[j - 1] as usize,
+                ),
+                Nonce::new(nonce),
             ));
         }
         vote
@@ -94,18 +119,23 @@ impl ContestEncrypted {
         contest_index: ContestIndex,
         pt_vote: &ContestSelection,
     ) -> ContestEncrypted {
-        let selection =
+        let selection_and_nonce =
             Self::encrypt_selection(&device.header, primary_nonce, contest_index, pt_vote);
+        let selection = selection_and_nonce
+            .iter()
+            .map(|(ct, _)| ct.clone())
+            .collect::<Vec<_>>();
         let contest_hash = contest_hash::contest_hash(&device.header, contest_index, &selection);
 
         let mut proof_ballot_correctness = Vec1::new();
-        for (i, sel) in selection.iter().enumerate() {
+        for (i, (sel, nonce)) in selection_and_nonce.iter().enumerate() {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proof_ballot_correctness
                 .try_push(sel.proof_ballot_correctness(
                     &device.header,
                     csprng,
                     pt_vote.vote[i] == 1u8,
+                    nonce,
                 ))
                 .unwrap();
         }
@@ -116,10 +146,11 @@ impl ContestEncrypted {
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
-            &selection,
+            &selection_and_nonce,
             num_selections as usize,
             contest.selection_limit,
         );
+
         ContestEncrypted {
             selection,
             contest_hash,
@@ -139,16 +170,17 @@ impl ContestEncrypted {
     pub fn proof_selection_limit(
         header: &PreVotingData,
         csprng: &mut Csprng,
-        selection: &[Ciphertext],
+        selection: &[(Ciphertext, Nonce)],
         num_selections: usize,
         selection_limit: usize,
     ) -> ProofRange {
-        let combined_ct =
-            Self::sum_selection_vector(&header.parameters.fixed_parameters, selection);
+        let (combined_ct, combined_nonce) =
+            Self::sum_selection_nonce_vector(&header.parameters.fixed_parameters, selection);
         ProofRange::new(
             header,
             csprng,
             &combined_ct,
+            &combined_nonce,
             num_selections,
             selection_limit,
         )
@@ -166,31 +198,42 @@ impl ContestEncrypted {
         )
     }
 
+    /// Sum up the encrypted votes on a contest and their nonces. The sum of the nonces can be used
+    /// to proof properties about the sum of the ciphertexts, e.g. that it satisfies the selection
+    /// limit.
+    pub fn sum_selection_nonce_vector(
+        fixed_parameters: &FixedParameters,
+        selection_with_nonces: &[(Ciphertext, Nonce)],
+    ) -> (Ciphertext, Nonce) {
+        let group = &fixed_parameters.group;
+        let field = &fixed_parameters.field;
+
+        let mut sum_ct = Ciphertext::one();
+        let mut sum_nonce = Nonce::zero();
+
+        for (sel, nonce) in selection_with_nonces {
+            sum_ct.alpha = sum_ct.alpha.mul(&sel.alpha, group);
+            sum_ct.beta = sum_ct.beta.mul(&sel.beta, group);
+            sum_nonce.xi = sum_nonce.xi.add(&nonce.xi, field);
+        }
+
+        (sum_ct, sum_nonce)
+    }
+
+    /// Sum up the encrypted votes on a contest. The sum is needed when checking that the selection
+    /// limit is satisfied.
     pub fn sum_selection_vector(
         fixed_parameters: &FixedParameters,
         selection: &[Ciphertext],
     ) -> Ciphertext {
-        let field = &fixed_parameters.field;
         let group = &fixed_parameters.group;
-        // First element in the selection
 
-        // let mut sum_ct = selection[0].clone();
-        let mut sum_ct = selection[0].clone();
-        assert!(sum_ct.nonce.is_some());
-
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let mut sum_nonce = sum_ct.nonce.as_ref().unwrap().clone();
-
-        // Subsequent elements in the selection
-
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        for sel in selection.iter().skip(1) {
+        let mut sum_ct = Ciphertext::one();
+        for sel in selection {
             sum_ct.alpha = sum_ct.alpha.mul(&sel.alpha, group);
             sum_ct.beta = sum_ct.beta.mul(&sel.beta, group);
-            sum_nonce = sum_nonce.add(sel.nonce.as_ref().unwrap(), field);
         }
 
-        sum_ct.nonce = Some(sum_nonce);
         sum_ct
     }
 
@@ -210,5 +253,19 @@ impl ContestEncrypted {
         }
 
         self.verify_selection_limit(header, selection_limit)
+    }
+
+    /// Scales all the encrypted votes on the contest by the same factor.
+    pub fn scale(
+        &self,
+        fixed_parameters: &FixedParameters,
+        factor: &FieldElement,
+    ) -> ScaledContestEncrypted {
+        let selection = self
+            .selection
+            .iter()
+            .map(|ct| ct.scale(fixed_parameters, factor))
+            .collect();
+        ScaledContestEncrypted { selection }
     }
 }

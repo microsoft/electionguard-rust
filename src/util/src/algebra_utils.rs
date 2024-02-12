@@ -11,7 +11,6 @@ use itertools::Itertools;
 use std::{borrow::Borrow, collections::HashMap, iter::zip, mem};
 
 use num_bigint::{BigInt, BigUint, Sign};
-use num_integer::Integer;
 use num_traits::{One, Zero};
 
 use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
@@ -35,24 +34,6 @@ pub fn cnt_bits_repr<T: Borrow<BigUint>>(n: &T) -> usize {
     }
 }
 
-pub fn largest_integer_a_such_that_2_to_a_divides_even_n(n: &BigUint) -> u64 {
-    assert!(n.is_even(), "requires n even");
-    assert!(!n.is_zero(), "requires n > 1");
-
-    // `unwrap()` is justified here because we just verified that 2 <= `n`.
-    #[allow(clippy::unwrap_used)]
-    n.trailing_zeros().unwrap()
-}
-
-// Returns the smallest integer `b` such that `b > a && b | n`.
-pub fn round_to_next_multiple(a: usize, x: usize) -> usize {
-    if a % x == 0 {
-        a
-    } else {
-        a + (x - (a % x))
-    }
-}
-
 /// Encodes [`BigUint`] in big-endian as a left-padded byte-string of length `len`.
 pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     let n: &BigUint = n.borrow();
@@ -72,7 +53,7 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
 }
 
 /// Computes the leading ones of a ['BigUInt']
-pub fn leading_ones(x: BigUint) -> u64 {
+pub fn leading_ones(x: &BigUint) -> u64 {
     let mut leading_ones = 0;
     for limb in x.iter_u64_digits().rev() {
         let ones = limb.leading_ones();
@@ -122,7 +103,7 @@ pub fn mod_inverse(a_u: &BigUint, m_u: &BigUint) -> Option<BigUint> {
 /// Holds a hash table of the Baby-step giant-step algorithm for computing discrete logarithms with respect to `base` and `modulus`.
 pub struct DiscreteLog {
     /// The hash table
-    table: HashMap<BigUint, u32>,
+    table: HashMap<BigUint, u64>,
     /// The modulus defining Z_modulus
     modulus: BigUint,
     //  The base an integer in Z_modulus
@@ -135,7 +116,7 @@ impl DiscreteLog {
         let base = base % &modulus;
         let mut table = HashMap::new();
         let mut k = BigUint::from(1u8);
-        for j in 0..(1 << 16) {
+        for j in 0..(1 << 20) {
             table.insert(k.clone(), j);
             k = (k * &base) % &modulus;
         }
@@ -148,13 +129,15 @@ impl DiscreteLog {
 
     /// Constructs a new pre-computation table for a given base and group
     pub fn from_group(base: &GroupElement, group: &Group) -> Self {
-        Self::new(base.to_biguint(), group.modulus())
+        Self::new(base.as_biguint().clone(), group.modulus().clone())
     }
 
     /// Tries to find the discrete logarithm of given `y` with respect to fixed base and modulus using the Baby-step giant-step algorithm.
+    /// It can find `x` from `g^x` if `0 <= x < n`, where currently `n = 2^38`.
     pub fn find(&self, y: &BigUint) -> Option<BigUint> {
         let mut gamma = y.clone();
-        let m = (1 << 16) as u32;
+        let m = (1 << 20) as u64; // The size of the pre-computed table.
+        let n_over_m = (1 << 18) as u64; // n/m = 2^38/2^20 = 2^18.
         let alpha_to_minus_m = match mod_inverse(
             &self.base.modpow(&BigUint::from(m), &self.modulus),
             &self.modulus,
@@ -162,7 +145,7 @@ impl DiscreteLog {
             Some(x) => x,
             None => return None,
         };
-        for i in 0..m {
+        for i in 0..n_over_m {
             match self.table.get(&gamma) {
                 Some(j) => {
                     return Some(BigUint::from(i * m + j));
@@ -177,16 +160,16 @@ impl DiscreteLog {
 
     /// Tries to find the discrete logarithm of given group element `y` with respect to fixed base using the Baby-step giant-step algorithm.
     pub fn ff_find(&self, y: &GroupElement, field: &ScalarField) -> Option<FieldElement> {
-        let y = y.to_biguint();
+        let y = y.as_biguint();
         // The given integer must be small enough
-        if y >= self.modulus {
+        if y >= &self.modulus {
             return None;
         }
         // The base should have an order < field.order
-        if self.base.modpow(&field.order(), &self.modulus) != BigUint::one() {
+        if self.base.modpow(field.order(), &self.modulus) != BigUint::one() {
             return None;
         }
-        let maybe_x = self.find(&y);
+        let maybe_x = self.find(y);
         maybe_x.map(|x| FieldElement::from(x, field))
     }
 }
@@ -310,7 +293,6 @@ mod tests {
     use crate::csprng::Csprng;
 
     use super::*;
-    use num_integer::Integer;
     use num_traits::Num;
 
     #[test]
@@ -318,27 +300,6 @@ mod tests {
         for (n, expected) in [1, 1, 2, 2, 3, 3, 3, 3, 4].into_iter().enumerate() {
             assert_eq!(cnt_bits_repr_usize(n), expected);
             assert_eq!(cnt_bits_repr(&BigUint::from(n)), expected);
-        }
-    }
-
-    #[test]
-    fn test_largest_integer_a_such_that_2_to_a_divides_even_n() {
-        for half_n in 1_usize..1000 {
-            let n = half_n * 2;
-
-            let a = largest_integer_a_such_that_2_to_a_divides_even_n(&BigUint::from(n));
-            assert!(a < 32);
-            let two_to_a = 1_usize << a;
-
-            assert!(n.is_multiple_of(&two_to_a));
-
-            for invalid_a in (a + 1)..32 {
-                let two_to_invalid_a = 1_usize << invalid_a;
-                if n.is_multiple_of(&two_to_invalid_a) {
-                    println!("\n\nn={n}, a={a}, invalid_a={invalid_a}, two_to_invalid_a={two_to_invalid_a}\n");
-                }
-                assert!(!n.is_multiple_of(&two_to_invalid_a));
-            }
         }
     }
 

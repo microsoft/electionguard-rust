@@ -11,9 +11,10 @@ use std::convert::TryInto;
 use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
+use num_integer::Integer;
 use num_traits::{One, Zero};
 
-use crate::{algebra_utils::largest_integer_a_such_that_2_to_a_divides_even_n, csprng::Csprng};
+use crate::csprng::Csprng;
 
 pub const PRIMES_TABLE_U8: [u8; 54] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
@@ -35,9 +36,10 @@ const MILLER_RABIN_ITERATIONS: usize = 50;
 //? TODO Would prefer to use AsRef instead of Borrow, but it doesn't have
 // an automatic `impl AsRef<T> for T`, and we can't `impl AsRef<BigUint> for BigUint`
 // since it's in a cargo crate.
-// `Borrow` does have a blanket implementation, but now we have to ensure that
-// the hash, ord, and eq traits work exactly the same between BigUintPrime and BigUint.
 
+/// This function provides a probabilistic primality test. For large numbers this call is expensive.
+///
+/// Internally, the function uses the Miller-Rabin test.
 pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
     //? OPT: Maybe somehow we could defer Csprng creation until we know that we need randomized primality testing.
 
@@ -98,7 +100,6 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
     // 1. w The odd integer to be tested for primality.
     // 2. iterations The number of iterations of the test to be performed; the value
     // shall be consistent with Table B.1.
-    use num_integer::Integer;
     assert!(w.is_odd(), "requires w odd");
     assert!(!w.is_one(), "requires 3 <= w");
     assert!(iterations > 0);
@@ -169,12 +170,42 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
     true
 }
 
+fn largest_integer_a_such_that_2_to_a_divides_even_n(n: &BigUint) -> u64 {
+    assert!(n.is_even(), "requires n even");
+    assert!(!n.is_zero(), "requires n > 1");
+
+    // `unwrap()` is justified here because we just verified that 2 <= `n`.
+    #[allow(clippy::unwrap_used)]
+    n.trailing_zeros().unwrap()
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test_primes {
     use num_traits::Num;
 
     use super::*;
+
+    #[test]
+    fn test_largest_integer_a_such_that_2_to_a_divides_even_n() {
+        for half_n in 1_usize..1000 {
+            let n = half_n * 2;
+
+            let a = largest_integer_a_such_that_2_to_a_divides_even_n(&BigUint::from(n));
+            assert!(a < 32);
+            let two_to_a = 1_usize << a;
+
+            assert!(n.is_multiple_of(&two_to_a));
+
+            for invalid_a in (a + 1)..32 {
+                let two_to_invalid_a = 1_usize << invalid_a;
+                if n.is_multiple_of(&two_to_invalid_a) {
+                    println!("\n\nn={n}, a={a}, invalid_a={invalid_a}, two_to_invalid_a={two_to_invalid_a}\n");
+                }
+                assert!(!n.is_multiple_of(&two_to_invalid_a));
+            }
+        }
+    }
 
     #[test]
     fn test_is_prime() {
