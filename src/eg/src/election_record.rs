@@ -85,12 +85,7 @@ impl PreVotingData {
         let hashes = Hashes::compute(&parameters, &manifest)
             .context("Could not compute hashes from election context")?;
 
-        let hashes_ext = HashesExt::compute(
-            &parameters,
-            &hashes,
-            &joint_election_public_key,
-            guardian_public_keys,
-        );
+        let hashes_ext = HashesExt::compute(&parameters, &hashes, &joint_election_public_key);
 
         let pre_voting_data = PreVotingData::new(
             manifest,

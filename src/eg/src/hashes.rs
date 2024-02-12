@@ -162,9 +162,10 @@ mod test {
     use crate::{
         ballot_style::BallotStyle,
         election_manifest::{Contest, ContestIndex, ContestOption},
+        example_election_parameters::example_election_parameters,
         guardian::GuardianIndex,
         standard_parameters::STANDARD_PARAMETERS,
-        varying_parameters::{BallotChaining, VaryingParameters}, example_election_parameters::example_election_parameters,
+        varying_parameters::{BallotChaining, VaryingParameters},
     };
     use hex_literal::hex;
 

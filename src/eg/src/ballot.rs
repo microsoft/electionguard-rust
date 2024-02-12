@@ -320,11 +320,8 @@ mod test {
 
         let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
 
-        let hashes_ext = HashesExt::compute(
-            &election_parameters,
-            &hashes,
-            &joint_election_public_key,
-        );
+        let hashes_ext =
+            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
         let pre_voting_data = PreVotingData {
             manifest: election_manifest,
@@ -595,7 +592,6 @@ mod test {
             &election_parameters,
             &hashes,
             &joint_election_public_key,
-            guardian_public_keys.as_slice(),
         );
 
         let pre_voting_data = PreVotingData {

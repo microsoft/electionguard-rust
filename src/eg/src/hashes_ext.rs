@@ -22,7 +22,6 @@ pub struct HashesExt {
 }
 
 impl HashesExt {
-
     /// This function computes the extended base hash
     pub fn compute(
         election_parameters: &ElectionParameters,
@@ -32,7 +31,7 @@ impl HashesExt {
         let fixed_parameters = &election_parameters.fixed_parameters;
         // Computation of the extended base hash H_E.
         let h_e = {
-            // B1 = 12 | b(K, 512) 
+            // B1 = 12 | b(K, 512)
             let mut v = vec![0x12];
             // K = election public key
             v.append(&mut joint_election_public_key.to_be_bytes_left_pad(fixed_parameters));
@@ -72,7 +71,6 @@ impl HashesExt {
         serde_json::from_reader(io_read)
             .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
     }
-
 }
 
 impl std::fmt::Display for HashesExt {
@@ -130,11 +128,8 @@ mod test {
             .as_ref()
             .is_valid(&fixed_parameters.group));
 
-        let hashes_ext = HashesExt::compute(
-            &election_parameters,
-            &hashes,
-            &joint_election_public_key,
-        );
+        let hashes_ext =
+            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
         let expected_h_e = HValue::from(hex!(
             "84135D7084DC8EC9A6E593EE0D7DF9E8F0444DEEB0B1C72BBCB0184D8D50C3A2"

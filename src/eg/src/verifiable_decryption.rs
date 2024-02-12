@@ -659,12 +659,7 @@ impl VerifiableDecryption {
             return Err(CombineProofError::JointPKFailure.into());
         };
 
-        let hashes_ext = HashesExt::compute(
-            parameters,
-            &hashes,
-            &joint_election_public_key,
-            guardian_public_keys,
-        );
+        let hashes_ext = HashesExt::compute(parameters, &hashes, &joint_election_public_key);
 
         let proof = DecryptionProof::combine_proof(
             parameters,
@@ -900,7 +895,7 @@ mod test {
         )
         .unwrap();
 
-        let h_e = HashesExt::compute(&election_parameters, &hashes, &joint_key, &public_keys);
+        let h_e = HashesExt::compute(&election_parameters, &hashes, &joint_key);
 
         let message: usize = 42;
         let nonce = field.random_field_elem(&mut csprng);
