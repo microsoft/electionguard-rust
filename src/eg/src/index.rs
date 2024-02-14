@@ -144,6 +144,12 @@ impl<T> Index<T> {
             .ok_or_else(|| anyhow!("Index value {ix1} out of range"))
     }
 
+    /// Creates a new `Index` from a 1-based index value. It is a precondition that
+    /// Self::VALID_MIN_U32 <= ix1 && ix1 <= Self::VALID_MAX_U32.
+    pub fn from_one_based_index_unchecked(ix1: u32) -> Self {
+        Self(ix1, PhantomData)
+    }
+
     /// Obtains the 1-based index value as a `u32`.
     pub const fn get_one_based_u32(&self) -> u32 {
         debug_assert!(Self::is_valid_one_based_index(self.0));

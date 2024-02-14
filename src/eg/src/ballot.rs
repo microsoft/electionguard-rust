@@ -81,16 +81,16 @@ impl BallotEncrypted {
         csprng: &mut Csprng,
         primary_nonce: &[u8],
         ctest_selections: &BTreeMap<ContestIndex, ContestSelection>,
-    ) -> BallotEncrypted {
+    ) -> Option<BallotEncrypted> {
         let mut contests = BTreeMap::new();
 
         for (&c_idx, selection) in ctest_selections {
-            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
+            let contest = device.header.manifest.contests.get(c_idx)?;
             let contest_encrypted = ContestEncrypted::new(
                 device,
                 csprng,
                 primary_nonce,
-                device.header.manifest.contests.get(c_idx).unwrap(),
+                contest,
                 c_idx,
                 selection,
             );
@@ -110,13 +110,13 @@ impl BallotEncrypted {
         let confirmation_code =
             confirmation_code(&device.header.hashes_ext.h_e, contests.values(), &[0u8; 32]);
 
-        BallotEncrypted {
+        Some(BallotEncrypted {
             contests,
             state: BallotState::Uncast,
             confirmation_code,
             date: device.header.parameters.varying_parameters.date.clone(),
             device: device.uuid.clone(),
-        }
+        })
     }
 
     pub fn contests(&self) -> &BTreeMap<ContestIndex, ContestEncrypted> {
@@ -337,56 +337,48 @@ mod test {
         let selections = BTreeMap::from([
             (
                 Index::from_one_based_index(1).unwrap(),
-                ContestSelection { vote: vec![1, 0] },
+                ContestSelection::new(vec![1, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(2).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0, 0],
-                },
+                ContestSelection::new(vec![0, 1, 0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 0, 1],
-                },
+                ContestSelection::new(vec![0, 0, 1]).unwrap()
             ),
             (
                 Index::from_one_based_index(4).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0],
-                },
+                ContestSelection::new(vec![1, 0, 0]).unwrap()
             ),
             (
                 Index::from_one_based_index(5).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-                },
+                ContestSelection::new(vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0]).unwrap()
             ),
             (
                 Index::from_one_based_index(6).unwrap(),
-                ContestSelection { vote: vec![1, 0] },
+                ContestSelection::new(vec![1, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(7).unwrap(),
-                ContestSelection { vote: vec![0, 0] },
+                ContestSelection::new(vec![0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(8).unwrap(),
-                ContestSelection { vote: vec![0, 1] },
+                ContestSelection::new(vec![0, 1]).unwrap(),
             ),
             (
                 Index::from_one_based_index(9).unwrap(),
-                ContestSelection { vote: vec![1, 0] },
+                ContestSelection::new(vec![1, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(11).unwrap(),
-                ContestSelection { vote: vec![0, 1] },
+                ContestSelection::new(vec![0, 1]).unwrap(),
             ),
         ]);
 
         let ballot_from_selections =
-            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &selections);
+            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &selections).unwrap();
 
         // Let's verify the ballot proofs.
 
@@ -609,15 +601,11 @@ mod test {
             // Voting on 1 and 3 only, ballot style 1
             (
                 Index::from_one_based_index(1).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 1, 0, 0],
-                },
+                ContestSelection::new(vec![1, 1, 0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0],
-                },
+                ContestSelection::new(vec![0, 1, 0]).unwrap(),
             ),
         ]);
 
@@ -625,50 +613,40 @@ mod test {
             // Voting on 2 and 3 only, ballot style 2
             (
                 Index::from_one_based_index(2).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0],
-                },
+                ContestSelection::new(vec![0, 1, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![0, 1, 0],
-                },
+                ContestSelection::new(vec![0, 1, 0]).unwrap(),
             ),
         ]);
         let voter3 = BTreeMap::from([
             // Voting on all three, ballot style 3
             (
                 Index::from_one_based_index(1).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0, 0],
-                },
+                ContestSelection::new(vec![1, 0, 0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(2).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0],
-                },
+                ContestSelection::new(vec![1, 0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
-                ContestSelection {
-                    vote: vec![1, 0, 0],
-                },
+                ContestSelection::new(vec![1, 0, 0]).unwrap(),
             ),
         ]);
         let ballot_voter1 =
-            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter1);
+            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter1).unwrap();
         let verify_result1 =
             ballot_voter1.verify(&device.header, Index::from_one_based_index(1).unwrap());
         assert!(verify_result1);
         let ballot_voter2 =
-            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter2);
+            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter2).unwrap();
         let verify_result2 =
             ballot_voter2.verify(&device.header, Index::from_one_based_index(2).unwrap());
         assert!(verify_result2);
         let ballot_voter3 =
-            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter3);
+            BallotEncrypted::new_from_selections(&device, &mut csprng, &primary_nonce, &voter3).unwrap();
         let verify_result3 =
             ballot_voter3.verify(&device.header, Index::from_one_based_index(3).unwrap());
         assert!(verify_result3);

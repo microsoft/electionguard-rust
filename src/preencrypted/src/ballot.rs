@@ -199,7 +199,7 @@ impl BallotPreEncrypted {
                     contest.finalize(
                         device,
                         csprng,
-                        &voter_ballot.selections.get(c_idx).unwrap().vote,
+                        &voter_ballot.selections.get(c_idx).unwrap().get_vote(),
                         c.selection_limit,
                         c.options.len(),
                     ),

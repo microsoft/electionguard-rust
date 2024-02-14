@@ -135,7 +135,7 @@ impl ContestPreEncrypted {
     pub fn combine_voter_selections(
         &self,
         fixed_parameters: &FixedParameters,
-        voter_selections: &Vec<ContestSelectionPlaintext>,
+        voter_selections: &[ContestSelectionPlaintext],
         selection_limit: usize,
     ) -> Vec<(Ciphertext, Nonce)> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
@@ -204,7 +204,7 @@ impl ContestPreEncrypted {
         &self,
         device: &Device,
         csprng: &mut Csprng,
-        voter_selections: &Vec<u8>,
+        voter_selections: &[u8],
         selection_limit: usize,
         num_options: usize,
     ) -> ContestEncrypted {

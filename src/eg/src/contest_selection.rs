@@ -40,7 +40,7 @@ pub type ContestSelectionIndex = Index<ContestSelection>;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContestSelection {
     /// Vector used to represent the selection
-    pub vote: Vec<ContestSelectionPlaintext>,
+    vote: Vec<ContestSelectionPlaintext>,
 }
 
 impl HasIndexType for ContestSelection {
@@ -48,6 +48,17 @@ impl HasIndexType for ContestSelection {
 }
 
 impl ContestSelection {
+    pub fn new(vote: Vec<ContestSelectionPlaintext>) -> Option<ContestSelection>{
+        if vote.len() > Index::<ContestSelectionPlaintext>::VALID_MAX_USIZE {
+            return None;
+        }
+        Some(ContestSelection{vote})
+    }
+
+    pub fn get_vote(&self) -> &[ContestSelectionPlaintext]{
+        &self.vote
+    }
+
     pub fn new_pick_random(
         csprng: &mut Csprng,
         selection_limit: usize,

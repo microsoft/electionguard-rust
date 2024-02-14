@@ -95,15 +95,15 @@ impl ContestEncrypted {
         // TODO: Check if selection limit is satisfied
 
         let mut vote: Vec<(Ciphertext, Nonce)> = Vec::new();
-        for j in 1..pt_vote.vote.len() + 1 {
-            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let o_idx = ContestOptionIndex::from_one_based_index(j as u32).unwrap();
+        for j in 1..pt_vote.get_vote().len() + 1 {
+            // This unwrap is fine since 1 <= j <= Index::VALID_MAX_U32
+            let o_idx = ContestOptionIndex::from_one_based_index_unchecked(j as u32);
             let nonce = nonce(header, primary_nonce, contest_index, o_idx);
             vote.push((
                 header.public_key.encrypt_with(
                     &header.parameters.fixed_parameters,
                     &nonce,
-                    pt_vote.vote[j - 1] as usize,
+                    pt_vote.get_vote()[j - 1] as usize,
                 ),
                 Nonce::new(nonce),
             ));
@@ -129,19 +129,20 @@ impl ContestEncrypted {
 
         let mut proof_ballot_correctness = Vec1::new();
         for (i, (sel, nonce)) in selection_and_nonce.iter().enumerate() {
-            #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
+            // This is OK, since selection_and_nonce.len() = pt_vote.vote.len() which
+            // is guaranteed to not exceed the size of a `Index<T>` by how a `ContestSelection` is
+            // constructed.
             proof_ballot_correctness
-                .try_push(sel.proof_ballot_correctness(
+                .push_unchecked(sel.proof_ballot_correctness(
                     &device.header,
                     csprng,
-                    pt_vote.vote[i] == 1u8,
+                    pt_vote.get_vote()[i] == 1u8,
                     nonce,
-                ))
-                .unwrap();
+                ));
         }
 
         let mut num_selections = 0;
-        pt_vote.vote.iter().for_each(|v| num_selections += v);
+        pt_vote.get_vote().iter().for_each(|v| num_selections += v);
 
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
