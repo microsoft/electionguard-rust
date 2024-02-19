@@ -20,28 +20,8 @@ use crate::{
     joint_election_public_key::{Ciphertext, Nonce},
     nonce::encrypted as nonce,
     vec1::Vec1,
-    zk::ProofRange,
+    zk::{ProofRange, ProofRangeError},
 };
-
-// /// A contest.
-// #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// pub struct Contest {
-//     /// The label.
-//     pub label: String,
-
-//     /// The maximum count of options that a voter may select.
-//     pub selection_limit: usize,
-
-//     /// The candidates/options. The order of options matches the virtual ballot.
-//     pub options: Vec<ContestOption>,
-// }
-
-// /// An option in a contest.
-// #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// pub struct ContestOption {
-//     /// The label.
-//     pub label: String,
-// }
 
 /// A 1-based index of a [`ContestEncrypted`] in the order it is defined in the [`crate::ballot::BallotEncrypted`].
 pub type ContestEncryptedIndex = Index<ContestEncrypted>;
@@ -95,8 +75,8 @@ impl ContestEncrypted {
         // TODO: Check if selection limit is satisfied
 
         let mut vote: Vec<(Ciphertext, Nonce)> = Vec::new();
-        for j in 1..pt_vote.get_vote().len() + 1 {
-            // This unwrap is fine since 1 <= j <= Index::VALID_MAX_U32
+        for j in 1..=pt_vote.get_vote().len() {
+            // This is fine since 1 <= j <= Index::VALID_MAX_U32
             let o_idx = ContestOptionIndex::from_one_based_index_unchecked(j as u32);
             let nonce = nonce(header, primary_nonce, contest_index, o_idx);
             vote.push((
@@ -118,7 +98,7 @@ impl ContestEncrypted {
         contest: &Contest,
         contest_index: ContestIndex,
         pt_vote: &ContestSelection,
-    ) -> ContestEncrypted {
+    ) -> Result<ContestEncrypted, ProofRangeError> {
         let selection_and_nonce =
             Self::encrypt_selection(&device.header, primary_nonce, contest_index, pt_vote);
         let selection = selection_and_nonce
@@ -138,26 +118,24 @@ impl ContestEncrypted {
                     csprng,
                     pt_vote.get_vote()[i] == 1u8,
                     nonce,
-                ));
+                )?);
         }
 
         let mut num_selections = 0;
         pt_vote.get_vote().iter().for_each(|v| num_selections += v);
-
         let proof_selection_limit = ContestEncrypted::proof_selection_limit(
             &device.header,
             csprng,
             &selection_and_nonce,
             num_selections as usize,
             contest.selection_limit,
-        );
-
-        ContestEncrypted {
+        )?;
+        Ok(ContestEncrypted {
             selection,
             contest_hash,
             proof_ballot_correctness,
             proof_selection_limit,
-        }
+        })
     }
 
     pub fn get_proof_ballot_correctness(&self) -> &Vec1<ProofRange> {
@@ -174,7 +152,7 @@ impl ContestEncrypted {
         selection: &[(Ciphertext, Nonce)],
         num_selections: usize,
         selection_limit: usize,
-    ) -> ProofRange {
+    ) -> Result<ProofRange, ProofRangeError> {
         let (combined_ct, combined_nonce) =
             Self::sum_selection_nonce_vector(&header.parameters.fixed_parameters, selection);
         ProofRange::new(

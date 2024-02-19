@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Context, Result};
 use eg::{
-    ballot::{BallotEncrypted, BallotState},
+    ballot::{BallotEncrypted, BallotEncryptedError, BallotState},
     ballot_style::BallotStyleIndex,
     contest_selection::ContestSelection,
     device::Device,
@@ -178,11 +178,11 @@ impl BallotPreEncrypted {
         device: &Device,
         csprng: &mut Csprng,
         voter_ballot: &VoterSelection,
-    ) -> BallotEncrypted {
+    ) -> Result<BallotEncrypted, BallotEncryptedError> {
         let mut contests = BTreeMap::new();
 
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        (1..self.contests.len() + 1).for_each(|i| {
+        for i in 1..self.contests.len() + 1{
             let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
             let contest = self.contests.get(c_idx).unwrap();
             let correct_content_index = contest.contest_index;
@@ -202,18 +202,18 @@ impl BallotPreEncrypted {
                         &voter_ballot.selections.get(c_idx).unwrap().get_vote(),
                         c.selection_limit,
                         c.options.len(),
-                    ),
+                    ).map_err(|err|BallotEncryptedError::ProofError{err})?,
                 )
                 .unwrap();
-        });
+        };
 
-        BallotEncrypted::new(
+        Ok(BallotEncrypted::new(
             &contests,
             BallotState::Cast,
             self.confirmation_code,
             &device.header.parameters.varying_parameters.date,
             device.get_uuid(),
-        )
+        ))
     }
 
     /// Returns a pretty JSON `String` representation of `BallotPreEncrypted`.

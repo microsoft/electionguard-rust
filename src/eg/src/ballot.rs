@@ -22,8 +22,10 @@ use crate::{
     fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
-    joint_election_public_key::Ciphertext,
+    joint_election_public_key::Ciphertext, zk::ProofRangeError,
 };
+
+use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BallotState {
@@ -59,6 +61,16 @@ pub struct ScaledBallotEncrypted {
     pub contests: BTreeMap<ContestIndex, ScaledContestEncrypted>,
 }
 
+#[derive(Error, Debug)]
+pub enum BallotEncryptedError {
+    /// Proof production error
+    #[error("Error producing ballot proofs: {:?}", err)]
+    ProofError { err: ProofRangeError },
+    /// Error looking up contest in manifest
+    #[error("Contest (index {}) not found in election manifest.", idx)]
+    ContestNotInManifest { idx: ContestIndex },
+}
+
 impl BallotEncrypted {
     pub fn new(
         contests: &BTreeMap<ContestIndex, ContestEncrypted>,
@@ -81,11 +93,11 @@ impl BallotEncrypted {
         csprng: &mut Csprng,
         primary_nonce: &[u8],
         ctest_selections: &BTreeMap<ContestIndex, ContestSelection>,
-    ) -> Option<BallotEncrypted> {
+    ) -> Result<BallotEncrypted, BallotEncryptedError> {
         let mut contests = BTreeMap::new();
 
         for (&c_idx, selection) in ctest_selections {
-            let contest = device.header.manifest.contests.get(c_idx)?;
+            let contest = device.header.manifest.contests.get(c_idx).ok_or(BallotEncryptedError::ContestNotInManifest { idx: c_idx })?;
             let contest_encrypted = ContestEncrypted::new(
                 device,
                 csprng,
@@ -93,24 +105,15 @@ impl BallotEncrypted {
                 contest,
                 c_idx,
                 selection,
-            );
+            ).map_err(|err| BallotEncryptedError::ProofError {err})?;
 
             contests.insert(c_idx, contest_encrypted);
         }
 
-        // for (i, selection) in selections.iter().enumerate() {
-        //     contests.push(ContestEncrypted::new(
-        //         device,
-        //         csprng,
-        //         primary_nonce,
-        //         &device.header.manifest.contests.get(i).unwrap(),
-        //         selection,
-        //     ));
-        // }
         let confirmation_code =
             confirmation_code(&device.header.hashes_ext.h_e, contests.values(), &[0u8; 32]);
 
-        Some(BallotEncrypted {
+        Ok(BallotEncrypted {
             contests,
             state: BallotState::Uncast,
             confirmation_code,

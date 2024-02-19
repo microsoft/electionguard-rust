@@ -30,7 +30,7 @@ pub struct VaryingParameters {
     /// Date string.
     pub date: String,
 
-    // Jurisdictional information string.
+    /// Jurisdictional information string. This can be used to specify a location.
     pub info: String,
 
     /// Ballot chaining.

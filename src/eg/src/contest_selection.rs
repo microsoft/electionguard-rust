@@ -15,7 +15,7 @@ use crate::{
     index::Index,
     joint_election_public_key::{Ciphertext, Nonce},
     vec1::HasIndexType,
-    zk::ProofRange,
+    zk::{ProofRange, ProofRangeError},
 };
 
 // An encrypted option in a contest.
@@ -105,7 +105,7 @@ impl Ciphertext {
         csprng: &mut Csprng,
         selected: bool,
         nonce: &Nonce,
-    ) -> ProofRange {
+    ) -> Result<ProofRange, ProofRangeError> {
         ProofRange::new(header, csprng, self, nonce, selected as usize, 1)
     }
 

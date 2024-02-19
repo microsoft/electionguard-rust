@@ -16,7 +16,7 @@ use eg::{
     index::Index,
     joint_election_public_key::{Ciphertext, Nonce},
     vec1::{HasIndexType, HasIndexTypeMarker, Vec1},
-    zk::ProofRange,
+    zk::{ProofRange, ProofRangeError},
 };
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
@@ -119,17 +119,17 @@ impl ContestPreEncrypted {
         &self,
         pvd: &PreVotingData,
         csprng: &mut Csprng,
-    ) -> Vec1<Vec1<ProofRange>> {
+    ) -> Result<Vec1<Vec1<ProofRange>>, ProofRangeError> {
         let mut proofs = Vec1::new();
-        self.selections.indices().for_each(|i| {
+        for i in self.selections.indices() {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let selection = self.selections.get(i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(selection.proof_ballot_correctness(pvd, csprng, i.get_one_based_usize()))
+                .try_push(selection.proof_ballot_correctness(pvd, csprng, i.get_one_based_usize())?)
                 .unwrap();
-        });
-        proofs
+        }
+        Ok(proofs)
     }
 
     pub fn combine_voter_selections(
@@ -207,7 +207,7 @@ impl ContestPreEncrypted {
         voter_selections: &[u8],
         selection_limit: usize,
         num_options: usize,
-    ) -> ContestEncrypted {
+    ) -> Result<ContestEncrypted, ProofRangeError> {
         let selection = self.combine_voter_selections(
             &device.header.parameters.fixed_parameters,
             voter_selections,
@@ -226,7 +226,7 @@ impl ContestPreEncrypted {
                     csprng,
                     voter_selections[i] == 1u8,
                     nonce,
-                ))
+                )?)
                 .unwrap();
         }
 
@@ -239,15 +239,15 @@ impl ContestPreEncrypted {
             &selection,
             num_selections as usize,
             selection_limit,
-        );
+        )?;
         let selection = selection.iter().map(|(ct, _)| ct.clone()).collect();
 
         // TODO: Change crypto hash
-        ContestEncrypted {
+        Ok(ContestEncrypted {
             selection,
             contest_hash: self.contest_hash,
             proof_ballot_correctness,
             proof_selection_limit,
-        }
+        })
     }
 }

@@ -119,7 +119,7 @@ impl GuardianEncryptedShare {
     fn mac_and_encryption_key(i: u32, l: u32, k_i_l: &HValue) -> (HValue, HValue) {
         // label = b("share_enc_keys",14)
         let label = "share_enc_keys".as_bytes();
-        // context = share_enc_keys("share_encrypt",13) | b(i, 4) | b(l, 4)
+        // context = b("share_encrypt",13) | b(i, 4) | b(l, 4)
         let mut context = "share_encrypt".as_bytes().to_vec();
         context.extend_from_slice(i.to_be_bytes().as_slice());
         context.extend_from_slice(l.to_be_bytes().as_slice());
