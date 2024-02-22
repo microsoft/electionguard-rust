@@ -208,6 +208,7 @@ impl BallotPreEncrypted {
         };
 
         Ok(BallotEncrypted::new(
+            self.ballot_style_index,
             &contests,
             BallotState::Cast,
             self.confirmation_code,
