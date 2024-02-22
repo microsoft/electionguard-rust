@@ -182,7 +182,7 @@ impl BallotPreEncrypted {
         let mut contests = BTreeMap::new();
 
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        for i in 1..self.contests.len() + 1{
+        for i in 1..self.contests.len() + 1 {
             let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
             let contest = self.contests.get(c_idx).unwrap();
             let correct_content_index = contest.contest_index;
@@ -196,16 +196,18 @@ impl BallotPreEncrypted {
             contests
                 .insert(
                     correct_content_index,
-                    contest.finalize(
-                        device,
-                        csprng,
-                        &voter_ballot.selections.get(c_idx).unwrap().get_vote(),
-                        c.selection_limit,
-                        c.options.len(),
-                    ).map_err(|err|BallotEncryptedError::ProofError{err})?,
+                    contest
+                        .finalize(
+                            device,
+                            csprng,
+                            &voter_ballot.selections.get(c_idx).unwrap().get_vote(),
+                            c.selection_limit,
+                            c.options.len(),
+                        )
+                        .map_err(|err| BallotEncryptedError::ProofError { err })?,
                 )
                 .unwrap();
-        };
+        }
 
         Ok(BallotEncrypted::new(
             self.ballot_style_index,

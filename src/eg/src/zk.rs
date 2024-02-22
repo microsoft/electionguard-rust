@@ -42,7 +42,9 @@ impl HasIndexTypeMarker for ProofRange {}
 #[derive(Error, Debug)]
 pub enum ProofRangeError {
     /// Bla bla
-    #[error("It must be the case that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l}).")]
+    #[error(
+        "It must be the case that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l})."
+    )]
     RangeNotSatisfied { small_l: usize, big_l: usize },
 }
 
@@ -102,7 +104,7 @@ impl ProofRange {
         big_l: usize,
     ) -> Result<Self, ProofRangeError> {
         if small_l > big_l {
-            return Err(ProofRangeError::RangeNotSatisfied{small_l, big_l});
+            return Err(ProofRangeError::RangeNotSatisfied { small_l, big_l });
         }
         let field = &pvd.parameters.fixed_parameters.field;
         let group = &pvd.parameters.fixed_parameters.group;

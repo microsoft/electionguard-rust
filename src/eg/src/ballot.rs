@@ -21,7 +21,8 @@ use crate::{
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    joint_election_public_key::Ciphertext, zk::ProofRangeError,
+    joint_election_public_key::Ciphertext,
+    zk::ProofRangeError,
 };
 
 use thiserror::Error;
@@ -102,15 +103,15 @@ impl BallotEncrypted {
         let mut contests = BTreeMap::new();
 
         for (&c_idx, selection) in ctest_selections {
-            let contest = device.header.manifest.contests.get(c_idx).ok_or(BallotEncryptedError::ContestNotInManifest { idx: c_idx })?;
-            let contest_encrypted = ContestEncrypted::new(
-                device,
-                csprng,
-                primary_nonce,
-                contest,
-                c_idx,
-                selection,
-            ).map_err(|err| BallotEncryptedError::ProofError {err})?;
+            let contest = device
+                .header
+                .manifest
+                .contests
+                .get(c_idx)
+                .ok_or(BallotEncryptedError::ContestNotInManifest { idx: c_idx })?;
+            let contest_encrypted =
+                ContestEncrypted::new(device, csprng, primary_nonce, contest, c_idx, selection)
+                    .map_err(|err| BallotEncryptedError::ProofError { err })?;
 
             contests.insert(c_idx, contest_encrypted);
         }
@@ -267,9 +268,24 @@ mod test {
 
     use super::*;
     use crate::{
-        ballot::BallotEncrypted, ballot_style::BallotStyle, contest_selection::ContestSelection, device::Device, election_manifest::{Contest, ContestOption}, election_record::PreVotingData, example_election_manifest::example_election_manifest, example_election_parameters::example_election_parameters, guardian_public_key::GuardianPublicKey, guardian_secret_key::GuardianSecretKey, guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare}, hashes::Hashes, hashes_ext::HashesExt, index::Index, joint_election_public_key::JointElectionPublicKey, verifiable_decryption::{
+        ballot::BallotEncrypted,
+        ballot_style::BallotStyle,
+        contest_selection::ContestSelection,
+        device::Device,
+        election_manifest::{Contest, ContestOption},
+        election_record::PreVotingData,
+        example_election_manifest::example_election_manifest,
+        example_election_parameters::example_election_parameters,
+        guardian_public_key::GuardianPublicKey,
+        guardian_secret_key::GuardianSecretKey,
+        guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
+        hashes::Hashes,
+        hashes_ext::HashesExt,
+        index::Index,
+        joint_election_public_key::JointElectionPublicKey,
+        verifiable_decryption::{
             CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption,
-        }
+        },
     };
     use std::iter::zip;
     use util::csprng::Csprng;
@@ -340,15 +356,15 @@ mod test {
             ),
             (
                 Index::from_one_based_index(3).unwrap(),
-                ContestSelection::new(vec![0, 0, 1]).unwrap()
+                ContestSelection::new(vec![0, 0, 1]).unwrap(),
             ),
             (
                 Index::from_one_based_index(4).unwrap(),
-                ContestSelection::new(vec![1, 0, 0]).unwrap()
+                ContestSelection::new(vec![1, 0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(5).unwrap(),
-                ContestSelection::new(vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0]).unwrap()
+                ContestSelection::new(vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0]).unwrap(),
             ),
             (
                 Index::from_one_based_index(6).unwrap(),
@@ -372,13 +388,18 @@ mod test {
             ),
         ]);
 
-        let ballot_from_selections =
-            BallotEncrypted::new_from_selections(Index::from_one_based_index(2).unwrap(), &device, &mut csprng, &primary_nonce, &selections).unwrap();
+        let ballot_from_selections = BallotEncrypted::new_from_selections(
+            Index::from_one_based_index(2).unwrap(),
+            &device,
+            &mut csprng,
+            &primary_nonce,
+            &selections,
+        )
+        .unwrap();
 
         // Let's verify the ballot proofs.
 
-        let verify_result =
-            ballot_from_selections.verify(&device.header);
+        let verify_result = ballot_from_selections.verify(&device.header);
 
         assert!(verify_result)
     }
@@ -575,11 +596,8 @@ mod test {
 
         let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
 
-        let hashes_ext = HashesExt::compute(
-            &election_parameters,
-            &hashes,
-            &joint_election_public_key,
-        );
+        let hashes_ext =
+            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
         let pre_voting_data = PreVotingData {
             manifest: election_manifest.clone(),
@@ -630,20 +648,35 @@ mod test {
                 ContestSelection::new(vec![1, 0, 0]).unwrap(),
             ),
         ]);
-        let ballot_voter1 =
-            BallotEncrypted::new_from_selections(Index::from_one_based_index(1).unwrap(), &device, &mut csprng, &primary_nonce, &voter1).unwrap();
-        let verify_result1 =
-            ballot_voter1.verify(&device.header);
+        let ballot_voter1 = BallotEncrypted::new_from_selections(
+            Index::from_one_based_index(1).unwrap(),
+            &device,
+            &mut csprng,
+            &primary_nonce,
+            &voter1,
+        )
+        .unwrap();
+        let verify_result1 = ballot_voter1.verify(&device.header);
         assert!(verify_result1);
-        let ballot_voter2 =
-            BallotEncrypted::new_from_selections(Index::from_one_based_index(2).unwrap(), &device, &mut csprng, &primary_nonce, &voter2).unwrap();
-        let verify_result2 =
-            ballot_voter2.verify(&device.header);
+        let ballot_voter2 = BallotEncrypted::new_from_selections(
+            Index::from_one_based_index(2).unwrap(),
+            &device,
+            &mut csprng,
+            &primary_nonce,
+            &voter2,
+        )
+        .unwrap();
+        let verify_result2 = ballot_voter2.verify(&device.header);
         assert!(verify_result2);
-        let ballot_voter3 =
-            BallotEncrypted::new_from_selections(Index::from_one_based_index(3).unwrap(), &device, &mut csprng, &primary_nonce, &voter3).unwrap();
-        let verify_result3 =
-            ballot_voter3.verify(&device.header);
+        let ballot_voter3 = BallotEncrypted::new_from_selections(
+            Index::from_one_based_index(3).unwrap(),
+            &device,
+            &mut csprng,
+            &primary_nonce,
+            &voter3,
+        )
+        .unwrap();
+        let verify_result3 = ballot_voter3.verify(&device.header);
         assert!(verify_result3);
 
         let factor = FieldElement::from(1u8, &fixed_parameters.field);

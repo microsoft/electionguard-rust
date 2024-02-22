@@ -166,7 +166,7 @@ impl ContestSelectionPreEncrypted {
             proofs
                 .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce)?)
                 .unwrap();
-        };
+        }
         Ok(proofs)
     }
 }

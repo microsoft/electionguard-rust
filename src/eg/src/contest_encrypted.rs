@@ -112,13 +112,12 @@ impl ContestEncrypted {
             // This is OK, since selection_and_nonce.len() = pt_vote.vote.len() which
             // is guaranteed to not exceed the size of a `Index<T>` by how a `ContestSelection` is
             // constructed.
-            proof_ballot_correctness
-                .push_unchecked(sel.proof_ballot_correctness(
-                    &device.header,
-                    csprng,
-                    pt_vote.get_vote()[i] == 1u8,
-                    nonce,
-                )?);
+            proof_ballot_correctness.push_unchecked(sel.proof_ballot_correctness(
+                &device.header,
+                csprng,
+                pt_vote.get_vote()[i] == 1u8,
+                nonce,
+            )?);
         }
 
         let mut num_selections = 0;

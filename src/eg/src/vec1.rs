@@ -104,7 +104,6 @@ impl<T: HasIndexType> Vec1<T> {
         self.0.push(value);
     }
 
-
     /// Attempts to reserve capacity for at least the specified number of additional elements to be
     /// added. Compare to: [`Vec::try_reserve`].
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {

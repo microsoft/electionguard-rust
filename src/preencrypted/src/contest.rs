@@ -126,7 +126,11 @@ impl ContestPreEncrypted {
             let selection = self.selections.get(i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(selection.proof_ballot_correctness(pvd, csprng, i.get_one_based_usize())?)
+                .try_push(selection.proof_ballot_correctness(
+                    pvd,
+                    csprng,
+                    i.get_one_based_usize(),
+                )?)
                 .unwrap();
         }
         Ok(proofs)

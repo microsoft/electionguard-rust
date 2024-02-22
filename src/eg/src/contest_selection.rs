@@ -48,14 +48,14 @@ impl HasIndexType for ContestSelection {
 }
 
 impl ContestSelection {
-    pub fn new(vote: Vec<ContestSelectionPlaintext>) -> Option<ContestSelection>{
+    pub fn new(vote: Vec<ContestSelectionPlaintext>) -> Option<ContestSelection> {
         if vote.len() > Index::<ContestSelectionPlaintext>::VALID_MAX_USIZE {
             return None;
         }
-        Some(ContestSelection{vote})
+        Some(ContestSelection { vote })
     }
 
-    pub fn get_vote(&self) -> &[ContestSelectionPlaintext]{
+    pub fn get_vote(&self) -> &[ContestSelectionPlaintext] {
         &self.vote
     }
 
