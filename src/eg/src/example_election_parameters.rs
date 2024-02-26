@@ -31,7 +31,7 @@ pub fn example_election_parameters() -> ElectionParameters {
     let varying_parameters = VaryingParameters {
         n,
         k,
-        date: Utc.with_ymd_and_hms(2023, 05, 02, 0, 0, 0).unwrap(),
+        date: Utc.with_ymd_and_hms(2023, 5, 2, 0, 0, 0).unwrap(),
         info: "The United Realms of Imaginaria, General Election".to_string(),
         ballot_chaining: BallotChaining::Prohibited,
     };

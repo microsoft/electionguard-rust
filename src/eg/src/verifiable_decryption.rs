@@ -796,7 +796,7 @@ mod test {
         let varying_parameters = VaryingParameters {
             n: GuardianIndex::from_one_based_index(3).unwrap(),
             k: GuardianIndex::from_one_based_index(3).unwrap(),
-            date: Utc.with_ymd_and_hms(2023, 05, 02, 0, 0, 0).unwrap(),
+            date: Utc.with_ymd_and_hms(2023, 5, 2, 0, 0, 0).unwrap(),
             info: "The test election".to_string(),
             ballot_chaining: BallotChaining::Prohibited,
         };
