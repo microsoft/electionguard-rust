@@ -252,6 +252,8 @@ mod test {
         let expected_h_p = HValue::from(hex!(
             "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296"
         ));
+        // These hashes are to get notified if the hash computation is changed. They have
+        // not been computed externally.
         let expected_h_m = HValue::from(hex!(
             "242568E9ECD120DA2CD7C86FB7F8504996FBAE934A558CF28D22DC8529C7C487"
         ));

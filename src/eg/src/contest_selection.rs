@@ -20,9 +20,6 @@ use crate::{
 
 pub type ContestSelectionPlaintext = u8;
 
-// /// A 1-based index of a [`ContestSelectionPlaintext`] in the order it is defined in the [`crate::election_manifest::ElectionManifest`].
-// pub type ContestSelectionPlaintextIndex = Index<ContestSelectionPlaintext>;
-
 /// A 1-based index of a [`ContestSelection`].
 pub type ContestSelectionIndex = Index<ContestSelection>;
 

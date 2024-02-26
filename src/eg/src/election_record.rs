@@ -61,8 +61,9 @@ pub struct ElectionRecordBody {
     /// Every challenged ballot
     // challenged_ballots: Vec<BallotSelections>,
 
-    /// Ordered lists of ballots encrypted by each device
-    ballots_by_device: HashMap<String, String>,
+    /// Ordered lists of ballots encrypted by each device. The values are indiced of the `all_ballots`
+    /// vector.
+    ballots_by_device: HashMap<String, usize>,
 }
 #[allow(dead_code)]
 /// The election record.
