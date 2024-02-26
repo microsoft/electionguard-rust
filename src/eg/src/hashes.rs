@@ -87,7 +87,7 @@ impl Hashes {
             }
 
             for u in [
-                &election_parameters.varying_parameters.date,
+                &election_parameters.varying_parameters.date.to_rfc3339(),
                 &election_parameters.varying_parameters.info,
             ] {
                 v.extend_from_slice(u.as_bytes());
@@ -167,6 +167,7 @@ mod test {
         standard_parameters::STANDARD_PARAMETERS,
         varying_parameters::{BallotChaining, VaryingParameters},
     };
+    use chrono::{TimeZone, Utc};
     use hex_literal::hex;
 
     #[test]
@@ -230,7 +231,7 @@ mod test {
         let varying_parameters = VaryingParameters {
             n,
             k,
-            date: "1212-12-12".to_string(),
+            date: Utc.with_ymd_and_hms(1212, 12, 12, 0, 0, 0).unwrap(),
             info: "Testing".to_string(),
             ballot_chaining: BallotChaining::Prohibited,
         };
@@ -255,7 +256,7 @@ mod test {
             "242568E9ECD120DA2CD7C86FB7F8504996FBAE934A558CF28D22DC8529C7C487"
         ));
         let expected_h_b = HValue::from(hex!(
-            "9D9A936241784D8D0B926579B6A7E7036AC2DE91B0EAC48ACC157A75EB179A79"
+            "ECF3D1424BAC568DEB036005E4151C8CE888913A291A6AA2C307BCE091EB48CB"
         ));
 
         #[cfg(test_hash_mismatch_warn_only)]

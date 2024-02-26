@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use util::{algebra::FieldElement, csprng::Csprng};
@@ -50,7 +51,7 @@ pub struct BallotEncrypted {
     pub state: BallotState,
 
     /// Date (and time) of ballot generation
-    pub date: String,
+    pub date: DateTime<Utc>,
 
     /// Device that generated this ballot
     pub device: String,
@@ -80,7 +81,7 @@ impl BallotEncrypted {
         contests: &BTreeMap<ContestIndex, ContestEncrypted>,
         state: BallotState,
         confirmation_code: HValue,
-        date: &str,
+        date: DateTime<Utc>,
         device: &str,
     ) -> BallotEncrypted {
         BallotEncrypted {
@@ -88,7 +89,7 @@ impl BallotEncrypted {
             contests: contests.clone(),
             state,
             confirmation_code,
-            date: date.to_string(),
+            date,
             device: device.to_string(),
         }
     }
@@ -124,7 +125,7 @@ impl BallotEncrypted {
             contests,
             state: BallotState::Uncast,
             confirmation_code,
-            date: device.header.parameters.varying_parameters.date.clone(),
+            date: Utc::now(),
             device: device.uuid.clone(),
         })
     }
@@ -137,7 +138,7 @@ impl BallotEncrypted {
         &self.confirmation_code
     }
 
-    pub fn date(&self) -> &String {
+    pub fn date(&self) -> &DateTime<Utc> {
         &self.date
     }
 

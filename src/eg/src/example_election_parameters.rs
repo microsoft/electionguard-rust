@@ -5,6 +5,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use chrono::{TimeZone, Utc};
+
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
@@ -29,7 +31,7 @@ pub fn example_election_parameters() -> ElectionParameters {
     let varying_parameters = VaryingParameters {
         n,
         k,
-        date: "2023-05-02".to_string(),
+        date: Utc.with_ymd_and_hms(2023, 05, 02, 0, 0, 0).unwrap(),
         info: "The United Realms of Imaginaria, General Election".to_string(),
         ballot_chaining: BallotChaining::Prohibited,
     };

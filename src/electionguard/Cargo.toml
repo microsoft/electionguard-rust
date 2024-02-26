@@ -13,3 +13,4 @@ eg = { path = "../eg" }
 util = { path = "../util" }
 preencrypted = { path = "../preencrypted" }
 # verifier = { path = "../verifier" }
+chrono = { version = "0.4.34", features = ["serde"] }

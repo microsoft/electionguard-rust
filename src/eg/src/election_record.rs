@@ -5,15 +5,21 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
+use util::algebra::FieldElement;
 
 use crate::{
-    ballot::BallotEncrypted, election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters, guardian_public_key::GuardianPublicKey,
-    hashes::Hashes, hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey,
+    ballot::BallotEncrypted,
+    election_manifest::{ContestIndex, ElectionManifest},
+    election_parameters::ElectionParameters,
+    guardian_public_key::GuardianPublicKey,
+    hashes::Hashes,
+    hashes_ext::HashesExt,
+    joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+    verifiable_decryption::VerifiableDecryption,
 };
 
 /// The header of the election record, generated before the election begins.
@@ -34,17 +40,26 @@ pub struct PreVotingData {
     /// The joint election public key.
     pub public_key: JointElectionPublicKey,
 }
+
 #[allow(dead_code)]
 /// The body of the election record, generated after the election is complete.
 #[derive(Debug)]
 pub struct ElectionRecordBody {
-    /// Every encrypted ballot prepared in the election (whether cast or challenged)
-    all_ballots: Vec<BallotEncrypted>,
+    /// Guardian public keys including commitments and proofs of knowledge
+    guardian_public_keys: Vec<GuardianPublicKey>,
+
+    /// Every encrypted ballot prepared in the election (whether cast or challenged) together
+    /// with its weight used in the tally.
+    all_ballots: Vec<(BallotEncrypted, FieldElement)>,
+
+    /// Encrypted tallies of each option
+    encrypted_tallies: BTreeMap<ContestIndex, Vec<Ciphertext>>,
+
+    /// Decrypted tallies with proofs of correct decryption
+    decrypted_tallies: BTreeMap<ContestIndex, Vec<VerifiableDecryption>>,
 
     /// Every challenged ballot
     // challenged_ballots: Vec<BallotSelections>,
-
-    /// Tally of all cast ballots
 
     /// Ordered lists of ballots encrypted by each device
     ballots_by_device: HashMap<String, String>,

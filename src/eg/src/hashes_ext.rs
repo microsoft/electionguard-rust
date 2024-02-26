@@ -132,7 +132,7 @@ mod test {
             HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
         let expected_h_e = HValue::from(hex!(
-            "84135D7084DC8EC9A6E593EE0D7DF9E8F0444DEEB0B1C72BBCB0184D8D50C3A2"
+            "5BFE1B5789C2F0D3C3C16D5D0F43012B5F920CC0AA61FF92B4B04C759B472F82"
         ));
 
         #[cfg(test_hash_mismatch_warn_only)]
