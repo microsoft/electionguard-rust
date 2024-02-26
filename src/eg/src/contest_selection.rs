@@ -18,16 +18,6 @@ use crate::{
     zk::{ProofRange, ProofRangeError},
 };
 
-// An encrypted option in a contest.
-// #[derive(Debug, Clone)]
-// pub struct ContestSelectionCiphertext {
-//     /// Ciphertext
-//     pub ciphertext: Ciphertext,
-//     // TODO: Probably shouldn't be here
-//     // Nonce used to produce the ciphertext
-//     // pub nonce: BigUint,
-// }
-
 pub type ContestSelectionPlaintext = u8;
 
 // /// A 1-based index of a [`ContestSelectionPlaintext`] in the order it is defined in the [`crate::election_manifest::ElectionManifest`].
@@ -81,21 +71,6 @@ impl ContestSelection {
 
         Self { vote }
     }
-
-    // Choices are 1-indexed
-    // pub fn new_unchecked(choices: Vec<u32>, num_options: usize) -> Self {
-    //     let mut vote = Vec::new();
-    //     for _ in 0..num_options {
-    //         vote.try_push(0).unwrap();
-    //     }
-
-    //     for choice in choices {
-    //         let idx = <Index<u8>>::from_one_based_index(choice).unwrap();
-    //         *vote.get_mut(idx).unwrap() = 1u8;
-    //     }
-
-    //     Self { vote }
-    // }
 }
 
 impl Ciphertext {
@@ -114,28 +89,3 @@ impl Ciphertext {
         proof.verify(header, self, 1)
     }
 }
-
-// /// Serialize for CiphertextContestSelection
-// impl Serialize for ContestSelectionCiphertext {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::ser::Serializer,
-//     {
-//         self.ciphertext.clone().serialize(serializer)
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for ContestSelectionCiphertext {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         match Ciphertext::deserialize(deserializer) {
-//             Ok(ciphertext) => Ok(ContestSelectionCiphertext {
-//                 ciphertext,
-//                 nonce: BigUint::from(0 as u8),
-//             }),
-//             Err(e) => Err(e),
-//         }
-//     }
-// }
