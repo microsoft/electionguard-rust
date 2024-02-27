@@ -67,7 +67,7 @@ pub struct ScaledBallotEncrypted {
 #[derive(Error, Debug)]
 pub enum BallotEncryptedError {
     /// Proof production error
-    #[error("Error producing ballot proofs: {:?}", err)]
+    #[error("Error producing ballot proofs: {}", err)]
     ProofError { err: ProofRangeError },
     /// Error looking up contest in manifest
     #[error("Contest (index {}) not found in election manifest.", idx)]
