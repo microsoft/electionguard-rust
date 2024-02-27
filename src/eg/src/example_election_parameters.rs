@@ -6,7 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use chrono::{TimeZone, Utc};
-
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
