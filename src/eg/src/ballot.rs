@@ -25,7 +25,6 @@ use crate::{
     joint_election_public_key::Ciphertext,
     zk::ProofRangeError,
 };
-
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
