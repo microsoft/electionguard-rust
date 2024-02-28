@@ -5,7 +5,6 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use chrono::{TimeZone, Utc};
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
@@ -13,6 +12,7 @@ use crate::{
     standard_parameters::STANDARD_PARAMETERS,
     varying_parameters::{BallotChaining, VaryingParameters},
 };
+use chrono::{TimeZone, Utc};
 
 /// An example ElectionParameters object, based on the standard parameters.
 pub fn example_election_parameters() -> ElectionParameters {

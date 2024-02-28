@@ -41,36 +41,35 @@ pub struct PreVotingData {
     pub public_key: JointElectionPublicKey,
 }
 
-#[allow(dead_code)]
 /// The body of the election record, generated after the election is complete.
 #[derive(Debug)]
 pub struct ElectionRecordBody {
     /// Guardian public keys including commitments and proofs of knowledge
-    guardian_public_keys: Vec<GuardianPublicKey>,
+    pub guardian_public_keys: Vec<GuardianPublicKey>,
 
     /// Every encrypted ballot prepared in the election (whether cast or challenged) together
     /// with its weight used in the tally.
-    all_ballots: Vec<(BallotEncrypted, FieldElement)>,
+    pub all_ballots: Vec<(BallotEncrypted, FieldElement)>,
 
     /// Encrypted tallies of each option
-    encrypted_tallies: BTreeMap<ContestIndex, Vec<Ciphertext>>,
+    pub encrypted_tallies: BTreeMap<ContestIndex, Vec<Ciphertext>>,
 
     /// Decrypted tallies with proofs of correct decryption
-    decrypted_tallies: BTreeMap<ContestIndex, Vec<VerifiableDecryption>>,
+    pub decrypted_tallies: BTreeMap<ContestIndex, Vec<VerifiableDecryption>>,
 
     /// Every challenged ballot
     // challenged_ballots: Vec<BallotSelections>,
 
     /// Ordered lists of ballots encrypted by each device. The values are indiced of the `all_ballots`
     /// vector.
-    ballots_by_device: HashMap<String, usize>,
+    pub ballots_by_device: HashMap<String, usize>,
 }
-#[allow(dead_code)]
+
 /// The election record.
 #[derive(Debug)]
 pub struct ElectionRecord {
-    prevoting: PreVotingData,
-    body: ElectionRecordBody,
+    pub prevoting: PreVotingData,
+    pub body: ElectionRecordBody,
 }
 
 impl PreVotingData {
