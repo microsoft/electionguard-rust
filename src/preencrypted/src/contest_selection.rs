@@ -13,7 +13,7 @@ use eg::{
     index::Index,
     joint_election_public_key::{Ciphertext, Nonce},
     vec1::Vec1,
-    zk::ProofRange,
+    zk::{ProofRange, ProofRangeError},
 };
 
 use serde::{Deserialize, Serialize};
@@ -156,17 +156,17 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         csprng: &mut Csprng,
         sequence_order: usize,
-    ) -> Vec1<ProofRange> {
+    ) -> Result<Vec1<ProofRange>, ProofRangeError> {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
-        self.selections.iter().enumerate().for_each(|(i, c)| {
+        for (i, c) in self.selections.iter().enumerate() {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let nonce = c.1.as_ref().unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce))
+                .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce)?)
                 .unwrap();
-        });
-        proofs
+        }
+        Ok(proofs)
     }
 }

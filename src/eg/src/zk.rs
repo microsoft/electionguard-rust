@@ -21,6 +21,7 @@ use crate::{
     joint_election_public_key::{Ciphertext, Nonce},
     vec1::HasIndexTypeMarker,
 };
+use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRangeSingle {
@@ -37,6 +38,15 @@ pub type ProofRangeIndex = Index<ProofRange>;
 pub struct ProofRange(Vec<ProofRangeSingle>);
 
 impl HasIndexTypeMarker for ProofRange {}
+
+#[derive(Error, Debug)]
+pub enum ProofRangeError {
+    /// Bla bla
+    #[error(
+        "It must be the case that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l})."
+    )]
+    RangeNotSatisfied { small_l: usize, big_l: usize },
+}
 
 impl ProofRange {
     /// This function computes the challenge for the range proof as specified in Equation `46`.
@@ -92,7 +102,10 @@ impl ProofRange {
         nonce: &Nonce,
         small_l: usize,
         big_l: usize,
-    ) -> Self {
+    ) -> Result<Self, ProofRangeError> {
+        if small_l > big_l {
+            return Err(ProofRangeError::RangeNotSatisfied { small_l, big_l });
+        }
         let field = &pvd.parameters.fixed_parameters.field;
         let group = &pvd.parameters.fixed_parameters.group;
 
@@ -133,14 +146,14 @@ impl ProofRange {
             .map(|j| u[j].sub(&c[j].mul(&nonce.xi, field), field))
             .collect::<Vec<FieldElement>>();
 
-        ProofRange(
+        Ok(ProofRange(
             (0..big_l + 1)
                 .map(|j| ProofRangeSingle {
                     c: c[j].clone(),
                     v: v[j].clone(),
                 })
                 .collect(),
-        )
+        ))
     }
 
     /// This function verifies a [`ProofRange`] with respect to a given [`Ciphertext`] and context.

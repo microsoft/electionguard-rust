@@ -18,6 +18,7 @@ static_assertions = "1.1.0"
 thiserror = "1.0"
 util = { path = "../util" }
 base64 = "0.21.2"
+chrono = { version = "0.4.34", features = ["serde"] }
 
 # For testing
 anyhow = "1.0"

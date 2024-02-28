@@ -144,7 +144,7 @@ impl Subcommand for PreEncryptedBallotRecord {
                     VoterSelection::from_stdioread(&mut stdioread)?
                 };
                 let encrypted_ballot =
-                    regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot);
+                    regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot)?;
 
                 let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                     &None,

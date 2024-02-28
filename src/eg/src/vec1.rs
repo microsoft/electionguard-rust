@@ -98,6 +98,12 @@ impl<T: HasIndexType> Vec1<T> {
         Ok(())
     }
 
+    /// Pushes an additional element onto the Vec1. It is a precondition that doing so would not exceed
+    /// the size of a `Index<T>`.
+    pub fn push_unchecked(&mut self, value: T) {
+        self.0.push(value);
+    }
+
     /// Attempts to reserve capacity for at least the specified number of additional elements to be
     /// added. Compare to: [`Vec::try_reserve`].
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
