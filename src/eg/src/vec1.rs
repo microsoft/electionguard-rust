@@ -152,6 +152,12 @@ impl<T: HasIndexType> Vec1<T> {
         })
     }
 
+    /// Returns an iterator over refs to any contained elements.
+    /// Compare to: [`slice::iter`].
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.0.iter()
+    }
+
     //todo!(); //? TODO: consider iterator over index value and ref
     //todo!(); //? TODO: consider iterator over index value and mut ref
 }
