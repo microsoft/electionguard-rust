@@ -37,6 +37,11 @@ pub struct ScalarField {
 }
 
 impl FieldElement {
+    /// The numeric value of the field element. Guaranteed to be `< q`.
+    pub fn value(&self) -> &BigUint {
+        &self.0
+    }
+
     /// Performs field addition.
     ///
     /// That is the function computes `(self + other) % q` where `q` is the field order.
