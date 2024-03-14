@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ballot_style::BallotStyle;
 use crate::index::Index;
-use crate::vec1::Vec1;
+use crate::vec1::{HasIndexTypeMarker, Vec1};
 
 /// The election manifest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +90,8 @@ pub struct Contest {
     pub options: Vec1<ContestOption>,
 }
 
+impl HasIndexTypeMarker for Contest {}
+
 /// A 1-based index of a [`Contest`] in the order it is defined in the [`ElectionManifest`].
 pub type ContestIndex = Index<Contest>;
 
@@ -111,6 +113,8 @@ pub struct ContestOption {
     pub opt_vote_limit: Option<NonZeroU32>,
      */
 }
+
+impl HasIndexTypeMarker for ContestOption {}
 
 /// A 1-based index of a [`ContestOption`] in the order it is defined within its
 /// [`Contest`], in the order it is defined in the [`ElectionManifest`].

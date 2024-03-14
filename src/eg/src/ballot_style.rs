@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::election_manifest::ContestIndex;
 use crate::index::Index;
+use crate::vec1::HasIndexTypeMarker;
 
 /// A 1-based index of a `BallotStyle` in the order it is defined in the `ElectionManifest`.
 pub type BallotStyleIndex = Index<BallotStyle>;
@@ -26,3 +27,5 @@ pub struct BallotStyle {
     /// The indices of the `Contest`s which appear on ballots of this style.
     pub contests: BTreeSet<ContestIndex>,
 }
+
+impl HasIndexTypeMarker for BallotStyle {}

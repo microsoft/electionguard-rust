@@ -5,39 +5,34 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::borrow::Borrow;
+//! This module provides implementation of guardian secret keys. For more details see Section `3.2` of the Electionguard specification `2.0.0`.
 
-use anyhow::{ensure, Context, Result};
-use num_bigint::BigUint;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-
-use util::csprng::Csprng;
+use util::{
+    algebra::{FieldElement, GroupElement},
+    csprng::Csprng,
+};
 
 use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
     guardian::GuardianIndex,
+    guardian_coeff_proof::CoefficientProof,
     guardian_public_key::GuardianPublicKey,
-    guardian_public_key_info::{validate_guardian_public_key_info, GuardianPublicKeyInfo},
+    guardian_public_key_info::{
+        validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
+    },
 };
 
+/// A polynomial coefficient used to define a secret key sharing.
+///
+/// This corresponds to the `a_{i,j}` in Equation `9`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SecretCoefficient(
-    //? TODO ensure this is serialized in a fixed-length format
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub BigUint,
-);
+pub struct SecretCoefficient(pub FieldElement);
 
-impl SecretCoefficient {
-    /// Returns the `SecretCoefficient` as a big-endian byte array of the correct length for `mod q`.
-    pub fn to_be_bytes_len_q(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
-        fixed_parameters.biguint_to_be_bytes_len_q(&self.0)
-    }
-}
-
+/// A vector of [`SecretCoefficient`]s defining a sharing of the guardian's secret key.
+///
 /// "Each guardian G_i in an election with a decryption threshold of k generates k secret
 /// polynomial coefficients a_i,j, for 0 ≤ j < k, by sampling them uniformly, at random in
 /// the range 0 ≤ a_i,j < q.
@@ -45,51 +40,49 @@ impl SecretCoefficient {
 pub struct SecretCoefficients(pub Vec<SecretCoefficient>);
 
 impl SecretCoefficients {
+    /// This function generates a fresh [`SecretCoefficients`].
+    ///
+    /// The arguments are
+    /// - `csprng` - secure randomness generator
+    /// - `election_parameters` - the election parameters
     pub fn generate(csprng: &mut Csprng, election_parameters: &ElectionParameters) -> Self {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
 
+        let field = &fixed_parameters.field;
         let k = varying_parameters.k;
 
         SecretCoefficients(
             (0..k.get_one_based_u32())
-                .map(|_j| SecretCoefficient(csprng.next_biguint_lt(fixed_parameters.q.borrow())))
+                .map(|_j| SecretCoefficient(field.random_field_elem(csprng)))
                 .collect(),
         )
     }
 }
 
+/// A commitment to a single [`SecretCoefficient`].
+///
+/// This corresponds to the `K_{i,j}` in Equation `10`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CoefficientCommitment(
-    #[serde(
-        serialize_with = "util::biguint_serde::biguint_serialize",
-        deserialize_with = "util::biguint_serde::biguint_deserialize"
-    )]
-    pub BigUint,
-);
+pub struct CoefficientCommitment(pub GroupElement);
 
 impl CoefficientCommitment {
-    /// Verifies that `CoefficientCommitment` is well-formed and conforms
-    /// to the election parameters. Useful after deserialization.
-    pub(crate) fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
-        ensure!(
-            election_parameters.fixed_parameters.is_valid_modp(&self.0),
-            "Coefficient commitment is not a valid mod p value"
-        );
-
-        Ok(())
-    }
-
-    /// Returns the `CoefficientCommitment` as a big-endian byte array of the correct length for `mod p`.
-    pub fn to_be_bytes_len_p(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
-        fixed_parameters.biguint_to_be_bytes_len_p(&self.0)
+    /// Returns the [`CoefficientCommitment`] as a big-endian byte array of the correct length for `mod p`.
+    pub fn to_be_bytes_left_pad(&self, fixed_parameters: &FixedParameters) -> Vec<u8> {
+        self.0.to_be_bytes_left_pad(&fixed_parameters.group)
     }
 }
 
+/// A vector of [`CoefficientCommitment`]s, defining the guardians public key.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CoefficientCommitments(pub Vec<CoefficientCommitment>);
 
 impl CoefficientCommitments {
+    /// This function computes the [`CoefficientCommitments`] for given [`SecretCoefficients`].
+    ///
+    /// The arguments are
+    /// - `fixed_parameters` - the fixed parameters    
+    /// - `secret_coefficients` - the secret coefficients
     pub fn new(
         fixed_parameters: &FixedParameters,
         secret_coefficients: &SecretCoefficients,
@@ -99,21 +92,19 @@ impl CoefficientCommitments {
                 .0
                 .iter()
                 .map(|secret_coefficient| {
-                    CoefficientCommitment(
-                        fixed_parameters
-                            .g
-                            .modpow(&secret_coefficient.0, fixed_parameters.p.as_ref()),
-                    )
+                    CoefficientCommitment(fixed_parameters.group.g_exp(&secret_coefficient.0))
                 })
                 .collect(),
         )
     }
 }
 
-/// Secret key for a guardian.
+/// The secret key for a guardian.
+///
+/// See Section `3.2.2` for details on the generation of secret keys.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GuardianSecretKey {
-    /// Guardian number, 1 <= i <= [`crate::varying_parameters::VaryingParameters::n`].
+    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
     pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
@@ -125,6 +116,9 @@ pub struct GuardianSecretKey {
 
     /// "Published" polynomial coefficient commitments.
     pub coefficient_commitments: CoefficientCommitments,
+
+    /// Proofs of knowledge for secret coefficients.
+    pub coefficient_proofs: Vec<CoefficientProof>,
 }
 
 impl GuardianPublicKeyInfo for GuardianSecretKey {
@@ -139,33 +133,90 @@ impl GuardianPublicKeyInfo for GuardianSecretKey {
     fn coefficient_commitments(&self) -> &CoefficientCommitments {
         &self.coefficient_commitments
     }
+
+    fn coefficient_proofs(&self) -> &[CoefficientProof] {
+        &self.coefficient_proofs
+    }
 }
 
 impl GuardianSecretKey {
+    /// This function generates a fresh [`GuardianSecretKey`] for guardian `i`.
+    ///
+    /// The arguments are
+    /// - `csprng` - secure randomness generator
+    /// - `election_parameters` - the election parameters
+    /// - `i` - the guardian's index
+    /// - `opt_name` - an optional name
     pub fn generate(
         csprng: &mut Csprng,
         election_parameters: &ElectionParameters,
         i: GuardianIndex,
         opt_name: Option<String>,
     ) -> Self {
+        let fixed_parameters = &election_parameters.fixed_parameters;
         let secret_coefficients = SecretCoefficients::generate(csprng, election_parameters);
-        assert_ne!(secret_coefficients.0.len(), 0);
 
-        let coefficient_commitments = CoefficientCommitments::new(
-            &election_parameters.fixed_parameters,
-            &secret_coefficients,
-        );
-        assert_ne!(secret_coefficients.0.len(), 0);
+        let coefficient_commitments =
+            CoefficientCommitments::new(fixed_parameters, &secret_coefficients);
+
+        let coefficient_proofs = secret_coefficients
+            .0
+            .iter()
+            .zip(&coefficient_commitments.0)
+            .enumerate()
+            .map(|(j, (coef, com))| {
+                CoefficientProof::new(
+                    csprng,
+                    fixed_parameters,
+                    i.get_one_based_u32(),
+                    j as u32,
+                    coef,
+                    com,
+                )
+            })
+            .collect();
 
         GuardianSecretKey {
             secret_coefficients,
             coefficient_commitments,
+            coefficient_proofs,
             i,
             opt_name,
         }
     }
 
-    /// Reads a `GuardianSecretKey` from a `std::io::Read` and validates it.
+    /// This function verifies that the `GuardianSecretKey` is well-formed and conforms to the election parameters.
+    /// Useful after deserialization.
+    pub fn validate(
+        &self,
+        election_parameters: &ElectionParameters,
+    ) -> Result<(), PublicKeyValidationError> {
+        validate_guardian_public_key_info(self, election_parameters)
+    }
+
+    /// This function returns the [`SecretCoefficients`] of the [`GuardianSecretKey`].
+    pub fn secret_coefficients(&self) -> &SecretCoefficients {
+        &self.secret_coefficients
+    }
+
+    /// This function returns the actual secret key of the [`GuardianSecretKey`].
+    ///
+    /// The returned value corresponds to `a_{i,0}` as defined in Section `3.2.2`.
+    pub fn secret_s(&self) -> &FieldElement {
+        &self.secret_coefficients.0[0].0
+    }
+
+    /// This function computes the [`GuardianPublicKey`] corresponding to the [`GuardianSecretKey`].
+    pub fn make_public_key(&self) -> GuardianPublicKey {
+        GuardianPublicKey {
+            i: self.i,
+            opt_name: self.opt_name.clone(),
+            coefficient_commitments: self.coefficient_commitments.clone(),
+            coefficient_proofs: self.coefficient_proofs.clone(),
+        }
+    }
+
+    /// Reads a [`GuardianSecretKey`] from a [`std::io::Read`] and validates it.
     pub fn from_stdioread_validated(
         stdioread: &mut dyn std::io::Read,
         election_parameters: &ElectionParameters,
@@ -178,30 +229,7 @@ impl GuardianSecretKey {
         Ok(self_)
     }
 
-    /// Verifies that the `GuardianSecretKey` is well-formed
-    /// and conforms to the election parameters.
-    /// Useful after deserialization.
-    pub fn validate(&self, election_parameters: &ElectionParameters) -> Result<()> {
-        validate_guardian_public_key_info(self, election_parameters)
-    }
-
-    pub fn secret_coefficients(&self) -> &SecretCoefficients {
-        &self.secret_coefficients
-    }
-
-    pub fn secret_s(&self) -> &BigUint {
-        &self.secret_coefficients.0[0].0
-    }
-
-    pub fn make_public_key(&self) -> GuardianPublicKey {
-        GuardianPublicKey {
-            i: self.i,
-            opt_name: self.opt_name.clone(),
-            coefficient_commitments: self.coefficient_commitments.clone(),
-        }
-    }
-
-    /// Writes a `GuardianSecretKey` to a `std::io::Write`.
+    /// Writes a [`GuardianSecretKey`] to a [`std::io::Write`].
     pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
         let mut ser = serde_json::Serializer::pretty(stdiowrite);
 

@@ -5,17 +5,14 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::{fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 
-use crate::{
-    confirmation_code::confirmation_code,
-    contest::{ContestPreEncrypted, ContestPreEncryptedIndex},
-};
+use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Context, Result};
 use eg::{
-    ballot::{BallotEncrypted, BallotState},
+    ballot::{BallotEncrypted, BallotEncryptedError, BallotState},
     ballot_style::BallotStyleIndex,
-    contest_selection::{ContestSelection, ContestSelectionIndex},
+    contest_selection::ContestSelection,
     device::Device,
     election_manifest::{ContestIndex, ElectionManifest},
     election_record::PreVotingData,
@@ -181,34 +178,45 @@ impl BallotPreEncrypted {
         device: &Device,
         csprng: &mut Csprng,
         voter_ballot: &VoterSelection,
-    ) -> BallotEncrypted {
-        let mut contests = Vec1::new();
+    ) -> Result<BallotEncrypted, BallotEncryptedError> {
+        let mut contests = BTreeMap::new();
 
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        (1..self.contests.len() + 1).for_each(|i| {
+        for i in 1..=self.contests.len() {
             let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
-            let vs_idx = ContestSelectionIndex::from_one_based_index(i as u32).unwrap();
-            let cp_idx = ContestPreEncryptedIndex::from_one_based_index(i as u32).unwrap();
+            let contest = self.contests.get(c_idx).unwrap();
+            let correct_content_index = contest.contest_index;
 
-            let c = device.header.manifest.contests.get(c_idx).unwrap();
+            let c = device
+                .header
+                .manifest
+                .contests
+                .get(correct_content_index)
+                .unwrap();
             contests
-                .try_push(self.contests.get(cp_idx).unwrap().finalize(
-                    device,
-                    csprng,
-                    &voter_ballot.selections.get(vs_idx).unwrap().vote,
-                    c.selection_limit,
-                    c.options.len(),
-                ))
-                .unwrap()
-        });
+                .insert(
+                    correct_content_index,
+                    contest
+                        .finalize(
+                            device,
+                            csprng,
+                            voter_ballot.selections.get(c_idx).unwrap().get_vote(),
+                            c.selection_limit,
+                            c.options.len(),
+                        )
+                        .map_err(|err| BallotEncryptedError::ProofError { err })?,
+                )
+                .unwrap();
+        }
 
-        BallotEncrypted::new(
+        Ok(BallotEncrypted::new(
+            self.ballot_style_index,
             &contests,
             BallotState::Cast,
             self.confirmation_code,
-            &device.header.parameters.varying_parameters.date,
+            device.header.parameters.varying_parameters.date,
             device.get_uuid(),
-        )
+        ))
     }
 
     /// Returns a pretty JSON `String` representation of `BallotPreEncrypted`.

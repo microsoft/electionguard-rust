@@ -6,22 +6,15 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
-use std::cmp::{PartialEq, PartialOrd};
-use std::convert::AsRef;
 use std::convert::Into;
 use std::convert::TryInto;
-use std::fmt::Debug;
 use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
+use num_integer::Integer;
 use num_traits::{One, Zero};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::biguint_serde;
-use crate::{
-    csprng::Csprng,
-    integer_util::{cnt_bits_repr_usize, largest_integer_a_such_that_2_to_a_divides_even_n},
-};
+use crate::csprng::Csprng;
 
 pub const PRIMES_TABLE_U8: [u8; 54] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
@@ -43,9 +36,10 @@ const MILLER_RABIN_ITERATIONS: usize = 50;
 //? TODO Would prefer to use AsRef instead of Borrow, but it doesn't have
 // an automatic `impl AsRef<T> for T`, and we can't `impl AsRef<BigUint> for BigUint`
 // since it's in a cargo crate.
-// `Borrow` does have a blanket implementation, but now we have to ensure that
-// the hash, ord, and eq traits work exactly the same between BigUintPrime and BigUint.
 
+/// This function provides a probabilistic primality test. For large numbers this call is expensive.
+///
+/// Internally, the function uses the Miller-Rabin test.
 pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
     //? OPT: Maybe somehow we could defer Csprng creation until we know that we need randomized primality testing.
 
@@ -80,7 +74,7 @@ pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
 
                 true
             } else {
-                let n: &BigUint = n.borrow();
+                let n: &BigUint = n;
 
                 if !n.bit(0) {
                     return false;
@@ -106,7 +100,6 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
     // 1. w The odd integer to be tested for primality.
     // 2. iterations The number of iterations of the test to be performed; the value
     // shall be consistent with Table B.1.
-    use num_integer::Integer;
     assert!(w.is_odd(), "requires w odd");
     assert!(!w.is_one(), "requires 3 <= w");
     assert!(iterations > 0);
@@ -177,122 +170,13 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
     true
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BigUintPrime(BigUint);
+fn largest_integer_a_such_that_2_to_a_divides_even_n(n: &BigUint) -> u64 {
+    assert!(n.is_even(), "requires n even");
+    assert!(!n.is_zero(), "requires n > 1");
 
-impl BigUintPrime {
-    // Constructor from BigUint
-    pub fn new(p: BigUint, csprng: &mut Csprng) -> Option<BigUintPrime> {
-        if is_prime(&p, csprng) {
-            Some(BigUintPrime(p))
-        } else {
-            None
-        }
-    }
-
-    pub fn new_unchecked_the_caller_guarantees_that_this_number_is_prime(
-        p: BigUint,
-    ) -> BigUintPrime {
-        BigUintPrime(p)
-    }
-
-    // Selects a random prime 2^(bits - 1) <= p < 2^bits
-    #[allow(clippy::panic)]
-    pub fn new_random_prime(bits: usize, csprng: &mut Csprng) -> BigUintPrime {
-        if PRIMES_TABLE_U8_BITS_RANGE.contains(&bits) {
-            let opt_ix_first_of_bits = PRIMES_TABLE_U8
-                .iter()
-                .position(|&p| bits == cnt_bits_repr_usize(p as usize));
-            let opt_ix_first_past_bits = PRIMES_TABLE_U8
-                .iter()
-                .position(|&p| bits < cnt_bits_repr_usize(p as usize));
-
-            let range = match (opt_ix_first_of_bits, opt_ix_first_past_bits) {
-                (Some(ix_first_of_bits), None) => ix_first_of_bits..PRIMES_TABLE_U8.len(),
-                (Some(ix_first_of_bits), Some(ix_first_past_bits)) => {
-                    ix_first_of_bits..ix_first_past_bits
-                }
-                _ => {
-                    panic!("shouldn't happen");
-                }
-            };
-
-            use rand::distributions::{Distribution, Uniform};
-            let ix = Uniform::from(range).sample(csprng);
-
-            let p = PRIMES_TABLE_U8[ix];
-            assert_eq!(cnt_bits_repr_usize(p as usize), bits);
-
-            BigUintPrime(p.into())
-        } else {
-            todo!("implement BigUintPrime::new_random_prime for bits > PRIMES_TABLE_U8_BITS_RANGE")
-        }
-    }
-
-    // Returns a random number chosen uniformly from 0 <= n < p.
-    pub fn random_group_elem(&self, csprng: &mut Csprng) -> BigUint {
-        csprng.next_biguint_lt(&self.0)
-    }
-
-    // Performs addition modulo prime p.
-    pub fn add_group_elem(&self, a: &BigUint, b: &BigUint) -> BigUint {
-        (a + b) % &self.0
-    }
-
-    // Performs subtraction modulo prime.
-    pub fn subtract_group_elem(&self, a: &BigUint, b: &BigUint) -> BigUint {
-        if a > b {
-            (a - b) % &self.0
-        } else {
-            &self.0 - ((b - a) % &self.0)
-        }
-    }
-
-    // Performs multiplication modulo prime.
-    pub fn multiply_group_elem(&self, a: &BigUint, b: &BigUint) -> BigUint {
-        (a * b) % &self.0
-    }
-}
-
-impl Serialize for BigUintPrime {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        biguint_serde::biguint_serialize(self.as_ref(), serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for BigUintPrime {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        //? TODO: check that the deserialized number is prime ?
-        biguint_serde::biguint_deserialize(deserializer)
-            .map(BigUintPrime::new_unchecked_the_caller_guarantees_that_this_number_is_prime)
-    }
-}
-
-impl From<BigUintPrime> for BigUint {
-    #[inline]
-    fn from(val: BigUintPrime) -> Self {
-        val.0
-    }
-}
-
-impl AsRef<BigUint> for BigUintPrime {
-    #[inline]
-    fn as_ref(&self) -> &BigUint {
-        &self.0
-    }
-}
-
-impl Borrow<BigUint> for BigUintPrime {
-    #[inline]
-    fn borrow(&self) -> &BigUint {
-        &self.0
-    }
+    // `unwrap()` is justified here because we just verified that 2 <= `n`.
+    #[allow(clippy::unwrap_used)]
+    n.trailing_zeros().unwrap()
 }
 
 #[cfg(test)]
@@ -301,6 +185,27 @@ mod test_primes {
     use num_traits::Num;
 
     use super::*;
+
+    #[test]
+    fn test_largest_integer_a_such_that_2_to_a_divides_even_n() {
+        for half_n in 1_usize..1000 {
+            let n = half_n * 2;
+
+            let a = largest_integer_a_such_that_2_to_a_divides_even_n(&BigUint::from(n));
+            assert!(a < 32);
+            let two_to_a = 1_usize << a;
+
+            assert!(n.is_multiple_of(&two_to_a));
+
+            for invalid_a in (a + 1)..32 {
+                let two_to_invalid_a = 1_usize << invalid_a;
+                if n.is_multiple_of(&two_to_invalid_a) {
+                    println!("\n\nn={n}, a={a}, invalid_a={invalid_a}, two_to_invalid_a={two_to_invalid_a}\n");
+                }
+                assert!(!n.is_multiple_of(&two_to_invalid_a));
+            }
+        }
+    }
 
     #[test]
     fn test_is_prime() {
@@ -350,30 +255,6 @@ mod test_primes {
             for expected_prime in (-2..=2).map(|offset| offset == 0) {
                 assert_eq!(is_prime(&n, &mut csprng), expected_prime);
                 n += BigUint::one();
-            }
-        }
-    }
-
-    #[test]
-    fn test_conversion_biguintprime_biguint() {
-        let mut csprng = Csprng::new(b"test_conversion_biguintprime_biguint");
-        let n = 3_u8;
-        let p = BigUintPrime::new(n.into(), &mut csprng).unwrap();
-        let b: BigUint = p.into();
-        assert_eq!(b, n.into());
-    }
-
-    #[test]
-    fn test_new_random_prime() {
-        let mut csprng = Csprng::new(b"test_new_random_prime");
-
-        for bits in PRIMES_TABLE_U8_BITS_RANGE {
-            for _ in 0..100 {
-                let p = BigUintPrime::new_random_prime(bits, &mut csprng);
-                assert!(is_prime(&p.0, &mut csprng));
-
-                let p: usize = p.0.try_into().unwrap();
-                assert_eq!(cnt_bits_repr_usize(p), bits);
             }
         }
     }

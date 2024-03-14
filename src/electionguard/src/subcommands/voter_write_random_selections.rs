@@ -6,14 +6,15 @@
 #![deny(clippy::manual_assert)]
 
 use std::{
+    collections::BTreeMap,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{Context, Result};
 use eg::{
-    ballot::BallotEncrypted, contest_selection::ContestSelection, device::Device,
-    election_record::PreVotingData,
+    ballot::BallotEncrypted, ballot_style::BallotStyleIndex, contest_selection::ContestSelection,
+    device::Device, election_manifest::ContestIndex, election_record::PreVotingData,
 };
 
 use crate::{
@@ -68,21 +69,22 @@ impl Subcommand for VoterWriteRandomSelection {
         );
         let device = Device::new("Ballot Recording Tool", record_header.clone());
 
-        let contest_selections = election_manifest
-            .contests
-            .iter()
-            .map(|c| {
-                ContestSelection::new_pick_random(&mut csprng, c.selection_limit, c.options.len())
-            })
-            .collect::<Vec<_>>()
-            .try_into()?;
+        let mut contest_selections = BTreeMap::new();
+        for (i, c) in (1u32..).zip(election_manifest.contests) {
+            let selection =
+                ContestSelection::new_pick_random(&mut csprng, c.selection_limit, c.options.len());
+            contest_selections.insert(ContestIndex::from_one_based_index_unchecked(i), selection);
+        }
+        let ballot_style_index = BallotStyleIndex::from_one_based_index_unchecked(1u32);
 
         let ballot = BallotEncrypted::new_from_selections(
+            ballot_style_index,
             &device,
             &mut csprng,
             record_header.hashes_ext.h_e.as_ref(),
             &contest_selections,
-        );
+        )
+        .unwrap();
 
         // distinct from `ballot.date`
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

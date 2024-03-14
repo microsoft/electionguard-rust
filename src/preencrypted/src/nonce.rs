@@ -10,7 +10,7 @@ use eg::{
     election_record::PreVotingData,
     hash::eg_h,
 };
-use num_bigint::BigUint;
+use util::algebra::FieldElement;
 
 // impl Nonce {
 /// Generates a nonce for pre-encrypted ballots (Equation 97)
@@ -23,7 +23,8 @@ pub fn option_nonce(
     index_i: ContestIndex,
     index_j: ContestOptionIndex,
     index_k: ContestOptionIndex,
-) -> BigUint {
+) -> FieldElement {
+    let field = &header.parameters.fixed_parameters.field;
     let mut v = vec![0x43];
 
     v.extend_from_slice(primary_nonce);
@@ -32,5 +33,5 @@ pub fn option_nonce(
     v.extend_from_slice(index_k.get_one_based_u32().to_be_bytes().as_slice());
 
     let nonce = eg_h(&header.hashes_ext.h_e, &v);
-    BigUint::from_bytes_be(nonce.0.as_slice()) % header.parameters.fixed_parameters.q.as_ref()
+    FieldElement::from_bytes_be(nonce.0.as_slice(), field)
 }

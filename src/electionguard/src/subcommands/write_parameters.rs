@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
+use chrono::{DateTime, Utc};
 use eg::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
     standard_parameters::STANDARD_PARAMETERS, varying_parameters::VaryingParameters,
@@ -48,7 +49,7 @@ pub(crate) struct WriteParameters {
 
     /// Date string.
     #[arg(long)]
-    date: String,
+    date: DateTime<Utc>,
 
     // Jurisdictional information string.
     #[arg(long)]

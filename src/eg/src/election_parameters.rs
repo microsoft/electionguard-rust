@@ -6,7 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{Context, Result};
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 use util::csprng::Csprng;
@@ -56,16 +55,6 @@ impl ElectionParameters {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
-    }
-
-    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod p`.
-    pub fn biguint_to_be_bytes_len_p(&self, u: &BigUint) -> Vec<u8> {
-        self.fixed_parameters.biguint_to_be_bytes_len_p(u)
-    }
-
-    /// Converts a `BigUint` to a big-endian byte array of the correct length for `mod q`.
-    pub fn biguint_to_be_bytes_len_q(&self, u: &BigUint) -> Vec<u8> {
-        self.fixed_parameters.biguint_to_be_bytes_len_q(u)
     }
 
     /// Writes a `ElectionParameters` to a `std::io::Write`.

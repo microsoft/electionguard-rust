@@ -7,39 +7,45 @@
 
 use serde::{Deserialize, Serialize};
 
-use util::{csprng::Csprng, prime::BigUintPrime};
+use util::csprng::Csprng;
 
 use crate::{
-    election_record::PreVotingData, index::Index, joint_election_public_key::Ciphertext,
-    zk::ProofRange,
+    election_manifest::Contest,
+    election_record::PreVotingData,
+    index::Index,
+    joint_election_public_key::{Ciphertext, Nonce},
+    vec1::HasIndexType,
+    zk::{ProofRange, ProofRangeError},
 };
 
-// An encrypted option in a contest.
-// #[derive(Debug, Clone)]
-// pub struct ContestSelectionCiphertext {
-//     /// Ciphertext
-//     pub ciphertext: Ciphertext,
-//     // TODO: Probably shouldn't be here
-//     // Nonce used to produce the ciphertext
-//     // pub nonce: BigUint,
-// }
-
 pub type ContestSelectionPlaintext = u8;
-
-// /// A 1-based index of a [`ContestSelectionPlaintext`] in the order it is defined in the [`crate::election_manifest::ElectionManifest`].
-// pub type ContestSelectionPlaintextIndex = Index<ContestSelectionPlaintext>;
 
 /// A 1-based index of a [`ContestSelection`].
 pub type ContestSelectionIndex = Index<ContestSelection>;
 
 /// A contest selection by a voter.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContestSelection {
     /// Vector used to represent the selection
-    pub vote: Vec<ContestSelectionPlaintext>,
+    vote: Vec<ContestSelectionPlaintext>,
+}
+
+impl HasIndexType for ContestSelection {
+    type IndexType = Contest;
 }
 
 impl ContestSelection {
+    pub fn new(vote: Vec<ContestSelectionPlaintext>) -> Option<ContestSelection> {
+        if vote.len() > Index::<ContestSelectionPlaintext>::VALID_MAX_USIZE {
+            return None;
+        }
+        Some(ContestSelection { vote })
+    }
+
+    pub fn get_vote(&self) -> &[ContestSelectionPlaintext] {
+        &self.vote
+    }
+
     pub fn new_pick_random(
         csprng: &mut Csprng,
         selection_limit: usize,
@@ -62,21 +68,6 @@ impl ContestSelection {
 
         Self { vote }
     }
-
-    // Choices are 1-indexed
-    // pub fn new_unchecked(choices: Vec<u32>, num_options: usize) -> Self {
-    //     let mut vote = Vec::new();
-    //     for _ in 0..num_options {
-    //         vote.try_push(0).unwrap();
-    //     }
-
-    //     for choice in choices {
-    //         let idx = <Index<u8>>::from_one_based_index(choice).unwrap();
-    //         *vote.get_mut(idx).unwrap() = 1u8;
-    //     }
-
-    //     Self { vote }
-    // }
 }
 
 impl Ciphertext {
@@ -85,33 +76,13 @@ impl Ciphertext {
         header: &PreVotingData,
         csprng: &mut Csprng,
         selected: bool,
-        q: &BigUintPrime,
-    ) -> ProofRange {
-        ProofRange::new(header, csprng, q, self, selected as usize, 1)
+        nonce: &Nonce,
+    ) -> Result<ProofRange, ProofRangeError> {
+        ProofRange::new(header, csprng, self, nonce, selected as usize, 1)
+    }
+
+    /// Verify the proof that the cipher text is an encryption of 0 or 1.
+    pub fn verify_ballot_correctness(&self, header: &PreVotingData, proof: &ProofRange) -> bool {
+        proof.verify(header, self, 1)
     }
 }
-
-// /// Serialize for CiphertextContestSelection
-// impl Serialize for ContestSelectionCiphertext {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::ser::Serializer,
-//     {
-//         self.ciphertext.clone().serialize(serializer)
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for ContestSelectionCiphertext {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         match Ciphertext::deserialize(deserializer) {
-//             Ok(ciphertext) => Ok(ContestSelectionCiphertext {
-//                 ciphertext,
-//                 nonce: BigUint::from(0 as u8),
-//             }),
-//             Err(e) => Err(e),
-//         }
-//     }
-// }

@@ -6,6 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{ensure, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::guardian::GuardianIndex;
@@ -28,9 +29,9 @@ pub struct VaryingParameters {
     pub k: GuardianIndex,
 
     /// Date string.
-    pub date: String,
+    pub date: DateTime<Utc>,
 
-    // Jurisdictional information string.
+    /// Jurisdictional information string. This can be used to specify a location.
     pub info: String,
 
     /// Ballot chaining.

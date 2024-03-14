@@ -41,6 +41,20 @@ impl<T> std::cmp::PartialEq for Index<T> {
     }
 }
 
+// Convenience for comparing indexes to numeric literals.
+impl<T> std::cmp::PartialEq<u32> for Index<T> {
+    fn eq(&self, other: &u32) -> bool {
+        self.0 == *other
+    }
+}
+
+// Convenience for comparing indexes to numeric literals.
+impl<T> std::cmp::PartialOrd<u32> for Index<T> {
+    fn partial_cmp(&self, other: &u32) -> Option<std::cmp::Ordering> {
+        Some(self.0.cmp(other))
+    }
+}
+
 // PartialOrd trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
 impl<T> std::cmp::PartialOrd for Index<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -128,6 +142,12 @@ impl<T> Index<T> {
     pub fn from_one_based_index(ix1: u32) -> Result<Self> {
         Self::from_one_based_index_const(ix1)
             .ok_or_else(|| anyhow!("Index value {ix1} out of range"))
+    }
+
+    /// Creates a new `Index` from a 1-based index value. It is a precondition that
+    /// Self::VALID_MIN_U32 <= ix1 && ix1 <= Self::VALID_MAX_U32.
+    pub fn from_one_based_index_unchecked(ix1: u32) -> Self {
+        Self(ix1, PhantomData)
     }
 
     /// Obtains the 1-based index value as a `u32`.
