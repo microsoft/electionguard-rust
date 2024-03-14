@@ -44,6 +44,7 @@ pub struct GuardianEncryptedShare {
 /// The secret input used to generate a [`GuardianEncryptedShare`].
 ///
 /// This object is used in case there is a dispute about the validity of a given [`GuardianEncryptedShare`].
+#[derive(Serialize, Deserialize)]
 pub struct GuardianEncryptionSecret {
     /// The sender of the share
     pub dealer: GuardianIndex,
