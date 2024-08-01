@@ -64,7 +64,7 @@ def main [
     #  Cargo clean
     # 
     if $clean {
-        run-subprocess [ cargo clean $cargo_profile_build_flag ]
+        run-subprocess --delimit [ cargo clean $cargo_profile_build_flag ]
     }
 
     let cargo_build_flag_vv = null
@@ -72,7 +72,7 @@ def main [
     #  Cargo build
     # 
     if not $no_build {
-        run-subprocess [ cargo build $cargo_build_flag_vv $cargo_profile_build_flag ]
+        run-subprocess --delimit [ cargo build $cargo_build_flag_vv $cargo_profile_build_flag ]
 
         if $dump_imports and (target_is_windows) {
             dumpbin /imports (eg_exe)
@@ -82,19 +82,19 @@ def main [
     #  Cargo check
     # 
     if not $no_check {
-        run-subprocess [ cargo check $cargo_profile_build_flag ]
+        run-subprocess --delimit [ cargo check $cargo_profile_build_flag ]
     }
 
     #  Cargo clippy
     # 
     if not $no_clippy {
-        run-subprocess [ cargo clippy $cargo_profile_build_flag ]
+        run-subprocess --delimit [ cargo clippy $cargo_profile_build_flag ]
     }
 
     #  Cargo test
     # 
     if not $no_test {
-        run-subprocess [
+        run-subprocess --delimit [
             cargo test $cargo_profile_build_flag --
             --test-threads=1 --nocapture
         ]
@@ -190,7 +190,7 @@ def artifacts_public_dir [] -> string {
 }
 
 def target_is_windows [] -> bool {
-    (sys).host.name =~ '(?i)^\s*windows\b.*'
+    (sys host).name =~ '(?i)^\s*windows\b.*'
 }
 
 def --env figure_eg_exe [$cargo_target_dir] {
@@ -214,7 +214,7 @@ def egtests [
 ] {
     #  Build electionguard.exe and its dependents
     # 
-    run-subprocess [
+    run-subprocess --delimit [
         cargo build $cargo_profile_build_flag -p electionguard
     ]
 
@@ -227,7 +227,7 @@ def egtests [
     #  Write random seed
     # 
     if not (artifacts_public_dir | path join "pseudorandom_seed_defeats_all_secrecy.bin" | path exists) {
-        run-subprocess [ (eg_exe) write-random-seed ]
+        run-subprocess --delimit [ (eg_exe) write-random-seed ]
     }
 
     # 
@@ -235,7 +235,7 @@ def egtests [
     # 
     let standard_parameters_verified_file = artifacts_public_dir | path join "standard_parameters_verified.txt"
     if ($standard_parameters_verified_file | path exists) {
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) --insecure-deterministic verify-standard-parameters
         ]
 
@@ -246,7 +246,7 @@ def egtests [
     #  Write election manifest (canonical)
     # 
     if not (artifacts_public_dir | path join "election_manifest_canonical.bin" | path exists) {
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) write-manifest --in-example --out-format canonical
         ]
     }
@@ -255,14 +255,14 @@ def egtests [
     #  Write election manifest (pretty)
     # 
     if not (artifacts_public_dir | path join "election_manifest_pretty.json" | path exists) {
-        run-subprocess [ (eg_exe) write-manifest --out-format pretty ]
+        run-subprocess --delimit [ (eg_exe) write-manifest --out-format pretty ]
     }
 
     # 
     #  Write election parameters
     # 
     if not (artifacts_public_dir | path join "election_parameters.json" | path exists) {
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) write-parameters
                 --n $election_parameters.n
                 --k $election_parameters.k
@@ -276,7 +276,7 @@ def egtests [
     #  Write hashes
     # 
     if not (artifacts_public_dir | path join "hashes.json" | path exists) {
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) --insecure-deterministic write-hashes
         ]
     }
@@ -295,7 +295,7 @@ def egtests [
     #  Write joint election public key
     # 
     if not (artifacts_public_dir | path join "joint_election_public_key.json" | path exists) {
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) --insecure-deterministic write-joint-election-public-key
         ]
     }
@@ -304,7 +304,7 @@ def egtests [
     #  Write HashesExt
     # 
     if not (artifacts_public_dir | path join "hashes_ext.json" | path exists) {
-        run-subprocess [ (eg_exe) --insecure-deterministic write-hashes-ext ]
+        run-subprocess --delimit [ (eg_exe) --insecure-deterministic write-hashes-ext ]
     }
 
     # 
@@ -352,7 +352,7 @@ def egtest_per_guardian [
             rm $guardian_public_key_file
         }
 
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) --insecure-deterministic guardian-secret-key-generate --i $i --name $guardian_name
         ]
 
@@ -363,7 +363,7 @@ def egtest_per_guardian [
     }
 
     if not ($guardian_public_key_file | path exists) {
-        run-subprocess [
+        run-subprocess --delimit [
             (eg_exe) --insecure-deterministic guardian-secret-key-write-public-key --i $i
         ]
 
@@ -378,9 +378,9 @@ def egtest_per_guardian [
 # Also, it errors if the exit code is non-zero.
 def run-subprocess [
     --delimit
-    argv: list<string>
+    argv: list<any>
 ] {
-    let argv = ($argv | into string | filter {|it| not ($it | is-empty )})
+    let argv = $argv | each {|it| $it | into string} | filter {|it| not ($it | is-empty )}
     std log info $"Executing: ($argv)"
 
     let argv_str = ($argv | str join ' ')
