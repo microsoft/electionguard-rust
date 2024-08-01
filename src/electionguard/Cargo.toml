@@ -5,11 +5,11 @@ edition = "2021"
 publish = false
 
 [dependencies]
-anyhow = "1.0.70"
-clap = { version = "4.3.3", features = ["derive", "env"] }
-rand_core = { version = "0.6.4", features = ["getrandom"] }
+anyhow.workspace = true
+clap.workspace = true
+rand_core = { workspace = true, features = ["getrandom"] }
 
-eg = { path = "../eg" }
-util = { path = "../util" }
-preencrypted = { path = "../preencrypted" }
-chrono = { version = "0.4.34", features = ["serde"] }
+eg.workspace = true
+util.workspace = true
+preencrypted.workspace = true
+chrono.workspace = true
