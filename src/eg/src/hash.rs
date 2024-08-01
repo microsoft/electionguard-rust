@@ -7,6 +7,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use util::array_ascii::ArrayAscii;
 
+use crate::serializable::SerializablePretty;
+
 type HmacSha256 = Hmac<sha2::Sha256>;
 
 // "In ElectionGuard, all inputs that are used as the HMAC key, i.e. all inputs to the first
@@ -88,32 +90,11 @@ impl HValue {
         serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing HValue: {}", e))
     }
 
-    /// Returns a pretty JSON `String` representation of the `HValue`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
-
     /// Reads a `HValue` from a `std::io::Write`.
     pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
         let hashes: Self = serde_json::from_reader(stdioread).context("Reading HValue")?;
 
         Ok(hashes)
-    }
-
-    /// Writes a `HValue` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser).context("Error writing HValue")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing HValue file")
     }
 
     pub fn to_string_hex_no_prefix_suffix(&self) -> String {
@@ -122,6 +103,8 @@ impl HValue {
         s[3..s.len() - 2].to_string()
     }
 }
+
+impl SerializablePretty for HValue {}
 
 impl From<HValueByteArray> for HValue {
     #[inline]

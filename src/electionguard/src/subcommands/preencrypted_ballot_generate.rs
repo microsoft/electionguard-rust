@@ -9,7 +9,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context, Result};
 
-use eg::{ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData};
+use eg::{
+    ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData,
+    serializable::SerializablePretty,
+};
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
 use util::file::create_path;
 
@@ -83,7 +86,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
             .out_file_stdiowrite(&None, Some(ArtifactFile::ElectionPreVotingData))?;
 
         pv_data
-            .to_stdiowrite(bx_write.as_mut())
+            .to_stdiowrite_pretty(bx_write.as_mut())
             .with_context(|| format!("Writing record header to: {}", path.display()))?;
 
         drop(bx_write);
@@ -121,7 +124,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
             )?;
 
             ballots[b_idx]
-                .to_stdiowrite(bx_write.as_mut())
+                .to_stdiowrite_pretty(bx_write.as_mut())
                 .with_context(|| format!("Writing pre-encrypted ballot to: {}", path.display()))?;
 
             eprintln!("Wrote pre-encrypted ballot to: {}", path.display());
@@ -137,7 +140,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
             )?;
 
             primary_nonces[b_idx]
-                .to_stdiowrite(bx_write.as_mut())
+                .to_stdiowrite_pretty(bx_write.as_mut())
                 .with_context(|| {
                     format!("Writing pre-encrypted ballot nonce to: {}", path.display())
                 })?;

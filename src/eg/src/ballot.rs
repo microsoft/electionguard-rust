@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -22,6 +22,7 @@ use crate::{
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
+    serializable::SerializablePretty,
     joint_election_public_key::Ciphertext,
     zk::ProofRangeError,
 };
@@ -167,18 +168,6 @@ impl BallotEncrypted {
         true
     }
 
-    /// Writes a `BallotEncrypted` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .context("Error serializing voter selection")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing serialized voter selection to file")
-    }
-
     /// Scale a [`BallotEncrypted`] by a factor, producing a [`ScaledBallotEncrypted`].
     /// Each encrypted vote in the ballot gets scaled by the same factor.
     pub fn scale(
@@ -194,6 +183,8 @@ impl BallotEncrypted {
         ScaledBallotEncrypted { contests }
     }
 }
+
+impl SerializablePretty for BallotEncrypted {}
 
 /// This function takes an iterator over encrypted ballots and tallies up the
 /// votes on each option in each contest. The result is map from `ContestIndex`

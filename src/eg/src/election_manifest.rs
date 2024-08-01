@@ -5,13 +5,12 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::io::Cursor;
-
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::ballot_style::BallotStyle;
 use crate::index::Index;
+use crate::serializable::{SerializableCanonical, SerializablePretty};
 use crate::vec1::{HasIndexTypeMarker, Vec1};
 
 /// The election manifest.
@@ -49,32 +48,11 @@ impl ElectionManifest {
         // We currently have no validation rules for this type.
         Ok(())
     }
-
-    /// Writes an [`ElectionManifest`] to a [`std::io::Write`] as canonical bytes.
-    /// This uses a more compact JSON format.
-    pub fn to_stdiowrite_canonical(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        serde_json::ser::to_writer(stdiowrite, self).context("Writing ElectionManifest canonical")
-    }
-
-    /// Returns the canonical byte sequence representation of the [`ElectionManifest`].
-    /// This uses a more compact JSON format.
-    pub fn to_canonical_bytes(&self) -> Result<Vec<u8>> {
-        let mut buf = Cursor::new(Vec::new());
-        self.to_stdiowrite_canonical(&mut buf)
-            .context("Writing ElectionManifest canonical")?;
-        Ok(buf.into_inner())
-    }
-
-    /// Writes an [`ElectionManifest`] to a [`std::io::Write`] as pretty JSON.
-    pub fn to_stdiowrite_pretty(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing ElectionManifest pretty")
-    }
 }
+
+impl SerializableCanonical for ElectionManifest {}
+
+impl SerializablePretty for ElectionManifest {}
 
 /// A contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -124,6 +102,8 @@ pub type ContestOptionIndex = Index<ContestOption>;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 pub mod test {
+    use std::io::Cursor;
+
     use super::*;
     use crate::example_election_manifest::example_election_manifest;
 

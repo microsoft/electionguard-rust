@@ -85,6 +85,7 @@ pub mod hashes_ext;
 pub mod index;
 pub mod joint_election_public_key;
 pub mod nonce;
+pub mod serializable;
 pub mod standard_parameters;
 pub mod varying_parameters;
 pub mod vec1;

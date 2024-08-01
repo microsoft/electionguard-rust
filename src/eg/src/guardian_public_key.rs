@@ -20,6 +20,7 @@ use crate::{
         validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
     },
     guardian_secret_key::CoefficientCommitments,
+    serializable::SerializablePretty,
 };
 
 /// The public key for a guardian.
@@ -107,16 +108,9 @@ impl GuardianPublicKey {
         Ok(self_)
     }
 
-    /// Returns a pretty JSON `String` representation of the [`GuardianPublicKey`].
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
 }
+
+impl SerializablePretty for GuardianPublicKey {}
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

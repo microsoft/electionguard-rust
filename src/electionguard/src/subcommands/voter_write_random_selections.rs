@@ -15,6 +15,7 @@ use anyhow::{Context, Result};
 use eg::{
     ballot::BallotEncrypted, ballot_style::BallotStyleIndex, contest_selection::ContestSelection,
     device::Device, election_manifest::ContestIndex, election_record::PreVotingData,
+    serializable::SerializablePretty,
 };
 
 use crate::{
@@ -97,7 +98,7 @@ impl Subcommand for VoterWriteRandomSelection {
         )?;
 
         ballot
-            .to_stdiowrite(stdiowrite.as_mut())
+            .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| format!("Writing ballot to: {}", path.display()))?;
 
         drop(stdiowrite);

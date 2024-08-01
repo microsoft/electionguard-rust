@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::hashes_ext::HashesExt;
+use eg::{hashes_ext::HashesExt, serializable::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -54,7 +54,7 @@ impl Subcommand for WriteHashesExt {
             .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::HashesExt))?;
 
         hashes_ext
-            .to_stdiowrite(stdiowrite.as_mut())
+            .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| format!("Writing hashes ext to: {}", path.display()))?;
 
         drop(stdiowrite);

@@ -13,6 +13,7 @@ use crate::{
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
+    serializable::SerializablePretty,
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,22 +57,14 @@ impl HashesExt {
         Ok(())
     }
 
-    /// Writes a `HashesExt` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing HashesExt")
-    }
-
     /// Reads `HashesExt` from a `std::io::Read`.
     pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HashesExt> {
         serde_json::from_reader(io_read)
             .map_err(|e| anyhow!("Error parsing JointElectionPublicKey: {}", e))
     }
 }
+
+impl SerializablePretty for HashesExt {}
 
 impl std::fmt::Display for HashesExt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {

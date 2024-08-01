@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
+use eg::serializable::{SerializableCanonical, SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::ElectionManifestSource,
