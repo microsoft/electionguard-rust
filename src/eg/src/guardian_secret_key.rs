@@ -23,7 +23,7 @@ use crate::{
     guardian_public_key_info::{
         validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
     },
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
 };
 
 /// A polynomial coefficient used to define a secret key sharing.

@@ -22,7 +22,7 @@ use crate::{
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
     joint_election_public_key::Ciphertext,
     zk::ProofRangeError,
 };

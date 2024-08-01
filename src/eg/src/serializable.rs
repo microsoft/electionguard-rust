@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
 use std::io::Cursor;
+
+use anyhow::{Context, Result};
 
 pub trait SerializableCanonical {
     /// Writes an entity to a [`std::io::Write`] as canonical bytes.
@@ -25,6 +26,19 @@ pub trait SerializableCanonical {
 }
 
 pub trait SerializablePretty {
+    /// Writes an entity to a [`std::io::Write`] as pretty JSON.
+    fn to_stdiowrite_pretty(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()>
+    where
+        Self: serde::Serialize,
+    {
+        let mut ser = serde_json::Serializer::pretty(stdiowrite);
+
+        self.serialize(&mut ser)
+            .map_err(Into::<anyhow::Error>::into)
+            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
+            .context("Writing pretty")
+    }
+
     /// Returns a pretty JSON `String` representation of the entity.
     /// The final line will end with a newline.
     fn to_json_pretty(&self) -> String
@@ -36,18 +50,5 @@ pub trait SerializablePretty {
         let mut s = serde_json::to_string_pretty(self).unwrap();
         s.push('\n');
         s
-    }
-
-    /// Writes an entity to a [`std::io::Write`] as pretty JSON.
-    fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()>
-    where
-        Self: serde::Serialize,
-    {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing pretty")
     }
 }

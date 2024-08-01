@@ -17,7 +17,7 @@ use eg::{
     election_manifest::{ContestIndex, ElectionManifest},
     election_record::PreVotingData,
     hash::HValue,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
     vec1::Vec1,
 };
 use serde::{Deserialize, Serialize};

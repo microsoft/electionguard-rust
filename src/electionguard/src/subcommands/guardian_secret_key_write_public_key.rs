@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
-use eg::{guardian::GuardianIndex, serialize::SerializablePretty};
+use eg::{guardian::GuardianIndex, serializable::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -70,7 +70,7 @@ impl Subcommand for GuardianSecretKeyWritePublicKey {
         )?;
 
         public_key
-            .to_stdiowrite(stdiowrite.as_mut())
+            .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| {
                 format!("Writing public key for guardian {i} to: {}", path.display())
             })?;

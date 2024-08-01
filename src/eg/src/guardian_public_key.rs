@@ -20,7 +20,7 @@ use crate::{
         validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
     },
     guardian_secret_key::CoefficientCommitments,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
 };
 
 /// The public key for a guardian.

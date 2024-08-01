@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use util::array_ascii::ArrayAscii;
 
-use crate::serialize::SerializablePretty;
+use crate::serializable::SerializablePretty;
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 

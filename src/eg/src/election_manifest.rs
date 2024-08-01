@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ballot_style::BallotStyle;
 use crate::index::Index;
-use crate::serialize::{SerializableCanonical, SerializablePretty};
+use crate::serializable::{SerializableCanonical, SerializablePretty};
 use crate::vec1::{HasIndexTypeMarker, Vec1};
 
 /// The election manifest.
@@ -114,7 +114,7 @@ pub mod test {
         // Pretty
         {
             let mut buf = Cursor::new(vec![0u8; 0]);
-            election_manifest.to_stdiowrite(&mut buf)?;
+            election_manifest.to_stdiowrite_pretty(&mut buf)?;
 
             let json_pretty = buf.into_inner();
             assert!(json_pretty.len() > 6);

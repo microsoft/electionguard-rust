@@ -10,7 +10,7 @@ use crate::{
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
-    serialize::{SerializableCanonical, SerializablePretty},
+    serializable::{SerializableCanonical, SerializablePretty},
 };
 
 /// Parameter base hash (cf. Section 3.1.2 in Specs 2.0.0)

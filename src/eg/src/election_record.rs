@@ -23,7 +23,7 @@ use crate::{
     hashes_ext::HashesExt,
     joint_election_public_key::{Ciphertext, JointElectionPublicKey},
     verifiable_decryption::VerifiableDecryption,
-    serialize::{SerializableCanonical, SerializablePretty},
+    serializable::{SerializableCanonical, SerializablePretty},
 };
 
 /// The header of the election record, generated before the election begins.

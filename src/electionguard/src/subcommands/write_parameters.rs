@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use eg::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
-    serialize::SerializablePretty, standard_parameters::STANDARD_PARAMETERS,
+    serializable::SerializablePretty, standard_parameters::STANDARD_PARAMETERS,
     varying_parameters::VaryingParameters,
 };
 
@@ -95,7 +95,7 @@ impl Subcommand for WriteParameters {
             .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::ElectionParameters))?;
 
         election_parameters
-            .to_stdiowrite(stdiowrite.as_mut())
+            .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| format!("Writing election parameters to: {}", path.display()))?;
 
         drop(stdiowrite);

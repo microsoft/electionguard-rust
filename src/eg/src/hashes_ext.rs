@@ -13,7 +13,7 @@ use crate::{
     hash::{eg_h, HValue},
     hashes::Hashes,
     joint_election_public_key::JointElectionPublicKey,
-    serialize::SerializablePretty,
+    serializable::SerializablePretty,
 };
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
