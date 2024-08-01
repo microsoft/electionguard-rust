@@ -1,6 +1,6 @@
 #!/usr/bin/env nu
 
-# watch -v bin\electionguard-test.nu {|$it| nu bin\electionguard-test.nu --release --test-hash-mismatch-warn-only --no-test --no-build-docs }
+# watch -v bin\electionguard-test.nu {|$it| nu bin\electionguard-test.nu --release --no-test --no-build-docs }
 
 use std
 use std log
@@ -13,7 +13,6 @@ def main [
     --no-check        # Do not run cargo check.
     --no-clippy       # Do not run cargo clippy.
     --no-test         # Do not run cargo test.
-    --test-hash-mismatch-warn-only # Only warn, don't error, if hashes mismatch in unit tests.
     --no-build-docs   # Do not build docs.
     --erase-artifacts # Erase the artifacts directory before running electionguard.exe tests.
     --no-egtest       # Do not run electionguard.exe tests.
