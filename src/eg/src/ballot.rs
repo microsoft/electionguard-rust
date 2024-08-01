@@ -505,7 +505,7 @@ mod test {
         csprng: &mut Csprng,
         pre_voting_data: &PreVotingData,
         ciphertext: &Ciphertext,
-        guardian_public_keys: &Vec<GuardianPublicKey>,
+        guardian_public_keys: &[GuardianPublicKey],
     ) -> VerifiableDecryption {
         let dec_shares: Vec<_> = key_shares
             .iter()

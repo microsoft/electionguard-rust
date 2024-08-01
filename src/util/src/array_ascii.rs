@@ -1,10 +1,18 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
 
+#[derive(thiserror::Error, Debug)]
+pub enum ArrayAsciiError {
+    #[error("Supplied byte value is not a non-NUL 7-bit ASCII value")]
+    SuppliedNotNonnul7bitAscii,
+}
+
+/// Returns `true` iff the supplied byte is a non-NUL 7-bit ASCII value.
+/// (i.e., `0x01 <= by < 0x80`).
 #[must_use]
 #[inline(always)]
 pub const fn is_nonnul_7bit_ascii(by: u8) -> bool {
@@ -12,32 +20,32 @@ pub const fn is_nonnul_7bit_ascii(by: u8) -> bool {
 }
 
 /// Fixed-length array of bytes containing non-NUL 7-bit ASCII values.
-/// (i.e., `1 <= b < 128`).
+/// (i.e., `0x01 <= by < 0x80`).
+///
 /// This is similar to the built-in `str` type, but it has a size
-/// known at compile-time, so can be returned directly from functions.
+/// known at compile time, so can be returned directly from functions.
 ///
 /// Compare to [`ASCII code point`](https://infra.spec.whatwg.org/#ascii-code-point)
 /// defined by [WHATWG](https://whatwg.org/).
 pub struct ArrayAscii<const N: usize>([u8; N]);
 
 impl<const N: usize> ArrayAscii<N> {
-    /// Creates a new `ArrayAscii` from a function taking `usize` array index
-    /// and returning `u8`.
-    /// Note: when debug assertions are turned off (`--release` profile),
-    /// it may be possible to create an `ArrayAscii` with non-ASCII values,
-    /// or even invalid UTF-8.
+    /// Tries to create an `ArrayAscii` from a function taking `usize` array index
+    /// and returning `u8`. Returns `Err` if any of the values are not non-NUL 7-bit ASCII.
+    ///
     /// Inspired by `std::array::from_fn`.
-    #[must_use]
     #[inline(always)]
-    pub fn from_fn<F>(f: F) -> Self
+    pub fn try_from_fn<F>(f: F) -> Result<Self, ArrayAsciiError>
     where
         F: FnMut(usize) -> u8,
     {
-        let aa = Self(std::array::from_fn(f));
+        let arr = std::array::from_fn(f);
 
-        debug_assert!(aa.0.iter().copied().all(is_nonnul_7bit_ascii));
-
-        aa
+        if arr.iter().copied().all(is_nonnul_7bit_ascii) {
+            Ok(Self(arr))
+        } else {
+            Err(ArrayAsciiError::SuppliedNotNonnul7bitAscii)
+        }
     }
 
     /// Provides the length of an instance of `ArrayAscii`.
@@ -78,20 +86,21 @@ impl<const N: usize> ArrayAscii<N> {
     }
 
     /// Provides access to the `ArrayAscii` as a `&str`.
-    /// May panic if the `ArrayAscii` contains invalid UTF-8.
     #[must_use]
-    #[inline]
+    #[inline(always)]
     pub fn as_str(&self) -> &str {
-        #[cfg(eg_allow_unsafe)]
-        unsafe {
-            std::str::from_utf8_unchecked(&self.0)
+        if cfg!(feature = "eg-allow-unsafe_code") {
+            unsafe {
+                // `from_utf8_unchecked()` is justified here because we took pains to ensure
+                // all values are non-NUL 7-bit ASCII values.
+                std::str::from_utf8_unchecked(&self.0)
+            }
+        } else {
+            // `unwrap()` is justified here because we took pains to ensure
+            // all values are non-NUL 7-bit ASCII values.
+            #[allow(clippy::unwrap_used)]
+            std::str::from_utf8(&self.0).unwrap()
         }
-
-        // `unwrap()` is justified here because we took pains to ensure
-        // all values are non-NUL 7-bit ASCII values.
-        #[allow(clippy::unwrap_used)]
-        #[cfg(not(eg_allow_unsafe))]
-        std::str::from_utf8(&self.0).unwrap()
     }
 }
 

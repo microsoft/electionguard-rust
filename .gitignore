@@ -3,7 +3,6 @@
 **/.errorviz-version
 **/.vscode
 **/artifacts
-**/Cargo.lock
 **/local.settings.json
 **/pkg
 **/target

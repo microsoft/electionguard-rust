@@ -102,5 +102,5 @@ cargo build
 
 ```custom
 cd src
-nu ../bin/electionguard-test.nu --release --test-hash-mismatch-warn-only --erase-artifacts --clean
+nu ../bin/electionguard-test.nu --release --erase-artifacts --clean
 ```

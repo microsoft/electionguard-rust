@@ -83,8 +83,7 @@ impl Subcommand for VoterWriteRandomSelection {
             &mut csprng,
             record_header.hashes_ext.h_e.as_ref(),
             &contest_selections,
-        )
-        .unwrap();
+        )?;
 
         // distinct from `ballot.date`
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();

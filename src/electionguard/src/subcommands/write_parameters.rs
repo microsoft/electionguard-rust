@@ -79,7 +79,7 @@ impl Subcommand for WriteParameters {
         let varying_parameters = VaryingParameters {
             n: self.n,
             k: self.k,
-            date: self.date.clone(),
+            date: self.date,
             info: self.info.clone(),
             ballot_chaining: self.ballot_chaining.into(),
         };

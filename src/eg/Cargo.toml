@@ -4,22 +4,23 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[features]
+eg_allow_unsafe_code = []
+
 [dependencies]
+anyhow.workspace = true
+chrono.workspace = true
 digest = "0.10"
+hex-literal = "0.4"
 hmac = "0.12"
-itertools = "0.12"
+itertools.workspace = true
 lazy_static = "1.4"
-num-bigint = "0.4"
-num-traits = "0.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+num-bigint.workspace = true
+#num-integer.workspace = true
+num-traits.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.10"
 static_assertions = "1.1.0"
-thiserror = "1.0"
-util = { path = "../util" }
-base64 = "0.21.2"
-chrono = { version = "0.4.34", features = ["serde"] }
-
-# For testing
-anyhow = "1.0"
-hex-literal = "0.4"
+thiserror.workspace = true
+util.workspace = true
