@@ -261,26 +261,9 @@ mod test {
             "ECF3D1424BAC568DEB036005E4151C8CE888913A291A6AA2C307BCE091EB48CB"
         ));
 
-        #[cfg(test_hash_mismatch_warn_only)]
-        {
-            let cmp = |s, actual, expected| {
-                if actual != expected {
-                    eprintln!(
-                        "\nWARNING FAILURE SUPPRESSED:\n{s}   actual: {:?}\n{s} expected: {:?}",
-                        actual, expected
-                    );
-                }
-            };
-            cmp("h_p", hashes.h_p, expected_h_p);
-            cmp("h_m", hashes.h_m, expected_h_m);
-            cmp("h_b", hashes.h_b, expected_h_b);
-        }
-        #[cfg(not(test_hash_mismatch_warn_only))]
-        {
-            assert_eq!(hashes.h_p, expected_h_p);
-            assert_eq!(hashes.h_m, expected_h_m);
-            assert_eq!(hashes.h_b, expected_h_b);
-        }
+        assert_eq!(hashes.h_p, expected_h_p);
+        assert_eq!(hashes.h_m, expected_h_m);
+        assert_eq!(hashes.h_b, expected_h_b);
 
         Ok(())
     }

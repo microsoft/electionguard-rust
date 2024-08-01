@@ -6,7 +6,6 @@ publish = false
 
 [features]
 eg_allow_unsafe_code = []
-test_hash_mismatch_warn_only = [] # TODO temp test code
 
 [dependencies]
 anyhow.workspace = true

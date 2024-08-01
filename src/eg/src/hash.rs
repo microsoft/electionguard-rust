@@ -1,7 +1,6 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
 use anyhow::{anyhow, Context, Result};
-use base64::{engine::general_purpose, Engine as _};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -35,7 +34,7 @@ impl HValue {
             End,
         }
         let mut state = State::Prefix(0);
-        ArrayAscii::from_fn(|_out_ix| match state {
+        let aa_result = ArrayAscii::try_from_fn(|_out_ix| match state {
             State::Prefix(ix) => {
                 state = if ix + 1 < HValue::HVALUE_SERIALIZE_PREFIX.len() {
                     State::Prefix(ix + 1)
@@ -77,7 +76,11 @@ impl HValue {
                 debug_assert!(false, "Should not be called after End state");
                 b' '
             }
-        })
+        });
+        
+        // `unwrap()` is justified here because we only emit a very limited set of characters.
+        #[allow(clippy::unwrap_used)]
+        aa_result.unwrap()
     }
 
     /// Reads `HValue` from a `std::io::Read`.
@@ -309,16 +312,4 @@ mod test_eg_h {
 
         assert_eq!(actual, expected);
     }
-}
-
-// ElectionGuard "H" function (for WebAssembly)
-pub fn eg_h_js(key: &[u8], data: &[u8]) -> String {
-    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` only fails on slice of
-    // incorrect size.
-    #[allow(clippy::unwrap_used)]
-    let hmac_sha256 = HmacSha256::new_from_slice(key).unwrap();
-
-    general_purpose::URL_SAFE_NO_PAD.encode(AsRef::<[u8; 32]>::as_ref(
-        &hmac_sha256.chain(data).finalize_fixed(),
-    ))
 }

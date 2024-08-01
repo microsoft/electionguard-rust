@@ -56,8 +56,9 @@ def main [
     #  Figure out RUSTFLAGS
     # 
     std log info $"Previous RUSTFLAGS: ($env.RUSTFLAGS?)"
-    if $test_hash_mismatch_warn_only {
-        $env.RUSTFLAGS = ($"($env.RUSTFLAGS?) --cfg test_hash_mismatch_warn_only" | str trim)
+    let xxx_some_cfg_setting = false
+    if $xxx_some_cfg_setting {
+        $env.RUSTFLAGS = ($"($env.RUSTFLAGS?) --cfg xxx_some_cfg_setting" | str trim)
     }
     std log info $"Subsequent RUSTFLAGS: ($env.RUSTFLAGS?)"
 

@@ -135,22 +135,7 @@ mod test {
             "5BFE1B5789C2F0D3C3C16D5D0F43012B5F920CC0AA61FF92B4B04C759B472F82"
         ));
 
-        #[cfg(test_hash_mismatch_warn_only)]
-        {
-            let cmp = |s, actual, expected| {
-                if actual != expected {
-                    eprintln!(
-                        "\nWARNING FAILURE SUPPRESSED:\n{s}   actual: {:?}\n{s} expected: {:?}",
-                        actual, expected
-                    );
-                }
-            };
-            cmp("h_e", hashes_ext.h_e, expected_h_e);
-        }
-        #[cfg(not(test_hash_mismatch_warn_only))]
-        {
-            assert_eq!(hashes_ext.h_e, expected_h_e);
-        }
+        assert_eq!(hashes_ext.h_e, expected_h_e);
 
         Ok(())
     }

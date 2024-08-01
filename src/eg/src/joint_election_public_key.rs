@@ -231,13 +231,12 @@ mod test {
 
         let mut csprng = Csprng::new(&seed);
 
-        let secret_key = GuardianSecretKey::generate(
+        GuardianSecretKey::generate(
             &mut csprng,
             &example_election_parameters(),
             Index::from_one_based_index_const(i).unwrap(),
             None,
-        );
-        secret_key
+        )
     }
 
     fn decrypt_ciphertext(
@@ -250,11 +249,10 @@ mod test {
         let s = &s.0;
         let alpha_s = ciphertext.alpha.exp(s, group);
         let alpha_s_inv = alpha_s.inv(group).unwrap();
-        let group_msg = &ciphertext.beta.mul(&alpha_s_inv, group);
+        let group_msg = ciphertext.beta.mul(&alpha_s_inv, group);
         let base = &joint_key.joint_election_public_key;
         let dlog = DiscreteLog::from_group(base, group);
-        let plain_text = dlog.ff_find(&group_msg, &fixed_parameters.field).unwrap();
-        plain_text
+        dlog.ff_find(&group_msg, &fixed_parameters.field).unwrap() // plaintext
     }
 
     #[test]
@@ -262,7 +260,7 @@ mod test {
         let election_parameters = example_election_parameters();
         let field = &election_parameters.fixed_parameters.field;
 
-        let sks: Vec<_> = (1..6).map(|i| g_key(i)).collect();
+        let sks: Vec<_> = (1..6).map(g_key).collect();
         let guardian_public_keys: Vec<_> = sks.iter().map(|sk| sk.make_public_key()).collect();
 
         let sk = sks.iter().fold(ScalarField::zero(), |a, b| {
