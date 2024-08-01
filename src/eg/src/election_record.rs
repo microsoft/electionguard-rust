@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use util::algebra::FieldElement;
 
