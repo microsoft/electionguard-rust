@@ -14,7 +14,7 @@ use util::algebra::{FieldElement, Group, GroupElement, ScalarField};
 
 use crate::{
     election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian_public_key::GuardianPublicKey, index::Index,
+    guardian_public_key::GuardianPublicKey, index::Index, serialize::SerializablePretty,
 };
 
 /// The joint election public key.
@@ -185,17 +185,9 @@ impl JointElectionPublicKey {
         self.joint_election_public_key
             .to_be_bytes_left_pad(&fixed_parameters.group)
     }
-
-    /// Writes a `JointElectionPublicKey` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing JointElectionPublicKey")
-    }
 }
+
+impl SerializablePretty for JointElectionPublicKey {}
 
 impl AsRef<GroupElement> for JointElectionPublicKey {
     #[inline]

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::joint_election_public_key::JointElectionPublicKey;
+use eg::{joint_election_public_key::JointElectionPublicKey, serialize::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,

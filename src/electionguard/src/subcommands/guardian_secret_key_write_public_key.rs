@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
-use eg::guardian::GuardianIndex;
+use eg::{guardian::GuardianIndex, serialize::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,

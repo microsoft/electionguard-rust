@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::hashes_ext::HashesExt;
+use eg::{hashes_ext::HashesExt, serialize::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,

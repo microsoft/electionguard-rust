@@ -23,6 +23,7 @@ use crate::{
     guardian_public_key_info::{
         validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
     },
+    serialize::SerializablePretty,
 };
 
 /// A polynomial coefficient used to define a secret key sharing.
@@ -229,13 +230,6 @@ impl GuardianSecretKey {
         Ok(self_)
     }
 
-    /// Writes a [`GuardianSecretKey`] to a [`std::io::Write`].
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing GuardianSecretKey")
-    }
 }
+
+impl SerializablePretty for GuardianSecretKey {}

@@ -12,7 +12,8 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use eg::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
-    standard_parameters::STANDARD_PARAMETERS, varying_parameters::VaryingParameters,
+    serialize::SerializablePretty, standard_parameters::STANDARD_PARAMETERS,
+    varying_parameters::VaryingParameters,
 };
 
 use crate::{

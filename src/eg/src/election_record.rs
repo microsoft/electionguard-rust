@@ -7,19 +7,23 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use util::algebra::FieldElement;
 
 use crate::{
     ballot::BallotEncrypted,
+   
     election_manifest::{ContestIndex, ElectionManifest},
     election_parameters::ElectionParameters,
     guardian_public_key::GuardianPublicKey,
+   
     hashes::Hashes,
+   
     hashes_ext::HashesExt,
     joint_election_public_key::{Ciphertext, JointElectionPublicKey},
     verifiable_decryption::VerifiableDecryption,
+    serialize::{SerializableCanonical, SerializablePretty},
 };
 
 /// The header of the election record, generated before the election begins.
@@ -130,34 +134,8 @@ impl PreVotingData {
     pub fn from_bytes(bytes: &[u8]) -> Result<PreVotingData> {
         serde_json::from_slice(bytes).map_err(|e| anyhow!("Error parsing canonical bytes: {}", e))
     }
-
-    /// Returns a pretty JSON `String` representation of the `ElectionRecordHeader`.
-    /// The final line will end with a newline.
-    pub fn to_json_pretty(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
-
-    /// Returns the canonical byte sequence representation of the `ElectionRecordHeader`.
-    /// This uses a more compact JSON format.
-    pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        serde_json::to_vec(self).unwrap()
-    }
-
-    /// Writes a `ElectionRecordHeader` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .context("Error writing ElectionRecordHeader")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing election record header file")
-    }
 }
+
+impl SerializableCanonical for PreVotingData {}
+
+impl SerializablePretty for PreVotingData {}

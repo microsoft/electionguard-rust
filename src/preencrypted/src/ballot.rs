@@ -17,6 +17,7 @@ use eg::{
     election_manifest::{ContestIndex, ElectionManifest},
     election_record::PreVotingData,
     hash::HValue,
+    serialize::SerializablePretty,
     vec1::Vec1,
 };
 use serde::{Deserialize, Serialize};
@@ -81,19 +82,9 @@ impl VoterSelection {
 
         Ok(selection)
     }
-
-    /// Writes a `VoterSelection` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .context("Error serializing voter selection")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing serialized voter selection to file")
-    }
 }
+
+impl SerializablePretty for BallotPreEncrypted {}
 
 impl PartialEq for BallotPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
@@ -219,16 +210,6 @@ impl BallotPreEncrypted {
         ))
     }
 
-    /// Returns a pretty JSON `String` representation of `BallotPreEncrypted`.
-    /// The final line will end with a newline.
-    pub fn to_json(&self) -> String {
-        // `unwrap()` is justified here because why would JSON serialization fail?
-        #[allow(clippy::unwrap_used)]
-        let mut s = serde_json::to_string_pretty(self).unwrap();
-        s.push('\n');
-        s
-    }
-
     /// Reads `BallotPreEncrypted` from a `std::io::Read`.
     pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<BallotPreEncrypted> {
         serde_json::from_reader(io_read)
@@ -242,16 +223,6 @@ impl BallotPreEncrypted {
 
         Ok(ballot)
     }
-
-    /// Writes a `BallotPreEncrypted` to a `std::io::Write`.
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .context("Error writing pre-encrypted ballot")?;
-
-        ser.into_inner()
-            .write_all(b"\n")
-            .context("Error writing pre-encrypted ballot file")
-    }
 }
+
+impl SerializablePretty for VoterSelection {}

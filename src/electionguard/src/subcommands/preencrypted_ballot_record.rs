@@ -9,6 +9,7 @@ use anyhow::{bail, Context, Result};
 
 use eg::{
     ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData, hash::HValue,
+    serialize::SerializablePretty,
 };
 use preencrypted::{
     ballot::{BallotPreEncrypted, VoterSelection},
