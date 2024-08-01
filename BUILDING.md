@@ -52,14 +52,15 @@ for more information.
 
 ### Rust language build environment
 
-[Install Rust](https://www.rust-lang.org/tools/install)
+[Install Rust](https://www.rust-lang.org/tools/install) (rust-lang.org)
 
-https://rust-lang.github.io/rustup/installation/index.html
+[rust-lang.github.io/rustup/installation](https://rust-lang.github.io/rustup/installation/index.html) (rust-lang.github.io)
 
 ### Nushell
 
-[Nushell](https://nushell.sh) is a Rust-based scripting environment used for orchestrating multi-step tests, building the
-API documentation, etc. It is *not* a software dependency of ElectionGuard reference implementation.
+[Nushell](https://nushell.sh) is a Rust-based scripting environment used for orchestrating
+multi-step tests, building the API documentation, etc. It is *not* a software dependency of
+the ElectionGuard reference implementation.
 
 Main site: [nushell.sh](https://nushell.sh)
 
@@ -67,7 +68,8 @@ Main site: [nushell.sh](https://nushell.sh)
 
 There are several ways to install it from pre-built packages, but one reason it was chosen was
 for the simple installation process for those who already have a Rust toolchain:
-```
+
+```custom
 cargo install nu
 ```
 
@@ -78,7 +80,8 @@ Some unit tests are managed by the excellent crate [`insta`](https://crates.io/c
 Homepage: [insta.rs](https://insta.rs/).
 
 If you expect to be developing tests, installing the `cargo` extension is recommended:
-```
+
+```custom
 cargo install cargo-insta
 ```
 
@@ -90,14 +93,14 @@ TODO
 
 ## Build with cargo
 
-```
+```custom
 cd src
 cargo build
 ```
 
-## Integration test 
+## Integration test
 
-```
+```custom
 cd src
-..\bin\electionguard-test.cmd --release --test-hash-mismatch-warn-only --erase-artifacts --clean
+nu ../bin/electionguard-test.nu --release --test-hash-mismatch-warn-only --erase-artifacts --clean
 ```
