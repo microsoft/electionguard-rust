@@ -88,7 +88,7 @@ impl Hashes {
             }
 
             for u in [
-                &election_parameters.varying_parameters.date.to_rfc3339(),
+                &election_parameters.varying_parameters.date,
                 &election_parameters.varying_parameters.info,
             ] {
                 v.extend_from_slice(u.as_bytes());
@@ -160,7 +160,6 @@ mod test {
         standard_parameters::STANDARD_PARAMETERS,
         varying_parameters::{BallotChaining, VaryingParameters},
     };
-    use chrono::{TimeZone, Utc};
     use hex_literal::hex;
 
     #[test]
@@ -224,7 +223,7 @@ mod test {
         let varying_parameters = VaryingParameters {
             n,
             k,
-            date: Utc.with_ymd_and_hms(1212, 12, 12, 0, 0, 0).unwrap(),
+            date: "1212-12-12".to_string(),
             info: "Testing".to_string(),
             ballot_chaining: BallotChaining::Prohibited,
         };

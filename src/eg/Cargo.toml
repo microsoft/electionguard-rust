@@ -9,7 +9,6 @@ eg_allow_unsafe_code = []
 
 [dependencies]
 anyhow.workspace = true
-chrono.workspace = true
 digest = "0.10"
 hex-literal = "0.4"
 hmac = "0.12"

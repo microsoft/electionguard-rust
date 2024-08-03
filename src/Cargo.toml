@@ -17,7 +17,6 @@ util = { path = "./util" }
 
 #--- commonly used crates
 anyhow = "1.0.70"
-chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.3.3", features = ["derive", "env"] }
 itertools = "0.12"
 num-bigint = { version = "0.4", features = ["serde"] }

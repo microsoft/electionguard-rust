@@ -6,7 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::{ensure, Result};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::guardian::GuardianIndex;
@@ -28,8 +27,9 @@ pub struct VaryingParameters {
     /// Decryption quorum threshold value.
     pub k: GuardianIndex,
 
-    /// Date string.
-    pub date: DateTime<Utc>,
+    /// Date. Optional, can be empty.
+    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/rfc3339/) or "ISO 8601" format.
+    pub date: String,
 
     /// Jurisdictional information string. This can be used to specify a location.
     pub info: String,

@@ -6,7 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use util::{algebra::FieldElement, csprng::Csprng};
@@ -50,8 +49,10 @@ pub struct BallotEncrypted {
     /// State of the ballot
     pub state: BallotState,
 
-    /// Date (and time) of ballot generation
-    pub date: DateTime<Utc>,
+    /// Date (and time) of ballot generation. Optional, can be empty.
+    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/rfc3339/) or "ISO 8601" format.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub date: String,
 
     /// Device that generated this ballot
     pub device: String,
@@ -70,6 +71,7 @@ pub enum BallotEncryptedError {
     /// Proof production error
     #[error("Error producing ballot proofs: {}", err)]
     ProofError { err: ProofRangeError },
+
     /// Error looking up contest in manifest
     #[error("Contest (index {}) not found in election manifest.", idx)]
     ContestNotInManifest { idx: ContestIndex },
@@ -81,7 +83,7 @@ impl BallotEncrypted {
         contests: &BTreeMap<ContestIndex, ContestEncrypted>,
         state: BallotState,
         confirmation_code: HValue,
-        date: DateTime<Utc>,
+        date: &str,
         device: &str,
     ) -> BallotEncrypted {
         BallotEncrypted {
@@ -89,7 +91,7 @@ impl BallotEncrypted {
             contests: contests.clone(),
             state,
             confirmation_code,
-            date,
+            date: date.to_string(),
             device: device.to_string(),
         }
     }
@@ -97,6 +99,7 @@ impl BallotEncrypted {
     pub fn new_from_selections(
         ballot_style_index: BallotStyleIndex,
         device: &Device,
+        date: &str,
         csprng: &mut Csprng,
         primary_nonce: &[u8],
         ctest_selections: &BTreeMap<ContestIndex, ContestSelection>,
@@ -125,7 +128,7 @@ impl BallotEncrypted {
             contests,
             state: BallotState::Uncast,
             confirmation_code,
-            date: Utc::now(),
+            date: date.to_owned(),
             device: device.uuid.clone(),
         })
     }
@@ -138,7 +141,7 @@ impl BallotEncrypted {
         &self.confirmation_code
     }
 
-    pub fn date(&self) -> &DateTime<Utc> {
+    pub fn date(&self) -> &str {
         &self.date
     }
 
@@ -382,6 +385,7 @@ mod test {
         let ballot_from_selections = BallotEncrypted::new_from_selections(
             Index::from_one_based_index(2).unwrap(),
             &device,
+            "2023-05-02",
             &mut csprng,
             &primary_nonce,
             &selections,
@@ -639,29 +643,35 @@ mod test {
                 ContestSelection::new(vec![1, 0, 0]).unwrap(),
             ),
         ]);
+
         let ballot_voter1 = BallotEncrypted::new_from_selections(
             Index::from_one_based_index(1).unwrap(),
             &device,
+            "2024-08-02",
             &mut csprng,
             &primary_nonce,
             &voter1,
         )
         .unwrap();
+
         let verify_result1 = ballot_voter1.verify(&device.header);
         assert!(verify_result1);
         let ballot_voter2 = BallotEncrypted::new_from_selections(
             Index::from_one_based_index(2).unwrap(),
             &device,
+            "2024-08-02",
             &mut csprng,
             &primary_nonce,
             &voter2,
         )
         .unwrap();
+
         let verify_result2 = ballot_voter2.verify(&device.header);
         assert!(verify_result2);
         let ballot_voter3 = BallotEncrypted::new_from_selections(
             Index::from_one_based_index(3).unwrap(),
             &device,
+            "2024-08-02",
             &mut csprng,
             &primary_nonce,
             &voter3,

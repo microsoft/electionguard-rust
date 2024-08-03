@@ -12,4 +12,3 @@ rand_core = { workspace = true, features = ["getrandom"] }
 eg.workspace = true
 util.workspace = true
 preencrypted.workspace = true
-chrono.workspace = true
