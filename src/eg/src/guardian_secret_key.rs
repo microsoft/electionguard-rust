@@ -229,7 +229,6 @@ impl GuardianSecretKey {
 
         Ok(self_)
     }
-
 }
 
 impl SerializablePretty for GuardianSecretKey {}

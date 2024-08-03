@@ -79,7 +79,7 @@ impl HValue {
                 b' '
             }
         });
-        
+
         // `unwrap()` is justified here because we only emit a very limited set of characters.
         #[allow(clippy::unwrap_used)]
         aa_result.unwrap()

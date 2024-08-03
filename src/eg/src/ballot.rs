@@ -21,8 +21,8 @@ use crate::{
     election_record::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
-    serializable::SerializablePretty,
     joint_election_public_key::Ciphertext,
+    serializable::SerializablePretty,
     zk::ProofRangeError,
 };
 use thiserror::Error;

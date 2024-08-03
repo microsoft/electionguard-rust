@@ -13,17 +13,14 @@ use util::algebra::FieldElement;
 
 use crate::{
     ballot::BallotEncrypted,
-   
     election_manifest::{ContestIndex, ElectionManifest},
     election_parameters::ElectionParameters,
     guardian_public_key::GuardianPublicKey,
-   
     hashes::Hashes,
-   
     hashes_ext::HashesExt,
     joint_election_public_key::{Ciphertext, JointElectionPublicKey},
-    verifiable_decryption::VerifiableDecryption,
     serializable::{SerializableCanonical, SerializablePretty},
+    verifiable_decryption::VerifiableDecryption,
 };
 
 /// The header of the election record, generated before the election begins.

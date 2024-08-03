@@ -107,7 +107,6 @@ impl GuardianPublicKey {
 
         Ok(self_)
     }
-
 }
 
 impl SerializablePretty for GuardianPublicKey {}
