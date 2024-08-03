@@ -81,6 +81,7 @@ impl Subcommand for VoterWriteRandomSelection {
         let ballot = BallotEncrypted::new_from_selections(
             ballot_style_index,
             &device,
+            "",
             &mut csprng,
             record_header.hashes_ext.h_e.as_ref(),
             &contest_selections,

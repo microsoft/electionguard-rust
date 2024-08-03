@@ -12,7 +12,6 @@ use crate::{
     standard_parameters::STANDARD_PARAMETERS,
     varying_parameters::{BallotChaining, VaryingParameters},
 };
-use chrono::{TimeZone, Utc};
 
 /// An example ElectionParameters object, based on the standard parameters.
 pub fn example_election_parameters() -> ElectionParameters {
@@ -30,7 +29,7 @@ pub fn example_election_parameters() -> ElectionParameters {
     let varying_parameters = VaryingParameters {
         n,
         k,
-        date: Utc.with_ymd_and_hms(2023, 5, 2, 0, 0, 0).unwrap(),
+        date: "2023-05-02".to_string(),
         info: "The United Realms of Imaginaria, General Election".to_string(),
         ballot_chaining: BallotChaining::Prohibited,
     };

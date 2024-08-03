@@ -9,7 +9,6 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use chrono::{DateTime, Utc};
 use eg::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
     serializable::SerializablePretty, standard_parameters::STANDARD_PARAMETERS,
@@ -49,8 +48,8 @@ pub(crate) struct WriteParameters {
     k: GuardianIndex,
 
     /// Date string.
-    #[arg(long)]
-    date: DateTime<Utc>,
+    #[arg(long, default_value(""))]
+    date: String,
 
     // Jurisdictional information string.
     #[arg(long)]
@@ -80,7 +79,7 @@ impl Subcommand for WriteParameters {
         let varying_parameters = VaryingParameters {
             n: self.n,
             k: self.k,
-            date: self.date,
+            date: self.date.to_owned(),
             info: self.info.clone(),
             ballot_chaining: self.ballot_chaining.into(),
         };

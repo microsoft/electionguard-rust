@@ -205,7 +205,7 @@ impl BallotPreEncrypted {
             &contests,
             BallotState::Cast,
             self.confirmation_code,
-            device.header.parameters.varying_parameters.date,
+            &device.header.parameters.varying_parameters.date,
             device.get_uuid(),
         ))
     }
