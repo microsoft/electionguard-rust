@@ -73,7 +73,7 @@ for the simple installation process for those who already have a Rust toolchain:
 cargo install nu
 ```
 
-### (Totally optional) Insta cargo extension
+### (Optional) 'Insta' cargo extension
 
 Some unit tests are managed by the excellent crate [`insta`](https://crates.io/crates/insta).
 
@@ -86,6 +86,19 @@ cargo install cargo-insta
 ```
 
 But this just a convenience and is not required.
+
+### (Optional) Cargo utility for JSON schema validation
+
+Data files are validated by the [`jsonschema`](https://crates.io/jsonschema/jsonschema) cargo
+utility.
+
+Homepage: [json-schema.org](https://json-schema.org/ "JSON Schema").
+
+You can install it using the `cargo` extension:
+
+```
+cargo install jsonschema
+```
 
 ## Configuration
 

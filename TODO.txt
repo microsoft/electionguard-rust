@@ -184,6 +184,12 @@ docs/api: reference NIST CDF where types clearly correspond. E.g., BallotStyle h
 
 ====vvvv====vvvv====vvvv====vvvv====vvvv==== TODO EG 2.0 Design Specification text ====vvvv====vvvv====vvvv====vvvv====vvvv====
 
+Abbreviations:
+
+RI Reference Implementation
+OI Other implementation
+
+
 %%%%%%%%%%%%% The plan here is to chop up the specification text and extract statements that can be translate into test cases
 
 \pagebreak
@@ -254,8 +260,8 @@ The key generation ceremony begins with each guardian publishing its public keys
 S2b Each guardian generates its own public-secret key pair.
 S2b The guardian public keys can be combined to form a single public key
 S2b The single public key can encrypt votes.
-S2b The guardian public keys can be used individually by guardians to exbchange information about their secret keys enabling the election record tob be produced after voting or auditing is complete
-S2b The guardian public keys can be used individually by guardians to exbchange information about their secret keys enabling the election record tob be produced after voting or auditing is complete even if not all gubardians are available at that time
+S2b The guardian public keys can be used individually by guardians to exchange information about their secret keys enabling the election record tob be produced after voting or auditing is complete
+S2b The guardian public keys can be used individually by guardians to exchange information about their secret keys enabling the election record tob be produced after voting or auditing is complete even if not all guardians are available at that time
 S2b Each guardian can publish their public keys together with proofs of knbowledge of the associated secret keys.
 S2b Each guardian can use each other guardian's public key to encrypt shares ofb its own secret keys
 S2b Each guardian can decrypt the shares it receives from other guardians
@@ -891,6 +897,7 @@ S3.2.1 Any set of k guardians' private keys is sufficient to complete decryption
 S3.2.1 No set of fewer than k guardians' private keys is sufficient to complete decryption of the tally for any contest (e.g. selection option) field
 S3.2.1 Any challenged ballot can be individually decrypted in the same fashion as the tally for a contest (e.g. selection option) field
 
+
 ---- S3.2.2
 \subsubsection{Details of key generation}\label{sec:keygendetails}
 \paragraph{Guardian coefficients and key pair.}
@@ -1029,7 +1036,7 @@ P(i) = \left(\sum_{j = 1}^n P_j(i)\right) \bmod q = \left(P_1(i) + P_2(i) + \dot
 for later use in decryption as will be described in Section~\ref{sec:decrypt_missing}.
 
 At a minimum, guardian $G_i$ should retain the values $s_i$ and $P(i)$.
-
+*** this is changing
 
 S3.2.2e [1/4] Every guardian G_l, after having received and decrypted every key share from another guardian G_i,
 S3.2.2e [2/4] verifies the k commitments K_{i, 0 <= j < k} made by G_i by
@@ -1042,7 +1049,8 @@ S3.2.2e [3/4] (if not matching) evict guardian G_i from the election on suspicio
 S3.2.2e [4/4] (if matching) absovle guardian G_i of suspicion of malfeasance and continue the key ceremony, optionally with suspicion on guardian G_l for having made a false claim of malfeasance.
 S3.2.2e Every guardian G_i computes its share of the implicit secret key, P(i) = (sum_{j = 1}^n P_j(i)) mod q = (P_1(i) + P_2(i) + ... + P_n(i) mod q
 S3.2.2e Every guardian G_i saves for later use its share of the implicit secret key, P(i)
-S3.2.2e Every guardian G_i saves for later use its random integer secret s_i
+S3.2.2e ***changed*** Every guardian G_i saves for later use its random integer secret s_i
+S3.2.2e Every guardian G_i discards s_i at the end of the key generation ceremony
 
 ---- S3.2.3
 \subsubsection{Extended base hash}\label{sec:extendedhash}
@@ -1079,6 +1087,8 @@ Note that if multiple encrypted votes $(g^{\xi_i} \bmod p,\ K^{\sigma_i+\xi_i} \
 
 Some cardinal voting methods like cumulative voting, score voting, STAR-voting, and Borda count may require the encryption of small positive integers $\sigma$ greater than $1$ that represent multiple allowed votes or weighted votes. In all these cases, encryption is done as shown in Equation~\eqref{eqn:encryptvote}.
 
+TODO QUESTION: Should the addition sigma plus xi_i,j be mod p? Seems unlikely, but wrapping at some fixed width would be bad.
+
 S3.3.1 [1/7] RI allows to encrypt a ballot entry 'sigma' by
 S3.3.1 [2/7] generating a random value xi by sampling a PRF (described in 3.3.2) uniformly as 0 <= xi < q
 S3.3.1 [3/7] computing alpha = g^xi mod p
@@ -1100,18 +1110,11 @@ Since access to a ballot nonce $\xi_B$ enables decryption of the ballot which it
 
 To accommodate preservation of ballot nonces, an \EG manifest may optionally provide a public key to be used for encryption of ballot nonces. This public key may be the same as the election key used to encrypt voter selections, but some scenarios warrant the use of an independent public key.  If such a key is provided, \EG uses that key to encrypt each ballot's ballot nonce $\xi_B$ and return this encryption together with the encrypted ballot.  There are also some scenarios in which ballot nonces are encrypted with symmetric keys. Any such symmetric key should never be published, and the process for managing these symmetric keys is outside of the scope of this specification.
 
-vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv dup
-Ballot nonces may be independent across different ballots, and only the nonces used to encrypt ballot selections need to be derived from the ballot nonce.\footnote{As will be seen below, in addition to encryption of voter selections, an \EG ballot contains additional encryptions that enable independent verification of a ballot's correctness.  The nonces used for these additional encryptions do not need to be derived from the ballot nonce $\xi_B$.}  The use of a single ballot nonce for each ballot allows the entire ballot encryption to be re-derived from the contents of a ballot and the ballot nonce. It also allows the encrypted ballot to be fully decrypted with the single ballot nonce.
-
-Since access to a ballot nonce $\xi_B$ enables decryption of the ballot which it encrypted, ballot nonces must be protected carefully.  Typically, ballot nonces will be destroyed immediately after they are used.  But there are several scenarios which warrant the preservation of ballot nonces---sometimes only briefly, but sometimes for an extended period.
-
-To accommodate preservation of ballot nonces, an \EG manifest may optionally provide a public key to be used for encryption of ballot nonces. This public key may be the same as the election key used to encrypt voter selections, but some scenarios warrant the use of an independent public key.  If such a key is provided, \EG uses that key to encrypt each ballot's ballot nonce $\xi_B$ and return this encryption together with the encrypted ballot.  There are also some scenarios in which ballot nonces are encrypted with symmetric keys. Any such symmetric key should never be published, and the process for managing these symmetric keys is outside of the scope of this specification.
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ dup
 
 
 S3.3.2 RI allows to "encrypt a voted plaintext ballot" `BallotSate::CompletedPlaintext` comprised of an election manifest label, a ballot style label, and a set of voter-assigned contest option selections (sigma).
 S3.3.2 [1/5] RI can process any `BallotSate::CompletedPlaintext` ballot:
-S3.3.2 [2/5] generate xi_B
+S3.3.2 [2/5] generate ballot nonce xi_B by sampling a CSRNG uniformly as 0 <= xi_B < 2^(len(q))
 S3.3.2 [3/5] impose contest and option selection limits to voter-assigned fields
 S3.3.2 [4/5] assign appropriate values to system-assigned fields (e.g. overvote, undervote, write-ins, etc.)
 S3.3.2 [5/5] for each contest i and field ("option") j, generate xi_{i,j} = H(H_E; 0x20, xi_B, i (4 bytes), j (4 bytes))
@@ -1122,8 +1125,22 @@ S3.3.2 RI allows to encrypt xi_B to a public key specified in the election manif
 S3.3.2 RI allows to use a private key to decrypt an xi_B encrypted to a public key
 S3.3.2 RI allows to encrypt xi_B to a symmetric key TBD
 S3.3.2 RI allows to store an encryption of xi_B
+S3.3.2 RI allows ballot nonces that are independent across different ballots
+S3.3.2 RI requires the nonces used to encrypt ballot selections be derived from the ballot nonce
+S3.3.2 RI the single ballot nonce can be used to fully decrypt the encrypted ballot selections
+S3.3.2 OI may use additional nonces (not necessarily derived from the ballot nonce) to encrypt additional encryptions (not ballot selections)
+S3.3.2 OI all of any additional nonces can be used to decrypt any additional encryptions
+S3.3.2 RI allows ballot nonces to be protected carefully
+S3.3.2 RI allows ballot nonces to be destroyed immediately after they are used
+S3.3.2 RI allows ballot nonces to be preserved briefly or for an extended period
+S3.3.2 manifest may provide an optional public key used for encryption of ballot nonces
+S3.3.2 any optional public key used for encryption of ballot nonces may be the same as the election key used to encrypt voter selections
+S3.3.2 any optional public key used for encryption of ballot nonces may be an independent public key
+S3.3.2 any optional public key used for encryption of ballot nonces is used to encrypt each ballot's ballot nonce xi_B
+S3.3.2 if the manifest provides any optional public key for encryption of ballot nonces, each ballot's ballot nonce xi_B encryption is returned with the encrypted ballot
 
-TODO more
+S3.3.2 a symmetric key may be used for encryption of ballot nonces
+S3.3.2 if a symmetric key is used for encryption of ballot nonces, RI allows to keep it secret
 
 ---- S3.3.3
 \subsubsection{Ballot well-formedness}
@@ -1131,22 +1148,23 @@ TODO more
 \paragraph{Contest selection limits.} 
 A contest in an election consists of a set of options together with a selection limit that indicates the number of selections that are allowed to be made in that contest. In most elections, most contests have a selection limit of one. However, a larger selection limit (e.g., select up to three) is not uncommon in some elections. Approval voting can be achieved by setting the selection limit to the total number of options in a contest. Ranked choice voting is not supported in this version of \EG, but it may be enabled in a future version.\footnote{Benaloh J., Moran. T, Naish L., Ramchen K., and Teague V. (2009) \emph{Shuffle-Sum:  Coercion-Resistant Verifiable Tallying for STV Voting} in Transactions of Information Forensics and Security.} Write-ins are assumed to be explicitly registered or allowed to be lumped into a single “write-ins” category for the purpose of verifiable tallying.  Verifiable tallying of free-form write-ins may be best done with a MixNet\footnote{Chaum D. (1981) \emph{Untraceable Electronic Mail, Return Addresses, and Digital Pseudonyms} Communications of the ACM.} design.
 
-
-S3.3.3a
-
+S3.3.3a RI allows approval voting by setting the selection limit to the total number of options in a contest
+S3.3.3a Ranked choice voting may be enabled in a future version.
 
 \paragraph{Undervotes.}
 A legitimate vote in a contest consists of a set of selections with cardinality not exceeding the selection limit of that contest. To accommodate legitimate undervotes, in previous versions of \EG (up to v1.1), the internal representation of a contest was augmented with “placeholder” options equal in number to the selection limit. Placeholder options were selected as necessary to force the total number of selections made in a contest to be equal to the selection limit. When the selection limit is one, for example, \EG used a single placeholder option that can be thought of as a “none of the above” option. The current version of \EG adopts a different approach to accomodate undervotes and allows the total number of selected options to lie in a range between $0$ and the selection limit. This has lower computational cost and leads to smaller election records.
 
-S3.3.3b
-
+S3.3.3b RI allows the total number of selected options to lie in a range between 0 and the selection limit
 
 \paragraph{Overvotes.}
 When the number of selections made by the voter exceeds the selection limit for a specific contest, the votes in the contest become invalid as an overvote. To not affect the election tallies, all selectable options in the contest are set to zero (unselected). To record that an overvote has occurred and what specific selections were made by the voter in this contest, this information is encoded into a contest data field, together with other data such as write-in text. This data is then encrypted with the election public key using the hashed ElGamal encryption described in Section~\ref{sec:encrypt_ext_data}.
 
-S3.3.3c
-
-
+S3.3.3c When the number of selections made by the voter exceeds the selection limit for a specific contest, the votes in the contest become invalid as an overvote.
+S3.3.3c When the number of selections made by the voter exceeds the selection limit for a specific contest, all selectable options in the contest are set to zero (unselected)
+S3.3.3c When the number of selections made by the voter exceeds the selection limit for a specific contest, all selectable options in the contest do not affect the election tallies
+S3.3.3c When the number of selections made by the voter exceeds the selection limit for a specific contest, the fact that an overvote has occurred is encoded into a contest data field and encrypted to the election public key using the hashed ElGamal encryption
+S3.3.3c When the number of selections made by the voter exceeds the selection limit for a specific contest, the voter's specific selections in this contest is encoded into a contest data field and encrypted to the election public key using the hashed ElGamal encryption
+S3.3.3c When the number of selections made by the voter exceeds the selection limit for a specific contest, other data such as write-in text is encoded into a contest data field and encrypted to the election public key using the hashed ElGamal encryption
 
 \paragraph{Ballot well-formedness}.
 Two things must now be proven about the encryption of each vote to ensure a ballot is well-formed.
@@ -1156,14 +1174,24 @@ Two things must now be proven about the encryption of each vote to ensure a ball
 \end{enumerate}
 The use of DPP vote encryption enables efficient zero-knowledge proofs of these requirements, and the Fiat-Shamir heuristic can be used to make these proofs non-interactive. Chaum-Pedersen proofs are used to demonstrate that an encryption is that of a specified value, and these are combined with the Cramer-Damgård-Schoenmakers technique to show that an encryption is that of one of a specified set of values---usually that a value is an encryption of either zero or one.  The encryptions of selections in a contest are homomorphically combined, and the result is shown to be an encryption of a non-negative value that is at most the contest's selection limit---again using Chaum-Pedersen proofs combined with the Cramer-Damgård-Schoenmakers technique.
 
-S3.3.3d
-
+S3.3.3d RI allows to prove the encryption associated with each option is an encryption of a legitimate value (e.g., either an encryption of zero or an encryption of one.)
+S3.3.3d RI allows to prove the sum of all encrypted selections in each contest lies in the range between $0$ and the selection limit $L$ for that contest (usually $L=1$), i.e. it is an encryption of one of the values $0,1, \dots, L$.
+S3.3.3d RI uses DPP vote encryption to enable efficient zero-knowledge proofs
+S3.3.3d RI uses the Fiat-Shamir heuristic can be used to make these proofs non-interactive
+S3.3.3d RI uses Chaum-Pedersen proofs combined with the Cramer-Damgård-Schoenmakers technique to show the result of homomorphically combining the encryptions of selections in a contest are an encryption of a non-negative value that is at most the contest's selection limit.
 
 
 \paragraph{Cardinal voting methods.}
 A range proof, i.e. a proof that a ciphertext is an encryption of one of the values $0,1,\dots,L$ is a generalization of the proof that a ciphertext is an encryption of zero or one. It can be used to prove well-formedness of an individual selection when it is allowed for options to receive multiple votes in a contest by a single voter. Using range proofs with a range up to a certain option selection limit for the individual option as well as the contest selection sum therefore enables cardinal voting methods such as cumulative voting, score voting, STAR-voting, and Borda count in \EG.
 
-S3.3.3e
+
+S3.3.3e Range proofs can be used to prove well-formedness of an individual selection when it is allowed for options to receive multiple votes in a contest by a single voter
+S3.3.3e Range proofs can be used for individual options
+S3.3.3e Range proofs can be used for the contest selection sum
+S3.3.3e Range proofs enable cumulative voting
+S3.3.3e Range proofs enable score voting
+S3.3.3e Range proofs enable STAR-voting
+S3.3.3e Range proofs enable Borda count
 
 
 
@@ -1171,13 +1199,14 @@ S3.3.3e
 \subsubsection{Outline for proofs of ballot correctness}
 This section provides the outlines for different types of encryption proofs that aim to give an understanding of how they work. It starts with the proof that a given ciphertext is an encryption of the value $0$. Based on that, it explains how it can be proved that a ciphertext is an encryption of the value $1$. It then combines those to arrive at the base case used in \EG, namely that a ciphertext is an encryption of $0$ or $1$. Finally, it shows how the latter is generalized to generate range proofs, i.e. proofs that a ciphertext encrypts a value in a range $0,1,\dots,L$.
 
-S3.3.4a
+S3.3.4a none
 
 
 \paragraph{NIZK Proof that $(\alpha,\beta)$ is an encryption of zero.}
 To prove that ciphertext $(\alpha,\beta)$ is an encryption of zero, the Chaum-Pedersen protocol proceeds as follows.
 This proof assumes knowledge of the secret encryption nonce $\xi$. The prover selects a random value $u$ in $\Z_q$ and commits to the pair $(a,b)= (g^u \bmod p,\ K^u \bmod p)$. A hash computation is then performed (using the Fiat-Shamir heuristic) to create a pseudo-random challenge value $c = H(\HH_E,K,\alpha,\beta,a,b)$, and the prover responds with $v = (u-c\xi) \bmod q$. A verifier can now confirm the claim by checking that both $g^v\cdot \alpha^c \equiv_p a$ and $K^v\cdot \beta^c \equiv_p b$ are true.
 
+TODO revisit this section if we need it
 S3.3.4b
 
 
@@ -1186,32 +1215,42 @@ To prove that $(\alpha,\beta)$ is an encryption of one, $\beta/K \bmod p$ is sub
 
 As with many zero-knowledge protocols, if the prover knows a challenge value prior to making its commitment, it can create a false proof. For example, if a particular challenge $c$ is known to be forthcoming, a prover can generate a random $v\in\Z_q$ and commit to $(a,b) = (g^v\alpha^c \bmod p,\ K^v\beta^c \bmod p)$.  This selection will satisfy the required checks for $(\alpha,\beta)$ to appear as an encryption of zero regardless of the values of $(\alpha,\beta)$. Similarly, setting $(a,b) = (g^v\alpha^c \bmod p,\ K^{(v-c)\bmod q}\beta^c \bmod p)$ will satisfy the required checks for $(\alpha,\beta)$ to appear as an encryption of one regardless of the values of $(\alpha,\beta)$. This quirk is what enables the Cramer-Damgård-Schoenmakers technique to prove a disjunction of two predicates.
 
+TODO revisit this section if we need it
 S3.3.4c
 
 
 \paragraph{Sketch of NIZK Proof that $(\alpha,\beta)$ is an encryption of zero or one.}
 The prover starts with whichever statement is \emph{not} true, generates a random challenge for it, and then derives the commitment from it to be able to produce a false proof, as described in the previous paragraph. For example, if $(\alpha, \beta)$ is an encryption of one, the prover chooses a challenge $c_0$ and a response at random, then derives values for $(a_0,b_0)$ so that the `response' satisfies the `challenge'; if $(\alpha, \beta)$ is an encryption of zero, the prover chooses $c_1$ and a response at random and derives satisfying values for $(a_1,b_1)$. The prover then works on the true part. It generates a truthful commitment $(a_0,b_0)$ like the first part of a proof of an encryption of zero (or a truthful commitment $(a_1,b_1)$ like the first part of a proof of an encryption of one, whichever is true). A single challenge value $c$ is selected by hashing all commitments and baseline parameters. The prover must produce challenge values $c_0$ and $c_1$ s.t. $c = c_0 + c_1 \bmod q$. It answers its false claim with the challenge it chose in the beginning ($c_0$ if $(\alpha,\beta)$ is an encryption of one, $c_1$ if it is an encryption of zero), then derives the other challenge by subtraction ($c_1 = c - c_0 \bmod q$ or $c_0 = c - c_1 \bmod q$ as needed). It then finishes the proof of the true part as usual, using this challenge. An observer can see that one of the claims must be true but cannot tell which.
 
+TODO revisit this section if we need it
 S3.3.4d
 
 
 \paragraph{Sketch of NIZK Proof that $(\alpha,\beta)$ is an encryption of an integer $\ell$ such that $0\leq \ell \leq R$.}
 The above method to prove that $(\alpha,\beta)$ is an encryption of zero or one can be extended to more than two values in an analogous way. Now, the prover needs to produce false proofs that verify for all values that are not encrypted in the ciphertext. This means that for each $i$ with $0\leq i \leq R$ and $i\neq\ell$, the prover selects a challenge value $c_i$ and a response at random and uses them to create commitments $(a_i, b_i)$ that make the response verify the challenge for the false claim that $(\alpha,\beta)$ is an encryption of the value $i \neq \ell$. For the true assertion that $(\alpha,\beta)$ is an encryption of $\ell$, the prover makes honest commitments $(a_\ell, b_\ell)$. At this point, there exist commitments $(a_i, b_i)$ for all $0\leq i \leq R$ and a single challenge value $c$ is selected by hashing all these commitments. The remaining challenge value $c_\ell$ is then uniquely determined by the constraint $c = (c_0 + \dots + c_\ell + \dots + c_R) \bmod q$ and can be computed by subtracting from $c$ all other challenge values that were chosen for the false proofs. The challenge $c_\ell$ must be used to answer the true assertion that $(\alpha,\beta)$ is an encryption of $\ell$. The proof now consists of all challenge and response pairs, including the honestly generated one for the true assertion and $R$ faked pairs for the false assertions.
 
+TODO revisit this section if we need it
 S3.3.4e
 
 
 ---- S3.3.5
-\subsubsection{Details for proofs of ballot correctness}\label{sec:proofsballotcorrectness}
-This subsection begins with the special but common case where a selection is either a $0$ or a $1$, which means that the range bound is $R=1$. Both cases---unselected (encryption of $0$) and selected (encryption of $1$) are spelled out in detail before the general case range proof is specified.  An \EG implementation can directly implement the general range proof 
 
-S3.3.5a
+\subsubsection{Details for proofs of ballot correctness}\label{sec:proofsballotcorrectness}
+This subsection begins with the special but common case where a selection is either a $0$ or a $1$, which means that the range bound is $R=1$. Both cases---unselected (encryption of $0$) and selected (encryption of $1$) are spelled out in detail before the general case range proof is specified.  An \EG implementation can directly implement the general range proof and use it in the
+special case $R=1$. There is no need to implement the case $R=1$ separately.
+
+S3.3.5a none
 
 
 \paragraph{Unselected option.}
 To encrypt an “unselected” option on a ballot, a pseudo-random nonce $\xi\in\Z_q$ for the selection is derived from the ballot nonce $\xi_B$ as described in Section~\ref{sec:noncegen}, and an encryption of zero is formed as $(\alpha,\beta)=(g^\xi \bmod p,\ K^\xi \bmod p)$.
 
-S3.3.5b
+
+S3.3.5b RI encrypts an "unselected" option as a value of 0
+S3.3.5b [dup S3.3.1 ?] [1/4] RI encrypts an "unselected" option as a value of 0 by
+S3.3.5b [dup S3.3.1 ?] [2/4] deriving a pseudo-random nonce xi in Z_q from the ballot nonce xi_B as described in 3.3.2
+S3.3.5b [dup S3.3.1 ?] [3/4] computing alpha = g^xi mod p
+S3.3.5b [dup S3.3.1 ?] [4/4] computing beta = K^xi mod p
 
 
 \paragraph{NIZK Proof:} Proves that $(\alpha,\beta)$ is an encryption of zero or one.\\
@@ -1244,13 +1283,54 @@ c & = ((c-c_1)+c_1) \bmod q = (c_0+c_1) \bmod q,\\
 (g^{v_1} \alpha^{c_1}, K^{v_1-c_1} \beta^{c_1}) & \equiv_p (g^{u_1-c_1 \xi} g^{c_1 \xi}, K^{u_1-c_1 \xi - c_1} K^{c_1 \xi}) \equiv_p (a_1, b_1).
 \end{align}
 
-S3.3.5c
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv dup
+\noindent To create the proof that $(\alpha,\beta)$ is an encryption of a zero or a one, randomly select $u_0$, $u_1$, and $c_1$ from $\Z_q$ and compute  
+\begin{equation}
+  (a_0,b_0 ) = (g^{u_0} \bmod p,\ K^{u_0} \bmod p)
+\end{equation}
+and 
+\begin{equation}
+  (a_1,b_1) = (g^{u_1} \bmod p,\ K^{u_1-c_1} \bmod p).
+\end{equation}
+A challenge value $c$ is formed by hashing the extended base hash $\HH_E$ together with $\alpha$, $\beta$, $a_0$, $b_0$, $a_1$ and $b_1$, namely
+
+\begin{equation}\label{eq:encproof0_challenge}
+  c = H(\HH_E;\mathtt{0x21},K,\alpha,\beta,a_0,b_0,a_1,b_1).
+\end{equation}
+The proof consists of the four values $c_0$, $c_1$, $v_0$, and $v_1$ which are computed as follows.
+\begin{align}
+c_0 & = (c-c_1) \bmod q,\\
+v_0 & = (u_0-c_0\cdot \xi) \bmod q,\\
+v_1 & = (u_1-c_1\cdot \xi) \bmod q.
+\end{align}
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ dup
+
+S3.3.5c RI creates proof encrypted option value from S3.3.5b is an encryption of 0
+S3.3.5c generate u_0 by sampling a CSRNG uniformly as 0 <= u_0 < Z_q
+S3.3.5c generate u_1 by sampling a CSRNG uniformly as 0 <= u_1 < Z_q
+S3.3.5c generate c_1 by sampling a CSRNG uniformly as 0 <= c_1 < Z_q
+S3.3.5c compute a_0 = g^{u_0} mod p
+S3.3.5c compute b_0 = K^{u_0} mod p
+S3.3.5c compute a_0 = g^{u_0} mod p
+S3.3.5c compute b_0 = K^{u_0} mod p
+S3.3.5c compute c = H(H_E; 0x21, K, alpha, beta, a_0, b_0, a_1, b_1)
+S3.3.5c c_0 & = (c-c_1) mod q
+S3.3.5c v_0 & = (u_0 - c_0 cdot xi) mod q
+S3.3.5c v_1 & = (u_1 - c_1 cdot xi) mod q
+
+S3.3.5c 
 
 
 \paragraph{Selected option.}
 To encrypt a “selected” option on a ballot, a pseudo-random nonce $\xi\in\Z_q$ for the selection is derived from the ballot nonce $\xi_B$ as described in Section~\ref{sec:noncegen}, and an encryption of one is formed as $(\alpha,\beta) = (g^\xi  \bmod p,\ K^{\xi+1} \bmod p)$.
 
-S3.3.5d
+S3.3.5d RI encrypts an "selected" option as a value of 1
+S3.3.5d [dup S3.3.1 ?] [1/4] RI encrypts a "selected" option as a value of 1 by
+S3.3.5d [dup S3.3.1 ?] [2/4] deriving a pseudo-random nonce xi in Z_q from the ballot nonce xi_B as described in 3.3.2
+S3.3.5d [dup S3.3.1 ?] [3/4] computing alpha = g^xi mod p
+S3.3.5d [dup S3.3.1 ?] [4/4] computing beta = K^(xi + 1) mod p
+
+
 
 
 \paragraph{NIZK Proof:} Proves that $(\alpha,\beta)$ is an encryption of zero or one.\\
@@ -1285,7 +1365,7 @@ c & =(c_0+(c-c_0)) \bmod q = (c_0+c_1 ) \bmod q,\\
 \equiv_p (a_1, b_1).
 \end{align}
 
-S3.3.5d
+S3.3.5e
 
 
 
@@ -1323,6 +1403,10 @@ Specializing the general range proof with $R=1$ and $\ell=0$ is identical to the
 \veriftextCorrectnessOfSelectionEncryptions}
 
 S3.3.5e
+
+
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv dup
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ dup
 
 
 

@@ -1,0 +1,41 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "xxx$id": "https://raw.githubusercontent.com/microsoft/electionguard-rust/doc/specs/ElectionGuard_2.0_json-schema/hashes.json",
+    "type": "object",
+    "properties": {
+        "h_p": { "$ref": "#/$defs/hash_value" },
+        "h_m": { "$ref": "#/$defs/hash_value" },
+        "h_b": { "$ref": "#/$defs/hash_value" }
+    },
+    "required": ["h_p", "h_m", "h_b"],
+
+    "$defs": {
+        "hash_value" : {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        },
+        "integer_small" : {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "integer_q" : {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        },
+        "integer_p" : {
+            "type": "string",
+            "pattern": "^[0-9A-F]{1024}$"
+        },
+        "xxhashes" : {
+            "$id": "#/hashes",
+            "type": "object",
+            "properties": {
+                "h_p": { "$ref": "#/$defs/hash_value" },
+                "h_m": { "$ref": "#/$defs/hash_value" },
+                "h_b": { "$ref": "#/$defs/hash_value" }
+            },
+            "required": ["h_p", "h_m", "h_b"]
+        }
+    }
+}

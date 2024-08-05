@@ -1,7 +1,5 @@
 # ElectionGuard 2.0 - Reference Implementation in Rust - Implementation Guide
 
-# Overview
-
 ## What Is This Document and Why Is It Important?
 
 TODO
@@ -12,7 +10,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
 "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL" in this document are to be
 interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
-# Software Implementation
+## Software Implementation
 
 ## Rust
 
@@ -22,17 +20,24 @@ Rust has native support for defining `extern "C"` functions and data, so wrapper
 should be straightforward to create them for almost any runtime environment. However, this
 package does not supply them.
 
-# Data types
+## Code organization and configuration
+
+### Config values
+
+* `allow_nonstandard_fixed_parameter_values` allow the use of values for p and q other than
+  the standard values specified in the ElectionGuard 2.0 Reference Specification.
+  When the standard values are used, some expensive primality checks can be avoided.
+
+## Data types
 
 ## Text data, strings
 
 Text data presents particular challenges for interoperability and
 [internationalizability](https://www.w3.org/International/i18n-drafts/nav/about).
 
-Text data used in ElectionGuard MUST:
-* Be representable as valid UTF-8. This derives from the requirements of Rust's
+Text data used in ElectionGuard must be representable as valid UTF-8. For the Reference
+Implementation in Rust, this is a requirement of Rust's
 [std::string::String](https://doc.rust-lang.org/std/string/struct.String.html) type.
-* Consider the possibility of homoglyph and encoding attacks TODO
 
 Humans tend to compare text without regard to upper/lower case distinctions. Perhaps because
 this feels so natural to us, software developers tend to underestimate the implementation
@@ -55,15 +60,17 @@ Have a plan for equivalence comparison, normalization, case-folding, sorting, an
 rather than casually adopting functional requirements such as "sorted alphabetically" or
 "case-insensitive string comparison".
 
+Consider the possibility of homoglyph and encoding attacks TODO
+
 Which will your application place first in sort order, "Precinct 2" or "Precinct 11"?
 
 ## Labels
 
 Thankfully, ElectionGuard itself only needs to work with text data in a few places:
+
 * Contest label
 * Option label
 * Ballot style label
-* TODO more places may be coming with preencrypted ballots
 
 A 'label' is intended to be a short, concise name or an identifier, not a long-form descriptions.
 
@@ -81,71 +88,96 @@ expresses this concept.
 considerations for identifiers and defines a "profile of identifiers in environments
 where security is at issue".
 
-* TODO Most US ballots I've seen do have line breaks in the contest options. The first line may
-not even include the name of the candidate. But results reporting always seems to have a way to
-refer to both candidates and their percentages along the bottom edge of a TV screen. Do we need
-to allow them?
-
-Labels MUST:
-* Conform to the requirements for text data described above
-* Define an equivalence relation that is reflexive and symmetric.
-* Be processed with regard to 
-
-Labels SHOULD:
-* Be human readable and human meaningful
-* Contain enough detail to identify the item uniquely
-* Be plain text
-* Use a single 0x20 for a whitespace character where possible
-* Be compatible with NIST 1500-100 [ref]
-
-Labels SHOULD NOT:
-* Include line breaks, tabs, or formatting characters beyond what is necessary to accurately
-represent the text.
-* Be used to store higher level formats such as HTML or JSON. Vendor data fields are provided for
-that.
-* Have contiguous sequences of multiple whitespace characters other than a single 0x20.
-* Have leading or trailing whitespace characters
+See the [Serialization Specification TBD](TBD) for specific requirements.
 
 ## Guardian secrets
 
-Guardians may re-use the same key for multiple elections. Perhaps this should be explicitly stated
-in the EG spec.
+Guardians may re-use the same key for multiple elections if all guardians are the same and
+n and k are the same.
 
-# Structure of an election
+There's an "election key" which is formed by the guardians
 
-## Roles in an election
+Analogy of building with one door and 4 locks.
 
-### Election Administrator
+Each guardian generates a their own secret key.
+Guardians send each other messages to validate and cross-check each others' keys.
+This cross-checking also serves as a back-up scheme allowing a quorum (k of n) of guardians to conduct the electionguard operations should one of them be unavailable.
 
-### Election Guardians
+## Structure of an election
 
-### Voters
+### Roles in an election
 
-### Political parties and voter-interest organizations
+#### Election Administrator
 
-### Journalists and other media
+#### Election Guardians
+
+Guardians have an essential role in fulfilling the privacy assurances
+of ElectionGuard.
+
+As a Guardian, the voters' privacy relies on you:
+
+1. ***To REFUSE*** to reveal your Guardian secret key to ***anyone***, not even to the
+Election Administrator. Using your secret key should not involve revealing it.
+
+1. ***To REFUSE*** to use your Guardian secret key to decrypt any ballots other than those
+that were intentionally challenged by the actual voter.
+
+1. To be alert for the tactics that scammers, both traditional
+and cyber-, use to trick people into enabling fraudulent actions unwittingly.
+
+[County Password Inspector](https://www.smbc-comics.com/comic/2012-02-20)
+
+1. To be present for the rehearsal and the formal Key and Tally Ceremonies with
+your Guardian secret key.
+
+1. To call a "time out" whenever something doesn't seem right.
+Red flags:
+
+* Unrehearsed, last-minute changes in plans or venue.
+* Feeling pressured by time or people.
+* Workarounds, or extra steps that weren't written down anywhere in advance.
+* Trying to do multiple things at the same time.
+* A feeling of too many balls in the air.
+* Flattery or other personal persuasion.
+
+The ceremonies should be deliberate, rehearsed, almost boring, procedures.
+
+The right decision in almost every unclear situation is to pause to think,
+express your concerns, gather more information,
+re-state and question your assumptions.
+
+1. To destroy your Guardian secret key at the appointed time after the election is over.
+
+#### Voters
+
+#### Political parties and voter-interest organizations
+
+#### Journalists and other media
 
 ## Hardware requirements
 
 ### Gurardian secret key storage
 
-### Gurardian secret key operations
+#### Gurardian secret key operations
 
-# Step-by-step
+## Step-by-step
 
-## Advance preparation
+### Advance preparation
 
-## Key ceremony
+### Key ceremony
 
-## Tally ceremony
+TODO come up with language that
+TODO avoid mental model of guardians posessing a fraction of a key
 
-## Publishing
+### Tally ceremony
 
-## Verification
+### Publishing
 
-## Reporting
+### Verification
 
-# References
+### Reporting
+
+## References
 
 ***Note*** Neither the ElectionGuard 2.0 Reference Specification nor this
 Reference Implementation claims conformance to any official standards.
@@ -156,49 +188,56 @@ election systems.
 [ElectionGuard Glossary](
 https://www.electionguard.vote/overview/Glossary/
 ) at electionguard.vote
+
 * Explicitly aims to conform with NIST CDF
 
 [NIST Election Terminology Glossary](https://pages.nist.gov/ElectionGlossary/)
+
 * "This glossary contains election terms including those used in the Voluntary Voting System
 Guidelines 2.0 (VVSG 2.0) requirements and glossary and in the NIST Common Data Format (CDF)"
 
 [NIST SP 1500-20 Ballot Definition Common Data Format Specification](
 https://doi.org/10.6028/NIST.SP.1500-20
 ) "BD CDF"
+
 * "This publication describes a ballot definition common data format for the interchange of logical
-and physical ballot style information. It contains a UML (Unified Modeling Language) model of 
-the election data and a JSON (JavaScript Object Notation) and XML (eXtensible Markup 
-Language) format derived from the UML model. It contains background information regarding 
-how geopolitical geography is structured and used in the model and schemas. It also provides 
-usage examples for anticipated use-cases. The format is comprehensive and at the same time 
-very flexible, able to accommodate election scenarios used throughout the U.S. It is part of a 
+and physical ballot style information. It contains a UML (Unified Modeling Language) model of
+the election data and a JSON (JavaScript Object Notation) and XML (eXtensible Markup
+Language) format derived from the UML model. It contains background information regarding
+how geopolitical geography is structured and used in the model and schemas. It also provides
+usage examples for anticipated use-cases. The format is comprehensive and at the same time
+very flexible, able to accommodate election scenarios used throughout the U.S. It is part of a
 series of common data format specifications for voting equipment."
 
 [NIST SP 1500-100r2 Election Results Common Data Format Specification](
 https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.1500-100r2.pdf
 ) "CDF"
+
 * "This publication describes an election results common data format specification for pre-election
-setup information and post-election results reporting. It contains a UML (Unified Modeling 
-Language) model of the election data and an XML (eXtensible Markup Language) and JSON 
-(JavaScript Object Notation) format derived from the UML model. It also contains background 
-information regarding how geopolitical geography is structured and used in the model and 
-schema. The XML format is comprehensive and at the same time very flexible, able to 
-accommodate election scenarios used throughout the U.S. It is part of a series of planned 
+setup information and post-election results reporting. It contains a UML (Unified Modeling
+Language) model of the election data and an XML (eXtensible Markup Language) and JSON
+(JavaScript Object Notation) format derived from the UML model. It also contains background
+information regarding how geopolitical geography is structured and used in the model and
+schema. The XML format is comprehensive and at the same time very flexible, able to
+accommodate election scenarios used throughout the U.S. It is part of a series of planned
 common data format specifications for voting equipment"
 
 [NIST CDF Test Data Sets](https://github.com/usnistgov/cdf-test-method/tree/main/test_data)
+
 * Six different test elections with completed ballots.
 * Suggested to start with GEN-03, then 02, then 01.
 
 [Voluntary Voting System Guidelines 2.0](
 https://www.eac.gov/sites/default/files/TestingCertification/Voluntary_Voting_System_Guidelines_Version_2_0.pdf
 ) "VVSG"
-* "This document will be used primarily by voting system manufacturers and voting system test 
-laboratories as a baseline set of requirements for voting systems to which states will add their 
+
+* "This document will be used primarily by voting system manufacturers and voting system test
+laboratories as a baseline set of requirements for voting systems to which states will add their
 state-specific requirements as necessary. [...] This document, therefore, serves as an important,
 foundational tool that defines a baseline set or requirements necessary for ensuring that the
 voting systems used in U.S. elections will be secure, reliable, and easy for all voters to use
 accurately."
 
 [Google Civics Common Standard Data Specification](https://developers.google.com/civics-data)
+
 * Wherever they conflict, the NIST CDF is authoritative.

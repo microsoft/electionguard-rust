@@ -1,0 +1,82 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "xxx$id": "https://raw.githubusercontent.com/microsoft/electionguard-rust/doc/specs/ElectionGuard_2.0_json-schema/election_parameters.json",
+    "type": "object",
+    "properties": {
+        "fixed_parameters": { "$ref": "#/$defs/fixed_parameters" },
+        "varying_parameters": { "$ref": "#/$defs/varying_parameters" }
+    },
+    "required": [ "fixed_parameters", "varying_parameters" ],
+    "$defs": {
+        "fixed_parameters": {
+            "type": "object",
+            "properties": {
+                "generation_parameters": { "$ref": "#/$defs/generation_parameters" },
+                "field": { "$ref": "#/$defs/field" },
+                "group": { "$ref": "#/$defs/group" }
+            },
+            "required": [
+                "generation_parameters",
+                "field",
+                "group"
+            ]
+        },
+        "varying_parameters": {
+            "type": "object",
+            "properties": {
+                "n": { "$ref": "#/$defs/integer_small" },
+                "k": { "$ref": "#/$defs/integer_small" },
+                "date": { "type": "string" },
+                "info": { "type": "string" },
+                "ballot_chaining": { "type": "string" }
+            },
+            "required": [
+                "n", "k", "info"
+            ]
+        },
+        "generation_parameters": {
+            "type": "object",
+            "properties": {
+                "q_bits_total": { "$ref": "#/$defs/integer_small" },
+                "p_bits_total": { "$ref": "#/$defs/integer_small" },
+                "p_bits_msb_fixed_1": { "$ref": "#/$defs/integer_small" },
+                "p_middle_bits_source": { "$ref": "#/$defs/middle_bits_source" },
+                "p_bits_lsb_fixed_1": { "$ref": "#/$defs/integer_small" }
+            },
+            "required": [ "p_bits_total", "p_bits_msb_fixed_1", "p_middle_bits_source", "p_bits_lsb_fixed_1", "q_bits_total" ]
+        },
+        "field": {
+            "type": "object",
+            "properties": {
+                "q": { "$ref": "#/$defs/integer_q" }
+            },
+            "required": [ "q" ]
+        },
+        "group": {
+            "type": "object",
+            "properties": {
+                "p": { "$ref": "#/$defs/integer_p" },
+                "g": { "$ref": "#/$defs/integer_p" },
+                "q": { "$ref": "#/$defs/integer_q" }
+            },
+            "required": [ "p", "g", "q" ]
+        },
+        "middle_bits_source": {
+            "type": "string",
+            "pattern": "^[0-9A-Za-z_]+$"
+        },
+        "integer_small": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "integer_q": {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        },
+        "integer_p": {
+            "type": "string",
+            "pattern": "^[0-9A-F]{1024}$"
+        }
+    }
+}
