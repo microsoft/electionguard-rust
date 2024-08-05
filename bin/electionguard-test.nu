@@ -237,7 +237,7 @@ def jsonschema_command [] -> string {
 }
 
 def --env figure_jsonschema_dir [] {    
-    let dir = (eg_top_dir | path join "../electionguard-rust_docs/doc/specs/ElectionGuard_2.0_jsonschema")
+    let dir = (eg_top_dir | path join "doc/specs/ElectionGuard_2.0_jsonschema")
 
     $env._eg_jsonschema_dir = $dir
 
@@ -274,8 +274,8 @@ def egtests [
     # 
     #  Write election parameters
     # 
-    let election_parameters_json = artifacts_public_dir | path join "election_parameters.json"
-    if not ($election_parameters_json | path exists) {
+    let election_parameters_json_file = artifacts_public_dir | path join "election_parameters.json"
+    if not ($election_parameters_json_file | path exists) {
         run-subprocess --delimit [
             (eg_exe) write-parameters
                 --n $election_parameters.n
@@ -284,9 +284,15 @@ def egtests [
                 --info $election_parameters.info
                 --ballot-chaining prohibited
         ]
-        if not $no_jsonschema {
-            validate-jsonschema --json-file $election_parameters_json --schema-file 'election_parameters.json'
+
+        if not ($election_parameters_json_file | path exists) {
+            log error $"ERROR: Election parameters file does not exist: ($election_parameters_json_file)"
+            exit 1
         }
+    }
+
+    if not $no_jsonschema {
+        validate-jsonschema --json-file $election_parameters_json_file --schema-file 'election_parameters.json'
     }
 
     # 
@@ -304,38 +310,64 @@ def egtests [
     # 
     #  Write election manifest (canonical)
     # 
-    if not (artifacts_public_dir | path join "election_manifest_canonical.bin" | path exists) {
+    let election_manifest_canonical_json_file = artifacts_public_dir | path join "election_manifest_canonical.bin"
+    if not ($election_manifest_canonical_json_file | path exists) {
         run-subprocess --delimit [
             (eg_exe) write-manifest --in-example --out-format canonical
         ]
+
+        if not ($election_manifest_canonical_json_file | path exists) {
+            log error $"ERROR: Election manifest \(canonical) file does not exist: ($election_manifest_canonical_json_file)"
+            exit 1
+        }
+    }
+
+    if not $no_jsonschema {
+        validate-jsonschema --json-file $election_manifest_canonical_json_file --schema-file 'election_manifest.json'
     }
 
     # 
     #  Write election manifest (pretty)
     # 
-    if not (artifacts_public_dir | path join "election_manifest_pretty.json" | path exists) {
-        run-subprocess --delimit [ (eg_exe) write-manifest --out-format pretty ]
+    let election_manifest_pretty_json_file = artifacts_public_dir | path join "election_manifest_pretty.json"
+    if not ($election_manifest_pretty_json_file | path exists) {
+        run-subprocess --delimit [
+            (eg_exe) write-manifest --in-canonical --out-format pretty
+        ]
+
+        if not ($election_manifest_pretty_json_file | path exists) {
+            log error $"ERROR: Election manifest \(pretty) file does not exist: ($election_manifest_pretty_json_file)"
+            exit 1
+        }
+    }
+    if not $no_jsonschema {
+        validate-jsonschema --json-file $election_manifest_pretty_json_file --schema-file 'election_manifest.json'
     }
 
     # 
     #  Write hashes
     # 
-    let hashes_json = artifacts_public_dir | path join "hashes.json"
-    if not ($hashes_json | path exists) {
+    let hashes_json_file = artifacts_public_dir | path join "hashes.json"
+    if not ($hashes_json_file | path exists) {
         run-subprocess --delimit [
             (eg_exe) --insecure-deterministic write-hashes
         ]
+
+        if not ($hashes_json_file | path exists) {
+            log error $"ERROR: Hashes .json file does not exist: ($hashes_json_file)"
+            exit 1
+        }
     }
 
     if not $no_jsonschema {
-        validate-jsonschema --json-file $hashes_json --schema-file 'hashes.json'
+        validate-jsonschema --json-file $hashes_json_file --schema-file 'hashes.json'
     }
 
     # 
     #  For each guardian
     #
     for $i in 1..$election_parameters.n {
-        egtest_per_guardian $i
+        egtest_per_guardian $i --no-jsonschema=$no_jsonschema
     }
 
     log info ""
@@ -344,17 +376,37 @@ def egtests [
     # 
     #  Write joint election public key
     # 
-    if not (artifacts_public_dir | path join "joint_election_public_key.json" | path exists) {
+    let joint_election_public_key_json_file = artifacts_public_dir | path join "joint_election_public_key.json"
+    if not ($joint_election_public_key_json_file | path exists) {
         run-subprocess --delimit [
             (eg_exe) --insecure-deterministic write-joint-election-public-key
         ]
     }
 
+    if not ($joint_election_public_key_json_file | path exists) {
+        log error $"ERROR: Joint election public key .json file does not exist: ($joint_election_public_key_json_file)"
+        exit 1
+    }
+    
+    if not $no_jsonschema {
+        validate-jsonschema --json-file $joint_election_public_key_json_file --schema-file 'joint_election_public_key.json'
+    }
+
     # 
     #  Write HashesExt
     # 
-    if not (artifacts_public_dir | path join "hashes_ext.json" | path exists) {
+    let hashes_ext_json_file = artifacts_public_dir | path join "hashes_ext.json"
+    if not ($hashes_ext_json_file | path exists) {
         run-subprocess --delimit [ (eg_exe) --insecure-deterministic write-hashes-ext ]
+    }
+
+    if not ($hashes_ext_json_file | path exists) {
+        log error $"ERROR: Hashes ext .json file does not exist: ($hashes_ext_json_file)"
+        exit 1
+    }
+    
+    if not $no_jsonschema {
+        validate-jsonschema --json-file $hashes_ext_json_file --schema-file 'hashes_ext.json'
     }
 
     # 
@@ -381,6 +433,7 @@ def log_artifact_files [] {
 
 def egtest_per_guardian [
     i: int
+    --no-jsonschema
 ] {
     let guardian_secret_dir = (artifacts_dir) | path join $"SECRET_for_guardian_($i)"
     if not ($guardian_secret_dir | path exists) {
@@ -410,6 +463,10 @@ def egtest_per_guardian [
             log error $"ERROR: Guardian ($i) secret key file does not exist: ($guardian_secret_key_file)"
             exit 1
         }
+
+        if not $no_jsonschema {
+            validate-jsonschema --json-file $guardian_secret_key_file --schema-file 'guardian_secret_key.json'
+        }
     }
 
     if not ($guardian_public_key_file | path exists) {
@@ -420,6 +477,10 @@ def egtest_per_guardian [
         if not ($guardian_public_key_file | path exists) {
             log error $"Guardian ($i) public key file does not exist: ($guardian_public_key_file)"
             exit 1
+        }
+        
+        if not $no_jsonschema {
+            validate-jsonschema --json-file $guardian_public_key_file --schema-file 'guardian_public_key.json'
         }
     }
 }

@@ -1,0 +1,15 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "joint_election_public_key": { "$ref": "#/$defs/integer_p" }
+    },
+    "required": [ "joint_election_public_key" ],
+
+    "$defs": {
+        "integer_p": {
+            "type": "string",
+            "pattern": "^[0-9A-F]{1024}$"
+        }
+    }
+}
