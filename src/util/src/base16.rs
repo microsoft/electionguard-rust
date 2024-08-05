@@ -20,33 +20,46 @@ pub fn to_string_with_prefix(
     opt_fixed_len_bits: Option<u32>,
 ) -> Result<String> {
     match radix {
-        16 => to_string_with_prefix_base16(u, opt_fixed_len_bits),
+        16 => to_string_uppercase_hex_prefix(u, "base16:", opt_fixed_len_bits),
         _ => bail!("Unsupported radix: {radix}"),
     }
 }
 
-fn to_string_with_prefix_base16(u: &BigUint, opt_fixed_len_bits: Option<u32>) -> Result<String> {
-    let prefix = "base16:";
+/// Converts a `BigUint` to a string, prefixed with "base16:" and using uppercase hex digits.
+///
+/// Currently, `radix` must be 16.
+///
+/// `fixed_len_bits` the result will be padded with leading zeros to the number of bytes required
+/// by the specified number of bits. If the input number is too large, then an error is returned.
+pub fn to_string_uppercase_hex_bits(
+    u: &BigUint,
+    fixed_len_bits: u32
+) -> Result<String> {
+    to_string_uppercase_hex_prefix(u, "", Some(fixed_len_bits))
+}
 
+fn to_string_uppercase_hex_prefix(u: &BigUint, prefix: &str, opt_fixed_len_bits: Option<u32>) -> Result<String> {
     let s = if let Some(fixed_len_bits) = opt_fixed_len_bits {
         let fixed_len_bits = (fixed_len_bits as u64).max(1);
         let value_bits = u.bits().max(1);
         ensure!(
             value_bits <= fixed_len_bits,
             "Value of {value_bits} bits too large for specified fixed length, expected {fixed_len_bits} or fewer." );
+            
+        let needed_bytes = (fixed_len_bits + 7) / 8;
+        let needed_digits = needed_bytes * 2;
 
-        let expected_digits = (fixed_len_bits + 3) / 4;
         let value_digits = (value_bits + 3) / 4;
 
-        let s = if value_digits < expected_digits {
-            let prepend_leading = expected_digits - value_digits;
+        let s = if value_digits < needed_digits {
+            let prepend_leading = needed_digits - value_digits;
             let leading_zeros = "0".repeat(prepend_leading as usize);
             format!("{prefix}{leading_zeros}{u:X}")
         } else {
             format!("{prefix}{u:X}")
         };
 
-        let expected_chars = prefix.len() as u64 + expected_digits;
+        let expected_chars = prefix.len() as u64 + needed_digits;
         ensure!(
             s.len() as u64 == expected_chars,
             "Output length mismatch. Got {}, expected {expected_chars}",
@@ -124,6 +137,52 @@ pub fn biguint_from_str_with_prefix(s: &str) -> Result<BigUint> {
             '0'..='9' => ch as u32 - b'0' as u32,
             'A'..='F' => ch as u32 - b'A' as u32 + 10,
             ch if ch.is_whitespace() => continue,
+            _ => bail!("Invalid character in base16 uppercase number: {}", ch),
+        };
+
+        u |= hexdigit_value << next_shift;
+        next_shift += 4;
+
+        if next_shift == 32 {
+            limbs.push(u);
+            u = 0;
+            next_shift = 0;
+        }
+    }
+
+    if u != 0 {
+        limbs.push(u);
+    }
+
+    // Remove any leading zero limbs.
+    #[allow(clippy::unwrap_used)] // Unwrap() is justified here because we check for empty.
+    while !limbs.is_empty() && limbs.last().unwrap() == &0 {
+        limbs.pop();
+    }
+
+    Ok(BigUint::new(limbs))
+}
+
+/// Read a `BigUint` number from a string, requiring uppercase hex digits only.
+pub fn biguint_from_str_uppercase_hex_bits(s: &str, fixed_len_bits: u32) -> Result<BigUint> {
+    let needed_bytes = (fixed_len_bits + 7) / 8;
+    let needed_digits = needed_bytes * 2;
+
+    let s_len = s.len();
+    let s_len_u64 = s_len as u64;
+    ensure!(needed_digits as u64 == s_len_u64,
+        "Expecting {needed_digits} uppercase hex digits, got {s_len} characters.");
+
+    // Iterate the string in reverse, to accumulate the limbs in little-endian order.
+
+    let mut limbs = Vec::<u32>::with_capacity(s.len() / 8 + 1);
+    let mut u: u32 = 0;
+    let mut next_shift = 0;
+
+    for ch in s.chars().rev() {
+        let hexdigit_value = match ch {
+            '0'..='9' => ch as u32 - b'0' as u32,
+            'A'..='F' => ch as u32 - b'A' as u32 + 10,
             _ => bail!("Invalid character in base16 uppercase number: {}", ch),
         };
 

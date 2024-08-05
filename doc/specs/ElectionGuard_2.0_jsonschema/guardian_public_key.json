@@ -1,0 +1,44 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "i": { "$ref": "#/$defs/integer_small" },
+        "name": { "type": "string" },
+        "coefficient_commitments": { "$ref": "#/$defs/coefficient_commitments" },
+        "coefficient_proofs": { "$ref": "#/$defs/coefficient_proofs" }
+    },
+    "required": [ "i", "name", "coefficient_commitments", "coefficient_proofs" ],
+
+    "$defs": {
+        "coefficient_commitments": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/integer_p" },
+            "minimum": 1
+        },
+        "coefficient_proofs": {
+            "type": "array",
+            "options": { "$ref": "#/$defs/coefficient_proof" }
+        },
+        "coefficient_proof": {
+            "type": "object",
+            "properties": {
+                "challenge": { "$ref": "#/$defs/integer_q" },
+                "response": { "$ref": "#/$defs/integer_q" }
+            },
+            "required": [ "challenge", "response" ]
+        },
+        "integer_small": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        },
+        "integer_q": {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        },
+        "integer_p": {
+            "type": "string",
+            "pattern": "^[0-9A-F]{1024}$"
+        }
+    }
+}

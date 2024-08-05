@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct FieldElement(
     #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
     )]
     BigUint,
 );
@@ -30,8 +30,8 @@ pub struct FieldElement(
 pub struct ScalarField {
     /// Subgroup order.
     #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
     )]
     q: BigUint,
 }
@@ -112,7 +112,7 @@ impl FieldElement {
     ///
     /// The encoding follows Section 5.1.2 in the specs.
     pub fn to_be_bytes_left_pad(&self, field: &ScalarField) -> Vec<u8> {
-        to_be_bytes_left_pad(&self.0, field.l_q())
+        to_be_bytes_left_pad(&self.0, field.q_len_bytes())
     }
 
     /// Returns true if the element is zero.
@@ -182,7 +182,7 @@ impl ScalarField {
     /// Returns the length of the byte-array representation of field order `q`.
     ///
     /// For the standard parameter field this is `32`.
-    pub fn l_q(&self) -> usize {
+    pub fn q_len_bytes(&self) -> usize {
         (cnt_bits_repr(&self.q) + 7) / 8
     }
 }
@@ -191,8 +191,8 @@ impl ScalarField {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GroupElement(
     #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
     )]
     BigUint,
 );
@@ -202,20 +202,22 @@ pub struct GroupElement(
 pub struct Group {
     /// Prime modulus `p`.
     #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
     )]
     p: BigUint,
+
     /// Subgroup generator `g`.
     #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
     )]
     g: BigUint,
+
     /// Group order `q`.
     #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize"
+        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
     )]
     q: BigUint,
 }
@@ -262,7 +264,7 @@ impl GroupElement {
     ///
     /// The encoding follows Section 5.1.1 in the specs.
     pub fn to_be_bytes_left_pad(&self, group: &Group) -> Vec<u8> {
-        to_be_bytes_left_pad(&self.0, group.l_p())
+        to_be_bytes_left_pad(&self.0, group.p_len_bytes())
     }
 
     /// Returns a reference to group element as BigUint
@@ -382,8 +384,15 @@ impl Group {
     /// Returns the length of the byte array representation of modulus `p`.
     ///
     /// For the standard parameter group this is `512`.
-    pub fn l_p(&self) -> usize {
+    pub fn p_len_bytes(&self) -> usize {
         (cnt_bits_repr(&self.p) + 7) / 8
+    }
+
+    /// Returns the length of the byte-array representation of field order `q`.
+    ///
+    /// For the standard parameter field this is `32`.
+    pub fn q_len_bytes(&self) -> usize {
+        (cnt_bits_repr(&self.q) + 7) / 8
     }
 
     /// This function checks if the group and the given field have the same order.

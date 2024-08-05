@@ -1,0 +1,15 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "h_e": { "$ref": "#/$defs/hash_value" }
+    },
+    "required": ["h_e"],
+
+    "$defs": {
+        "hash_value" : {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        }
+    }
+}

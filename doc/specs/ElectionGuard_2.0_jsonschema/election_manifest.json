@@ -1,0 +1,58 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "label": { "type": "string" },
+        "contests": { "$ref": "#/$defs/contests" },
+        "ballot_styles": { "$ref": "#/$defs/ballot_styles" }
+    },
+    "required": [ "label", "contests", "ballot_styles" ],
+
+    "$defs": {
+        "contests": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/contest" }
+        },
+        "contest": {
+            "type": "object",
+            "properties": {
+                "label": { "type": "string" },
+                "selection_limit": { "$ref": "#/$defs/integer_small" },
+                "options": { "type": "array", "options": { "$ref": "#/$defs/contest_option" } }
+            },
+            "required": [
+                "label", "selection_limit", "options"
+            ]
+        },
+        "contest_option": {
+            "type": "object",
+            "properties": {
+                "label": { "type": "string" },
+                "vote_limit": { "$ref": "#/$defs/integer_small" }
+            },
+            "required": [ "label" ]
+        },
+        "ballot_styles": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/ballot_style" }
+        },
+        "ballot_style": {
+            "type": "object",
+            "properties": {
+                "label": { "type": "string" },
+                "contests": {
+                    "type": "array",
+                    "options": { "$ref": "#/$defs/integer_small" }
+                }
+            },
+            "required": [
+                "label", "contests"
+            ]
+        },
+        "integer_small": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        }
+    }
+}
