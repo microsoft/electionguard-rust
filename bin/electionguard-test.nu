@@ -16,6 +16,7 @@ def main [
     --no-build-docs   # Do not build docs.
     --erase-artifacts # Erase the artifacts directory before running electionguard.exe tests.
     --no-egtest       # Do not run electionguard.exe tests.
+    --no-jsonschema   # Do not validate files against JSON schema.
     --no-insecure-deterministic # Do not use the --insecure-deterministic flag.
     --dump-imports    # Dump the imports of the resulting binary (currently windows only)
 ] {
@@ -24,6 +25,12 @@ def main [
     std log info $"Checkout top dir: (eg_top_dir)"
     
     figure_artifacts_dir
+    std log info $"Artifacts dir: (artifacts_dir)"
+
+    if not $no_jsonschema {
+        figure_jsonschema_command
+        figure_jsonschema_dir
+    }
 
     let electionguard_bin_dir = (eg_top_dir | path join bin)
     std log info $"electionguard_bin_dir=($electionguard_bin_dir)"
@@ -128,7 +135,8 @@ def main [
     # 
     if not $no_egtest {
         (egtests $election_parameters
-            --cargo_profile_build_flag $cargo_profile_build_flag)
+            --cargo_profile_build_flag $cargo_profile_build_flag
+            --no-jsonschema=$no_jsonschema )
     }
 
     #  Success!
@@ -138,11 +146,11 @@ def main [
 
 def --env figure_eg_top_dir [] {
     let dir = ($env.FILE_PWD | path dirname)
-    $env._eg_eg_eg_top_dir = $dir
+    $env._eg_top_dir = $dir
 }
 
 def eg_top_dir [] -> string {    
-    $env._eg_eg_eg_top_dir
+    $env._eg_top_dir
 }
 
 def --env figure_artifacts_dir [] {
@@ -208,9 +216,42 @@ def eg_exe [] -> string {
     $env._eg_exe
 }
 
+def --env figure_jsonschema_command [] {
+    mut jsonschema_command_name = "jsonschema"
+
+    $env._jsonschema_command = $jsonschema_command_name
+
+    log info $"jsonschema command: ($env._jsonschema_command)"
+
+    let exit_code = run-subprocess --delimit [
+        (jsonschema_command) --version
+    ]
+    if $exit_code != 0 {
+        log error $"ERROR: The jsonschema command '($env._jsonschema_command)' isn't working. Supply the --no-jsonschema flag to skip it."
+        exit 1
+    }
+}
+
+def jsonschema_command [] -> string {    
+    $env._jsonschema_command
+}
+
+def --env figure_jsonschema_dir [] {    
+    let dir = (eg_top_dir | path join "../electionguard-rust_docs/doc/specs/ElectionGuard_2.0_jsonschema")
+
+    $env._eg_jsonschema_dir = $dir
+
+    std log info $"jsonschema dir: ($env._eg_jsonschema_dir)"
+}
+
+def eg_jsonschema_dir [] -> string {    
+    $env._eg_jsonschema_dir
+}
+
 def egtests [
     election_parameters: record<n: int, k: int, date: string, info: string>
     --cargo_profile_build_flag: string
+    --no-jsonschema
 ] {
     #  Build electionguard.exe and its dependents
     # 
@@ -231,10 +272,28 @@ def egtests [
     }
 
     # 
+    #  Write election parameters
+    # 
+    let election_parameters_json = artifacts_public_dir | path join "election_parameters.json"
+    if not ($election_parameters_json | path exists) {
+        run-subprocess --delimit [
+            (eg_exe) write-parameters
+                --n $election_parameters.n
+                --k $election_parameters.k
+                --date $election_parameters.date
+                --info $election_parameters.info
+                --ballot-chaining prohibited
+        ]
+        if not $no_jsonschema {
+            validate-jsonschema --json-file $election_parameters_json --schema-file 'election_parameters.json'
+        }
+    }
+
+    # 
     #  Verify standard parameters
     # 
     let standard_parameters_verified_file = artifacts_public_dir | path join "standard_parameters_verified.txt"
-    if ($standard_parameters_verified_file | path exists) {
+    if not ($standard_parameters_verified_file | path exists) {
         run-subprocess --delimit [
             (eg_exe) --insecure-deterministic verify-standard-parameters
         ]
@@ -259,26 +318,17 @@ def egtests [
     }
 
     # 
-    #  Write election parameters
-    # 
-    if not (artifacts_public_dir | path join "election_parameters.json" | path exists) {
-        run-subprocess --delimit [
-            (eg_exe) write-parameters
-                --n $election_parameters.n
-                --k $election_parameters.k
-                --date $election_parameters.date
-                --info $election_parameters.info
-                --ballot-chaining prohibited
-        ]
-    }
-
-    # 
     #  Write hashes
     # 
-    if not (artifacts_public_dir | path join "hashes.json" | path exists) {
+    let hashes_json = artifacts_public_dir | path join "hashes.json"
+    if not ($hashes_json | path exists) {
         run-subprocess --delimit [
             (eg_exe) --insecure-deterministic write-hashes
         ]
+    }
+
+    if not $no_jsonschema {
+        validate-jsonschema --json-file $hashes_json --schema-file 'hashes.json'
     }
 
     # 
@@ -372,6 +422,16 @@ def egtest_per_guardian [
             exit 1
         }
     }
+}
+
+# Validates a json file against a json schema.
+def validate-jsonschema [
+    --json-file: string
+    --schema-file: string # relative to eg_jsonschema_dir
+] {
+    run-subprocess --delimit [
+        (jsonschema_command) -i $json_file (eg_jsonschema_dir | path join $schema_file)
+    ]
 }
 
 # Runs a subprocess and returns the exit code.

@@ -22,8 +22,10 @@ type HValueByteArray = [u8; HVALUE_BYTE_LEN];
 pub struct HValue(pub HValueByteArray);
 
 impl HValue {
-    const HVALUE_SERIALIZE_PREFIX: &'static [u8] = b"H(";
-    const HVALUE_SERIALIZE_SUFFIX: &'static [u8] = b")";
+    //const HVALUE_SERIALIZE_PREFIX: &'static [u8] = b"H(";
+    //const HVALUE_SERIALIZE_SUFFIX: &'static [u8] = b")";
+    const HVALUE_SERIALIZE_PREFIX: &'static [u8] = b"";
+    const HVALUE_SERIALIZE_SUFFIX: &'static [u8] = b"";
     const HVALUE_SERIALIZE_LEN: usize = HValue::HVALUE_SERIALIZE_PREFIX.len()
         + HVALUE_BYTE_LEN * 2
         + HValue::HVALUE_SERIALIZE_SUFFIX.len();
@@ -35,7 +37,17 @@ impl HValue {
             Suffix(usize),
             End,
         }
-        let mut state = State::Prefix(0);
+
+        #[allow(clippy::const_is_empty)]
+        let mut state = if HValue::HVALUE_SERIALIZE_PREFIX.is_empty() {
+                State::Nibble {
+                lower: false,
+                ix: 0,
+            }
+        } else {
+            State::Prefix(0)
+        };
+
         let aa_result = ArrayAscii::try_from_fn(|_out_ix| match state {
             State::Prefix(ix) => {
                 state = if ix + 1 < HValue::HVALUE_SERIALIZE_PREFIX.len() {
@@ -60,7 +72,12 @@ impl HValue {
                             ix: ix + 1,
                         }
                     } else {
-                        State::Suffix(0)
+                        #[allow(clippy::const_is_empty)]
+                        if HValue::HVALUE_SERIALIZE_SUFFIX.is_empty() {
+                            State::End
+                        } else {
+                            State::Suffix(0)
+                        }
                     };
                     self.0[ix] & 0x0f
                 };

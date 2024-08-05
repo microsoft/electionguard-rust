@@ -36,8 +36,8 @@ impl ParameterBaseHash {
 
         // v = 0x00 | b(p,512)| b(q,32) | b(g,512)
         let mut v = vec![0x00];
-        v.extend_from_slice(to_be_bytes_left_pad(&group.modulus(), group.l_p()).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(&field.order(), field.l_q()).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(&group.modulus(), group.p_len_bytes()).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(&field.order(), field.q_len_bytes()).as_slice());
         v.extend_from_slice(group.generator().to_be_bytes_left_pad(group).as_slice());
         let h_p = eg_h(&h_v, &v);
 
