@@ -1,5 +1,5 @@
 {
-    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
         "label": { "type": "string" },
@@ -18,19 +18,34 @@
             "properties": {
                 "label": { "type": "string" },
                 "selection_limit": { "$ref": "#/$defs/integer_small" },
-                "options": { "type": "array", "options": { "$ref": "#/$defs/contest_option" } }
+                "contest_options": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/contest_option" }
+                }
             },
             "required": [
-                "label", "selection_limit", "options"
+                "label", "contest_options"
             ]
         },
         "contest_option": {
             "type": "object",
             "properties": {
                 "label": { "type": "string" },
-                "vote_limit": { "$ref": "#/$defs/integer_small" }
+                "selection_limit": { "$ref": "#/$defs/contest_option_selection_limit" }
             },
             "required": [ "label" ]
+        },
+        "contest_option_selection_limit": {
+            "anyOf": [
+                { "enum": [ "CONTEST_LIMIT" ] },
+                { "$ref": "#/$defs/integer_small" },
+                {
+                    "$comment": "This is a workaround for `jsonschema-rs version 0.18.0`, which does not support `$ref` in the `oneOf` keyword.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                }
+            ]
         },
         "ballot_styles": {
             "type": "array",

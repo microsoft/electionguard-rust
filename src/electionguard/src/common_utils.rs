@@ -1,20 +1,21 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 use std::path::PathBuf;
 
 use anyhow::{ensure, Context, Result};
-use rand_core::{OsRng, RngCore};
 
 use eg::{
     election_manifest::ElectionManifest, election_parameters::ElectionParameters,
     example_election_manifest::example_election_manifest, guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey, guardian_secret_key::GuardianSecretKey, hashes::Hashes,
     hashes_ext::HashesExt, joint_election_public_key::JointElectionPublicKey,
+    pre_voting_data::PreVotingData,
 };
 use util::csprng::Csprng;
 
@@ -201,6 +202,20 @@ pub(crate) fn load_hashes_ext(artifacts_dir: &ArtifactsDir) -> Result<HashesExt>
     Ok(hashes)
 }
 
+pub(crate) fn load_pre_voting_data(
+    artifacts_dir: &ArtifactsDir,
+    csprng: &mut Csprng,
+) -> Result<PreVotingData> {
+    let (mut stdioread, path) =
+        artifacts_dir.in_file_stdioread(&None, Some(ArtifactFile::PreVotingData))?;
+
+    let pre_voting_data = PreVotingData::from_stdioread_validated(&mut stdioread, csprng)?;
+
+    eprintln!("PreVotingData loaded from: {}", path.display());
+
+    Ok(pre_voting_data)
+}
+
 /// Read the recommended amount of seed data from the OS RNG.
 ///
 /// `OsRng` is implemented by the `getrandom` crate, which describes itself as an "Interface to
@@ -213,6 +228,7 @@ pub(crate) fn load_hashes_ext(artifacts_dir: &ArtifactsDir) -> Result<HashesExt>
 /// https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom
 ///
 pub(crate) fn osrng_seed_data_for_csprng() -> [u8; Csprng::recommended_max_seed_bytes()] {
+    use rand_core::{OsRng, RngCore};
     let mut seed_bytes = core::array::from_fn(|_i| 0);
     OsRng.fill_bytes(&mut seed_bytes);
     seed_bytes

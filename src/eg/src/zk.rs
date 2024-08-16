@@ -1,9 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 //! This module provides the implementation of the range proof [`ProofRange`] for [`Ciphertext`]s.
 //! For more details see Section `3.3.5` of the Electionguard specification `2.0.0`.
@@ -15,13 +16,12 @@ use util::{
 };
 
 use crate::{
-    election_record::PreVotingData,
+    ciphertext::{Ciphertext, CiphertextIndex},
     hash::eg_h,
-    index::Index,
-    joint_election_public_key::{Ciphertext, Nonce},
-    vec1::HasIndexTypeMarker,
+    nonce::NonceFE,
+    pre_voting_data::PreVotingData,
+    vec1::HasIndexType,
 };
-use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRangeSingle {
@@ -31,17 +31,20 @@ pub struct ProofRangeSingle {
     pub v: FieldElement,
 }
 
-/// A 1-based index of a [`ProofRange`] in the order it is stored in the [`crate::contest_encrypted::ContestEncrypted`].
-pub type ProofRangeIndex = Index<ProofRange>;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRange(Vec<ProofRangeSingle>);
 
-impl HasIndexTypeMarker for ProofRange {}
+/// A [`Vec1`] of [`ProofRange`] is indexed with the same type as [`Ciphertext`]
+/// Same as [`ContestOption`], [`ContestDataFieldPlaintext`], and others.
+impl HasIndexType for ProofRange {
+    type IndexType = Ciphertext;
+}
 
-#[derive(Error, Debug)]
-pub enum ProofRangeError {
-    /// Bla bla
+/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestDataFieldPlaintextIndex`], etc.
+pub type ProofRangeIndex = CiphertextIndex;
+
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+pub enum ZkProofRangeError {
     #[error(
         "It must be the case that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l})."
     )]
@@ -90,24 +93,24 @@ impl ProofRange {
     /// This function computes a [`ProofRange`] from given [`Ciphertext`] and encrypted `small_l`.
     ///
     /// The arguments are
-    /// - `pvd` - pre-voting data
+    /// - `pre_voting_data` - pre-voting data
     /// - `csprng` - secure randomness generator
     /// - `ct` - the ciphertext
     /// - `small_l` - the encrypted number
     /// - `big_l` - the range bound
     pub fn new(
-        pvd: &PreVotingData,
+        pre_voting_data: &PreVotingData,
         csprng: &mut Csprng,
         ct: &Ciphertext,
-        nonce: &Nonce,
+        nonce: &NonceFE,
         small_l: usize,
         big_l: usize,
-    ) -> Result<Self, ProofRangeError> {
+    ) -> Result<Self, ZkProofRangeError> {
         if small_l > big_l {
-            return Err(ProofRangeError::RangeNotSatisfied { small_l, big_l });
+            return Err(ZkProofRangeError::RangeNotSatisfied { small_l, big_l });
         }
-        let field = &pvd.parameters.fixed_parameters.field;
-        let group = &pvd.parameters.fixed_parameters.group;
+        let field = &pre_voting_data.parameters.fixed_parameters.field;
+        let group = &pre_voting_data.parameters.fixed_parameters.group;
 
         // Compute commit message and simulated challenges
         let u = (0..big_l + 1)
@@ -129,11 +132,16 @@ impl ProofRange {
             }
         }
         let b = (0..big_l + 1)
-            .map(|j| pvd.public_key.joint_election_public_key.exp(&t[j], group))
+            .map(|j| {
+                pre_voting_data
+                    .public_key
+                    .joint_election_public_key
+                    .exp(&t[j], group)
+            })
             .collect::<Vec<GroupElement>>();
 
         // Compute real challenge c_{small_l}
-        let challenge = ProofRange::challenge(pvd, ct, &a, &b);
+        let challenge = ProofRange::challenge(pre_voting_data, ct, &a, &b);
         c[small_l] = challenge;
         for j in 0..big_l + 1 {
             if j != small_l {
@@ -143,7 +151,7 @@ impl ProofRange {
 
         // Compute responses
         let v = (0..big_l + 1)
-            .map(|j| u[j].sub(&c[j].mul(&nonce.xi, field), field))
+            .map(|j| u[j].sub(&c[j].mul(nonce.as_ref(), field), field))
             .collect::<Vec<FieldElement>>();
 
         Ok(ProofRange(
@@ -165,12 +173,16 @@ impl ProofRange {
     /// - `big_l` - the range bound
     ///
     /// This is essentially Verification (5).
-    pub fn verify(&self, pvd: &PreVotingData, ct: &Ciphertext, big_l: usize) -> bool {
+    pub fn verify(&self, pvd: &PreVotingData, ct: &Ciphertext, big_l: u32) -> bool {
         let field = &pvd.parameters.fixed_parameters.field;
         let group = &pvd.parameters.fixed_parameters.group;
 
+        let Ok(big_l_usize) = TryInto::<usize>::try_into(big_l) else {
+            return false;
+        };
+
         // (5.1)
-        let a = (0..big_l + 1)
+        let a = (0..big_l_usize + 1)
             .map(|j| {
                 group
                     .g_exp(&self.0[j].v)
@@ -178,13 +190,13 @@ impl ProofRange {
             })
             .collect::<Vec<GroupElement>>();
         // (5.2)
-        let w = (0..big_l + 1)
+        let w = (0..big_l_usize + 1)
             .map(|j| {
                 let j_scalar = FieldElement::from(j, field);
                 self.0[j].v.sub(&j_scalar.mul(&self.0[j].c, field), field)
             })
             .collect::<Vec<FieldElement>>();
-        let b = (0..big_l + 1)
+        let b = (0..big_l_usize + 1)
             .map(|j| {
                 let k_w = pvd.public_key.joint_election_public_key.exp(&w[j], group);
                 let b_c = ct.beta.exp(&self.0[j].c, group);
@@ -198,12 +210,14 @@ impl ProofRange {
         if !ct.alpha.is_valid(group) || !ct.beta.is_valid(group) {
             return false;
         }
-        for j in 0..big_l + 1 {
+
+        for j in 0..big_l_usize + 1 {
             // Verification check (5.B) 0 <= c_j < 2^256
             // This is enforced by c_j being a valid field element (q < 2^256 for standard parameter)
             if !self.0[j].c.is_valid(field) {
                 return false;
             }
+
             // Verification check (5.C) v_j is a valid field element
             if !self.0[j].v.is_valid(field) {
                 return false;
@@ -283,8 +297,8 @@ impl ProofGuardian {
     pub fn challenge(
         fixed_parameters: &FixedParameters,
         h_p: HValue,
-        i: usize,
-        j: usize,
+        i: u32,
+        j: u32,
         capital_k_i_j: &BigUint,
         h_i_j: &BigUint,
     ) -> BigUint {
@@ -326,16 +340,16 @@ impl ProofGuardian {
                 Self::challenge(
                     fixed_parameters,
                     h_p,
-                    i as usize,
-                    j as usize,
-                    &capital_k_i[j as usize],
-                    &h[j as usize],
+                    i as u32,
+                    j as u32,
+                    &capital_k_i[j as u32],
+                    &h[j as u32],
                 ),
             ) {
                 Some(x) => c.push(x),
                 None => panic!("Challenge is not in ZmulPrime"),
             };
-            v.push(&u[j as usize] - &(&c[j as usize] * &a_i[j as usize]));
+            v.push(&u[j as u32] - &(&c[j as u32] * &a_i[j as u32]));
         }
         ProofGuardian {
             c: c.iter().map(|x| x.elem.clone()).collect(),
@@ -348,7 +362,7 @@ impl ProofGuardian {
         // 2.1
         let h = (0..k)
             .map(|j| {
-                let j = j as usize;
+                let j = j as u32;
                 fixed_parameters
                     .g
                     .modpow(&self.v[j], fixed_parameters.p.borrow())
@@ -362,7 +376,7 @@ impl ProofGuardian {
         let zero = BigUint::from(0u8);
         // let one = BigUint::from(1u8);
         for j in 0..k {
-            let j = j as usize;
+            let j = j as u32;
             // 2.A
             verified &=
                 (zero <= self.capital_k[j]) & (self.capital_k[j] < *fixed_parameters.p.borrow());
@@ -376,7 +390,7 @@ impl ProofGuardian {
                 == Self::challenge(
                     fixed_parameters,
                     h_p,
-                    i as usize,
+                    i as u32,
                     j,
                     &self.capital_k[j],
                     &h[j],

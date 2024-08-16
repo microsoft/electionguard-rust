@@ -6,17 +6,16 @@
 #![deny(clippy::manual_assert)]
 
 use eg::{
-    contest_encrypted::ContestEncrypted,
-    contest_selection::ContestSelectionPlaintext,
-    device::Device,
-    election_manifest::{Contest, ContestIndex, ContestOptionIndex},
-    election_record::PreVotingData,
+    contest_encrypted::ContestDataFieldsCiphertexts,
+    contest_option_fields::ContestDataFieldPlaintext,
+    election_manifest::{Contest, ContestIndex, ContestDataFieldIndex},
+    pre_voting_data::PreVotingData,
     fixed_parameters::FixedParameters,
     hash::HValue,
     index::Index,
-    joint_election_public_key::{Ciphertext, Nonce},
+    ciphertext::{Ciphertext, Nonce},
     vec1::{HasIndexType, HasIndexTypeMarker, Vec1},
-    zk::{ProofRange, ProofRangeError},
+    zk::{ProofRange, ZkProofRangeError},
 };
 use serde::{Deserialize, Serialize};
 use util::csprng::Csprng;
@@ -33,7 +32,7 @@ pub type ContestPreEncryptedIndex = Index<ContestPreEncrypted>;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ContestPreEncrypted {
     /// Index of the contest in the election manifest.
-    pub contest_index: ContestIndex,
+    pub contest_ix: ContestIndex,
 
     /// Selections in this contest.
     pub selections: Vec1<ContestSelectionPreEncrypted>,
@@ -50,7 +49,7 @@ impl HasIndexTypeMarker for ContestSelectionPreEncrypted {}
 
 impl PartialEq for ContestPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
-        self.contest_index == other.contest_index && self.selections == other.selections
+        self.contest_ix == other.contest_ix && self.selections == other.selections
     }
 }
 
@@ -62,8 +61,8 @@ impl ContestPreEncrypted {
             self.selections.get_mut(j).unwrap().regenerate_nonces(
                 device,
                 primary_nonce,
-                self.contest_index,
-                ContestOptionIndex::from_one_based_index(j.get_one_based_usize() as u32).unwrap(),
+                self.contest_ix,
+                ContestDataFieldIndex::from_one_based_index(j.get_one_based_usize() as u32).unwrap(),
             );
         });
     }
@@ -73,19 +72,19 @@ impl ContestPreEncrypted {
         primary_nonce: &[u8],
         store_nonces: bool,
         contest: &Contest,
-        contest_index: ContestIndex,
+        contest_ix: ContestIndex,
     ) -> ContestPreEncrypted {
         let mut selections = <Vec1<ContestSelectionPreEncrypted>>::new();
-        let num_selections = contest.options.len() + contest.selection_limit;
+        let num_selections = contest.contest_options.len() + contest.selection_limit;
 
-        for j in 1..contest.options.len() + 1 {
+        for j in 1..contest.contest_options.len() + 1 {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             let selection = ContestSelectionPreEncrypted::new(
                 pvd,
                 primary_nonce,
                 store_nonces,
-                contest_index,
-                ContestOptionIndex::from_one_based_index(j as u32).unwrap(),
+                contest_ix,
+                ContestDataFieldIndex::from_one_based_index(j as u32).unwrap(),
                 num_selections,
             );
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
@@ -98,8 +97,8 @@ impl ContestPreEncrypted {
                 pvd,
                 primary_nonce,
                 store_nonces,
-                contest_index,
-                ContestOptionIndex::from_one_based_index((contest.options.len() + j + 1) as u32)
+                contest_ix,
+                ContestDataFieldIndex::from_one_based_index((contest.contest_options.len() + j + 1) as u32)
                     .unwrap(),
                 num_selections,
             );
@@ -107,9 +106,9 @@ impl ContestPreEncrypted {
             selections.try_push(selection).unwrap();
         }
 
-        let contest_hash = contest_hash(pvd, contest_index, &selections);
+        let contest_hash = contest_hash(pvd, contest_ix, &selections);
         ContestPreEncrypted {
-            contest_index,
+            contest_ix,
             selections,
             contest_hash,
         }
@@ -119,7 +118,7 @@ impl ContestPreEncrypted {
         &self,
         pvd: &PreVotingData,
         csprng: &mut Csprng,
-    ) -> Result<Vec1<Vec1<ProofRange>>, ProofRangeError> {
+    ) -> Result<Vec1<Vec1<ProofRange>>, ZkProofRangeError> {
         let mut proofs = Vec1::new();
         for i in self.selections.indices() {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
@@ -139,7 +138,7 @@ impl ContestPreEncrypted {
     pub fn combine_voter_selections(
         &self,
         fixed_parameters: &FixedParameters,
-        voter_selections: &[ContestSelectionPlaintext],
+        voter_selections: &[ContestDataFieldPlaintext],
         selection_limit: usize,
     ) -> Vec<(Ciphertext, Nonce)> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
@@ -197,6 +196,7 @@ impl ContestPreEncrypted {
                 combined_selection_j.1 = Some(Nonce::new(cs_j_nonce));
             }
         }
+
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         combined_selection
             .iter()
@@ -206,14 +206,14 @@ impl ContestPreEncrypted {
 
     pub fn finalize(
         &self,
-        device: &Device,
+        pre_voting_data: &PreVotingData,
         csprng: &mut Csprng,
         voter_selections: &[u8],
         selection_limit: usize,
         num_options: usize,
-    ) -> Result<ContestEncrypted, ProofRangeError> {
+    ) -> Result<ContestDataFieldsCiphertexts, ZkProofRangeError> {
         let selection = self.combine_voter_selections(
-            &device.header.parameters.fixed_parameters,
+            &pre_voting_data.parameters.fixed_parameters,
             voter_selections,
             selection_limit,
         );
@@ -225,8 +225,8 @@ impl ContestPreEncrypted {
             let nonce = &selection[i].1;
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proof_ballot_correctness
-                .try_push(selection[i].0.proof_ballot_correctness(
-                    &device.header,
+                .try_push(selection[i].0.generate_range_proof_of_contest_data_field(
+                    &pre_voting_data,
                     csprng,
                     voter_selections[i] == 1u8,
                     nonce,
@@ -237,8 +237,8 @@ impl ContestPreEncrypted {
         let mut num_selections = 0;
         voter_selections.iter().for_each(|v| num_selections += v);
 
-        let proof_selection_limit = ContestEncrypted::proof_selection_limit(
-            &device.header,
+        let proof_selection_limit = ContestDataFieldsCiphertexts::proof_selection_limit(
+            &pre_voting_data,
             csprng,
             &selection,
             num_selections as usize,
@@ -247,7 +247,7 @@ impl ContestPreEncrypted {
         let selection = selection.iter().map(|(ct, _)| ct.clone()).collect();
 
         // TODO: Change crypto hash
-        Ok(ContestEncrypted {
+        Ok(ContestDataFieldsCiphertexts {
             selection,
             contest_hash: self.contest_hash,
             proof_ballot_correctness,

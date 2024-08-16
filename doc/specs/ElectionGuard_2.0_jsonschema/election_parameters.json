@@ -27,9 +27,9 @@
             "properties": {
                 "n": { "$ref": "#/$defs/integer_small" },
                 "k": { "$ref": "#/$defs/integer_small" },
-                "date": { "type": "string" },
                 "info": { "type": "string" },
-                "ballot_chaining": { "type": "string" }
+                "ballot_chaining": { "type": "string", "value": "Prohibited" },
+                "date": { "type": "string" }
             },
             "required": [
                 "n", "k", "info"

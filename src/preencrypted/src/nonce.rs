@@ -6,8 +6,8 @@
 #![deny(clippy::manual_assert)]
 
 use eg::{
-    election_manifest::{ContestIndex, ContestOptionIndex},
-    election_record::PreVotingData,
+    election_manifest::{ContestIndex, ContestDataFieldIndex},
+    pre_voting_data::PreVotingData,
     hash::eg_h,
 };
 use util::algebra::FieldElement;
@@ -21,8 +21,8 @@ pub fn option_nonce(
     header: &PreVotingData,
     primary_nonce: &[u8],
     index_i: ContestIndex,
-    index_j: ContestOptionIndex,
-    index_k: ContestOptionIndex,
+    index_j: ContestDataFieldIndex,
+    index_k: ContestDataFieldIndex,
 ) -> FieldElement {
     let field = &header.parameters.fixed_parameters.field;
     let mut v = vec![0x43];

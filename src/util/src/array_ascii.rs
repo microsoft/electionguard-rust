@@ -89,7 +89,7 @@ impl<const N: usize> ArrayAscii<N> {
     #[must_use]
     #[inline(always)]
     pub fn as_str(&self) -> &str {
-        if cfg!(feature = "eg-allow-unsafe_code") {
+        if cfg!(feature = "eg-allow-unsafe-code") {
             unsafe {
                 // `from_utf8_unchecked()` is justified here because we took pains to ensure
                 // all values are non-NUL 7-bit ASCII values.

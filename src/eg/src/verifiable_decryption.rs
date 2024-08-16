@@ -1,13 +1,15 @@
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 //! This module provides the implementation of verifiable decryption for
 //! [`Ciphertext`]s. For more details see Section `3.6` of the Electionguard
 //! specification `2.0.0`.
 
 use crate::{
+    ciphertext::Ciphertext,
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
@@ -17,7 +19,8 @@ use crate::{
     hash::{eg_h, HValue},
     hashes::Hashes,
     hashes_ext::HashesExt,
-    joint_election_public_key::{Ciphertext, JointElectionPublicKey},
+    joint_election_public_key::JointElectionPublicKey,
+    pre_voting_data::PreVotingData,
 };
 use itertools::izip;
 use serde::{Deserialize, Serialize};
@@ -71,7 +74,7 @@ pub struct CombinedDecryptionShare(GroupElement);
 
 /// Represents errors occurring while combining [`DecryptionShare`]s into a
 /// [`CombinedDecryptionShare`].
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ShareCombinationError {
     /// Occurs if not enough shares were provided. Combination requires shares
     /// from at least `k` out of `n` guardians.
@@ -198,7 +201,7 @@ pub enum ResponseShareError {
 
 /// Represents errors occurring while combining the commit and response shares
 /// into a single [`DecryptionProof`].
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum CombineProofError {
     /// Occurs if the input list are not of the same length
     #[error("The given lists must be of the same length!")]
@@ -308,9 +311,7 @@ impl DecryptionProof {
     /// This corresponds to the computation specified in Equation `73`.
     ///
     /// The arguments are
-    /// - `fixed_parameters` - the fixed parameters
-    /// - `h_e` - the extended bash hash
-    /// - `k` - the joint election public key
+    /// - `pre_voting_data` - includes the extended bash hash and the joint election public key
     /// - `m` - combined decryption share
     /// - `ciphertext` - the ciphertext
     /// - `proof_commit_shares` - the shares of the commit message
@@ -318,15 +319,17 @@ impl DecryptionProof {
     /// - `secret_key_share` - the guardian's key share
     #[allow(clippy::too_many_arguments)]
     pub fn generate_response_share(
-        fixed_parameters: &FixedParameters,
-        h_e: &HashesExt,
-        k: &JointElectionPublicKey,
+        pre_voting_data: &PreVotingData,
         ciphertext: &Ciphertext,
         m: &CombinedDecryptionShare,
         proof_commit_shares: &[DecryptionProofCommitShare],
         proof_commit_state: &DecryptionProofStateShare,
         secret_key_share: &GuardianSecretKeyShare,
     ) -> Result<DecryptionProofResponseShare, ResponseShareError> {
+        let fixed_parameters = &pre_voting_data.parameters.fixed_parameters;
+        let h_e = &pre_voting_data.hashes_ext.h_e;
+        let k = &pre_voting_data.public_key;
+
         if proof_commit_state.i != secret_key_share.i {
             return Err(ResponseShareError::KeyStateShareIndexMismatch {
                 i: proof_commit_state.i,
@@ -342,7 +345,7 @@ impl DecryptionProof {
                 (a.mul(&share.a_i, group), b.mul(&share.b_i, group))
             });
         // Equation `71`
-        let c = Self::challenge(fixed_parameters, &h_e.h_e, k, ciphertext, &a, &b, m);
+        let c = Self::challenge(fixed_parameters, h_e, k, ciphertext, &a, &b, m);
         // Equation `72` c_i = (c*w_i)
         let i_scalar = FieldElement::from(proof_commit_state.i.get_one_based_u32(), field);
         let xs: Vec<FieldElement> = proof_commit_shares
@@ -548,7 +551,7 @@ impl DecryptionProof {
 }
 
 /// Represents errors occurring during decryption.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum DecryptionError {
     /// Occurs if the combined decryption share has no inverse.
     #[error("The combined decryption share has no inverse!")]
@@ -562,7 +565,7 @@ pub enum DecryptionError {
 /// Represents a "in-the-exponent" plain-text with a [`DecryptionProof`].
 ///
 /// This corresponds to `t` and `(c,v)` as in Section `3.6.3`.
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct VerifiableDecryption {
     /// The decrypted plain-text
     pub plain_text: FieldElement,
@@ -577,7 +580,7 @@ pub struct DecryptionShareResult {
     pub proof_commit: DecryptionProofCommitShare,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ComputeDecryptionError {
     #[error("Failed to decrypt: {0}")]
     Decryption(#[from] DecryptionError),
@@ -716,24 +719,27 @@ impl VerifiableDecryption {
     }
 }
 
+//-------------------------------------------------------------------------------------------------|
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
     use std::iter::zip;
+
     use util::{algebra::FieldElement, csprng::Csprng};
 
     use crate::{
+        election_manifest::ElectionManifest,
         election_parameters::ElectionParameters,
-        example_election_manifest,
+        errors::EgResult,
+        example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters,
         fixed_parameters::FixedParameters,
         guardian::GuardianIndex,
         guardian_public_key::GuardianPublicKey,
         guardian_secret_key::GuardianSecretKey,
         guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
-        hashes::Hashes,
-        hashes_ext::HashesExt,
-        joint_election_public_key::JointElectionPublicKey,
+        pre_voting_data::PreVotingData,
         standard_parameters::test_parameter_do_not_use_in_production::TOY_PARAMETERS_01,
         varying_parameters::{BallotChaining, VaryingParameters},
         verifiable_decryption::ShareCombinationError,
@@ -743,22 +749,32 @@ mod test {
 
     fn key_setup(
         csprng: &mut Csprng,
-        election_parameters: &ElectionParameters,
-    ) -> (
-        JointElectionPublicKey,
+        election_parameters: ElectionParameters,
+        election_manifest: ElectionManifest,
+    ) -> EgResult<(
+        PreVotingData,
         Vec<GuardianPublicKey>,
         Vec<GuardianSecretKeyShare>,
-    ) {
-        let varying_parameters = &election_parameters.varying_parameters;
+    )> {
         // Setup some keys
-        let guardian_secret_keys = varying_parameters
+        let guardian_secret_keys = election_parameters
+            .varying_parameters
             .each_guardian_i()
-            .map(|i| GuardianSecretKey::generate(csprng, election_parameters, i, None))
+            .map(|i| GuardianSecretKey::generate(csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
+
         let guardian_public_keys = guardian_secret_keys
             .iter()
             .map(|secret_key| secret_key.make_public_key())
             .collect::<Vec<_>>();
+
+        let pre_voting_data = PreVotingData::try_from_parameters_manifest_gpks(
+            election_parameters,
+            election_manifest,
+            &guardian_public_keys,
+        )?;
+        let election_parameters = &pre_voting_data.parameters;
+
         let share_vecs = guardian_public_keys
             .iter()
             .map(|pk| {
@@ -771,10 +787,11 @@ mod test {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+
         let key_shares = zip(&guardian_secret_keys, share_vecs)
             .map(|(sk, shares)| {
                 GuardianSecretKeyShare::compute(
-                    election_parameters,
+                    &pre_voting_data,
                     &guardian_public_keys,
                     &shares,
                     sk,
@@ -782,9 +799,8 @@ mod test {
                 .unwrap()
             })
             .collect::<Vec<_>>();
-        let joint_key =
-            JointElectionPublicKey::compute(election_parameters, &guardian_public_keys).unwrap();
-        (joint_key, guardian_public_keys, key_shares)
+
+        Ok((pre_voting_data, guardian_public_keys, key_shares))
     }
 
     #[test]
@@ -881,33 +897,30 @@ mod test {
     }
 
     #[test]
-    fn test_decryption_overall() {
+    fn test_decryption_overall() -> EgResult<()> {
         let mut csprng = Csprng::new(b"test_proof_generation");
+
         let election_parameters = example_election_parameters();
+        let election_manifest = example_election_manifest();
+        let (pre_voting_data, public_keys, key_shares) =
+            key_setup(&mut csprng, election_parameters, election_manifest)?;
+        let hashes_ext = &pre_voting_data.hashes_ext;
+
+        let election_parameters = &pre_voting_data.parameters;
         let fixed_parameters = &election_parameters.fixed_parameters;
-
         let field = &fixed_parameters.field;
-
-        let (joint_key, public_keys, key_shares) = key_setup(&mut csprng, &election_parameters);
-
-        let hashes = Hashes::compute(
-            &election_parameters,
-            &example_election_manifest::example_election_manifest(),
-        )
-        .unwrap();
-
-        let h_e = HashesExt::compute(&election_parameters, &hashes, &joint_key);
+        let joint_election_public_key = &pre_voting_data.public_key;
 
         let message: usize = 42;
         let nonce = field.random_field_elem(&mut csprng);
-        let ciphertext = joint_key.encrypt_with(fixed_parameters, &nonce, message);
+        let ciphertext = joint_election_public_key.encrypt_to(fixed_parameters, &nonce, message);
 
         let dec_shares: Vec<_> = key_shares
             .iter()
             .map(|ks| DecryptionShare::from(fixed_parameters, ks, &ciphertext))
             .collect();
         let combined_dec_share =
-            CombinedDecryptionShare::combine(&election_parameters, &dec_shares).unwrap();
+            CombinedDecryptionShare::combine(election_parameters, &dec_shares)?;
 
         let mut com_shares = vec![];
         let mut com_states = vec![];
@@ -926,9 +939,7 @@ mod test {
             .zip(&key_shares)
             .map(|(state, key_share)| {
                 DecryptionProof::generate_response_share(
-                    fixed_parameters,
-                    &h_e,
-                    &joint_key,
+                    &pre_voting_data,
                     &ciphertext,
                     &combined_dec_share,
                     &com_shares,
@@ -940,30 +951,34 @@ mod test {
             .collect();
 
         let proof = DecryptionProof::combine_proof(
-            &election_parameters,
-            &h_e,
+            election_parameters,
+            hashes_ext,
             &ciphertext,
             &dec_shares,
             &com_shares,
             &rsp_shares,
             &public_keys,
-        )
-        .unwrap();
+        )?;
 
         let decryption = VerifiableDecryption::new(
             fixed_parameters,
-            &joint_key,
+            joint_election_public_key,
             &ciphertext,
             &combined_dec_share,
             &proof,
-        )
-        .unwrap();
+        )?;
 
         assert_eq!(
             decryption.plain_text,
             FieldElement::from(message, field),
             "Decryption should match the message."
         );
-        assert!(decryption.verify(fixed_parameters, &h_e, &joint_key, &ciphertext))
+        assert!(decryption.verify(
+            fixed_parameters,
+            hashes_ext,
+            joint_election_public_key,
+            &ciphertext
+        ));
+        Ok(())
     }
 }

@@ -9,9 +9,10 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use eg::ballot_style::BallotStyleIndex;
-use eg::election_record::PreVotingData;
+use eg::pre_voting_data::PreVotingData;
 use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
-use eg::joint_election_public_key::{Ciphertext, JointElectionPublicKey};
+use eg::ciphertext::Ciphertext
+use eg::joint_election_public_key::JointElectionPublicKey;
 use eg::vec1::Vec1;
 use util::csprng::Csprng;
 use util::logging::Logging;
@@ -60,11 +61,11 @@ impl BallotEncryptingTool {
             file!(),
         );
         Logging::log(tag, "  Contests", line!(), file!());
-        ballot.contests.indices().for_each(|i| {
+        ballot.contests().indices().for_each(|i| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             Logging::log(
                 tag,
-                &format!("    {:?}", ballot.contests.get(i).unwrap().contest_hash),
+                &format!("    {:?}", ballot.contests().get(i).unwrap().contest_hash),
                 line!(),
                 file!(),
             );

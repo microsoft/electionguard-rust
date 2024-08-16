@@ -5,10 +5,13 @@ edition = "2021"
 publish = false
 
 [features]
-eg_allow_unsafe_code = []
+eg-allow-unsafe-code = []
+eg-test-data-generation = []
 
 [dependencies]
 anyhow.workspace = true
+cfg-if.workspace = true
+derive_more = { workspace = true, features = ["display"] }
 digest = "0.10"
 hex-literal = "0.4"
 hmac = "0.12"
@@ -17,9 +20,11 @@ lazy_static = "1.4"
 num-bigint.workspace = true
 #num-integer.workspace = true
 num-traits.workspace = true
+nutype.workspace = true
+rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
-static_assertions = "1.1.0"
+static_assertions.workspace = true
 thiserror.workspace = true
 util.workspace = true

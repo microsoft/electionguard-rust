@@ -124,8 +124,9 @@ mod test {
         let hashes_ext =
             HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
 
+        // This has to be modified every time the election manifest is changed even a little bit.
         let expected_h_e = HValue::from(hex!(
-            "5BFE1B5789C2F0D3C3C16D5D0F43012B5F920CC0AA61FF92B4B04C759B472F82"
+            "67C04B52497C5E0BD94378C833670799EACDCE5F25870F749C1C6E874493AF2A"
         ));
 
         assert_eq!(hashes_ext.h_e, expected_h_e);

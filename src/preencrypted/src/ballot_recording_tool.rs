@@ -9,7 +9,7 @@ use std::str::FromStr;
 
 use anyhow::Result;
 
-use eg::{ballot_style::BallotStyleIndex, election_record::PreVotingData, hash::HValue};
+use eg::{ballot_style::BallotStyleIndex, pre_voting_data::PreVotingData, hash::HValue};
 
 use crate::ballot::BallotPreEncrypted;
 

@@ -10,7 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{bail, Context, Result};
 
 use eg::{
-    ballot_style::BallotStyleIndex, device::Device, election_record::PreVotingData,
+    ballot_style::BallotStyleIndex,
+    pre_voting_data::PreVotingData,
     serializable::SerializablePretty,
 };
 use preencrypted::ballot_encrypting_tool::BallotEncryptingTool;
@@ -50,50 +51,12 @@ impl Subcommand for PreEncryptedBallotGenerate {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         let mut csprng = subcommand_helper.get_csprng("PreEncryptedBallotGenerate".as_bytes())?;
 
-        //? TODO: Do we need a command line arg to specify the election parameters source?
-        let election_parameters =
-            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
+        let pv_data = load_pre_voting_data(&subcommand_helper.artifacts_dir)?;
 
-        //? TODO: Do we need a command line arg to specify the election manifest source?
-        let election_manifest_source =
-            ElectionManifestSource::ArtifactFileElectionManifestCanonical;
-        let election_manifest =
-            election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
+        let ballot_style_index = BallotStyleIndex::from_one_based_index(self.ballot_style_index)
+                .unwrap_or_else(|| anyhow!("Ballot style is required to generate pre-encrypted ballots."));
 
-        if self.ballot_style_index == 0 {
-            bail!("Ballot style is required to generate pre-encrypted ballots.");
-        }
-
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let ballot_style_index =
-            BallotStyleIndex::from_one_based_index(self.ballot_style_index).unwrap();
-
-        let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
-        let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;
-        let jepk =
-            load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
-
-        let pv_data = PreVotingData::new(
-            election_manifest,
-            election_parameters,
-            hashes,
-            hashes_ext,
-            jepk,
-        );
-
-        let (mut bx_write, path) = subcommand_helper
-            .artifacts_dir
-            .out_file_stdiowrite(&None, Some(ArtifactFile::ElectionPreVotingData))?;
-
-        pv_data
-            .to_stdiowrite_pretty(bx_write.as_mut())
-            .with_context(|| format!("Writing record header to: {}", path.display()))?;
-
-        drop(bx_write);
-
-        let device = Device::new("Ballot Encrypting Tool", pv_data.clone());
-
-        let tool = BallotEncryptingTool::new(device.header, ballot_style_index, None);
+        let tool = BallotEncryptingTool::new(&pre_voting_data, ballot_style_index, None);
 
         let (ballots, primary_nonces) = tool.generate_ballots(&mut csprng, self.num_ballots);
 

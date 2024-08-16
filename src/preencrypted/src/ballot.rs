@@ -10,12 +10,11 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Context, Result};
 use eg::{
-    ballot::{BallotEncrypted, BallotEncryptedError, BallotState},
+    ballot::{BallotEncrypted, BallotError, BallotState},
     ballot_style::BallotStyleIndex,
-    contest_selection::ContestSelection,
-    device::Device,
+    contest_option_fields::ContestOptionFieldsPlaintexts,
     election_manifest::{ContestIndex, ElectionManifest},
-    election_record::PreVotingData,
+    pre_voting_data::PreVotingData,
     hash::HValue,
     serializable::SerializablePretty,
     vec1::Vec1,
@@ -44,7 +43,7 @@ pub struct VoterSelection {
     pub ballot_style_index: BallotStyleIndex,
 
     /// Plaintext selections made by the voter.
-    pub selections: Vec1<ContestSelection>,
+    pub selections: Vec1<ContestOptionFieldsPlaintexts>,
 }
 
 impl VoterSelection {
@@ -55,16 +54,16 @@ impl VoterSelection {
     ) -> Self {
         let mut selections = Vec1::new();
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let ballot_style = manifest.ballot_styles.get(ballot_style_index).unwrap();
-        ballot_style.contests.iter().for_each(|i| {
+        let ballot_style = manifest.ballot_styles().get(ballot_style_index).unwrap();
+        ballot_style.contests().iter().for_each(|i| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let contest = manifest.contests.get(*i).unwrap();
+            let contest = manifest.contests().get(*i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             selections
-                .try_push(ContestSelection::new_pick_random(
+                .try_push(ContestOptionFieldsPlaintexts::new_pick_random(
                     csprng,
                     contest.selection_limit,
-                    contest.options.len(),
+                    contest.contest_options.len(),
                 ))
                 .unwrap();
         });
@@ -110,9 +109,9 @@ impl BallotPreEncrypted {
             .unwrap();
 
         let mut contests = Vec1::new();
-        ballot_style.contests.iter().for_each(|i| {
+        ballot_style.contests().iter().for_each(|i| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let c = header.manifest.contests.get(*i).unwrap();
+            let c = header.manifest.contests().get(*i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             contests
                 .try_push(ContestPreEncrypted::new(
@@ -166,20 +165,19 @@ impl BallotPreEncrypted {
 
     pub fn finalize(
         &self,
-        device: &Device,
+        pre_voting_data: &PreVotingData,
         csprng: &mut Csprng,
         voter_ballot: &VoterSelection,
-    ) -> Result<BallotEncrypted, BallotEncryptedError> {
+    ) -> Result<BallotEncrypted, BallotError> {
         let mut contests = BTreeMap::new();
 
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        for i in 1..=self.contests.len() {
+        for i in 1..=self.contests().len() {
             let c_idx = ContestIndex::from_one_based_index(i as u32).unwrap();
-            let contest = self.contests.get(c_idx).unwrap();
-            let correct_content_index = contest.contest_index;
+            let contest = self.contests().get(c_idx).unwrap();
+            let correct_content_index = contest.contest_ix;
 
-            let c = device
-                .header
+            let c = pre_voting_data
                 .manifest
                 .contests
                 .get(correct_content_index)
@@ -189,13 +187,13 @@ impl BallotPreEncrypted {
                     correct_content_index,
                     contest
                         .finalize(
-                            device,
+                            pre_voting_data,
                             csprng,
                             voter_ballot.selections.get(c_idx).unwrap().get_vote(),
                             c.selection_limit,
-                            c.options.len(),
+                            c.contest_options.len(),
                         )
-                        .map_err(|err| BallotEncryptedError::ProofError { err })?,
+                        .map_err(|err| EgError::ProofError { err })?,
                 )
                 .unwrap();
         }
@@ -205,7 +203,7 @@ impl BallotPreEncrypted {
             &contests,
             BallotState::Cast,
             self.confirmation_code,
-            &device.header.parameters.varying_parameters.date,
+            &device.pre_voting_data.parameters.varying_parameters.date,
             device.get_uuid(),
         ))
     }

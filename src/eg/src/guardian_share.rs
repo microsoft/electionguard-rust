@@ -1,15 +1,18 @@
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 //! This module provides the implementation of guardian key shares.
 //!
 //! For more details see Section `3.2.2` of the Electionguard specification `2.0.0`.
 
-use serde::{Deserialize, Serialize};
 use std::iter::zip;
+
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
 use util::{
     algebra::{FieldElement, Group, GroupElement, ScalarField},
     bitwise::xor,
@@ -24,22 +27,8 @@ use crate::{
     guardian_secret_key::GuardianSecretKey,
     hash::{eg_h, eg_hmac, HValue},
     hashes::ParameterBaseHash,
+    pre_voting_data::PreVotingData,
 };
-
-/// An encrypted share for sending shares to other guardians.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct GuardianEncryptedShare {
-    /// The sender of the share
-    pub dealer: GuardianIndex,
-    /// The recipient of the share
-    pub recipient: GuardianIndex,
-    /// First ciphertext part, corresponds to `C_{i,l,0}` in Equation `19`.
-    pub c0: GroupElement,
-    /// Second ciphertext part, corresponds to `C_{i,l,1}` in Equation `19`.
-    pub c1: HValue,
-    /// Third ciphertext part, corresponds to `C_{i,l,2}` in Equation `19`.
-    pub c2: HValue,
-}
 
 /// The secret input used to generate a [`GuardianEncryptedShare`].
 ///
@@ -79,6 +68,21 @@ pub enum DecryptionError {
     /// Occurs if the decrypted share is invalid with respect to the dealer's public key.
     #[error("The share does not validate against the dealer's public key.")]
     InvalidShare,
+}
+
+/// An encrypted share for sending shares to other guardians.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct GuardianEncryptedShare {
+    /// The sender of the share
+    pub dealer: GuardianIndex,
+    /// The recipient of the share
+    pub recipient: GuardianIndex,
+    /// First ciphertext part, corresponds to `C_{i,l,0}` in Equation `19`.
+    pub c0: GroupElement,
+    /// Second ciphertext part, corresponds to `C_{i,l,1}` in Equation `19`.
+    pub c1: HValue,
+    /// Third ciphertext part, corresponds to `C_{i,l,2}` in Equation `19`.
+    pub c2: HValue,
 }
 
 impl GuardianEncryptedShare {
@@ -373,17 +377,6 @@ impl GuardianEncryptedShare {
     }
 }
 
-/// A guardian's share of the joint secret key, it corresponds to `P(i)` in Equation `22`.
-///
-/// The corresponding public key is never computed explicitly.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GuardianSecretKeyShare {
-    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
-    pub i: GuardianIndex,
-    /// Secret key share
-    pub p_i: FieldElement,
-}
-
 /// Represents errors occurring while combining shares to compute a [`GuardianSecretKeyShare`].
 #[derive(Error, Debug)]
 pub enum ShareCombinationError {
@@ -401,29 +394,44 @@ pub enum ShareCombinationError {
     DecryptionError(String),
 }
 
+/// A guardian's share of the joint secret key, it corresponds to `P(i)` in Equation `22`.
+///
+/// The corresponding public key is never computed explicitly.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GuardianSecretKeyShare {
+    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
+    pub i: GuardianIndex,
+    /// Secret key share
+    pub p_i: FieldElement,
+}
+
 impl GuardianSecretKeyShare {
     /// This function computes a new [`GuardianSecretKeyShare`] from a list of [`GuardianEncryptedShare`].
     ///
     /// The arguments are
-    /// - `election_parameters` - the election parameters
+    /// - `pre_voting_data` - the [`PreVotingData`]
     /// - `guardian_public_keys` - a list of [`GuardianPublicKey`]
     /// - `encrypted_shares` - a list of [`GuardianEncryptedShare`]
     /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
     ///
     /// This function assumes that i-th encrypted_share and the i-th guardian_public_key are from the same guardian.
     pub fn compute(
-        election_parameters: &ElectionParameters,
+        pre_voting_data: &PreVotingData,
         guardian_public_keys: &[GuardianPublicKey],
         encrypted_shares: &[GuardianEncryptedShare],
         recipient_secret_key: &GuardianSecretKey,
     ) -> Result<Self, ShareCombinationError> {
-        let fixed_parameters = &election_parameters.fixed_parameters;
-        let varying_parameters = &election_parameters.varying_parameters;
+        let fixed_parameters = &pre_voting_data.parameters.fixed_parameters;
+        let varying_parameters = &pre_voting_data.parameters.varying_parameters;
+
         let n = varying_parameters.n.get_one_based_usize();
 
         // Validate every supplied guardian public key.
         for guardian_public_key in guardian_public_keys {
-            if guardian_public_key.validate(election_parameters).is_err() {
+            if guardian_public_key
+                .validate(&pre_voting_data.parameters)
+                .is_err()
+            {
                 return Err(ShareCombinationError::InvalidPublicKey(
                     guardian_public_key.i,
                 ));
@@ -464,7 +472,8 @@ impl GuardianSecretKeyShare {
         let mut shares = vec![];
         let mut issues = vec![];
         for (pk, share) in zip(guardian_public_keys, encrypted_shares) {
-            let res = share.decrypt_and_validate(election_parameters, pk, recipient_secret_key);
+            let res =
+                share.decrypt_and_validate(&pre_voting_data.parameters, pk, recipient_secret_key);
             match res {
                 Err(e) => issues.push((pk.i, e)),
                 Ok(share) => shares.push(share),
@@ -493,10 +502,13 @@ impl GuardianSecretKeyShare {
     }
 }
 
+//-------------------------------------------------------------------------------------------------|
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
     use std::iter::zip;
+
     use util::{
         algebra::{FieldElement, ScalarField},
         algebra_utils::field_lagrange_at_zero,
@@ -504,8 +516,9 @@ mod test {
     };
 
     use crate::{
+        errors::EgResult, example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters, guardian::GuardianIndex,
-        guardian_secret_key::GuardianSecretKey,
+        guardian_secret_key::GuardianSecretKey, pre_voting_data::PreVotingData,
     };
 
     use super::{GuardianEncryptedShare, GuardianSecretKeyShare};
@@ -518,7 +531,7 @@ mod test {
 
     #[test]
     fn test_encryption_decryption() {
-        let mut csprng = Csprng::new(b"test_proof_generation");
+        let mut csprng = Csprng::new(b"test_encryption_decryption");
 
         let election_parameters = example_election_parameters();
         let index_one = GuardianIndex::from_one_based_index(1).unwrap();
@@ -543,15 +556,13 @@ mod test {
     }
 
     #[test]
-    fn test_key_sharing() {
-        let mut csprng = Csprng::new(b"test_proof_generation");
+    fn test_key_sharing() -> EgResult<()> {
+        let mut csprng = Csprng::new(b"test_key_sharing");
 
         let election_parameters = example_election_parameters();
 
-        let fixed_parameters = &election_parameters.fixed_parameters;
-        let varying_parameters = &election_parameters.varying_parameters;
-
-        let guardian_secret_keys = varying_parameters
+        let guardian_secret_keys = election_parameters
+            .varying_parameters
             .each_guardian_i()
             .map(|i| GuardianSecretKey::generate(&mut csprng, &election_parameters, i, None))
             .collect::<Vec<_>>();
@@ -560,6 +571,14 @@ mod test {
             .iter()
             .map(|secret_key| secret_key.make_public_key())
             .collect::<Vec<_>>();
+
+        let pre_voting_data = PreVotingData::try_from_parameters_manifest_gpks(
+            election_parameters,
+            example_election_manifest(),
+            &guardian_public_keys,
+        )?;
+        let election_parameters = &pre_voting_data.parameters;
+        let fixed_parameters = &election_parameters.fixed_parameters;
 
         // Compute secret key shares
         let share_vecs = guardian_public_keys
@@ -570,7 +589,7 @@ mod test {
                     .map(|dealer_sk| {
                         GuardianEncryptedShare::encrypt(
                             &mut csprng,
-                            &election_parameters,
+                            election_parameters,
                             dealer_sk,
                             pk,
                         )
@@ -579,10 +598,11 @@ mod test {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+
         let key_shares = zip(&guardian_secret_keys, share_vecs)
             .map(|(sk, shares)| {
                 GuardianSecretKeyShare::compute(
-                    &election_parameters,
+                    &pre_voting_data,
                     &guardian_public_keys,
                     &shares,
                     sk,
@@ -606,7 +626,8 @@ mod test {
         let ys = key_shares.iter().map(|s| s.p_i.clone()).collect::<Vec<_>>();
         let joint_key_2 = field_lagrange_at_zero(&xs, &ys, &fixed_parameters.field);
 
-        assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.")
+        assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.");
+        Ok(())
     }
 
     #[test]

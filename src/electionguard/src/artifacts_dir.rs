@@ -1,9 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -19,18 +20,19 @@ pub(crate) enum ArtifactFile {
     ElectionManifestPretty,
     ElectionManifestCanonical,
     ElectionParameters,
-    ElectionPreVotingData,
-    EncryptedBallot(u128, HValue),
-    PreEncryptedBallotMetadata(u128),
-    PreEncryptedBallot(u128, HValue),
-    PreEncryptedBallotNonce(u128, HValue),
     Hashes,
     HashesExt,
-    // VoterConfirmationCode(HValue),
-    VoterSelection(u128, u64),
+    PreVotingData,
+    BallotEncrypted(u128, HValue),
     GuardianSecretKey(GuardianIndex),
     GuardianPublicKey(GuardianIndex),
     JointElectionPublicKey,
+    // #preencrypted_ballot#
+    // PreEncryptedBallotMetadata(u128),
+    // PreEncryptedBallot(u128, HValue),
+    // PreEncryptedBallotNonce(u128, HValue),
+    // VoterConfirmationCode(HValue),
+    // VoterSelection(u128, u64),
 }
 
 impl std::fmt::Display for ArtifactFile {
@@ -55,63 +57,47 @@ impl From<ArtifactFile> for PathBuf {
             PseudorandomSeedDefeatsAllSecrecy => {
                 election_public_dir().join("pseudorandom_seed_defeats_all_secrecy.bin")
             }
-            // ElectionManifestPretty => PathBuf::from("election_manifest_pretty.json"),
-            // ElectionManifestCanonical => PathBuf::from("election_manifest_canonical.bin"),
-            // ElectionParameters => PathBuf::from("election_parameters.json"),
-            ElectionPreVotingData => PathBuf::from("election_record_header.json"),
-            // Hashes => PathBuf::from("hashes.json"),
-            // HashesExt => PathBuf::from("hashes_ext.json"),
-            // GuardianSecretKey(i) => Path::new("guardians")
-            // .join(format!("{i}"))
-            // .join(format!("guardian_{i}.SECRET_key.json")),
-            // GuardianPublicKey(i) => Path::new("guardians")
-            // .join(format!("{i}"))
-            // .join(format!("guardian_{i}.public_key.json")),
-            PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted/ballots/")
-                .join(format!("{ts}"))
-                .join(format!("metadata.{ts}.dat")),
-            EncryptedBallot(ts, i) => {
-                Path::new("record/ballots/")
-                    .join(format!("{ts}"))
-                    .join(format!(
-                        "ballot.{}.json",
-                        i.to_string_hex_no_prefix_suffix()
-                    ))
-            }
-            PreEncryptedBallot(ts, i) => Path::new("pre_encrypted/ballots/")
-                .join(format!("{ts}"))
-                .join(format!(
-                    "ballot.{}.json",
-                    i.to_string_hex_no_prefix_suffix()
-                )),
-            PreEncryptedBallotNonce(ts, i) => Path::new("pre_encrypted/nonces/")
-                .join(format!("{ts}"))
-                .join(format!(
-                    "nonce.SECRET.{}.json",
-                    i.to_string_hex_no_prefix_suffix()
-                )),
-            VoterSelection(ts, i) => Path::new("pre_encrypted/selections/")
-                .join(format!("{ts}"))
-                .join(format!("selection.SECRET.{}.json", i)),
-            // VoterConfirmationCode(i) => Path::new("pre_encrypted").join(format!(
-            //     "confirmation_code.{}.svg",
-            //     i.to_string_hex_no_prefix_suffix()
-            // )),
-            // JointElectionPublicKey => PathBuf::from("joint_election_public_key.json"),
-            ElectionManifestPretty => election_public_dir().join("election_manifest_pretty.json"),
+            BallotEncrypted(ts, hv) => election_public_dir().join("ballots").join(format!(
+                "ballot-encrypted-{ts}-{}.json",
+                hv.to_string_hex_no_prefix_suffix()
+            )),
+            ElectionParameters => election_public_dir().join("election_parameters.json"),
+            ElectionManifestPretty => election_public_dir().join("election_manifest.json"),
             ElectionManifestCanonical => {
                 election_public_dir().join("election_manifest_canonical.bin")
             }
-            ElectionParameters => election_public_dir().join("election_parameters.json"),
-            Hashes => election_public_dir().join("hashes.json"),
             GuardianSecretKey(i) => {
                 guardian_secret_dir(i).join(format!("guardian_{i}.SECRET_key.json"))
             }
             GuardianPublicKey(i) => {
                 election_public_dir().join(format!("guardian_{i}.public_key.json"))
             }
+            Hashes => election_public_dir().join("hashes.json"),
             JointElectionPublicKey => election_public_dir().join("joint_election_public_key.json"),
             HashesExt => election_public_dir().join("hashes_ext.json"),
+            PreVotingData => election_public_dir().join("pre_voting_data.json"),
+            //PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted/ballots/")
+            //    .join(format!("{ts}"))
+            //    .join(format!("metadata.{ts}.dat")),
+            //PreEncryptedBallot(ts, i) => Path::new("pre_encrypted/ballots/")
+            //    .join(format!("{ts}"))
+            //    .join(format!(
+            //        "ballot.{}.json",
+            //        i.to_string_hex_no_prefix_suffix()
+            //    )),
+            //PreEncryptedBallotNonce(ts, i) => Path::new("pre_encrypted/nonces/")
+            //    .join(format!("{ts}"))
+            //    .join(format!(
+            //        "nonce.SECRET.{}.json",
+            //        i.to_string_hex_no_prefix_suffix()
+            //    )),
+            //VoterSelection(ts, i) => Path::new("pre_encrypted/selections/")
+            //    .join(format!("{ts}"))
+            //    .join(format!("selection.SECRET.{}.json", i)),
+            // VoterConfirmationCode(i) => Path::new("pre_encrypted").join(format!(
+            //     "confirmation_code.{}.svg",
+            //     i.to_string_hex_no_prefix_suffix()
+            // )),
         }
     }
 }

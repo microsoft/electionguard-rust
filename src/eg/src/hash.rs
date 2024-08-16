@@ -1,5 +1,11 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
+#![deny(clippy::expect_used)]
+#![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
+
 use anyhow::{anyhow, Context, Result};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
@@ -18,10 +24,32 @@ type HmacSha256 = Hmac<sha2::Sha256>;
 pub const HVALUE_BYTE_LEN: usize = 32;
 type HValueByteArray = [u8; HVALUE_BYTE_LEN];
 
+//-------------------------------------------------------------------------------------------------|
+
+/// Represents a hash output value of the ElectionGuard hash function ‘H’. It is also
+/// the type used as the first parameter, the HMAC key.
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HValue(pub HValueByteArray);
 
 impl HValue {
+    pub fn from_csprng(csprng: &mut util::csprng::Csprng) -> HValue {
+        let mut bytes: HValueByteArray = Default::default();
+        rand::RngCore::fill_bytes(csprng, &mut bytes);
+        HValue(bytes)
+    }
+
+    /// Reads `HValue` from a `std::io::Read`.
+    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HValue> {
+        serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing HValue: {}", e))
+    }
+
+    /// Reads a `HValue` from a `std::io::Write`.
+    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
+        let hashes: Self = serde_json::from_reader(stdioread).context("Reading HValue")?;
+
+        Ok(hashes)
+    }
+
     //const HVALUE_SERIALIZE_PREFIX: &'static [u8] = b"H(";
     //const HVALUE_SERIALIZE_SUFFIX: &'static [u8] = b")";
     const HVALUE_SERIALIZE_PREFIX: &'static [u8] = b"";
@@ -40,7 +68,7 @@ impl HValue {
 
         #[allow(clippy::const_is_empty)]
         let mut state = if HValue::HVALUE_SERIALIZE_PREFIX.is_empty() {
-                State::Nibble {
+            State::Nibble {
                 lower: false,
                 ix: 0,
             }
@@ -102,22 +130,8 @@ impl HValue {
         aa_result.unwrap()
     }
 
-    /// Reads `HValue` from a `std::io::Read`.
-    pub fn from_reader(io_read: &mut dyn std::io::Read) -> Result<HValue> {
-        serde_json::from_reader(io_read).map_err(|e| anyhow!("Error parsing HValue: {}", e))
-    }
-
-    /// Reads a `HValue` from a `std::io::Write`.
-    pub fn from_stdioread(stdioread: &mut dyn std::io::Read) -> Result<Self> {
-        let hashes: Self = serde_json::from_reader(stdioread).context("Reading HValue")?;
-
-        Ok(hashes)
-    }
-
     pub fn to_string_hex_no_prefix_suffix(&self) -> String {
-        #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let s = serde_json::to_string_pretty(self).unwrap();
-        s[3..s.len() - 2].to_string()
+        self.to_string()
     }
 }
 
@@ -141,6 +155,13 @@ impl AsRef<HValueByteArray> for HValue {
     #[inline]
     fn as_ref(&self) -> &HValueByteArray {
         &self.0
+    }
+}
+
+impl From<HValue> for HValueByteArray {
+    #[inline]
+    fn from(value: HValue) -> Self {
+        value.0
     }
 }
 
@@ -249,6 +270,12 @@ impl<'de> Deserialize<'de> for HValue {
     }
 }
 
+impl rand::Fill for HValue {
+    fn try_fill<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Result<(), rand::Error> {
+        rng.try_fill(&mut self.0)
+    }
+}
+
 /// ElectionGuard `H` hash function.
 pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
     // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
@@ -279,7 +306,7 @@ mod test_eg_h {
     fn test_hvalue_std_fmt() {
         let h: HValue = std::array::from_fn(|ix| ix as u8).into();
 
-        let expected = "H(000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F)";
+        let expected = "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F";
         assert_eq!(h.to_string(), expected);
         assert_eq!(format!("{h}"), expected);
         assert_eq!(format!("{h:?}"), expected);
@@ -291,7 +318,7 @@ mod test_eg_h {
 
         let json = serde_json::to_string(&h).unwrap();
 
-        let expected = "\"H(000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F)\"";
+        let expected = "\"000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F\"";
         assert_eq!(json, expected);
 
         let h2: HValue = serde_json::from_str(&json).unwrap();
@@ -307,7 +334,7 @@ mod test_eg_h {
         let actual = eg_h(&key, &data);
 
         let expected =
-            HValue::from_str("H(B613679A0814D9EC772F95D778C35FC5FF1697C493715653C6C712144292C5AD)")
+            HValue::from_str("B613679A0814D9EC772F95D778C35FC5FF1697C493715653C6C712144292C5AD")
                 .unwrap();
 
         assert_eq!(actual, expected);

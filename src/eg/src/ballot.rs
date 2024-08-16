@@ -1,191 +1,282 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
-use anyhow::Result;
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+
 use util::{algebra::FieldElement, csprng::Csprng};
 
 use crate::{
     ballot_style::BallotStyleIndex,
-    confirmation_code::confirmation_code,
-    contest_encrypted::{ContestEncrypted, ScaledContestEncrypted},
-    contest_selection::ContestSelection,
-    device::Device,
-    election_manifest::{ContestIndex, ElectionManifest},
-    election_parameters::ElectionParameters,
-    election_record::PreVotingData,
+    ciphertext::Ciphertext,
+    confirmation_code::compute_confirmation_code,
+    contest_data_fields::ContestDataFieldsPlaintexts,
+    contest_encrypted::ContestDataFieldsCiphertexts,
+    election_manifest::ContestIndex,
+    errors::{EgError, EgResult},
     fixed_parameters::FixedParameters,
     hash::HValue,
-    joint_election_public_key::Ciphertext,
-    serializable::SerializablePretty,
-    zk::ProofRangeError,
+    pre_voting_data::PreVotingData,
+    serializable::{SerializableCanonical, SerializablePretty},
+    voter_selections_plaintext::VoterSelectionsPlaintext,
 };
-use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BallotState {
-    Uncast,
+    /// Voter selections are completed and present in encrypted form.
+    /// The ballot has not yet been cast, challenged, or spoiled.
+    VoterSelectionsEncrypted,
+
+    /// Voter selections are completed and present in encrypted form.
+    /// The ballot has been cast.
+    /// Selections MUST be considered to express voter intent, so
+    /// the ballot MUST NOT be decrypted.
+    /// Selections MUST be included in the tally.
+    /// This is a final state.
     Cast,
+
+    /// Voter selections are completed and present in encrypted form.
+    /// The ballot has been spoiled, it will NOT be cast.
+    /// Selections MUST be considered as potentially expressing voter intent, so
+    /// the ballot MUST NOT be decrypted.
+    /// However, selections MUST NOT be included in the tally.
+    /// This is a final state.
+    Spoiled,
+
+    /// Voter selections are completed and present in encrypted form.
+    /// The ballot has been challenged, it will never been cast.
+    /// Selections MUST NOT be interpreted as an expression of voter intent.
+    /// The ballot SHOULD be decrypted for verification.
+    /// Selections MUST NOT be included in the tally.
     Challenged,
+
+    /// A challenged ballot in which voter selections have been decrypted.
+    /// Voter selections are present in both encrypted and plaintext form.
+    /// Selections MUST NOT be interpreted as an expression of voter intent.
+    /// Selections MUST NOT be included in the tally.
+    /// The challenged and decrypted ballot SHOULD be published.
+    /// This is a final state.
+    ChallengedDecrypted,
 }
 
-/// An encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BallotEncrypted {
-    /// The index of ballot style that this ballot belongs to.
-    pub ballot_style_index: BallotStyleIndex,
+    /// The 1-based index of the [`BallotStyle`] within the [`ElectionManifest`].
+    #[serde(rename = "ballot_style")]
+    pub ballot_style_ix: BallotStyleIndex,
 
-    /// Contests in this ballot
-    pub contests: BTreeMap<ContestIndex, ContestEncrypted>,
+    /// The state of ballot.
+    pub ballot_state: BallotState,
 
-    /// Confirmation code
+    /// ElectionGuard 2.1 Section 3.3.2 defines a
+    /// Selection Encryption Identifier as 32 random bytes.
+    /// For convenience, we'll use `HValue` for this.
+    pub selection_encryption_identifier: HValue,
+
+    /// Encrypted data fields for [`Contests`] reflecting voter selections and
+    /// possibly additional contest data fields.
+    pub contests_data_fields_ciphertexts: BTreeMap<ContestIndex, ContestDataFieldsCiphertexts>,
+
+    /// Confirmation code.
     pub confirmation_code: HValue,
 
-    /// State of the ballot
-    pub state: BallotState,
+    /// Identifier of device that encrypted the voter selections to produce a ballot.
+    /// Optional, can be empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub device_id: String,
 
-    /// Date (and time) of ballot generation. Optional, can be empty.
-    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/rfc3339/) or "ISO 8601" format.
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub date: String,
+    /// The device may apply an identifier to the ballot. Optional, can be empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub ballot_id: String,
 
-    /// Device that generated this ballot
-    pub device: String,
-    // TODO: Have an optional field to store election record data for pre-encrypted ballots
-}
-
-/// Scaled version of [`BallotEncrypted`]. This means that each encrypted vote in the ballot
-/// has been scaled by factor. A [`ScaledBallotEncrypted`] does not contain any proofs.
-pub struct ScaledBallotEncrypted {
-    /// Contests in this ballot
-    pub contests: BTreeMap<ContestIndex, ScaledContestEncrypted>,
-}
-
-#[derive(Error, Debug)]
-pub enum BallotEncryptedError {
-    /// Proof production error
-    #[error("Error producing ballot proofs: {}", err)]
-    ProofError { err: ProofRangeError },
-
-    /// Error looking up contest in manifest
-    #[error("Contest (index {}) not found in election manifest.", idx)]
-    ContestNotInManifest { idx: ContestIndex },
+    /// Date and time of ballot encryption.
+    /// Optional, can be empty.
+    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339#section-5.8),
+    /// AKA "ISO 8601" format for this.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub encryption_datetime: String,
 }
 
 impl BallotEncrypted {
-    pub fn new(
-        ballot_style_index: BallotStyleIndex,
-        contests: &BTreeMap<ContestIndex, ContestEncrypted>,
-        state: BallotState,
-        confirmation_code: HValue,
-        date: &str,
-        device: &str,
-    ) -> BallotEncrypted {
-        BallotEncrypted {
-            ballot_style_index,
-            contests: contests.clone(),
-            state,
-            confirmation_code,
-            date: date.to_string(),
-            device: device.to_string(),
-        }
-    }
-
-    pub fn new_from_selections(
-        ballot_style_index: BallotStyleIndex,
-        device: &Device,
-        date: &str,
+    /// Create a new [`BallotEncrypted`] from a [`VoterSelectionsPlaintext`].
+    ///
+    /// If a nonce is not provided, a random nonce will be generated.
+    #[allow(non_snake_case)]
+    pub fn try_from_ballot_selection_data_plaintext(
+        pre_voting_data: &PreVotingData,
+        voter_selections_plaintext: VoterSelectionsPlaintext,
+        opt_ballot_nonce_xi_B: Option<HValue>,
         csprng: &mut Csprng,
-        primary_nonce: &[u8],
-        ctest_selections: &BTreeMap<ContestIndex, ContestSelection>,
-    ) -> Result<BallotEncrypted, BallotEncryptedError> {
-        let mut contests = BTreeMap::new();
+    ) -> EgResult<BallotEncrypted> {
+        let (ballot_style_ix, _ballot_style) =
+            voter_selections_plaintext.verify_against_pre_voting_data(pre_voting_data)?;
 
-        for (&c_idx, selection) in ctest_selections {
-            let contest = device
-                .header
-                .manifest
-                .contests
-                .get(c_idx)
-                .ok_or(BallotEncryptedError::ContestNotInManifest { idx: c_idx })?;
-            let contest_encrypted =
-                ContestEncrypted::new(device, csprng, primary_nonce, contest, c_idx, selection)
-                    .map_err(|err| BallotEncryptedError::ProofError { err })?;
+        let ballot_nonce_xi_B =
+            opt_ballot_nonce_xi_B.unwrap_or_else(|| HValue::from_csprng(csprng));
 
-            contests.insert(c_idx, contest_encrypted);
+        // Convert the plaintext contest option fields to plaintext contest data fields.
+        let mut contests_data_fields_plaintexts: BTreeMap<
+            ContestIndex,
+            ContestDataFieldsPlaintexts,
+        > = BTreeMap::new();
+        for (contest_ix, contest_option_fields_plaintexts) in
+            voter_selections_plaintext.contests_option_fields_plaintexts
+        {
+            let specific_contest_data_fields_plaintexts =
+                ContestDataFieldsPlaintexts::try_from_option_fields(
+                    pre_voting_data,
+                    contest_ix,
+                    contest_option_fields_plaintexts,
+                )?;
+            contests_data_fields_plaintexts
+                .insert(contest_ix, specific_contest_data_fields_plaintexts);
         }
 
-        let confirmation_code =
-            confirmation_code(&device.header.hashes_ext.h_e, contests.values(), &[0u8; 32]);
+        // Encrypt the plaintext contest data fields to make the contest data fields ciphertexts.
+        let mut contests_data_fields_ciphertexts: BTreeMap<
+            ContestIndex,
+            ContestDataFieldsCiphertexts,
+        > = BTreeMap::new();
+        for (contest_ix, contest_data_fields_plaintexts) in contests_data_fields_plaintexts {
+            let contest_data_fields_ciphertexts =
+                ContestDataFieldsCiphertexts::from_contest_data_fields_plaintexts(
+                    pre_voting_data,
+                    ballot_nonce_xi_B,
+                    contest_ix,
+                    contest_data_fields_plaintexts,
+                    csprng,
+                )?;
+
+            contests_data_fields_ciphertexts.insert(contest_ix, contest_data_fields_ciphertexts);
+        }
+
+        let confirmation_code = compute_confirmation_code(
+            pre_voting_data,
+            contests_data_fields_ciphertexts.values(),
+            None,
+        );
+
+        //? TODO Make these function parameters
+        let device_id = "".to_owned();
+        let ballot_id = "".to_owned();
+        let encryption_datetime = "".to_owned();
+
+        let ballot_state = BallotState::VoterSelectionsEncrypted;
+
+        let selection_encryption_identifier = HValue::from_csprng(csprng);
 
         Ok(BallotEncrypted {
-            ballot_style_index,
-            contests,
-            state: BallotState::Uncast,
+            ballot_style_ix,
+            ballot_state,
+            selection_encryption_identifier,
+            contests_data_fields_ciphertexts,
             confirmation_code,
-            date: date.to_owned(),
-            device: device.uuid.clone(),
+            device_id,
+            ballot_id,
+            encryption_datetime,
         })
     }
 
-    pub fn contests(&self) -> &BTreeMap<ContestIndex, ContestEncrypted> {
-        &self.contests
-    }
-
-    pub fn confirmation_code(&self) -> &HValue {
-        &self.confirmation_code
-    }
-
-    pub fn date(&self) -> &str {
-        &self.date
-    }
-
-    pub fn device(&self) -> &String {
-        &self.device
-    }
-
-    /// Verify all of the [`ContestEncrypted`] in the [`BallotEncrypted`]. Given
+    /// Verify all of the [`ContestEncrypted`] in the [`Ballot`]. Given
     /// a ballot style it checks that all contests are voted on in the
     /// ballot style, and that all of the vote proofs are correct.
-    pub fn verify(&self, header: &PreVotingData) -> bool {
-        let Some(ballot_style) = header.manifest.ballot_styles.get(self.ballot_style_index) else {
-            return false;
-        };
-        for contest_index in &ballot_style.contests {
-            let Some(contest) = header.manifest.contests.get(*contest_index) else {
-                return false;
-            };
-            let Some(contest_encrypted) = self.contests().get(contest_index) else {
-                return false;
-            };
+    pub fn verify(&self, pre_voting_data: &PreVotingData) -> EgResult<()> {
+        let ballot_style_ix = self.ballot_style_ix;
 
-            if !contest_encrypted.verify(header, contest.selection_limit) {
-                return false;
+        let ballot_style = pre_voting_data.manifest.get_ballot_style(ballot_style_ix)?;
+
+        // Verify that every contest in the ballot style:
+        // - is present in the manifest
+        // - is present in this ballot's data fields ciphertexts.
+        for &contest_ix in ballot_style.contests().iter() {
+            if !pre_voting_data
+                .manifest
+                .contests()
+                .contains_index(contest_ix)
+            {
+                return Err(EgError::BallotStyleClaimsNonExistentContest {
+                    ballot_style_ix,
+                    contest_ix,
+                });
+            }
+
+            if !self
+                .contests_data_fields_ciphertexts
+                .contains_key(&contest_ix)
+            {
+                return Err(EgError::BallotMissingDataFieldsForContestInBallotStyle {
+                    ballot_style_ix,
+                    contest_ix,
+                });
             }
         }
-        true
+
+        // Verify that every contest present in the ballot:
+        // - is present in the ballot style
+        // - has valid proofs for all contest data fields.
+        let mut verified_contests = BTreeSet::<ContestIndex>::new();
+        for (&contest_ix, contest_fields_ciphertexts) in
+            self.contests_data_fields_ciphertexts.iter()
+        {
+            if !ballot_style.contests().contains(&contest_ix) {
+                return Err(EgError::BallotClaimsContestNonExistentInBallotStyle {
+                    ballot_style_ix,
+                    contest_ix,
+                });
+            }
+
+            contest_fields_ciphertexts.verify(pre_voting_data)?;
+
+            verified_contests.insert(contest_ix);
+        }
+
+        // Verify that we verified all contests in the ballot style.
+        for &contest_ix in ballot_style.contests().iter() {
+            if !verified_contests.contains(&contest_ix) {
+                return Err(EgError::BallotContestNotVerified {
+                    ballot_style_ix,
+                    contest_ix,
+                });
+            }
+        }
+
+        // Verify that all contests we verified are in the ballot style.
+        for &contest_ix in verified_contests.iter() {
+            if !ballot_style.contests().contains(&contest_ix) {
+                return Err(EgError::BallotContestVerifiedNotInBallotStyle {
+                    ballot_style_ix,
+                    contest_ix,
+                });
+            }
+        }
+
+        Ok(())
     }
 
-    /// Scale a [`BallotEncrypted`] by a factor, producing a [`ScaledBallotEncrypted`].
+    /// Scale the contest option values of a [`Ballot`] by a factor, producing a [`BallotScaled`].
     /// Each encrypted vote in the ballot gets scaled by the same factor.
     pub fn scale(
         &self,
         fixed_parameters: &FixedParameters,
         factor: &FieldElement,
-    ) -> ScaledBallotEncrypted {
+    ) -> crate::ballot_scaled::BallotScaled {
+        //? TODO move to `ballot_scaled.rs`
         let contests = self
-            .contests
+            .contests_data_fields_ciphertexts
             .iter()
             .map(|(idx, ballot)| (*idx, ballot.scale(fixed_parameters, factor)))
             .collect();
-        ScaledBallotEncrypted { contests }
+        crate::ballot_scaled::BallotScaled { contests }
     }
 }
+
+impl SerializableCanonical for BallotEncrypted {}
 
 impl SerializablePretty for BallotEncrypted {}
 
@@ -195,11 +286,10 @@ impl SerializablePretty for BallotEncrypted {}
 /// for the contest, namely a vector of encrypted tallies; one for each option
 /// in the contest.
 pub fn tally_ballots(
-    encrypted_ballots: impl IntoIterator<Item = ScaledBallotEncrypted>,
-    manifest: &ElectionManifest,
-    parameters: &ElectionParameters,
+    encrypted_ballots: impl IntoIterator<Item = crate::ballot_scaled::BallotScaled>,
+    pre_voting_data: &PreVotingData,
 ) -> Option<BTreeMap<ContestIndex, Vec<Ciphertext>>> {
-    let mut result = BallotTallyBuilder::new(manifest, parameters);
+    let mut result = BallotTallyBuilder::new(pre_voting_data);
 
     for ballot in encrypted_ballots {
         if !result.update(ballot) {
@@ -211,16 +301,14 @@ pub fn tally_ballots(
 
 /// A builder to tally ballots incrementally.
 pub struct BallotTallyBuilder<'a> {
-    manifest: &'a ElectionManifest,
-    parameters: &'a ElectionParameters,
+    pre_voting_data: &'a PreVotingData,
     state: BTreeMap<ContestIndex, Vec<Ciphertext>>,
 }
 
 impl<'a> BallotTallyBuilder<'a> {
-    pub fn new(manifest: &'a ElectionManifest, parameters: &'a ElectionParameters) -> Self {
+    pub fn new(pre_voting_data: &'a PreVotingData) -> Self {
         Self {
-            manifest,
-            parameters,
+            pre_voting_data,
             state: BTreeMap::new(),
         }
     }
@@ -233,13 +321,13 @@ impl<'a> BallotTallyBuilder<'a> {
     /// Update the tally with a new ballot. Returns whether the
     /// new ballot was compatible with the tally. If `false` is returned then
     /// the tally is not updated.
-    pub fn update(&mut self, ballot: ScaledBallotEncrypted) -> bool {
-        let group = &self.parameters.fixed_parameters.group;
+    pub fn update(&mut self, ballot: crate::ballot_scaled::BallotScaled) -> bool {
+        let group = &self.pre_voting_data.parameters.fixed_parameters.group;
         for (idx, contest) in ballot.contests {
-            let Some(manifest_contest) = self.manifest.contests.get(idx) else {
+            let Some(manifest_contest) = self.pre_voting_data.manifest.contests().get(idx) else {
                 return false;
             };
-            if contest.selection.len() != manifest_contest.options.len() {
+            if contest.selection.len() != manifest_contest.contest_options.len() {
                 return false;
             }
             if let Some(v) = self.state.get_mut(&idx) {
@@ -258,33 +346,30 @@ impl<'a> BallotTallyBuilder<'a> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
-    use std::collections::BTreeSet;
-
     use super::*;
+
+    use std::iter::zip;
+
+    use util::csprng::Csprng;
+
     use crate::{
         ballot::BallotEncrypted,
-        ballot_style::BallotStyle,
-        contest_selection::ContestSelection,
-        device::Device,
-        election_manifest::{Contest, ContestOption},
-        election_record::PreVotingData,
+        contest_option_fields::ContestOptionFieldsPlaintexts,
+        election_parameters::ElectionParameters,
+        errors::EgResult,
         example_election_manifest::example_election_manifest,
         example_election_parameters::example_election_parameters,
         guardian_public_key::GuardianPublicKey,
         guardian_secret_key::GuardianSecretKey,
         guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
-        hashes::Hashes,
-        hashes_ext::HashesExt,
         index::Index,
-        joint_election_public_key::JointElectionPublicKey,
+        pre_voting_data::PreVotingData,
         verifiable_decryption::{
             CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption,
         },
     };
-    use std::iter::zip;
-    use util::csprng::Csprng;
 
-    fn g_key(i: u32) -> GuardianSecretKey {
+    fn g_key(election_parameters: &ElectionParameters, i: u32) -> GuardianSecretKey {
         let mut seed = Vec::new();
         let customization_data = format!("GuardianSecretKeyGenerate({})", i.clone());
         seed.extend_from_slice(&(customization_data.as_bytes().len() as u64).to_be_bytes());
@@ -294,22 +379,21 @@ mod test {
 
         GuardianSecretKey::generate(
             &mut csprng,
-            &example_election_parameters(),
+            election_parameters,
             Index::from_one_based_index_const(i).unwrap(),
             None,
         )
     }
 
     #[test]
-    fn test_verify_ballot() {
-        let election_manifest = example_election_manifest();
+    fn test_check_verify_ballot() -> EgResult<()> {
         let election_parameters = example_election_parameters();
 
-        let sk1 = g_key(1);
-        let sk2 = g_key(2);
-        let sk3 = g_key(3);
-        let sk4 = g_key(4);
-        let sk5 = g_key(5);
+        let sk1 = g_key(&election_parameters, 1);
+        let sk2 = g_key(&election_parameters, 2);
+        let sk3 = g_key(&election_parameters, 3);
+        let sk4 = g_key(&election_parameters, 4);
+        let sk5 = g_key(&election_parameters, 5);
 
         let pk1 = sk1.make_public_key();
         let pk2 = sk2.make_public_key();
@@ -319,180 +403,39 @@ mod test {
 
         let guardian_public_keys = vec![pk1, pk2, pk3, pk4, pk5];
 
-        let joint_election_public_key =
-            JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())
-                .unwrap();
+        let pre_voting_data = PreVotingData::try_from_parameters_manifest_gpks(
+            election_parameters,
+            example_election_manifest(),
+            &guardian_public_keys,
+        )?;
 
-        let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
+        let seed = b"electionguard-rust/src/eg/src/ballot::test::test_check_verify_ballot";
+        let csprng = &mut Csprng::new(seed);
 
-        let hashes_ext =
-            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
+        #[allow(non_snake_case)]
+        let xi_B = HValue::from_csprng(csprng);
 
-        let pre_voting_data = PreVotingData {
-            manifest: election_manifest,
-            parameters: election_parameters,
-            hashes,
-            hashes_ext,
-            public_key: joint_election_public_key,
+        let vspt = VoterSelectionsPlaintext {
+            h_e: pre_voting_data.hashes_ext.h_e,
+            ballot_style_ix: 1.try_into()?,
+            contests_option_fields_plaintexts: BTreeMap::from([
+                // Voting Ballot style 1 has 1 contest: 1
+                (
+                    1.try_into()?,
+                    ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1]).unwrap(),
+                ),
+            ]),
         };
-        let device = Device::new("Some encryption device", pre_voting_data);
-        let seed = vec![0, 1, 2, 3];
-        let mut csprng = Csprng::new(&seed);
-        let primary_nonce = vec![0, 1, 2, 2, 2, 2, 2, 2, 3];
-        let selections = BTreeMap::from([
-            (
-                Index::from_one_based_index(1).unwrap(),
-                ContestSelection::new(vec![1, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(2).unwrap(),
-                ContestSelection::new(vec![0, 1, 0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection::new(vec![0, 0, 1]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(4).unwrap(),
-                ContestSelection::new(vec![1, 0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(5).unwrap(),
-                ContestSelection::new(vec![0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(6).unwrap(),
-                ContestSelection::new(vec![1, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(7).unwrap(),
-                ContestSelection::new(vec![0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(8).unwrap(),
-                ContestSelection::new(vec![0, 1]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(9).unwrap(),
-                ContestSelection::new(vec![1, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(11).unwrap(),
-                ContestSelection::new(vec![0, 1]).unwrap(),
-            ),
-        ]);
 
-        let ballot_from_selections = BallotEncrypted::new_from_selections(
-            Index::from_one_based_index(2).unwrap(),
-            &device,
-            "2023-05-02",
-            &mut csprng,
-            &primary_nonce,
-            &selections,
-        )
-        .unwrap();
+        let ballot = BallotEncrypted::try_from_ballot_selection_data_plaintext(
+            &pre_voting_data,
+            vspt,
+            Some(xi_B),
+            csprng,
+        )?;
 
         // Let's verify the ballot proofs.
-
-        let verify_result = ballot_from_selections.verify(&device.header);
-
-        assert!(verify_result)
-    }
-
-    fn short_manifest() -> ElectionManifest {
-        let contests = [
-            // Contest index 1:
-            Contest {
-                label: "Minister of Arcane Sciences".to_string(),
-                selection_limit: 2,
-                options: [
-                    ContestOption {
-                        label: "Élyria Moonshadow\n(Crystâlheärt)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Archímedes Darkstone\n(Ætherwïng)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Seraphína Stormbinder\n(Independent)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Gávrïel Runëbørne\n(Stärsky)".to_string(),
-                    },
-                ]
-                .try_into()
-                .unwrap(),
-            },
-            // Contest index 2:
-            Contest {
-                label: "Minister of Elemental Resources".to_string(),
-                selection_limit: 1,
-                options: [
-                    ContestOption {
-                        label: "Tïtus Stormforge\n(Ætherwïng)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Fæ Willowgrove\n(Crystâlheärt)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Tèrra Stonebinder\n(Independent)".to_string(),
-                    },
-                ]
-                .try_into()
-                .unwrap(),
-            },
-            // Contest index 3:
-            Contest {
-                label: "Minister of Dance".to_string(),
-                selection_limit: 1,
-                options: [
-                    ContestOption {
-                        label: "Äeliana Sunsong\n(Crystâlheärt)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Thâlia Shadowdance\n(Ætherwïng)".to_string(),
-                    },
-                    ContestOption {
-                        label: "Jasper Moonstep\n(Stärsky)".to_string(),
-                    },
-                ]
-                .try_into()
-                .unwrap(),
-            },
-        ]
-        .try_into()
-        .unwrap();
-
-        let ballot_styles = [
-            // Ballot style index 1:
-            BallotStyle {
-                label: "Smoothstone County Ballot".to_string(),
-                contests: BTreeSet::from(
-                    [1u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-                ),
-            },
-            // Ballot style index 2:
-            BallotStyle {
-                label: "Silvërspîre County Ballot".to_string(),
-                contests: BTreeSet::from(
-                    [2u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-                ),
-            },
-            // Ballot style index 3:
-            BallotStyle {
-                label: "Another County Ballot".to_string(),
-                contests: BTreeSet::from(
-                    [1, 2u32, 3].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-                ),
-            },
-        ]
-        .try_into()
-        .unwrap();
-
-        ElectionManifest {
-            label: "General Election - The United Realms of Imaginaria".to_string(),
-            contests,
-            ballot_styles,
-        }
+        ballot.verify(&pre_voting_data)
     }
 
     fn decryption_helper(
@@ -508,10 +451,12 @@ mod test {
                 DecryptionShare::from(&pre_voting_data.parameters.fixed_parameters, ks, ciphertext)
             })
             .collect();
+
         let combined_dec_share =
             CombinedDecryptionShare::combine(&pre_voting_data.parameters, &dec_shares).unwrap();
         let mut com_shares = vec![];
         let mut com_states = vec![];
+
         for ks in key_shares.iter() {
             let (share, state) = DecryptionProof::generate_commit_share(
                 csprng,
@@ -522,16 +467,14 @@ mod test {
             com_shares.push(share);
             com_states.push(state);
         }
+
         let election_parameters = &pre_voting_data.parameters;
-        let joint_election_public_key_clone = &pre_voting_data.public_key;
         let rsp_shares: Vec<_> = com_states
             .iter()
             .zip(key_shares)
             .map(|(state, key_share)| {
                 DecryptionProof::generate_response_share(
-                    &election_parameters.fixed_parameters,
-                    &pre_voting_data.clone().hashes_ext,
-                    joint_election_public_key_clone,
+                    pre_voting_data,
                     ciphertext,
                     &combined_dec_share,
                     &com_shares,
@@ -544,7 +487,7 @@ mod test {
 
         let proof = DecryptionProof::combine_proof(
             election_parameters,
-            &pre_voting_data.clone().hashes_ext,
+            &pre_voting_data.hashes_ext,
             ciphertext,
             &dec_shares,
             &com_shares,
@@ -555,7 +498,7 @@ mod test {
 
         VerifiableDecryption::new(
             &election_parameters.fixed_parameters,
-            joint_election_public_key_clone,
+            &pre_voting_data.public_key,
             ciphertext,
             &combined_dec_share,
             &proof,
@@ -565,16 +508,15 @@ mod test {
 
     /// Testing that encrypted tallies decrypt the expected result
     #[test]
-    fn test_tally_ballot() {
-        let election_manifest = short_manifest();
+    #[allow(non_snake_case)]
+    fn test_tally_ballot() -> EgResult<()> {
         let election_parameters = example_election_parameters();
-        let fixed_parameters = &election_parameters.fixed_parameters;
 
-        let sk1 = g_key(1);
-        let sk2 = g_key(2);
-        let sk3 = g_key(3);
-        let sk4 = g_key(4);
-        let sk5 = g_key(5);
+        let sk1 = g_key(&election_parameters, 1);
+        let sk2 = g_key(&election_parameters, 2);
+        let sk3 = g_key(&election_parameters, 3);
+        let sk4 = g_key(&election_parameters, 4);
+        let sk5 = g_key(&election_parameters, 5);
 
         let pk1 = sk1.make_public_key();
         let pk2 = sk2.make_public_key();
@@ -582,116 +524,122 @@ mod test {
         let pk4 = sk4.make_public_key();
         let pk5 = sk5.make_public_key();
 
-        let guardian_secret_keys = vec![sk1, sk2, sk3, sk4, sk5];
         let guardian_public_keys = vec![pk1, pk2, pk3, pk4, pk5];
+        let guardian_secret_keys = vec![sk1, sk2, sk3, sk4, sk5];
 
-        let joint_election_public_key =
-            JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())
-                .unwrap();
+        let pre_voting_data = PreVotingData::try_from_parameters_manifest_gpks(
+            election_parameters,
+            example_election_manifest(),
+            &guardian_public_keys,
+        )?;
+        let fixed_parameters = &pre_voting_data.parameters.fixed_parameters;
 
-        let hashes = Hashes::compute(&election_parameters, &election_manifest).unwrap();
+        let seed = b"electionguard-rust/src/eg/src/ballot::test::test_tally_ballot";
+        let csprng = &mut Csprng::new(seed);
 
-        let hashes_ext =
-            HashesExt::compute(&election_parameters, &hashes, &joint_election_public_key);
+        let xi_B_1 = HValue::from_csprng(csprng);
+        let xi_B_2 = HValue::from_csprng(csprng);
+        let xi_B_3 = HValue::from_csprng(csprng);
 
-        let pre_voting_data = PreVotingData {
-            manifest: election_manifest.clone(),
-            parameters: election_parameters.clone(),
-            hashes,
-            hashes_ext,
-            public_key: joint_election_public_key,
+        let ballot_1 = {
+            // Voting Ballot style 15 has 2 contests: 1 and 3
+            let vspt = VoterSelectionsPlaintext {
+                h_e: pre_voting_data.hashes_ext.h_e,
+                ballot_style_ix: 15.try_into()?,
+                contests_option_fields_plaintexts: BTreeMap::from([
+                    (
+                        1.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0]).unwrap(),
+                    ),
+                    (
+                        3.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 1, 0]).unwrap(),
+                    ),
+                ]),
+            };
+
+            let ballot = BallotEncrypted::try_from_ballot_selection_data_plaintext(
+                &pre_voting_data,
+                vspt,
+                Some(xi_B_1),
+                csprng,
+            )?;
+            ballot.verify(&pre_voting_data)?;
+            ballot
         };
-        let device = Device::new("Some encryption device", pre_voting_data.clone());
-        let seed = vec![0, 1, 2, 3];
-        let mut csprng = Csprng::new(&seed);
-        let primary_nonce = vec![0, 1, 2, 2, 2, 2, 2, 2, 3];
-        let voter1 = BTreeMap::from([
-            // Voting on 1 and 3 only, ballot style 1
-            (
-                Index::from_one_based_index(1).unwrap(),
-                ContestSelection::new(vec![1, 1, 0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection::new(vec![0, 1, 0]).unwrap(),
-            ),
-        ]);
 
-        let voter2 = BTreeMap::from([
-            // Voting on 2 and 3 only, ballot style 2
-            (
-                Index::from_one_based_index(2).unwrap(),
-                ContestSelection::new(vec![0, 1, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection::new(vec![0, 1, 0]).unwrap(),
-            ),
-        ]);
-        let voter3 = BTreeMap::from([
-            // Voting on all three, ballot style 3
-            (
-                Index::from_one_based_index(1).unwrap(),
-                ContestSelection::new(vec![1, 0, 0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(2).unwrap(),
-                ContestSelection::new(vec![1, 0, 0]).unwrap(),
-            ),
-            (
-                Index::from_one_based_index(3).unwrap(),
-                ContestSelection::new(vec![1, 0, 0]).unwrap(),
-            ),
-        ]);
+        let ballot_2 = {
+            // Voting Ballot style 16 has 2 contests: 2 and 3
+            let vspt = VoterSelectionsPlaintext {
+                h_e: pre_voting_data.hashes_ext.h_e,
+                ballot_style_ix: 16.try_into()?,
+                contests_option_fields_plaintexts: BTreeMap::from([
+                    (
+                        2.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 1]).unwrap(),
+                    ),
+                    (
+                        3.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0, 0, 0]).unwrap(),
+                    ),
+                ]),
+            };
 
-        let ballot_voter1 = BallotEncrypted::new_from_selections(
-            Index::from_one_based_index(1).unwrap(),
-            &device,
-            "2024-08-02",
-            &mut csprng,
-            &primary_nonce,
-            &voter1,
-        )
-        .unwrap();
+            let ballot = BallotEncrypted::try_from_ballot_selection_data_plaintext(
+                &pre_voting_data,
+                vspt,
+                Some(xi_B_2),
+                csprng,
+            )?;
+            ballot.verify(&pre_voting_data)?;
+            ballot
+        };
 
-        let verify_result1 = ballot_voter1.verify(&device.header);
-        assert!(verify_result1);
-        let ballot_voter2 = BallotEncrypted::new_from_selections(
-            Index::from_one_based_index(2).unwrap(),
-            &device,
-            "2024-08-02",
-            &mut csprng,
-            &primary_nonce,
-            &voter2,
-        )
-        .unwrap();
+        let ballot_3 = {
+            // Voting Ballot style 17 has 3 contests: 1, 2, and 3
+            let vspt = VoterSelectionsPlaintext {
+                h_e: pre_voting_data.hashes_ext.h_e,
+                ballot_style_ix: 17.try_into()?,
+                contests_option_fields_plaintexts: BTreeMap::from([
+                    (
+                        1.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0]).unwrap(),
+                    ),
+                    (
+                        2.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1, 0]).unwrap(),
+                    ),
+                    (
+                        3.try_into()?,
+                        ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1, 0, 0]).unwrap(),
+                    ),
+                ]),
+            };
 
-        let verify_result2 = ballot_voter2.verify(&device.header);
-        assert!(verify_result2);
-        let ballot_voter3 = BallotEncrypted::new_from_selections(
-            Index::from_one_based_index(3).unwrap(),
-            &device,
-            "2024-08-02",
-            &mut csprng,
-            &primary_nonce,
-            &voter3,
-        )
-        .unwrap();
-        let verify_result3 = ballot_voter3.verify(&device.header);
-        assert!(verify_result3);
+            let ballot = BallotEncrypted::try_from_ballot_selection_data_plaintext(
+                &pre_voting_data,
+                vspt,
+                Some(xi_B_3),
+                csprng,
+            )?;
+            ballot.verify(&pre_voting_data)?;
+            ballot
+        };
 
-        let factor = FieldElement::from(1u8, &fixed_parameters.field);
-        let encrypted_ballots = vec![
-            ballot_voter1.scale(fixed_parameters, &factor),
-            ballot_voter2.scale(fixed_parameters, &factor),
-            ballot_voter3.scale(fixed_parameters, &factor),
-        ];
-        let tally =
-            tally_ballots(encrypted_ballots, &election_manifest, &election_parameters).unwrap();
+        let scaled_ballots = {
+            let scale_factor = FieldElement::from(1u8, &fixed_parameters.field);
+            vec![
+                ballot_1.scale(fixed_parameters, &scale_factor),
+                ballot_2.scale(fixed_parameters, &scale_factor),
+                ballot_3.scale(fixed_parameters, &scale_factor),
+            ]
+        };
 
-        let result_contest_1 = tally.get(&Index::from_one_based_index(1).unwrap()).unwrap();
-        let result_contest_2 = tally.get(&Index::from_one_based_index(2).unwrap()).unwrap();
-        let result_contest_3 = tally.get(&Index::from_one_based_index(3).unwrap()).unwrap();
+        let tally = tally_ballots(scaled_ballots, &pre_voting_data).unwrap();
+
+        let result_contest_1 = tally.get(&(1.try_into()?)).unwrap();
+        let result_contest_2 = tally.get(&(2.try_into()?)).unwrap();
+        let result_contest_3 = tally.get(&(3.try_into()?)).unwrap();
 
         // Decryption
         let share_vecs = guardian_public_keys
@@ -701,8 +649,8 @@ mod test {
                     .iter()
                     .map(|dealer_sk| {
                         GuardianEncryptedShare::encrypt(
-                            &mut csprng,
-                            &election_parameters.clone(),
+                            csprng,
+                            &pre_voting_data.parameters,
                             dealer_sk,
                             pk,
                         )
@@ -711,10 +659,11 @@ mod test {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+
         let key_shares = zip(&guardian_secret_keys, share_vecs)
             .map(|(sk, shares)| {
                 GuardianSecretKeyShare::compute(
-                    &election_parameters,
+                    &pre_voting_data,
                     &guardian_public_keys,
                     &shares,
                     sk,
@@ -728,13 +677,13 @@ mod test {
             .map(|ct| {
                 let dec = decryption_helper(
                     &key_shares,
-                    &mut csprng,
+                    csprng,
                     &pre_voting_data,
                     ct,
                     &guardian_public_keys,
                 );
                 assert!(dec.verify(
-                    &pre_voting_data.parameters.fixed_parameters,
+                    fixed_parameters,
                     &pre_voting_data.hashes_ext,
                     &pre_voting_data.public_key,
                     ct
@@ -742,27 +691,27 @@ mod test {
                 dec.plain_text
             })
             .collect();
+
         assert_eq!(
             decryption_contest_1,
             vec![
                 FieldElement::from(2u8, &fixed_parameters.field),
-                FieldElement::from(1u8, &fixed_parameters.field),
-                FieldElement::from(0u8, &fixed_parameters.field),
                 FieldElement::from(0u8, &fixed_parameters.field)
             ]
         );
+
         let decryption_contest_2: Vec<_> = result_contest_2
             .iter()
             .map(|ct| {
                 let dec = decryption_helper(
                     &key_shares,
-                    &mut csprng,
+                    csprng,
                     &pre_voting_data,
                     ct,
                     &guardian_public_keys,
                 );
                 assert!(dec.verify(
-                    &pre_voting_data.parameters.fixed_parameters,
+                    fixed_parameters,
                     &pre_voting_data.hashes_ext,
                     &pre_voting_data.public_key,
                     ct
@@ -770,26 +719,28 @@ mod test {
                 dec.plain_text
             })
             .collect();
+
         assert_eq!(
             decryption_contest_2,
             vec![
+                FieldElement::from(0u8, &fixed_parameters.field),
                 FieldElement::from(1u8, &fixed_parameters.field),
-                FieldElement::from(1u8, &fixed_parameters.field),
-                FieldElement::from(0u8, &fixed_parameters.field)
+                FieldElement::from(1u8, &fixed_parameters.field)
             ]
         );
+
         let decryption_contest_3: Vec<_> = result_contest_3
             .iter()
             .map(|ct| {
                 let dec = decryption_helper(
                     &key_shares,
-                    &mut csprng,
+                    csprng,
                     &pre_voting_data,
                     ct,
                     &guardian_public_keys,
                 );
                 assert!(dec.verify(
-                    &pre_voting_data.parameters.fixed_parameters,
+                    fixed_parameters,
                     &pre_voting_data.hashes_ext,
                     &pre_voting_data.public_key,
                     ct
@@ -801,9 +752,12 @@ mod test {
             decryption_contest_3,
             vec![
                 FieldElement::from(1u8, &fixed_parameters.field),
-                FieldElement::from(2u8, &fixed_parameters.field),
+                FieldElement::from(1u8, &fixed_parameters.field),
+                FieldElement::from(1u8, &fixed_parameters.field),
                 FieldElement::from(0u8, &fixed_parameters.field)
             ]
         );
+
+        Ok(())
     }
 }

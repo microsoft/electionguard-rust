@@ -1,4 +1,11 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
+
+#![deny(clippy::expect_used)]
+#![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
+
 use std::vec;
 
 use anyhow::{anyhow, Context, Result};
@@ -8,6 +15,7 @@ use util::algebra_utils::to_be_bytes_left_pad;
 use crate::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
+    errors::EgResult,
     fixed_parameters::FixedParameters,
     hash::{eg_h, HValue},
     serializable::{SerializableCanonical, SerializablePretty},
@@ -61,7 +69,7 @@ impl Hashes {
     pub fn compute(
         election_parameters: &ElectionParameters,
         election_manifest: &ElectionManifest,
-    ) -> Result<Self> {
+    ) -> EgResult<Self> {
         // Computation of the base parameter hash H_P.
         let h_p = ParameterBaseHash::compute(&election_parameters.fixed_parameters).h_p;
 
@@ -145,6 +153,8 @@ impl std::fmt::Display for Hashes {
     }
 }
 
+//-------------------------------------------------------------------------------------------------|
+
 // Unit tests for the ElectionGuard hashes.
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -157,6 +167,7 @@ mod test {
         election_manifest::{Contest, ContestIndex, ContestOption},
         example_election_parameters::example_election_parameters,
         guardian::GuardianIndex,
+        selection_limit::OptionSelectionLimit,
         standard_parameters::STANDARD_PARAMETERS,
         varying_parameters::{BallotChaining, VaryingParameters},
     };
@@ -173,39 +184,47 @@ mod test {
     }
 
     fn simple_election_manifest() -> ElectionManifest {
-        let contests = [
-            // Contest index 1:
-            Contest {
-                label: "Contest01".to_string(),
-                selection_limit: 1,
-                options: [
-                    ContestOption {
-                        label: "SelectionA".to_string(),
-                    },
-                    ContestOption {
-                        label: "SelectionB".to_string(),
-                    },
-                ]
-                .try_into()
-                .unwrap(),
-            },
-        ]
-        .try_into()
-        .unwrap();
-        let ballot_styles = [BallotStyle {
-            label: "BallotStyle01".to_string(),
-            contests: BTreeSet::from(
-                [1u32].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
-            ),
-        }]
-        .try_into()
-        .unwrap();
+        fn imp_() -> EgResult<ElectionManifest> {
+            let contests = [
+                // Contest index 1:
+                Contest {
+                    opt_contest_ix: None,
+                    label: "Contest01".to_string(),
+                    selection_limit: 1_u8.into(),
+                    contest_options: [
+                        ContestOption {
+                            opt_contest_ix: None,
+                            opt_contest_option_ix: None,
+                            label: "SelectionA".to_string(),
+                            selection_limit: OptionSelectionLimit::Limit(1),
+                        },
+                        ContestOption {
+                            opt_contest_ix: None,
+                            opt_contest_option_ix: None,
+                            label: "SelectionB".to_string(),
+                            selection_limit: OptionSelectionLimit::LimitedOnlyByContest,
+                        },
+                    ]
+                    .try_into()
+                    .unwrap(),
+                },
+            ]
+            .try_into()
+            .unwrap();
 
-        ElectionManifest {
-            label: "AElection".to_string(),
-            contests,
-            ballot_styles,
+            let ballot_styles = [BallotStyle {
+                opt_ballot_style_ix: Some(1.try_into()?),
+                label: "BallotStyle01".to_string(),
+                contests: BTreeSet::from(
+                    [1u32].map(|ix1| ContestIndex::from_one_based_index(ix1).unwrap()),
+                ),
+            }]
+            .try_into()
+            .unwrap();
+
+            ElectionManifest::new("AElection".to_string(), contests, ballot_styles)
         }
+        imp_().unwrap()
     }
 
     fn simple_election_parameters() -> ElectionParameters {
@@ -247,10 +266,10 @@ mod test {
         // These hashes are to get notified if the hash computation is changed. They have
         // not been computed externally.
         let expected_h_m = HValue::from(hex!(
-            "242568E9ECD120DA2CD7C86FB7F8504996FBAE934A558CF28D22DC8529C7C487"
+            "CC38E1C22E7768ABD6D5377B536E2E25F5C5AE8BE0F9329CD6E8A333AC938F30"
         ));
         let expected_h_b = HValue::from(hex!(
-            "ECF3D1424BAC568DEB036005E4151C8CE888913A291A6AA2C307BCE091EB48CB"
+            "2AE3ABD11843AA8AC228FAFA8B5C196A2D9C47090F5450BC0DECF15524963B6D"
         ));
 
         assert_eq!(hashes.h_p, expected_h_p);

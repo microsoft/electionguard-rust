@@ -6,14 +6,13 @@
 #![deny(clippy::manual_assert)]
 
 use eg::{
-    device::Device,
-    election_manifest::{ContestIndex, ContestOptionIndex},
-    election_record::PreVotingData,
+    election_manifest::{ContestIndex, ContestDataFieldIndex},
+    pre_voting_data::PreVotingData,
     hash::HValue,
     index::Index,
-    joint_election_public_key::{Ciphertext, Nonce},
+    ciphertext::{Ciphertext, Nonce},
     vec1::Vec1,
-    zk::{ProofRange, ProofRangeError},
+    zk::{ProofRange, ZkProofRangeError},
 };
 
 use serde::{Deserialize, Serialize};
@@ -53,17 +52,17 @@ impl ContestSelectionPreEncrypted {
         &mut self,
         device: &Device,
         primary_nonce: &[u8],
-        contest_index: ContestIndex,
-        j: ContestOptionIndex,
+        contest_ix: ContestIndex,
+        j: ContestDataFieldIndex,
     ) {
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         for k in 1..self.selections.len() + 1 {
             self.selections[k].1 = Some(Nonce::new(option_nonce(
-                &device.header,
+                &device.pre_voting_data,
                 primary_nonce,
-                contest_index,
+                contest_ix,
                 j,
-                ContestOptionIndex::from_one_based_index(k as u32).unwrap(),
+                ContestDataFieldIndex::from_one_based_index(k as u32).unwrap(),
             )));
         }
     }
@@ -72,8 +71,8 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
-        contest_index: ContestIndex,
-        j: ContestOptionIndex,
+        contest_ix: ContestIndex,
+        j: ContestDataFieldIndex,
         num_selections: usize,
     ) -> ContestSelectionPreEncrypted {
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
@@ -83,9 +82,9 @@ impl ContestSelectionPreEncrypted {
         let mut selections = Vec::new();
         for k in 1..num_selections + 1 {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
-            let nonce = option_nonce(pvd, primary_nonce, contest_index, j, k);
-            let ciphertext = pvd.public_key.encrypt_with(
+            let k = ContestDataFieldIndex::from_one_based_index(k as u32).unwrap();
+            let nonce = option_nonce(pvd, primary_nonce, contest_ix, j, k);
+            let ciphertext = pvd.public_key.encrypt_to(
                 &pvd.parameters.fixed_parameters,
                 &nonce,
                 (j == k) as usize,
@@ -114,8 +113,8 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         primary_nonce: &[u8],
         store_nonces: bool,
-        contest_index: ContestIndex,
-        null_index: ContestOptionIndex,
+        contest_ix: ContestIndex,
+        null_index: ContestDataFieldIndex,
         num_selections: usize,
     ) -> ContestSelectionPreEncrypted {
         let mut selections = Vec::new();
@@ -125,11 +124,11 @@ impl ContestSelectionPreEncrypted {
                 .unwrap();
         for k in 1..num_selections + 1 {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let k = ContestOptionIndex::from_one_based_index(k as u32).unwrap();
-            let nonce = option_nonce(pvd, primary_nonce, contest_index, null_index, k);
+            let k = ContestDataFieldIndex::from_one_based_index(k as u32).unwrap();
+            let nonce = option_nonce(pvd, primary_nonce, contest_ix, null_index, k);
             let ciphertext =
                 pvd.public_key
-                    .encrypt_with(&pvd.parameters.fixed_parameters, &nonce, 0);
+                    .encrypt_to(&pvd.parameters.fixed_parameters, &nonce, 0);
             let maybe_nonce = if store_nonces {
                 Some(Nonce::new(nonce))
             } else {
@@ -156,7 +155,7 @@ impl ContestSelectionPreEncrypted {
         pvd: &PreVotingData,
         csprng: &mut Csprng,
         sequence_order: usize,
-    ) -> Result<Vec1<ProofRange>, ProofRangeError> {
+    ) -> Result<Vec1<ProofRange>, ZkProofRangeError> {
         let mut proofs = Vec1::new();
         // for (i, selection) in self.selections.iter().enumerate() {
         for (i, c) in self.selections.iter().enumerate() {
@@ -164,7 +163,7 @@ impl ContestSelectionPreEncrypted {
             let nonce = c.1.as_ref().unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(c.0.proof_ballot_correctness(pvd, csprng, sequence_order == i, nonce)?)
+                .try_push(c.0.generate_range_proof_for_contest_data_field(pvd, csprng, sequence_order == i, nonce)?)
                 .unwrap();
         }
         Ok(proofs)
