@@ -1,9 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 //! This module provides fixed parameter type.
 
@@ -41,53 +42,38 @@ pub enum NumsNumber {
 pub struct FixedParameterGenerationParameters {
     /// number of bits of the field order `q`
     pub q_bits_total: usize,
+
     /// number of bits of the group modulus `p`
     pub p_bits_total: usize,
+
     // number of leading bits set to 1 for `p`
     pub p_bits_msb_fixed_1: usize,
+
     // source of the middle bits
     pub p_middle_bits_source: Option<NumsNumber>,
+
     // number of trailing bits set to 1 for `p`
     pub p_bits_lsb_fixed_1: usize,
 }
 
-// Released prereleased.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum OfficialReleaseKind {
-    Release,
-    Prerelease,
-}
-
-// Released prereleased.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OfficialVersion {
-    pub version: [usize; 2],
-    pub release: OfficialReleaseKind,
-}
-
 // Design specification version.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ElectionGuardDesignSpecificationVersion {
-    /// Officially-released "ElectionGuard Design Specification" version.
-    /// Which may be an official pre-release.
-    Official(OfficialVersion),
-
-    /// Some other specification and version.
-    Other(String),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+pub struct ElectionGuardDesignSpecificationVersion {
+    pub number: [u32; 2],
 }
 
 /// The fixed parameters define the used field and group.
-#[allow(non_snake_case)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixedParameters {
     /// Version of the ElectionGuard Design Specification to which these parameters conform.
     /// E.g., `Some([2, 0])` for v2.0 and `Some([1, 55])` for v1.55.
     /// `None` means the parameters may not conform to any version of the ElectionGuard spec.
     #[serde(
-        rename = "ElectionGuard_Design_Specification",
+        rename = "ElectionGuard_Design_Specification_version",
+        default,
         skip_serializing_if = "Option::is_none"
     )]
-    pub opt_ElectionGuard_Design_Specification: Option<ElectionGuardDesignSpecificationVersion>,
+    pub opt_eg_design_specification_version: Option<ElectionGuardDesignSpecificationVersion>,
 
     /// Parameters used to generate the parameters.
     pub generation_parameters: FixedParameterGenerationParameters,

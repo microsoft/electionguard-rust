@@ -76,7 +76,7 @@ mkdir "%target_docs_reldir%"
 @if "%ERRORLEVEL%" NEQ "0" exit /b
 
 @REM Build the lib crates documentation using `cargo doc`.
-cargo doc %verbose% %cargo_profile_build_flag% %frozen_offline% --no-deps --lib -p eg -p util
+cargo doc %verbose% %cargo_profile_build_flag% %frozen_offline% --all-features --no-deps --lib -p eg -p util
 @if "%ERRORLEVEL%" NEQ "0" exit /b
 
 @REM The cmd built-in "move" sometimes fails with "Access is denied."

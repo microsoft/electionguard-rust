@@ -1,20 +1,26 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 //! This module provides the implementation of the [`JointElectionPublicKey`] and [`Ciphertext`] for ballot encryption.
 //! For more details see Sections `3.2.2` and `3.3` of the Electionguard specification `2.0.0`.
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use util::algebra::{FieldElement, Group, GroupElement, ScalarField};
+use util::algebra::{FieldElement, Group, GroupElement};
 
 use crate::{
-    election_parameters::ElectionParameters, fixed_parameters::FixedParameters,
-    guardian_public_key::GuardianPublicKey, index::Index, serializable::SerializablePretty,
+    ciphertext::Ciphertext,
+    election_parameters::ElectionParameters,
+    errors::{EgError, EgResult},
+    fixed_parameters::FixedParameters,
+    guardian_public_key::GuardianPublicKey,
+    serializable::SerializablePretty,
 };
 
 /// The joint election public key.
@@ -23,67 +29,11 @@ pub struct JointElectionPublicKey {
     pub joint_election_public_key: GroupElement,
 }
 
-/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`crate::contest_encrypted::ContestEncrypted`].
-pub type CiphertextIndex = Index<Ciphertext>;
-
-/// The ciphertext used to store a vote value corresponding to one option.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq)]
-pub struct Ciphertext {
-    pub alpha: GroupElement,
-    pub beta: GroupElement,
-}
-
-/// The encryption nonce used to produce a [`Ciphertext`]
-/// Relevant for producing proofs about the plaintext.
-#[derive(Debug, Clone)]
-pub struct Nonce {
-    pub xi: FieldElement,
-}
-
-impl Nonce {
-    pub fn new(xi: FieldElement) -> Nonce {
-        Nonce { xi }
-    }
-
-    /// The nonce with xi equal to 0.
-    pub fn zero() -> Nonce {
-        Nonce {
-            xi: ScalarField::zero(),
-        }
-    }
-}
-
-impl Ciphertext {
-    /// The ciphertext with alpha and beta equal to 1. This is the neutral element
-    /// of ciphertexts with respect to component-wise multiplication.
-    pub fn one() -> Ciphertext {
-        Ciphertext {
-            alpha: Group::one(),
-            beta: Group::one(),
-        }
-    }
-
-    /// Scale a ciphertext by a factor. The scaling of an encryption of `x` with a factor `k`
-    /// gives an encryption of `k*x`.
-    pub fn scale(&self, fixed_parameters: &FixedParameters, factor: &FieldElement) -> Ciphertext {
-        let alpha = self.alpha.exp(factor, &fixed_parameters.group);
-        let beta = self.beta.exp(factor, &fixed_parameters.group);
-
-        Ciphertext { alpha, beta }
-    }
-}
-
-impl PartialEq for Ciphertext {
-    fn eq(&self, other: &Self) -> bool {
-        self.alpha == other.alpha && self.beta == other.beta
-    }
-}
-
 impl JointElectionPublicKey {
     pub fn compute(
         election_parameters: &ElectionParameters,
         guardian_public_keys: &[GuardianPublicKey],
-    ) -> Result<Self> {
+    ) -> EgResult<Self> {
         let fixed_parameters = &election_parameters.fixed_parameters;
         let varying_parameters = &election_parameters.varying_parameters;
         let n = varying_parameters.n.get_one_based_usize();
@@ -99,11 +49,11 @@ impl JointElectionPublicKey {
         for guardian_public_key in guardian_public_keys {
             let seen_ix = guardian_public_key.i.get_zero_based_usize();
 
-            ensure!(
-                !seen[seen_ix],
-                "Guardian {} is represented more than once in the guardian public keys",
-                guardian_public_key.i
-            );
+            if seen.get(seen_ix).cloned().unwrap_or(true) {
+                return Err(EgError::JointElectionPublicKeyCompute_GuardianMultiple(
+                    guardian_public_key.i,
+                ));
+            }
 
             seen[seen_ix] = true;
         }
@@ -127,7 +77,8 @@ impl JointElectionPublicKey {
                 }
             });
 
-            bail!("Guardian(s) {iter:?} are not represented in the guardian public keys");
+            let s = iter.collect::<String>();
+            return Err(EgError::JointElectionPublicKeyCompute_GuardiansMissing(s));
         }
 
         let joint_election_public_key = guardian_public_keys.iter().fold(
@@ -142,17 +93,21 @@ impl JointElectionPublicKey {
         })
     }
 
-    pub fn encrypt_with(
+    /// Encrypts a value to the joint election public key to produce a [`Ciphertext`].
+    pub fn encrypt_to<T>(
         &self,
         fixed_parameters: &FixedParameters,
         nonce: &FieldElement,
-        vote: usize,
-    ) -> Ciphertext {
+        value: T,
+    ) -> Ciphertext
+    where
+        BigUint: From<T>,
+    {
         let field = &fixed_parameters.field;
         let group = &fixed_parameters.group;
 
         let alpha = group.g_exp(nonce);
-        let exponent = &nonce.add(&FieldElement::from(vote, field), field);
+        let exponent = &nonce.add(&FieldElement::from(value, field), field);
         let beta = self.joint_election_public_key.exp(exponent, group);
 
         Ciphertext { alpha, beta }
@@ -195,6 +150,8 @@ impl AsRef<GroupElement> for JointElectionPublicKey {
         &self.joint_election_public_key
     }
 }
+
+//=================================================================================================|
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -263,15 +220,20 @@ mod test {
         let joint_election_public_key =
             JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())
                 .unwrap();
+
         let nonce = FieldElement::from(BigUint::from(5u8), field);
-        let encryption = joint_election_public_key.encrypt_with(
+
+        let encryption = joint_election_public_key.encrypt_to(
             &election_parameters.fixed_parameters,
             &nonce,
-            1,
+            1_u32,
         );
+
         let factor = FieldElement::from(BigUint::new(vec![0, 64u32]), field); // 2^38
         let factor = factor.sub(&ScalarField::one(), field); // 2^38 - 1
+
         let encryption = encryption.scale(&election_parameters.fixed_parameters, &factor);
+
         let result = decrypt_ciphertext(
             &encryption,
             &joint_election_public_key,

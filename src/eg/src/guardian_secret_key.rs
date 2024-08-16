@@ -109,7 +109,7 @@ pub struct GuardianSecretKey {
     pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
-    #[serde(rename = "name", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "name", default, skip_serializing_if = "Option::is_none")]
     pub opt_name: Option<String>,
 
     /// Secret polynomial coefficients.
@@ -120,24 +120,6 @@ pub struct GuardianSecretKey {
 
     /// Proofs of knowledge for secret coefficients.
     pub coefficient_proofs: Vec<CoefficientProof>,
-}
-
-impl GuardianPublicKeyInfo for GuardianSecretKey {
-    fn i(&self) -> GuardianIndex {
-        self.i
-    }
-
-    fn opt_name(&self) -> &Option<String> {
-        &self.opt_name
-    }
-
-    fn coefficient_commitments(&self) -> &CoefficientCommitments {
-        &self.coefficient_commitments
-    }
-
-    fn coefficient_proofs(&self) -> &[CoefficientProof] {
-        &self.coefficient_proofs
-    }
 }
 
 impl GuardianSecretKey {
@@ -228,6 +210,24 @@ impl GuardianSecretKey {
         self_.validate(election_parameters)?;
 
         Ok(self_)
+    }
+}
+
+impl GuardianPublicKeyInfo for GuardianSecretKey {
+    fn i(&self) -> GuardianIndex {
+        self.i
+    }
+
+    fn opt_name(&self) -> &Option<String> {
+        &self.opt_name
+    }
+
+    fn coefficient_commitments(&self) -> &CoefficientCommitments {
+        &self.coefficient_commitments
+    }
+
+    fn coefficient_proofs(&self) -> &[CoefficientProof] {
+        &self.coefficient_proofs
     }
 }
 

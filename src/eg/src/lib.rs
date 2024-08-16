@@ -61,15 +61,20 @@
 //! - [VerifiableDecryption](crate::verifiable_decryption::VerifiableDecryption) A decrypted plain-text with a [proof of correct decryption](crate::verifiable_decryption::DecryptionProof)
 
 pub mod ballot;
+pub mod ballot_scaled;
 pub mod ballot_style;
+#[cfg(test)]
+mod ballot_test_verify;
+pub mod ciphertext;
 pub mod confirmation_code;
+pub mod contest_data_fields;
 pub mod contest_encrypted;
 pub mod contest_hash;
-pub mod contest_selection;
-pub mod device;
+pub mod contest_option_fields;
 pub mod election_manifest;
 pub mod election_parameters;
 pub mod election_record;
+pub mod errors;
 pub mod example_election_manifest;
 pub mod example_election_parameters;
 pub mod fixed_parameters;
@@ -85,9 +90,14 @@ pub mod hashes_ext;
 pub mod index;
 pub mod joint_election_public_key;
 pub mod nonce;
+pub mod pre_voting_data;
+pub mod selection_limit;
 pub mod serializable;
 pub mod standard_parameters;
+pub mod u31;
+pub mod u53;
 pub mod varying_parameters;
 pub mod vec1;
 pub mod verifiable_decryption;
+pub mod voter_selections_plaintext;
 pub mod zk;

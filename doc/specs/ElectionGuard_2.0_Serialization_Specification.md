@@ -147,7 +147,7 @@ If rich text formatting capabilities are required, it should be carried external
 referenced to the relevant object's label or index from the election manifest.
 Alternatively, a vendor-specific extension could be used.
 
-The JSON [RFC 8259] is a bit ambiguous with respect to Unicode surrogate pair code points
+The JSON [RFC 8259] is somewhat ambiguous with respect to Unicode surrogate pair code points
 encoded as escaped characters in strings. See [JSON RFC Errata 7603](https://www.rfc-editor.org/errata/eid7603).
 
 * Writers MUST NOT emit JSON strings which if un-encaped would result in a malformed
@@ -178,24 +178,6 @@ On the other hand, "labels" are used to uniquely identify items in the ElectionG
 structures and carry aditional requirements. While they may be presented to users, that
 is not their primary purpose.
 
-### Name-type text fields
-
-An example of a name-type text field is the `opt_name` field of `GuardianPublicKey` data structure.
-
-In addition to the general requirements applicable to all text data...
-
-Name-type text SHOULD:
-
-* Be human readable and meaningful.
-* Be as concise as practical.
-
-Name-type text SHOULD NOT:
-
-* Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` characters.
-* Contain line break or tab characters.
-* Contain any leading or trailing whitespace characters.
-* Contain contiguous sequences of multiple whitespace characters.
-
 ### Description-type text fields
 
 In addition to the general requirements applicable to all text data...
@@ -221,12 +203,35 @@ Description-type text MAY:
 * Use `U+2007 FIGURE SPACE` characters to line up with digits on nearby lines.
 * Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` as necessary.
 
+### Name-type text fields
+
+An example of a name-type text field is the `opt_name` field of `GuardianPublicKey` data structure.
+
+In addition to the general requirements applicable to all text data...
+
+Name-type text SHOULD:
+
+* Be human readable and meaningful.
+* Be as concise as practical.
+
+Name-type text SHOULD NOT:
+
+* Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` characters.
+* Contain any leading or trailing whitespace characters.
+* Contain contiguous sequences of multiple whitespace characters.
+
+Name-type text MAY:
+
+* Contain line break characters.
+
 ### Labels
 
 In addition to the general requirements applicable to all text data...
 
 Labels MUST:
 
+* Be human readable and meaningful.
+* Be as concise as practical.
 * Identify the item uniquely within its scope.
 * Define an equivalence relation that is reflexive and symmetric.
 * Be processed with due regard to security considerations.
@@ -234,10 +239,13 @@ Labels MUST:
 
 Labels MUST NOT:
 
-* Include line break or tab characters.
-* Include any leading or trailing whitespace characters.
-* Contain contiguous sequences of multiple whitespace characters other than a single `0x20`.
-* Contain leading or trailing whitespace characters.
+* Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` characters.
+* Contain any leading or trailing whitespace characters.
+* Contain contiguous sequences of multiple whitespace characters.
+
+Labels text MAY:
+
+* Contain line break characters.
 
 Writers MUST NOT emit serialized data that does not meet "MUST level" requirements.
 
@@ -252,14 +260,25 @@ Labels SHOULD:
 ## Numeric and hash values
 
 As a cryptographic system, ElectionGuard is heavily based on numbers, specifically
-non-negative integers. In practice these are always far too large to represent as JSON.
+non-negative integers. In practice, the cryptographic values are far too large to
+represent directly in JSON. But basic JSON integers are used to represent real-world
+quantities.
 
 ### Small integers
 
-Small integers (less than 2^31) are used for things like the number of guardians in a quorum,
-or a 1-based index identifying a specific element in a sequence.
+Small integers (less than 2^31) are used for things like the number of guardians in a
+quorum, or a 1-based index identifying a specific element in a sequence.
 
-They are written as ordinary base-10 integers.
+They are written as ordinary JSON numbers (base-10).
+
+### Medium integers
+
+Medium integers (less than 2^53) are used for things like vote totals.
+
+This upper limit is chosen to be compatible with scripting language interpreters
+that internally represent integers as double-precision floating point values.
+
+Like small integers, they are written as ordinary JSON numbers (base-10).
 
 ### <a id="Large_integers"></a>Large integers
 
@@ -280,30 +299,10 @@ where `N` is the number of hex digits specified above.
 
 ### Hash values
 
-The `HMAC-SHA-256` function used in ElectionGuard 2.0 produces fixed size values of 256 bits
-which are interpreted as [large integers](#Large_integers) of that size and written as described
-above.
+The `HMAC-SHA-256` function used in ElectionGuard 2.0 produces fixed size of 32 bytes
 
-### Cryptographic values
-
-There are three kinds of cryptographic values used in ElectionGuard:
-
-* Non-negative integers of fixed size corresponding to `q` or `p`.<br/>
-  For the standard parameter set, `q`- and `p`-sized values are (respectively):
-  * 256 or 4096 bits
-  * 64 or 1024 hex digits
-
-* Fixed size `HMAC-SHA-256` values:
-  * 256 bits
-  * 64 hex digits
-
-These values are written as JSON strings, the content of which MUST match the case-sensitive regex
-
-```regex
-    ^[0-9A-F]{N}$
-```
-
-where `N` is the number of hex digits specified above.
+which are interpreted (using big-endian) as [large integers](#Large_integers) of that size and
+written as described above. See the [Design Specification][EGDS20] sections 5.1 and 5.4 for more information.
 
 ## Specific Data Structures
 
@@ -312,19 +311,16 @@ where `N` is the number of hex digits specified above.
 The public `election_parameters.json` file is validated by the
 [`election_parameters.json`](./ElectionGuard_2.0_jsonschema/election_parameters.json) schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
   "fixed_parameters": {
-    "ElectionGuard_Design_Specification": {
-      "Official": {
-        "version": [
+      "ElectionGuard_Design_Specification_version": {
+        "number": [
           2,
           0
-        ],
-        "release": "Release"
-      }
+        ]
     },
     "generation_parameters": {
       "q_bits_total": 256,
@@ -345,8 +341,8 @@ Example in non-canonical pretty form:
   "varying_parameters": {
     "n": 5,
     "k": 3,
-    "date": "2024-08-05",
     "info": "The United Realms of Imaginaria General Election 2024",
+    "date": "2024-08-05",
     "ballot_chaining": "Prohibited"
   }
 }
@@ -357,7 +353,7 @@ Example in non-canonical pretty form:
 The public `hashes.json` file is validated by the
 [`hashes.json`](./ElectionGuard_2.0_jsonschema/hashes.json) schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
@@ -372,7 +368,7 @@ Example in non-canonical pretty form:
 The public `election_manifest_canonical.bin` file is validated by the
 [`election_manifest.json`](./ElectionGuard_2.0_jsonschema/election_manifest.json) schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
@@ -380,172 +376,125 @@ Example in non-canonical pretty form:
   "contests": [
     {
       "label": "For President and Vice President of The United Realms of Imaginaria",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)"
-        },
-        {
+        }, {
           "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)"
         }
       ]
     },
     {
       "label": "Minister of Arcane Sciences",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Élyria Moonshadow\n(Crystâlheärt)"
-        },
-        {
+        }, {
           "label": "Archímedes Darkstone\n(Ætherwïng)"
-        },
-        {
+        }, {
           "label": "Seraphína Stormbinder\n(Independent)"
         },
         {
           "label": "Gávrïel Runëbørne\n(Stärsky)"
         }
       ]
-    },
-    {
+    }, {
       "label": "Minister of Elemental Resources",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Tïtus Stormforge\n(Ætherwïng)"
-        },
-        {
+        }, {
           "label": "Fæ Willowgrove\n(Crystâlheärt)"
-        },
-        {
+        }, {
           "label": "Tèrra Stonebinder\n(Independent)"
         }
       ]
-    },
-    {
+    }, {
       "label": "Minister of Dance",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Äeliana Sunsong\n(Crystâlheärt)"
-        },
-        {
+        }, {
           "label": "Thâlia Shadowdance\n(Ætherwïng)"
-        },
-        {
+        }, {
           "label": "Jasper Moonstep\n(Stärsky)"
         }
       ]
-    },
-    {
+    }, {
       "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
-      "selection_limit": 3,
-      "options": [
+      "selection_limit": 6,
+      "contest_options": [
         {
           "label": "Ìgnatius Gearsøul\n(Crystâlheärt)"
-        },
-        {
-          "label": "Èlena Wîndwhisper\n(Technocrat)"
-        },
-        {
-          "label": "Bërnard Månesworn\n(Ætherwïng)"
-        },
-        {
-          "label": "Èmeline Glîmmerwillow\n(Ætherwïng)"
-        },
-        {
-          "label": "Nikólai Thunderstrîde\n(Independent)"
-        },
-        {
-          "label": "Lïliana Fîrestone\n(Pęacemaker)"
-        },
-        {
-          "label": "Émeric Crystálgaze\n(Førestmíst)"
-        },
-        {
-          "label": "Séraphine Lùmenwing\n(Stärsky)"
-        },
-        {
-          "label": "Rãfael Stëamheart\n(Ætherwïng)"
-        },
-        {
-          "label": "Océane Tidecaller\n(Pęacemaker)"
-        },
-        {
-          "label": "Elysêa Shadowbinder\n(Independent)"
+        }, {
+          "label": "Èlena Wîndwhisper\n(Technocrat)",
+          "selection_limit": "CONTEST_LIMIT"
+        }, {
+          "label": "Bërnard Månesworn\n(Ætherwïng)",
+          "selection_limit": 8
+        }, {
+          "label": "Émeric Crystálgaze\n(Førestmíst)",
+          "selection_limit": 4
         }
       ]
-    },
-    {
+    }, {
       "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
-          "label": "For"
-        },
-        {
+          "label": "For",
+          "selection_limit": "CONTEST_LIMIT"
+        }, {
           "label": "Against"
         }
       ]
-    },
-    {
+    }, {
       "label": "Privacy Protection in Techno-Magical Communications Act",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Prō"
-        },
-        {
+        }, {
           "label": "Ĉontrá"
         }
       ]
-    },
-    {
+    }, {
       "label": "Public Transport Modernization and Enchantment Proposal",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Prō"
-        },
-        {
+        }, {
           "label": "Ĉontrá"
         }
       ]
-    },
-    {
+    }, {
       "label": "Renewable Ætherwind Infrastructure Initiative",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
           "label": "Prō"
-        },
-        {
+        }, {
           "label": "Ĉontrá"
         }
       ]
-    },
-    {
+    }, {
       "label": "For Librarian-in-Chief of Smoothstone County",
-      "selection_limit": 1,
-      "options": [
+      "selection_limit": 2147483647,
+      "contest_options": [
         {
-          "label": "Élise Planetes"
-        },
-        {
-          "label": "Théodoric Inkdrifter"
+          "label": "Élise Planetes",
+          "selection_limit": "CONTEST_LIMIT"
+        }, {
+          "label": "Théodoric Inkdrifter",
+          "selection_limit": 2147483647
         }
       ]
-    },
-    {
+    }, {
       "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
-      "selection_limit": 1,
-      "options": [
+      "contest_options": [
         {
-          "label": "Retain"
-        },
-        {
-          "label": "Remove"
+          "label": "Retain",
+          "selection_limit": 375
+        }, {
+          "label": "Remove",
+          "selection_limit": "CONTEST_LIMIT"
         }
       ]
     }
@@ -553,33 +502,13 @@ Example in non-canonical pretty form:
   "ballot_styles": [
     {
       "label": "Smoothstone County Ballot",
-      "contests": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10
-      ]
-    },
-    {
+      "contests": [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
+    }, {
       "label": "Silvërspîre County Ballot",
-      "contests": [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        11
-      ]
+      "contests": [ 1, 3, 5, 7, 9, 11 ]
+    }, {
+      "label": "Wandering Wizard and Herbalist Ballot",
+      "contests": [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ]
     }
   ]
 }
@@ -590,7 +519,7 @@ Example in non-canonical pretty form:
 The secret for Guardian N `guardian_N.SECRET_key.json` file is validated by the
 [`guardian_secret_key.json`](./ElectionGuard_2.0_jsonschema/guardian_secret_key.json) schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
@@ -602,9 +531,9 @@ Example in non-canonical pretty form:
     "5674483FED6C7685F90D9C214623865B1F5871D4A034ABC3B4277C1FF938938D"
   ],
   "coefficient_commitments": [
-    "C2A7DFAAE02425A7F3E50AC8691393C74BC6F2E21E6B25955A1DBAED2E9D14D23E83D989B0D529BB675207D90F7C025DC068D418DACBDCC086234B87E8235ECE4A6482DD938EC824CDFCE12345C586685DB70595BD10951FE24774B3DD52637EBDBF25C694F73163F37B7F64CA3E6FD63404BFD1FB1C9AEA4573F36C9B43467EFF789021BA6DC7A43EE6D5E8EFF9CFC70BC18D0CBA8A712439E386C6C23BE6CFAD579E7BB8A087DA77CF4C938E8765C5A0B0E564065DB2701D785183A549B821687E87D46CE635AC8B9F7E8AC0CA1E3BB5268FA39B9C92ED7D30882E1DC7F734FED73D3CB7522D242BE185965E87FD302FB1A809394376B6E8A219E8B960328C4B6BEC1F42183038FE9B95DB8A9803FBD8DCE345A79E811D49921B9D908A958F1DCB5DB10AE9D26552896346726626BE600AF7318397256477E9CE020534931A2AA26DD0A8ACD4A2597F4D0BA24F8378A6C9EC6EC7A0E11412228C8415CF1805133C17157555465641F58AAFB8E2AD8FD1718500B27FE4DEF5C46F99FFFF982F88EC4229FCD347E746317DCEDCD60B7B9C54FBBA3847707A80EEB71AB1F2558D9C09E8A5A25981363F8F59CECBCDA7AAF1666E4B37A041D5A95B6FA5046808F99C09E3894779A3E8ABED23B4F14FFEF6B929D9C8F06A39E5C94F1C2BD2DCAF5ED6E5D30C6DED9BFB83721A69E253FA8FA067D18F923D0B07AE5ADF1D71A4EE5C",
-    "75EFDB0BF483B504C451BE856DE969D7835CFE8251C2B3C2BF006552A02342E6EFEEDB7E6B923D964BE063E075EF37EB91EED872886B9D92CF3937824BD17DEA2154AEE2C205461A12930917908586F2D35C936C992C4C39F1F02BF5C9641B6230836EB8C37A4C86D1BCB7CA3191E0ED1C06BFBB3E6C39DC86FF036178A8FC0CE7F7709BD5F5119ED81EEBAFB8E588B3FABAD5B3213B9B24698F37B4A4FA919BA831F8E3B180B75D8E44CD2B949BE4F1A4D2342C43DA7BD8E978DDD00076BC048C5B964ADDD507011B293EC7D96EFC0A72349D9EC453E076C917E0C6391198FD3E5A1E1F15CD65045FA030306B6C63CDA88F2BFB0EFACD367F50E952D3CD93C7B62123BD7F658C4C16BCD28622FAF1B0CF01E869182D79A7B28371DFFAC9D6D04E6836C8BD34643FCEC9E2B88F6812021E1A7CC6022203876A9D49D9460B61461191443538C7A0A80CAC5B17243A0860676D075A54E997E27F4D4A7FBD19777689C249006E829AF10ECCF1878FE8015FD35175F0E6B7B7B984950C8F9DF458BDCC02E2BAB92DFA10D8C8094D4AC8ECBDF8D4071BD3864B52873A62C3FEAF728B9DC944E1E8CD741614105054017AAED6F1D62F39677727364F1D646C60846B1B98AA12B1D430392C9E516C913F3B1238A417D1C2A8A45D4C2724094E1A2F34A9524F665FC50A82A424FA1E35CB4744338D21768D9E2FBE1A0C09FA6CB263F36E",
-    "54D4DB5B7B9C37134D66D9502FC10DE734703D5F0041400E904D1A67E156ACE512070BECA9E8C03551FEB1AA225769B63A36E524C50220CDCD49E2955F1EEF9082E937E6B071337E8873C7E44F03B430F2ABA9BE54D6658227365510F3F11C5A701E9BB46DA525C2F6C29F91DFB20A5A8500C2A5FD784B0761F20B77846D1332A15DDD1C724639DA28B3066FAC99B7D211C80F24C4C96AA27D0F6B72C914D66C090586A9B39E58C8E67014D6D5A69D7E7932E2D2BF1248B5835B732979AAF7C2C7B5ED28D552B3AEFE4A6B697869043DBF802CC29E036CB10974771BAC7117CB9F8795086BFBB9621071AC1E938C9FECD08678FB5A0DB2EC524D8E2677E9C7DF41E075AB6F1A8A056A0B8D37F8E8B571BFB130A82DDCB0A2603D1B375E6A28317D96408DFEA8700E4A3FF119761D3A3D520B3C496B9F3C060D1C5F9FB6254E7FE029984B788650E6578BC1B732184BD97B9AF46A4E245F14E0872BC21779094D3A24EB00D1B42257282E0B76AE9BF7835CAD9F5EA59B7B0C8BDE50EE71EB2D5D8C5F2AA9DD32BA408C51A676E46EDA81FEEBACCF77F1CDF166A2ACEE6F4C9F74D70B282C8F24FC84F47B5152EB65634E78E68CC4C4A25EE23F94B9E95298CB34D76EF6B53D3EE55705C79A90775CD16F88125DB3302069397CC20BF7BE242F145379138993CEE429C58B11C79D6383449DD68FE0291F1EA01E48B564106F3486"
+    "...1024 uppercase hex digits total...",
+    "...1024 uppercase hex digits total...",
+    "...1024 uppercase hex digits total..."
   ],
   "coefficient_proofs": [
     {
@@ -628,16 +557,16 @@ Example in non-canonical pretty form:
 The public `guardian_N.public_key.json` file is validated by the
 [`guardian_public_key.json`](./ElectionGuard_2.0_jsonschema/guardian_public_key.json) schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
   "i": 1,
   "name": "Guardian 1",
   "coefficient_commitments": [
-    "C2A7DFAAE02425A7F3E50AC8691393C74BC6F2E21E6B25955A1DBAED2E9D14D23E83D989B0D529BB675207D90F7C025DC068D418DACBDCC086234B87E8235ECE4A6482DD938EC824CDFCE12345C586685DB70595BD10951FE24774B3DD52637EBDBF25C694F73163F37B7F64CA3E6FD63404BFD1FB1C9AEA4573F36C9B43467EFF789021BA6DC7A43EE6D5E8EFF9CFC70BC18D0CBA8A712439E386C6C23BE6CFAD579E7BB8A087DA77CF4C938E8765C5A0B0E564065DB2701D785183A549B821687E87D46CE635AC8B9F7E8AC0CA1E3BB5268FA39B9C92ED7D30882E1DC7F734FED73D3CB7522D242BE185965E87FD302FB1A809394376B6E8A219E8B960328C4B6BEC1F42183038FE9B95DB8A9803FBD8DCE345A79E811D49921B9D908A958F1DCB5DB10AE9D26552896346726626BE600AF7318397256477E9CE020534931A2AA26DD0A8ACD4A2597F4D0BA24F8378A6C9EC6EC7A0E11412228C8415CF1805133C17157555465641F58AAFB8E2AD8FD1718500B27FE4DEF5C46F99FFFF982F88EC4229FCD347E746317DCEDCD60B7B9C54FBBA3847707A80EEB71AB1F2558D9C09E8A5A25981363F8F59CECBCDA7AAF1666E4B37A041D5A95B6FA5046808F99C09E3894779A3E8ABED23B4F14FFEF6B929D9C8F06A39E5C94F1C2BD2DCAF5ED6E5D30C6DED9BFB83721A69E253FA8FA067D18F923D0B07AE5ADF1D71A4EE5C",
-    "75EFDB0BF483B504C451BE856DE969D7835CFE8251C2B3C2BF006552A02342E6EFEEDB7E6B923D964BE063E075EF37EB91EED872886B9D92CF3937824BD17DEA2154AEE2C205461A12930917908586F2D35C936C992C4C39F1F02BF5C9641B6230836EB8C37A4C86D1BCB7CA3191E0ED1C06BFBB3E6C39DC86FF036178A8FC0CE7F7709BD5F5119ED81EEBAFB8E588B3FABAD5B3213B9B24698F37B4A4FA919BA831F8E3B180B75D8E44CD2B949BE4F1A4D2342C43DA7BD8E978DDD00076BC048C5B964ADDD507011B293EC7D96EFC0A72349D9EC453E076C917E0C6391198FD3E5A1E1F15CD65045FA030306B6C63CDA88F2BFB0EFACD367F50E952D3CD93C7B62123BD7F658C4C16BCD28622FAF1B0CF01E869182D79A7B28371DFFAC9D6D04E6836C8BD34643FCEC9E2B88F6812021E1A7CC6022203876A9D49D9460B61461191443538C7A0A80CAC5B17243A0860676D075A54E997E27F4D4A7FBD19777689C249006E829AF10ECCF1878FE8015FD35175F0E6B7B7B984950C8F9DF458BDCC02E2BAB92DFA10D8C8094D4AC8ECBDF8D4071BD3864B52873A62C3FEAF728B9DC944E1E8CD741614105054017AAED6F1D62F39677727364F1D646C60846B1B98AA12B1D430392C9E516C913F3B1238A417D1C2A8A45D4C2724094E1A2F34A9524F665FC50A82A424FA1E35CB4744338D21768D9E2FBE1A0C09FA6CB263F36E",
-    "54D4DB5B7B9C37134D66D9502FC10DE734703D5F0041400E904D1A67E156ACE512070BECA9E8C03551FEB1AA225769B63A36E524C50220CDCD49E2955F1EEF9082E937E6B071337E8873C7E44F03B430F2ABA9BE54D6658227365510F3F11C5A701E9BB46DA525C2F6C29F91DFB20A5A8500C2A5FD784B0761F20B77846D1332A15DDD1C724639DA28B3066FAC99B7D211C80F24C4C96AA27D0F6B72C914D66C090586A9B39E58C8E67014D6D5A69D7E7932E2D2BF1248B5835B732979AAF7C2C7B5ED28D552B3AEFE4A6B697869043DBF802CC29E036CB10974771BAC7117CB9F8795086BFBB9621071AC1E938C9FECD08678FB5A0DB2EC524D8E2677E9C7DF41E075AB6F1A8A056A0B8D37F8E8B571BFB130A82DDCB0A2603D1B375E6A28317D96408DFEA8700E4A3FF119761D3A3D520B3C496B9F3C060D1C5F9FB6254E7FE029984B788650E6578BC1B732184BD97B9AF46A4E245F14E0872BC21779094D3A24EB00D1B42257282E0B76AE9BF7835CAD9F5EA59B7B0C8BDE50EE71EB2D5D8C5F2AA9DD32BA408C51A676E46EDA81FEEBACCF77F1CDF166A2ACEE6F4C9F74D70B282C8F24FC84F47B5152EB65634E78E68CC4C4A25EE23F94B9E95298CB34D76EF6B53D3EE55705C79A90775CD16F88125DB3302069397CC20BF7BE242F145379138993CEE429C58B11C79D6383449DD68FE0291F1EA01E48B564106F3486"
+    "...1024 uppercase hex digits total...",
+    "...1024 uppercase hex digits total...",
+    "...1024 uppercase hex digits total..."
   ],
   "coefficient_proofs": [
     {
@@ -661,7 +590,7 @@ Example in non-canonical pretty form:
 The public `hashes_ext.json` file is validated by the
 [`hashes_ext.json`](./ElectionGuard_2.0_jsonschema/hashes_ext.json) schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
@@ -672,25 +601,195 @@ Example in non-canonical pretty form:
 ### Joint Election Public Key
 
 The public `joint_election_public_key.json` file is validated by the
-[`joint_election_public_key.json`](./ElectionGuard_2.0_jsonschema/joint_election_public_key.json) schema file.
+[`joint_election_public_key.json`](./ElectionGuard_2.0_jsonschema/joint_election_public_key.json)
+schema file.
 
-Example in non-canonical pretty form:
+Example in non-canonical form:
 
 ```json
 {
-  "joint_election_public_key": "0193E1118F54F001395C3AA7F33596ED178E3B3228EF644C694561F530D68B50F06D27FD9DAD2468B3842711685B7ADDB3C7CD882F1644B695C8E0228B7CECFAC05E5BCA85DD6D83B43940310D9CF48E9641641FA8244A5996A086F811E7157552F4EECC1441782738E940DDDE312EEA3CD296666735FB68F38EE288539035F88695E9DC1495E5013BCDB75FB1F440B9D1F99BEE915A06B4DB327608CC219D0FBEC3B561D94EA7AC4DB92D69370C2BC76EF43BD68357DB312015A28731F9E8ECFA3C757765CB4A0FDDE14ABD892EB700C7ADDD833C4A29BD23424424597FFC57FE70CE2EE1461A83E277D903FEFF41AE7AA0AABF3B4D5A3F8EFC0703E6638EED2E279B01EE28B896F4E0326037DC0C63894DFDCAC95BC462489A0E72C75CE9AA24FF21A160B44F6EE109274334784F16D6AD8E4E4A38BF9F847018C12E06633E5D6D15192F2154E9E9A392314722C71F1F99860F6B6F4120BCCAFCC4CBA0C3DE8DD36ACE0A551FC14FEEB6929BEDA076060A4AB93D46ADC2E91D69B1089FB3DDB4B622D099FC1EA59C2D5A71058E81EFCD97F9E55ED7D6809578375D8F6562BDC843F5F93D7B105FEC6061A51EB785A3D751D400240DB66D49F8A4549D036C613938CF5906FBA35762F235EC2EA30D2C8C7913F2572AD3F27EF1D6A5FE98654649685EBAAD71BADC953DC0122F171F8A9438E7EC9689B16380174E701656593C"
+  "joint_election_public_key": "...1024 uppercase hex digits total..."
 }
 ```
 
 ### Pre-voting Data
 
+The `PreVotingData` structure is simply a collection of the structures that must be known
+before ballots can be produced.
+
+Example in non-canonical form:
+
+```json
+{
+  "parameters": {
+    "fixed_parameters": {
+      "ElectionGuard_Design_Specification_version": {
+        "number": [
+          2,
+          0
+        ]
+      },
+      "generation_parameters": {
+        "q_bits_total": 256,
+        "p_bits_total": 4096,
+        "p_bits_msb_fixed_1": 256,
+        "p_middle_bits_source": "ln_2",
+        "p_bits_lsb_fixed_1": 256
+      },
+      "field": {
+        "q": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF43"
+      },
+      "group": {
+        "p":  ...as before...
+        "g":  ...as before...
+        "q":  ...as before...
+      }
+    },
+    "varying_parameters": {
+      "n": 5,
+      "k": 3,
+      "info": "The United Realms of Imaginaria General Election 2024",
+      "ballot_chaining": "Prohibited",
+      "date": "2024-08-13"
+    }
+  },
+  "manifest": {
+    "label": "General Election - The United Realms of Imaginaria",
+    "contests": [ ...as before... ],
+    "ballot_styles": [ ...as before... ]
+  },
+  "hashes": {
+    "h_p": "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296",
+    "h_m": "201911B9B70665AB4E7C81F9C0AD0B2B0035BEF97EBE728AF0198CE4138F0BC3",
+    "h_b": "B715EF39863A46D5C0D539AA0869EF18C7FDA022F47953969F5A56C66BBEB422"
+  },
+  "public_key": {
+    "joint_election_public_key": "...1024 uppercase hex digits total..."
+  },
+  "hashes_ext": {
+    "h_e": "6CDFB2F4750E7A6BF7D99D9E05E87784C2C9A289E3DBB2AC958670A38989231E"
+  }
+}
+
+```
+
+### VoterSelectionsPlaintext
+
+This identifies a BallotStyle and voter selections. It is supplied as input to create a `Ballot`.
+
+- Voter selections are present as plaintext.
+- They have not been encrypted.
+- The contest option fields contain voter selections. They have not had any
+  encryption or selection limits applied.
+
+Example of a ballot in `VoterSelectionsPlaintext` in non-canonical form:
+
+```json
+{
+  "id": "00000-00001",
+  "ballot_state": "VoterSelectionsPlaintext",
+  "device": "Contoso Model SV-237 SN 98172-3645155",
+  "creation_date": "2024-08-08T21:55:37Z",
+  "contest_fields_plaintexts": {
+    "1": { "field_values": [0, 1] },
+    "2": { "field_values": [0, 0, 1, 0] },
+    // ...
+  },
+}
+```
+
+### Ballot
+
+A ballot can be in one of the following states:
+
+* `PreEncrypted` - The ballot has been generated. It is
+  - Includes a ballot identifier (`selection_encryption_identifier`)
+  - Possibly associated with a specific device
+  - It has encryptions of all possible voter selections, but
+  - It has __no__ actual voter selections
+
+* `VoterSelectionsEncrypted`,
+  - Voter selections are completed and present in encrypted form.
+  - The ballot has not yet been cast, challenged, or spoiled.
+  - This is the initial state of a `Ballot` created by processing a
+    `VoterSelectionsPlaintext` object with the `PreVotingData`.
+  - The contest option fields from the `VoterSelectionsPlaintext` object may have been augmented
+    with additional data fields. For example, additional data fields may indicate the
+    voter selections exceeded selection limits.
+
+* `Cast`
+  - Voter selections are completed and present in encrypted form.
+  - The ballot has been cast.
+  - Selections MUST be considered to express voter intent, so
+  - the ballot MUST NOT be decrypted.
+  - Selections MUST be included in the tally.
+  - This is a final state.
+
+* `Spoiled`
+  - Voter selections are completed and present in encrypted form.
+  - The ballot has been spoiled, it will NOT be cast.
+  - Selections MUST be considered as potentially expressing voter intent, so
+  - the ballot MUST NOT be decrypted.
+  - However, selections MUST NOT be included in the tally.
+  - This is a final state.
+
+* `Challenged`
+  - Voter selections are completed and present in encrypted form.
+  - The ballot has been challenged, it will never be cast.
+  - Selections MUST NOT be interpreted as an expression of voter intent.
+  - The ballot SHOULD be decrypted for verification.
+  - Selections MUST NOT be included in the tally.
+
+* `ChallengedDecrypted`
+  * A challenged ballot in which voter selections have been decrypted.
+  * Voter selections are present in both encrypted and plaintext form.
+  * Selections MUST NOT be interpreted as an expression of voter intent.
+  * Selections MUST NOT be included in the tally.
+  * The challenged and decrypted ballot SHOULD be published.
+  * This is a final state.
+
+Example of a ballot in `VoterSelectionsEncrypted` state in non-canonical form:
+
+```json
+{
+  "id": "00000-00001",
+  "ballot_state": "VoterSelectionsEncrypted",
+  "device": "Contoso Model SV-237 SN 98172-3645155",
+  "creation_date": "2024-08-08T21:55:37Z",
+  "contest_fields_ciphertexts": {
+    "1": {
+      "fields_ciphertexts": [
+        { "alpha": "...",
+          "beta": "..." },
+        { "alpha": "...",
+          "beta": "..." }
+      ],
+      "proofs_correctness": [
+        { "c": "...",
+          "v": "..." },
+        { "c": "...",
+          "v": "..." }
+      ],
+      "proofs_limits": [
+        { "c": "...",
+          "v": "..." },
+        { "c": "...",
+          "v": "..." }
+      ],
+
+    },
+    // ...
+  },
+}
+```
+
 TODO
 
-### Ballot Voter Selections Plaintext
+### Tally
 
 TODO
 
-### Ballot Voter Selections Encrypted
+### ElectionRecord
 
 TODO
 
@@ -728,4 +827,4 @@ TODO
 [UNICODE]: #refs.UNICODE "The Unicode Standard (latest) - The Unicode Consortium"
 
 [EGDS20-pdf]: https://github.com/microsoft/electionguard-rust/tree/main/doc/specs "ElectionGuard Design Specification v2.0 - MSR"
-[EGDS20]: #refs.EGDS "ElectionGuard Design Specification v2.0 - MSR"
+[EGDS20]: #refs.EGDS20 "ElectionGuard Design Specification v2.0 - MSR"

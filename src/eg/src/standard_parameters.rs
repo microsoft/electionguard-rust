@@ -1,9 +1,10 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 //! This module provides the standard [`FixedParameters`].
 //! For more details see Section `3.1.1` of the Electionguard specification `2.0.0`.
@@ -16,24 +17,21 @@ use util::algebra::{Group, ScalarField};
 
 use crate::fixed_parameters::{
     ElectionGuardDesignSpecificationVersion, FixedParameterGenerationParameters, FixedParameters,
-    NumsNumber, OfficialReleaseKind, OfficialVersion,
+    NumsNumber,
 };
 
 lazy_static! {
     /// Standard parameters, ElectionGuard latest (currently v2.0).
-    pub static ref STANDARD_PARAMETERS: FixedParameters = make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0();
+    pub static ref STANDARD_PARAMETERS: FixedParameters = make_standard_parameters_egds_v2_0();
 }
 
-/// Standard parameters, "MSR ElectionGuard Design Specification 2.0 of 2023-08-16"
+/// Standard parameters, "ElectionGuard Design Specification 2.0 of 2023-08-16"
 #[allow(non_snake_case)]
-pub fn make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0() -> FixedParameters {
-    let egds_ver = ElectionGuardDesignSpecificationVersion::Official(OfficialVersion {
-        version: [2, 0],
-        release: OfficialReleaseKind::Release,
-    });
-
+pub fn make_standard_parameters_egds_v2_0() -> FixedParameters {
     FixedParameters {
-        opt_ElectionGuard_Design_Specification: Some(egds_ver),
+        opt_eg_design_specification_version: Some(ElectionGuardDesignSpecificationVersion {
+            number: [2, 0],
+        }),
 
         generation_parameters: FixedParameterGenerationParameters {
             q_bits_total: 256,
@@ -119,7 +117,7 @@ pub mod test_parameter_do_not_use_in_production {
 
     pub fn make_toy_parameters_1() -> FixedParameters {
         FixedParameters {
-            opt_ElectionGuard_Design_Specification: None,
+            opt_eg_design_specification_version: None,
             generation_parameters: FixedParameterGenerationParameters {
                 q_bits_total: 7,
                 p_bits_total: 16,
@@ -137,6 +135,8 @@ pub mod test_parameter_do_not_use_in_production {
     }
 }
 
+//-------------------------------------------------------------------------------------------------|
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
@@ -148,15 +148,10 @@ mod test {
     fn standard_parameters_v2_0() {
         let mut csprng = util::csprng::Csprng::new(b"test::standard_parameters_v2_0");
 
-        let fixed_params = make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0();
+        let fixed_params = make_standard_parameters_egds_v2_0();
         assert!(matches!(
-            fixed_params.opt_ElectionGuard_Design_Specification,
-            Some(ElectionGuardDesignSpecificationVersion::Official(
-                OfficialVersion {
-                    version: [2, 0],
-                    release: OfficialReleaseKind::Release
-                }
-            ))
+            fixed_params.opt_eg_design_specification_version,
+            Some(ElectionGuardDesignSpecificationVersion { number: [2, 0] })
         ));
         assert!(fixed_params.validate(&mut csprng).is_ok());
     }
@@ -165,9 +160,6 @@ mod test {
     #[test]
     fn standard_parameters_pub_static() {
         // Latest standard parameters are v2.0.
-        assert_eq!(
-            &*STANDARD_PARAMETERS,
-            &make_standard_parameters_MSR_ElectionGuard_Design_Specification_v2_0()
-        );
+        assert_eq!(&*STANDARD_PARAMETERS, &make_standard_parameters_egds_v2_0());
     }
 }

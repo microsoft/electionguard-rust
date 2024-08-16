@@ -26,7 +26,7 @@ pub(crate) enum BallotChaining {
     Required,
 }
 
-impl std::convert::From<BallotChaining> for eg::varying_parameters::BallotChaining {
+impl From<BallotChaining> for eg::varying_parameters::BallotChaining {
     fn from(value: BallotChaining) -> Self {
         use eg::varying_parameters::BallotChaining as EgBallotChaining;
         match value {

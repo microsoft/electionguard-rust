@@ -28,6 +28,12 @@ package does not supply them.
   the standard values specified in the ElectionGuard 2.0 Reference Specification.
   When the standard values are used, some expensive primality checks can be avoided.
 
+## Limits
+
+In consideration of smaller platforms and languages and runtimes lacking good support
+for unsigned integers, the maximum value of any quantity is generally limited to
+`2^31 - 1` or `2,147,483,647`.
+
 ## Data types
 
 ## Text data, strings
@@ -37,7 +43,7 @@ Text data presents particular challenges for interoperability and
 
 Text data used in ElectionGuard must be representable as valid UTF-8. For the Reference
 Implementation in Rust, this is a requirement of Rust's
-[std::string::String](https://doc.rust-lang.org/std/string/struct.String.html) type.
+[String](https://doc.rust-lang.org/std/string/struct.String.html) type.
 
 Humans tend to compare text without regard to upper/lower case distinctions. Perhaps because
 this feels so natural to us, software developers tend to underestimate the implementation
@@ -81,7 +87,7 @@ in your project planning.
 ElectionGuard requires that these labels are unique within their collection. I.e., every Contest
 has a label distinct from any other Contest. This means we'll need a defined function to determine
 if two arbitrary labels are equal. The Rust
-[std::cmp::Eq trait](https://doc.rust-lang.org/std/cmp/trait.Eq.html)
+[Eq trait](https://doc.rust-lang.org/std/cmp/trait.Eq.html)
 expresses this concept.
 
 [Unicode Technical Standard #39](https://www.unicode.org/reports/tr39/) discusses security

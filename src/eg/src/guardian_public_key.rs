@@ -32,32 +32,14 @@ pub struct GuardianPublicKey {
     pub i: GuardianIndex,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
-    #[serde(rename = "name", skip_serializing_if = "Option::is_none")]
-    pub opt_name: Option<String>,
+    #[serde(rename = "name", default, skip_serializing_if = "Option::is_none")]
+    pub opt_name: Option<String>, //? TODO make this a string that may be empty
 
     /// "Published" polynomial coefficient commitments.
     pub coefficient_commitments: CoefficientCommitments,
 
     /// Proofs of knowledge for secret coefficients.
     pub coefficient_proofs: Vec<CoefficientProof>,
-}
-
-impl GuardianPublicKeyInfo for GuardianPublicKey {
-    fn i(&self) -> GuardianIndex {
-        self.i
-    }
-
-    fn opt_name(&self) -> &Option<String> {
-        &self.opt_name
-    }
-
-    fn coefficient_commitments(&self) -> &CoefficientCommitments {
-        &self.coefficient_commitments
-    }
-
-    fn coefficient_proofs(&self) -> &[CoefficientProof] {
-        &self.coefficient_proofs
-    }
 }
 
 impl GuardianPublicKey {
@@ -85,16 +67,6 @@ impl GuardianPublicKey {
             .to_be_bytes_left_pad(&fixed_parameters.group)
     }
 
-    /// Writes a [`GuardianPublicKey`] to a [`std::io::Write`].
-    pub fn to_stdiowrite(&self, stdiowrite: &mut dyn std::io::Write) -> Result<()> {
-        let mut ser = serde_json::Serializer::pretty(stdiowrite);
-
-        self.serialize(&mut ser)
-            .map_err(Into::<anyhow::Error>::into)
-            .and_then(|_| ser.into_inner().write_all(b"\n").map_err(Into::into))
-            .context("Writing GuardianPublicKey")
-    }
-
     /// Reads a [`GuardianPublicKey`] from a [`std::io::Read`] and validates it.
     pub fn from_stdioread_validated(
         stdioread: &mut dyn std::io::Read,
@@ -106,6 +78,24 @@ impl GuardianPublicKey {
         self_.validate(election_parameters)?;
 
         Ok(self_)
+    }
+}
+
+impl GuardianPublicKeyInfo for GuardianPublicKey {
+    fn i(&self) -> GuardianIndex {
+        self.i
+    }
+
+    fn opt_name(&self) -> &Option<String> {
+        &self.opt_name
+    }
+
+    fn coefficient_commitments(&self) -> &CoefficientCommitments {
+        &self.coefficient_commitments
+    }
+
+    fn coefficient_proofs(&self) -> &[CoefficientProof] {
+        &self.coefficient_proofs
     }
 }
 

@@ -7,7 +7,7 @@
 
 use eg::{
     election_manifest::ContestIndex,
-    election_record::PreVotingData,
+    pre_voting_data::PreVotingData,
     hash::{eg_h, HValue},
     vec1::Vec1,
 };
@@ -20,14 +20,14 @@ use crate::contest_selection::ContestSelectionPreEncrypted;
 ///
 pub fn contest_hash(
     header: &PreVotingData,
-    contest_index: ContestIndex,
+    contest_ix: ContestIndex,
     selections: &Vec1<ContestSelectionPreEncrypted>,
 ) -> HValue {
     let group = &header.parameters.fixed_parameters.group;
 
     let mut v = vec![0x41];
 
-    v.extend_from_slice(contest_index.get_one_based_u32().to_be_bytes().as_slice());
+    v.extend_from_slice(contest_ix.get_one_based_u32().to_be_bytes().as_slice());
     v.extend_from_slice(
         header
             .public_key

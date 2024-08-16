@@ -25,18 +25,12 @@ pub struct FieldElement(
     BigUint,
 );
 
-/// The finite field `Z_q` of integers modulo prime `q`.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ScalarField {
-    /// Subgroup order.
-    #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
-    )]
-    q: BigUint,
-}
-
 impl FieldElement {
+    /// The field element with the value `0`.
+    pub fn zero() -> Self {
+        FieldElement(BigUint::zero())
+    }
+
     /// The numeric value of the field element. Guaranteed to be `< q`.
     pub fn value(&self) -> &BigUint {
         &self.0
@@ -48,6 +42,16 @@ impl FieldElement {
     pub fn add(&self, other: &FieldElement, field: &ScalarField) -> Self {
         FieldElement((&self.0 + &other.0) % &field.q)
     }
+
+    /*
+    /// Performs field assignment addition.
+    ///
+    /// `self = (self + other) % q` where `q` is the field order.
+    fn add_assign(&mut self, rhs: Self, field: &ScalarField) {
+        self.0 += rhs.0;
+        self.0 &= &field.q;
+    }
+    */
 
     /// Performs field subtraction.
     ///
@@ -86,9 +90,9 @@ impl FieldElement {
     /// Creates a field element from a given integer.
     pub fn from<T>(x: T, field: &ScalarField) -> Self
     where
-        BigUint: From<T>,
+        T: Into<BigUint>,
     {
-        let x = BigUint::from(x);
+        let x: BigUint = x.into();
         FieldElement(x % &field.q)
     }
 
@@ -127,6 +131,17 @@ impl FieldElement {
         // It is enough to check the upper bound as self.0 is unsigned.
         self.0 < field.q
     }
+}
+
+/// The finite field `Z_q` of integers modulo prime `q`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScalarField {
+    /// Subgroup order.
+    #[serde(
+        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
+    )]
+    q: BigUint,
 }
 
 impl ScalarField {

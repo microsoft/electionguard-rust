@@ -5,7 +5,9 @@ edition = "2021"
 publish = false
 
 [features]
-eg-allow-unsafe_code = []
+default = ["eg-allow-unsafe-code", "eg-test-data-generation"]
+eg-allow-unsafe-code = []
+eg-test-data-generation = []
 
 [dependencies]
 anyhow.workspace = true

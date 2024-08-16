@@ -33,7 +33,7 @@ pub trait GuardianPublicKeyInfo {
 }
 
 /// Represents errors occurring during the validation of a public key.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum PublicKeyValidationError {
     /// Occurs if the guardian's index is out of bounds.
     #[error("Guardian number i={i} is not in the range 1 <= i <= n={n}")]

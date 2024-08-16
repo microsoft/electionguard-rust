@@ -1,25 +1,29 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
 mod guardian_secret_key_generate;
-//? TODO mod guardian_secret_key_write_encrypted_share;
+//? TODO #preencrypted_ballot# mod guardian_secret_key_write_encrypted_share;
 mod guardian_secret_key_write_public_key;
 mod none;
-mod preencrypted_ballot_generate;
-mod preencrypted_ballot_record;
+//? TODO #preencrypted_ballot# mod preencrypted_ballot_generate;
+//? TODO #preencrypted_ballot# mod preencrypted_ballot_record;
 mod verify_standard_parameters;
 mod voter_write_confirmation_code;
-mod voter_write_random_selections;
 mod write_hashes;
 mod write_hashes_ext;
 mod write_joint_election_public_key;
 mod write_manifest;
 mod write_parameters;
+mod write_pre_voting_data;
 mod write_random_seed;
+
+#[cfg(feature = "eg-test-data-generation")]
+mod voter_write_random_selections;
 
 use anyhow::Result;
 
@@ -49,27 +53,14 @@ pub(crate) enum Subcommands {
         crate::subcommands::verify_standard_parameters::VerifyStandardParameters,
     ),
 
-    /// Write the election manifest to a file.
-    WriteManifest(crate::subcommands::write_manifest::WriteManifest),
-
     /// Write the election parameters to a file.
     WriteParameters(crate::subcommands::write_parameters::WriteParameters),
 
+    /// Write the election manifest to a file.
+    WriteManifest(crate::subcommands::write_manifest::WriteManifest),
+
     /// Write the hashes to a file.
     WriteHashes(crate::subcommands::write_hashes::WriteHashes),
-
-    //TODO /// Generate an encrypted share of the guardian secret key.
-    //TODO GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
-    //
-    /// Generate pre-encrypted ballots.
-    PreEncryptedBallotGenerate(
-        crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate,
-    ),
-
-    /// Record voter selections for pre-encrypted ballots.
-    PreEncryptedBallotRecord(
-        crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord,
-    ),
 
     /// Generate a guardian secret key.
     GuardianSecretKeyGenerate(
@@ -81,16 +72,6 @@ pub(crate) enum Subcommands {
         crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
     ),
 
-    /// Write the confirmation QR code for a voter.
-    VoterWriteConfirmationCode(
-        crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode,
-    ),
-
-    /// Write random ballot selections to a file for testing.
-    VoterWriteRandomSelections(
-        crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection,
-    ),
-
     /// Compute the joint election public key from the guardian public keys and write it to a file.
     WriteJointElectionPublicKey(
         crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
@@ -98,6 +79,33 @@ pub(crate) enum Subcommands {
 
     /// Write the extended hash to a file.
     WriteHashesExt(crate::subcommands::write_hashes_ext::WriteHashesExt),
+
+    /// Write the pre voting data to a file.
+    WritePreVotingData(crate::subcommands::write_pre_voting_data::WritePreVotingData),
+
+    /// Write random ballot selections to a file for testing.
+    #[cfg(feature = "eg-test-data-generation")]
+    VoterWriteRandomSelections(
+        crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection,
+    ),
+
+    /// Write the confirmation QR code for a voter.
+    VoterWriteConfirmationCode(
+        crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode,
+    ),
+    //? TODO #preencrypted_ballot#
+    // /// Generate an encrypted share of the guardian secret key.
+    // GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
+    //
+    // /// Generate pre-encrypted ballots.
+    // PreEncryptedBallotGenerate(
+    //     crate::subcommands::preencrypted_ballot_generate::PreEncryptedBallotGenerate,
+    // ),
+    //
+    // /// Record voter selections for pre-encrypted ballots.
+    // PreEncryptedBallotRecord(
+    //     crate::subcommands::preencrypted_ballot_record::PreEncryptedBallotRecord,
+    // ),
 }
 
 impl Default for Subcommands {
@@ -113,18 +121,22 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             None(a) => a,
             WriteRandomSeed(a) => a,
             VerifyStandardParameters(a) => a,
-            WriteManifest(a) => a,
             WriteParameters(a) => a,
+            WriteManifest(a) => a,
             WriteHashes(a) => a,
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
             //TODO GuardianSecretKeyWriteEncryptedShare(a) => a,
-            PreEncryptedBallotGenerate(a) => a,
-            PreEncryptedBallotRecord(a) => a,
-            VoterWriteRandomSelections(a) => a,
-            VoterWriteConfirmationCode(a) => a,
             WriteJointElectionPublicKey(a) => a,
             WriteHashesExt(a) => a,
+            WritePreVotingData(a) => a,
+
+            #[cfg(feature = "eg-test-data-generation")]
+            VoterWriteRandomSelections(a) => a,
+
+            VoterWriteConfirmationCode(a) => a,
+            //? TODO #preencrypted_ballot# PreEncryptedBallotGenerate(a) => a,
+            //? TODO #preencrypted_ballot# PreEncryptedBallotRecord(a) => a,
         }
     }
 }

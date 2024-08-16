@@ -1,7 +1,5 @@
 #!/usr/bin/env nu
 
-# watch -v bin\electionguard-test.nu {|$it| nu bin\electionguard-test.nu --release --no-test --no-build-docs }
-
 use std
 use std log
 
@@ -74,10 +72,22 @@ def main [
         run-subprocess --delimit [ cargo clean $cargo_profile_build_flag ]
     }
 
-    let cargo_build_flag_vv = null
+    #  Erase ELECTIONGUARD_ARTIFACTS_DIR
+    #
+    if $erase_artifacts {
+        if (artifacts_dir | path exists) {
+            log info $"Removing artifacts directory."
+            rm -rf (artifacts_dir)
+        }
+    }
+    if not (artifacts_dir | path exists) {
+        log info $"Creating artifacts directory."
+        mkdir (artifacts_dir)
+    }
 
     #  Cargo build
     # 
+    let cargo_build_flag_vv = null
     if not $no_build {
         run-subprocess --delimit [ cargo build $cargo_build_flag_vv $cargo_profile_build_flag ]
 
@@ -120,15 +130,6 @@ def main [
         run-subprocess --delimit [
             cmd.exe /c ($build_docs)
         ]
-    }
-
-    #  Erase ELECTIONGUARD_ARTIFACTS_DIR
-    #
-    if $erase_artifacts {
-        if (artifacts_dir | path exists) {
-            log info $"Removing artifacts directory."
-            rm -rf (artifacts_dir)
-        }
     }
 
     #  Run ElectionGuard tests
@@ -308,9 +309,23 @@ def egtests [
     }
 
     # 
-    #  Write election manifest (canonical)
-    # 
+    #  Write election manifest (canonical and pretty), then validate them with the schema
+    #
+    
+    let election_manifest_pretty_json_file = artifacts_public_dir | path join "election_manifest.json"
     let election_manifest_canonical_json_file = artifacts_public_dir | path join "election_manifest_canonical.bin"
+
+    if not ($election_manifest_pretty_json_file | path exists) {
+        run-subprocess --delimit [
+            (eg_exe) write-manifest --in-example --out-format pretty
+        ]
+    
+        if not ($election_manifest_pretty_json_file | path exists) {
+            log error $"ERROR: Election manifest \(pretty) file does not exist: ($election_manifest_pretty_json_file)"
+            exit 1
+        }
+    }
+
     if not ($election_manifest_canonical_json_file | path exists) {
         run-subprocess --delimit [
             (eg_exe) write-manifest --in-example --out-format canonical
@@ -323,25 +338,8 @@ def egtests [
     }
 
     if not $no_jsonschema {
-        validate-jsonschema --json-file $election_manifest_canonical_json_file --schema-file 'election_manifest.json'
-    }
-
-    # 
-    #  Write election manifest (pretty)
-    # 
-    let election_manifest_pretty_json_file = artifacts_public_dir | path join "election_manifest_pretty.json"
-    if not ($election_manifest_pretty_json_file | path exists) {
-        run-subprocess --delimit [
-            (eg_exe) write-manifest --in-canonical --out-format pretty
-        ]
-
-        if not ($election_manifest_pretty_json_file | path exists) {
-            log error $"ERROR: Election manifest \(pretty) file does not exist: ($election_manifest_pretty_json_file)"
-            exit 1
-        }
-    }
-    if not $no_jsonschema {
         validate-jsonschema --json-file $election_manifest_pretty_json_file --schema-file 'election_manifest.json'
+        validate-jsonschema --json-file $election_manifest_canonical_json_file --schema-file 'election_manifest.json'
     }
 
     # 
@@ -408,6 +406,23 @@ def egtests [
     if not $no_jsonschema {
         validate-jsonschema --json-file $hashes_ext_json_file --schema-file 'hashes_ext.json'
     }
+    
+    # 
+    #  Write PreVotingData
+    # 
+    let pre_voting_data_json_file = artifacts_public_dir | path join "pre_voting_data.json"
+    if not ($pre_voting_data_json_file | path exists) {
+        run-subprocess --delimit [ (eg_exe) --insecure-deterministic write-pre-voting-data ]
+    }
+
+    if not ($pre_voting_data_json_file | path exists) {
+        log error $"ERROR: Hashes ext .json file does not exist: ($pre_voting_data_json_file)"
+        exit 1
+    }
+    
+    #if not $no_jsonschema {
+    #    validate-jsonschema --json-file $pre_voting_data_json_file --schema-file 'pre_voting_data.json'
+    #}
 
     # 
     #  Tests success!

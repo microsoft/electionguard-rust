@@ -1,0 +1,51 @@
+{
+    "xxx$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "id": { "type": "string" },
+        "ballot_state": { "type": "string" },
+        "ballot_style": { "$ref": "#/$defs/integer_small" },
+        "device": { "type": "string" },
+        "creation_date": { "type": "string" },
+        "contest_fields_plaintexts": { "$ref": "#/$defs/contest_fields_plaintexts" },
+        "contest_fields_ciphertexts": { "$ref": "#/$defs/contest_fields_ciphertexts" },
+        "confirmation_code": { "$ref": "#/$defs/hash_value" }
+    },
+    "required": [ "ballot_state", "ballot_style" ],
+
+    "$defs": {
+        "contest_fields_plaintexts": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/field_values_plaintexts" }
+        },
+        "field_values_plaintexts": {
+            "type": "object",
+            "properties": {
+                "contest_ix": { "$ref": "#/$defs/integer_small" },
+                "field_values": { "type": "array", "items": { "$ref": "#/$defs/integer_small" } }
+            },
+            "required": [ "contest_ix", "field_values" ]
+        },
+        "contest_fields_ciphertexts": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/field_values_ciphertexts" }
+        },
+        "field_values_ciphertexts": {
+            "type": "object",
+            "properties": {
+                "contest_ix": { "$ref": "#/$defs/integer_small" },
+                "field_values": { "type": "array", "items": { "$ref": "#/$defs/integer_small" } }
+            },
+            "required": [ "contest_ix", "field_values" ]
+        },
+        "hash_value" : {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        },
+        "integer_small": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        }
+    }
+}

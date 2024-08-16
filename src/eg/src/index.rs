@@ -1,19 +1,19 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
-#![allow(unused_imports)] //? TODO remove
+#![deny(clippy::panic)]
+#![deny(clippy::unwrap_used)]
+#![allow(clippy::assertions_on_constants)]
 
-use std::collections::TryReserveError;
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
-use std::{alloc::LayoutError, ffi::c_char};
 
-use anyhow::{anyhow, ensure, Context, Error, Result};
+use anyhow::anyhow;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use static_assertions::{assert_eq_size, assert_impl_all, const_assert};
+use static_assertions::const_assert;
+
+use crate::errors::{EgError, EgResult};
 
 /// A 1-based ordinal type that enforces a range 1 <= i < 2^31.
 ///
@@ -25,48 +25,48 @@ where
     T: ?Sized;
 
 // Copy trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
-impl<T> std::marker::Copy for Index<T> {}
+impl<T: ?Sized> std::marker::Copy for Index<T> {}
 
 // Clone trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
-impl<T> std::clone::Clone for Index<T> {
+impl<T: ?Sized> Clone for Index<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
 // PartialEq trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
-impl<T> std::cmp::PartialEq for Index<T> {
+impl<T: ?Sized> PartialEq for Index<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
 // Convenience for comparing indexes to numeric literals.
-impl<T> std::cmp::PartialEq<u32> for Index<T> {
+impl<T: ?Sized> PartialEq<u32> for Index<T> {
     fn eq(&self, other: &u32) -> bool {
         self.0 == *other
     }
 }
 
+// Eq trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
+impl<T: ?Sized> Eq for Index<T> {}
+
 // Convenience for comparing indexes to numeric literals.
-impl<T> std::cmp::PartialOrd<u32> for Index<T> {
+impl<T: ?Sized> std::cmp::PartialOrd<u32> for Index<T> {
     fn partial_cmp(&self, other: &u32) -> Option<std::cmp::Ordering> {
         Some(self.0.cmp(other))
     }
 }
 
 // PartialOrd trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
-impl<T> std::cmp::PartialOrd for Index<T> {
+impl<T: ?Sized> std::cmp::PartialOrd for Index<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.0.cmp(&other.0))
     }
 }
 
-// Eq trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
-impl<T> std::cmp::Eq for Index<T> {}
-
 // Ord trait must be implmented manually because of the [`PhantomData`](std::marker::PhantomData).
-impl<T> std::cmp::Ord for Index<T> {
+impl<T: ?Sized> std::cmp::Ord for Index<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
     }
@@ -76,10 +76,10 @@ impl<T> std::cmp::Ord for Index<T> {
 // If someone needs to target a 16-bit platform with this code, we will have to deal
 // with `Vec` index type being too small to represent the spec commitment.
 const INDEX_MAX_U32: u32 = (1u32 << 31) - 1;
-static_assertions::const_assert!(INDEX_MAX_U32 as u64 <= (usize::MAX as u64));
-static_assertions::const_assert!(INDEX_MAX_U32 as usize <= usize::MAX);
+const_assert!(INDEX_MAX_U32 as u64 <= (usize::MAX as u64));
+const_assert!(INDEX_MAX_U32 as usize <= usize::MAX);
 
-impl<T> Index<T> {
+impl<T: ?Sized> Index<T> {
     /// Minimum valid value as a `u32`.
     pub const VALID_MIN_U32: u32 = 1;
 
@@ -106,6 +106,16 @@ impl<T> Index<T> {
     pub const VALID_RANGEINCLUSIVE_USIZE: RangeInclusive<usize> =
         Self::VALID_MIN_USIZE..=Self::VALID_MAX_USIZE;
 
+    /// Returns the index value `1`.
+    pub const fn one() -> Self {
+        Self::MIN
+    }
+
+    /// Returns the index value `1 + rhs`. Since rhs is a `u16`, the result is always in the valid range.
+    pub const fn one_plus_u16(rhs: u16) -> Self {
+        Self(Self::VALID_MIN_U32 + rhs as u32, PhantomData)
+    }
+
     /// An iterator over `Index` values over the inclusive range defined by [start, last].
     ///
     /// This is useful because `Index` cannot (yet) implement
@@ -120,10 +130,11 @@ impl<T> Index<T> {
         (start.0..=last.0).map(|i| Self(i, PhantomData))
     }
 
-    pub const fn is_valid_one_based_index(ix1: u32) -> bool {
+    /// Returns true iff `i` is a valid 1-based index value.
+    pub const fn is_valid_one_based_index(i: u32) -> bool {
         // RangeInclusive::<Idx>::contains` is not yet stable as a const fn
         //Self::VALID_RANGEINCLUSIVE_U32.contains(&ix1)
-        Self::VALID_MIN_U32 <= ix1 && ix1 <= Self::VALID_MAX_U32
+        Self::VALID_MIN_U32 <= i && i <= Self::VALID_MAX_U32
     }
 
     /// Creates a new `Index` from a 1-based index value.
@@ -139,15 +150,49 @@ impl<T> Index<T> {
     }
 
     /// Creates a new `Index` from a 1-based index value.
-    pub fn from_one_based_index(ix1: u32) -> Result<Self> {
+    pub fn from_one_based_index(ix1: u32) -> EgResult<Self> {
         Self::from_one_based_index_const(ix1)
             .ok_or_else(|| anyhow!("Index value {ix1} out of range"))
+            .map_err(Into::into)
+    }
+
+    /// Returns true iff `ix0` is a valid 0-based index value.
+    pub const fn is_valid_zero_based_index_usize(ix0: usize) -> bool {
+        ix0 < Self::VALID_MAX_USIZE
+    }
+
+    /// Creates a new `Index` from a 1-based index value.
+    /// All [`std::num::NonZeroU8`] values are valid.
+    pub fn from_one_based_nonzero_u8(ix1: std::num::NonZeroU8) -> Self {
+        Self(u8::from(ix1) as u32, PhantomData)
+    }
+
+    /// Creates a new `Index` from a 1-based index value.
+    /// All [`std::num::NonZeroU16`] values are valid.
+    pub fn from_one_based_nonzero_u16(ix1: std::num::NonZeroU16) -> Self {
+        Self(u16::from(ix1) as u32, PhantomData)
     }
 
     /// Creates a new `Index` from a 1-based index value. It is a precondition that
     /// Self::VALID_MIN_U32 <= ix1 && ix1 <= Self::VALID_MAX_U32.
     pub fn from_one_based_index_unchecked(ix1: u32) -> Self {
         Self(ix1, PhantomData)
+    }
+
+    /// Creates a new `Index` from a 0-based index value.
+    pub fn from_zero_based_index<U: Into<usize>>(ix0: U) -> EgResult<Self> {
+        let ix0: usize = ix0.into();
+        Self::is_valid_zero_based_index_usize(ix0)
+            .then(|| Self((ix0 + 1) as u32, PhantomData))
+            .ok_or_else(|| anyhow!("Index value {ix0} out of range for 0-based index"))
+            .map_err(Into::into)
+    }
+
+    /// Creates a new `Index` from a 0-based index value. It is a precondition that
+    /// 0 <= ix1 < Self::VALID_MAX_U32.
+    pub fn from_zero_based_index_unchecked<U: Into<usize>>(ix0: U) -> Self {
+        let ix0: usize = ix0.into();
+        Self((ix0 + 1) as u32, PhantomData)
     }
 
     /// Obtains the 1-based index value as a `u32`.
@@ -176,29 +221,69 @@ impl<T> Index<T> {
     }
 }
 
-impl<T> std::fmt::Display for Index<T> {
+/* impl<T, U> TryFrom<U> for Index<T>
+where
+    T: ?Sized,
+    U: TryInto<u32>
+{
+    type Error = EgError;
+    #[inline]
+    fn try_from(value: U) -> EgResult<Self> {
+        if let Ok(valu32) = u32::try_from(value) {
+            if Self::VALID_RANGEINCLUSIVE_U32.contains(&valu32) {
+                return Ok(Self::from_one_based_index_unchecked(valu32))
+            }
+        }
+        return Err(anyhow!("Index value out of range 1..2^31.").into());
+    }
+} */
+
+impl<T: ?Sized> TryFrom<u32> for Index<T> {
+    type Error = EgError;
+    #[inline]
+    fn try_from(value: u32) -> EgResult<Self> {
+        Self::from_one_based_index_const(value)
+            .ok_or_else(|| anyhow!("Index value `{value}` out of range `1..2^31`"))
+            .map_err(Into::into)
+    }
+}
+
+impl<T: ?Sized> TryFrom<i32> for Index<T> {
+    type Error = EgError;
+    #[inline]
+    fn try_from(value: i32) -> EgResult<Self> {
+        if let Ok(valu32) = u32::try_from(value) {
+            if Self::VALID_RANGEINCLUSIVE_U32.contains(&valu32) {
+                return Ok(Self::from_one_based_index_unchecked(valu32));
+            }
+        }
+        Err(anyhow!("Index value out of range 1..2^31.").into())
+    }
+}
+
+impl<T: ?Sized> std::fmt::Display for Index<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.0)
     }
 }
 
-impl<T> std::fmt::Debug for Index<T> {
+impl<T: ?Sized> std::fmt::Debug for Index<T> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         std::fmt::Display::fmt(self, f)
     }
 }
 
-impl<T> std::str::FromStr for Index<T> {
-    type Err = Error;
+impl<T: ?Sized> std::str::FromStr for Index<T> {
+    type Err = EgError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_one_based_index(s.parse()?)
     }
 }
 
-impl<T> Serialize for Index<T> {
+impl<T: ?Sized> Serialize for Index<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -220,10 +305,14 @@ impl<'de, T> Deserialize<'de> for Index<T> {
     }
 }
 
+//-------------------------------------------------------------------------------------------------|
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test_index {
     use super::*;
+
+    use static_assertions::{assert_eq_size, assert_impl_all};
 
     #[allow(dead_code)]
     struct Foo;

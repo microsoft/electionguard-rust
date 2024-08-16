@@ -27,15 +27,15 @@ pub struct VaryingParameters {
     /// Decryption quorum threshold value.
     pub k: GuardianIndex,
 
-    /// Date. Optional, can be empty.
-    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/rfc3339/) or "ISO 8601" format.
-    pub date: String,
-
     /// Jurisdictional information string. This can be used to specify a location.
     pub info: String,
 
     /// Ballot chaining.
     pub ballot_chaining: BallotChaining,
+
+    /// Date. Optional, can be empty.
+    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/rfc3339/) or "ISO 8601" format.
+    pub date: String,
 }
 
 impl VaryingParameters {

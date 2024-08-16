@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[features]
+default = ["eg-allow-unsafe-code", "eg-test-data-generation"]
+eg-allow-unsafe-code = []
+eg-test-data-generation = ["eg/eg-test-data-generation"]
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
@@ -11,4 +16,4 @@ rand_core = { workspace = true, features = ["getrandom"] }
 
 eg.workspace = true
 util.workspace = true
-preencrypted.workspace = true
+# preencrypted.workspace = true

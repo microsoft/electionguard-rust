@@ -6,8 +6,6 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
-use std::convert::Into;
-use std::convert::TryInto;
 use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
