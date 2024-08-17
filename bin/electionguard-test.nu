@@ -59,12 +59,12 @@ def main [
 
     #  Figure out RUSTFLAGS
     # 
-    std log info $"Previous RUSTFLAGS: ($env.RUSTFLAGS?)"
+    std log info $"Previous RUSTFLAGS: ($env.RUSTFLAGS? | default "")"
     let xxx_some_cfg_setting = false
     if $xxx_some_cfg_setting {
-        $env.RUSTFLAGS = ($"($env.RUSTFLAGS?) --cfg xxx_some_cfg_setting" | str trim)
+        $env.RUSTFLAGS = ($"($env.RUSTFLAGS? | default "") --cfg xxx_some_cfg_setting" | str trim)
     }
-    std log info $"Subsequent RUSTFLAGS: ($env.RUSTFLAGS?)"
+    std log info $"Subsequent RUSTFLAGS: ($env.RUSTFLAGS? | default "")"
 
     #  Cargo clean
     # 
@@ -155,7 +155,7 @@ def eg_top_dir [] -> string {
 }
 
 def --env figure_artifacts_dir [] {
-    let dir: string = $env.ELECTIONGUARD_ARTIFACTS_DIR?
+    let dir: string = ($env.ELECTIONGUARD_ARTIFACTS_DIR? | default "")
     std log info $"ELECTIONGUARD_ARTIFACTS_DIR: ($dir)"
     if $dir == "" {
         std log error "Env var ELECTIONGUARD_ARTIFACTS_DIR is not set."

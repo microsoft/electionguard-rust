@@ -46,15 +46,20 @@ for more information.
 The Rust build system relies on having a C language compiler (or at least the linker
 and libraries) appropriate for the target platform.
 
-Again, if you're targeting MS Windows, see
+If you're targeting MS Windows, see
 [Windows - The rustup book](https://rust-lang.github.io/rustup/installation/windows.html)
 for more information.
 
+On Linux Debian-derivatives such as Ubuntu, you can install the necessary packages with
+`apt install build-essential`.
+
 ### Rust language build environment
 
-[Install Rust](https://www.rust-lang.org/tools/install) (rust-lang.org)
+Installation instructions:
 
-[rust-lang.github.io/rustup/installation](https://rust-lang.github.io/rustup/installation/index.html) (rust-lang.github.io)
+- [Install Rust](https://www.rust-lang.org/tools/install) (rust-lang.org)
+- [rust-lang.github.io/rustup/installation](https://rust-lang.github.io/rustup/installation/index.html)
+(rust-lang.github.io)
 
 ### Nushell
 
@@ -73,6 +78,19 @@ for the simple installation process for those who already have a Rust toolchain:
 cargo install nu
 ```
 
+### (Optional) Cargo utility for JSON schema validation
+
+The `electionguard-test.nu` script use the [`jsonschema`](https://crates.io/jsonschema/jsonschema)
+utility to validate the generated artifact json files against the defined schema.
+
+Homepage: [json-schema.org](https://json-schema.org/ "JSON Schema").
+
+You can install it using the `cargo` extension:
+
+```custom
+cargo install jsonschema
+```
+
 ### (Optional) 'Insta' cargo extension
 
 Some unit tests are managed by the excellent crate [`insta`](https://crates.io/crates/insta).
@@ -87,33 +105,22 @@ cargo install cargo-insta
 
 But this just a convenience and is not required.
 
-### (Optional) Cargo utility for JSON schema validation
-
-Data files are validated by the [`jsonschema`](https://crates.io/jsonschema/jsonschema) cargo
-utility.
-
-Homepage: [json-schema.org](https://json-schema.org/ "JSON Schema").
-
-You can install it using the `cargo` extension:
-
-```
-cargo install jsonschema
-```
-
-## Configuration
-
-TODO
-
-## Build with cargo
+## Build, run, and test with cargo
 
 ```custom
 cd src
-cargo build
+cargo build --release
+cargo run --release -p electionguard -- --help
+cargo test --release
 ```
 
 ## Integration test
 
+Set the environment variable `ELECTIONGUARD_ARTIFACTS_DIR` to the path of an empty directory
+where test artifacts will be written.
+
 ```custom
 cd src
-nu ../bin/electionguard-test.nu --release --erase-artifacts --clean
+nu ../bin/electionguard-test.nu --help
+nu ../bin/electionguard-test.nu --erase-artifacts --clean
 ```

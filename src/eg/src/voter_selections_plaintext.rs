@@ -8,21 +8,26 @@
 
 use std::collections::BTreeMap;
 
-use rand::{distributions::Uniform, Rng};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     ballot_style::{BallotStyle, BallotStyleIndex},
-    contest_option_fields::{ContestOptionFieldPlaintext, ContestOptionFieldsPlaintexts},
+    contest_option_fields::ContestOptionFieldsPlaintexts,
     election_manifest::ContestIndex,
     errors::{EgError, EgResult},
     hash::HValue,
     pre_voting_data::PreVotingData,
     serializable::SerializablePretty,
-    vec1::Vec1,
 };
 
-use util::csprng::Csprng;
+cfg_if::cfg_if! { if #[cfg(feature = "eg-test-data-generation")] {
+    use rand::{distributions::Uniform, Rng};
+    use util::csprng::Csprng;
+    use crate::{
+        contest_option_fields::ContestOptionFieldPlaintext,
+        vec1::Vec1,
+    };
+} }
 
 /// Plaintext voter selections for a specific ballot style.
 ///

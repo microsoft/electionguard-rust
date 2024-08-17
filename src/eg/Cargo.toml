@@ -5,6 +5,7 @@ edition = "2021"
 publish = false
 
 [features]
+default = ["eg-allow-unsafe-code", "eg-test-data-generation"]
 eg-allow-unsafe-code = []
 eg-test-data-generation = []
 
