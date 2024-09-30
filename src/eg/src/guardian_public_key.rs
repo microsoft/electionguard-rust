@@ -20,7 +20,7 @@ use crate::{
         validate_guardian_public_key_info, GuardianPublicKeyInfo, PublicKeyValidationError,
     },
     guardian_secret_key::CoefficientCommitments,
-    serializable::SerializablePretty,
+    serializable::{SerializablePretty, SerializableCanonical},
 };
 
 /// The public key for a guardian.
@@ -98,6 +98,8 @@ impl GuardianPublicKeyInfo for GuardianPublicKey {
         &self.coefficient_proofs
     }
 }
+
+impl SerializableCanonical for GuardianPublicKey {}
 
 impl SerializablePretty for GuardianPublicKey {}
 

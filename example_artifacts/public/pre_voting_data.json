@@ -1,0 +1,333 @@
+{
+  "parameters": {
+    "fixed_parameters": {
+      "ElectionGuard_Design_Specification_version": {
+        "number": [
+          2,
+          0
+        ]
+      },
+      "generation_parameters": {
+        "q_bits_total": 256,
+        "p_bits_total": 4096,
+        "p_bits_msb_fixed_1": 256,
+        "p_middle_bits_source": "ln_2",
+        "p_bits_lsb_fixed_1": 256
+      },
+      "field": {
+        "q": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF43"
+      },
+      "group": {
+        "p": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFB17217F7D1CF79ABC9E3B39803F2F6AF40F343267298B62D8A0D175B8BAAFA2BE7B876206DEBAC98559552FB4AFA1B10ED2EAE35C138214427573B291169B8253E96CA16224AE8C51ACBDA11317C387EB9EA9BC3B136603B256FA0EC7657F74B72CE87B19D6548CAF5DFA6BD38303248655FA1872F20E3A2DA2D97C50F3FD5C607F4CA11FB5BFB90610D30F88FE551A2EE569D6DFC1EFA157D2E23DE1400B39617460775DB8990E5C943E732B479CD33CCCC4E659393514C4C1A1E0BD1D6095D25669B333564A3376A9C7F8A5E148E82074DB6015CFE7AA30C480A5417350D2C955D5179B1E17B9DAE313CDB6C606CB1078F735D1B2DB31B5F50B5185064C18B4D162DB3B365853D7598A1951AE273EE5570B6C68F96983496D4E6D330AF889B44A02554731CDC8EA17293D1228A4EF98D6F5177FBCF0755268A5C1F9538B98261AFFD446B1CA3CF5E9222B88C66D3C5422183EDC99421090BBB16FAF3D949F236E02B20CEE886B905C128D53D0BD2F9621363196AF503020060E49908391A0C57339BA2BEBA7D052AC5B61CC4E9207CEF2F0CE2D7373958D762265890445744FB5F2DA4B751005892D356890DEFE9CAD9B9D4B713E06162A2D8FDD0DF2FD608FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "g": "36036FED214F3B50DC566D3A312FE4131FEE1C2BCE6D02EA39B477AC05F7F885F38CFE77A7E45ACF4029114C4D7A9BFE058BF2F995D2479D3DDA618FFD910D3C4236AB2CFDD783A5016F7465CF59BBF45D24A22F130F2D04FE93B2D58BB9C1D1D27FC9A17D2AF49A779F3FFBDCA22900C14202EE6C99616034BE35CBCDD3E7BB7996ADFE534B63CCA41E21FF5DC778EBB1B86C53BFBE99987D7AEA0756237FB40922139F90A62F2AA8D9AD34DFF799E33C857A6468D001ACF3B681DB87DC4242755E2AC5A5027DB81984F033C4D178371F273DBB4FCEA1E628C23E52759BC7765728035CEA26B44C49A65666889820A45C33DD37EA4A1D00CB62305CD541BE1E8A92685A07012B1A20A746C3591A2DB3815000D2AACCFE43DC49E828C1ED7387466AFD8E4BF1935593B2A442EEC271C50AD39F733797A1EA11802A2557916534662A6B7E9A9E449A24C8CFF809E79A4D806EB681119330E6C57985E39B200B4893639FDFDEA49F76AD1ACD997EBA13657541E79EC57437E504EDA9DD011061516C643FB30D6D58AFCCD28B73FEDA29EC12B01A5EB86399A593A9D5F450DE39CB92962C5EC6925348DB54D128FD99C14B457F883EC20112A75A6A0581D3D80A3B4EF09EC86F9552FFDA1653F133AA2534983A6F31B0EE4697935A6B1EA2F75B85E7EBA151BA486094D68722B054633FEC51CA3F29B31E77E317B178B6B9D8AE0F",
+        "q": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF43"
+      }
+    },
+    "varying_parameters": {
+      "n": 5,
+      "k": 3,
+      "info": "The United Realms of Imaginaria General Election 2024",
+      "ballot_chaining": "Prohibited",
+      "date": "2024-09-30"
+    }
+  },
+  "manifest": {
+    "label": "General Election - The United Realms of Imaginaria",
+    "contests": [
+      {
+        "label": "For President and Vice President of The United Realms of Imaginaria",
+        "contest_options": [
+          {
+            "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)"
+          },
+          {
+            "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)"
+          }
+        ]
+      },
+      {
+        "label": "Minister of Elemental Resources",
+        "contest_options": [
+          {
+            "label": "Tïtus Stormforge\n(Ætherwïng)"
+          },
+          {
+            "label": "Fæ Willowgrove\n(Crystâlheärt)"
+          },
+          {
+            "label": "Tèrra Stonebinder\n(Independent)"
+          }
+        ]
+      },
+      {
+        "label": "Minister of Arcane Sciences",
+        "contest_options": [
+          {
+            "label": "Élyria Moonshadow\n(Crystâlheärt)",
+            "selection_limit": "CONTEST_LIMIT"
+          },
+          {
+            "label": "Archímedes Darkstone\n(Ætherwïng)"
+          },
+          {
+            "label": "Seraphína Stormbinder\n(Independent)"
+          },
+          {
+            "label": "Gávrïel Runëbørne\n(Stärsky)"
+          }
+        ]
+      },
+      {
+        "label": "Minister of Dance",
+        "contest_options": [
+          {
+            "label": "Äeliana Sunsong\n(Crystâlheärt)"
+          },
+          {
+            "label": "Thâlia Shadowdance\n(Ætherwïng)"
+          },
+          {
+            "label": "Jasper Moonstep\n(Stärsky)"
+          }
+        ]
+      },
+      {
+        "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
+        "contest_options": [
+          {
+            "label": "Ìgnatius Gearsøul\n(Crystâlheärt)"
+          },
+          {
+            "label": "Èlena Wîndwhisper\n(Technocrat)",
+            "selection_limit": 3
+          },
+          {
+            "label": "Bërnard Månesworn\n(Ætherwïng)",
+            "selection_limit": "CONTEST_LIMIT"
+          },
+          {
+            "label": "Séraphine Lùmenwing\n(Stärsky)",
+            "selection_limit": 2
+          },
+          {
+            "label": "Nikólai Thunderstrîde\n(Independent)"
+          },
+          {
+            "label": "Lïliana Fîrestone\n(Pęacemaker)",
+            "selection_limit": "CONTEST_LIMIT"
+          }
+        ]
+      },
+      {
+        "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
+        "contest_options": [
+          {
+            "label": "For",
+            "selection_limit": "CONTEST_LIMIT"
+          },
+          {
+            "label": "Against"
+          }
+        ]
+      },
+      {
+        "label": "Privacy Protection in Techno-Magical Communications Act",
+        "contest_options": [
+          {
+            "label": "Prō"
+          },
+          {
+            "label": "Ĉontrá"
+          }
+        ]
+      },
+      {
+        "label": "Public Transport Modernization and Enchantment Proposal",
+        "contest_options": [
+          {
+            "label": "Prō"
+          },
+          {
+            "label": "Ĉontrá"
+          }
+        ]
+      },
+      {
+        "label": "Renewable Ætherwind Infrastructure Initiative",
+        "contest_options": [
+          {
+            "label": "Prō"
+          },
+          {
+            "label": "Ĉontrá"
+          }
+        ]
+      },
+      {
+        "label": "For Librarian-in-Chief of Smoothstone County",
+        "selection_limit": 2147483647,
+        "contest_options": [
+          {
+            "label": "Élise Planetes",
+            "selection_limit": "CONTEST_LIMIT"
+          },
+          {
+            "label": "Théodoric Inkdrifter",
+            "selection_limit": 2147483647
+          }
+        ]
+      },
+      {
+        "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
+        "contest_options": [
+          {
+            "label": "Retain",
+            "selection_limit": 375
+          },
+          {
+            "label": "Remove",
+            "selection_limit": "CONTEST_LIMIT"
+          }
+        ]
+      }
+    ],
+    "ballot_styles": [
+      {
+        "label": "Ballot style 1 has 1 contest: 1",
+        "contests": [
+          1
+        ]
+      },
+      {
+        "label": "Ballot style 2 has 1 contest: 2",
+        "contests": [
+          2
+        ]
+      },
+      {
+        "label": "Ballot style 3 has 1 contest: 3",
+        "contests": [
+          3
+        ]
+      },
+      {
+        "label": "Ballot style 4 has 1 contest: 4",
+        "contests": [
+          4
+        ]
+      },
+      {
+        "label": "Ballot style 5 has 1 contest: 5",
+        "contests": [
+          5
+        ]
+      },
+      {
+        "label": "Ballot style 6 has 1 contest: 6",
+        "contests": [
+          6
+        ]
+      },
+      {
+        "label": "Ballot style 7 has 1 contest: 7",
+        "contests": [
+          7
+        ]
+      },
+      {
+        "label": "Ballot style 8 has 1 contest: 8",
+        "contests": [
+          8
+        ]
+      },
+      {
+        "label": "Ballot style 9 has 1 contest: 9",
+        "contests": [
+          9
+        ]
+      },
+      {
+        "label": "Ballot style 10 has 1 contest: 10",
+        "contests": [
+          10
+        ]
+      },
+      {
+        "label": "Ballot style 11 has 1 contest: 11",
+        "contests": [
+          11
+        ]
+      },
+      {
+        "label": "Ballot style 12 has 2 contests: 1, 2",
+        "contests": [
+          1,
+          2
+        ]
+      },
+      {
+        "label": "Ballot style 13 (Smoothstone County Ballot) has 10 contests: 1 through 10",
+        "contests": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      },
+      {
+        "label": "Ballot style 14 (Silvërspîre County Ballot) has 10 contests: 1 through 11, skipping 10",
+        "contests": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11
+        ]
+      },
+      {
+        "label": "Ballot style 15 has 2 contests: 1 and 3",
+        "contests": [
+          1,
+          3
+        ]
+      },
+      {
+        "label": "Ballot style 16 has 2 contests: 2 and 3",
+        "contests": [
+          2,
+          3
+        ]
+      },
+      {
+        "label": "Ballot style 17 has 3 contests: 1, 2, and 3",
+        "contests": [
+          1,
+          2,
+          3
+        ]
+      }
+    ]
+  },
+  "hashes": {
+    "h_p": "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296",
+    "h_m": "3C47CF5C61CBE86D0ADFA0739E8E407C6C9B516141E7A27B17E5EF6D12A546B3",
+    "h_b": "CD68D4801F0647694BA3F720646A76FC509AE77A832EB84ECB1B30DF3FCCDE71"
+  },
+  "public_key": {
+    "joint_election_public_key": "6408D14105997B540E895F2BB53EA074153851C3F98575D3F055BB2D41877291E5136EB829C3332ECA869357E3D2C6EFD00118581BF76A49613F54C6822F06A52C8177566BA3E3BFA21E9380C372E7218676C51CBCC2313B79948DF38A6CC3F5126B3F0134E2DC9F39666E514404E902FE0597D10556D8093DA1F8DBD09155B9957E2FDEC4A3EEFA8AC69595144B1741C00B8F1E7C564DE7D956BCD644D2E6DDFCB32708BD676CBE8D0582C6AE5F814F5FCF5A8F683B4602CE48F58B4F50A4FED8DAE3C6349DF96AB4FE1B4A3A12A77959B34E57C3556CF483D4DDF206818F7DAB37F3528EABF6E7FB5EFBFC320659EDF454C86AC6E63B7FC9E75C6C0C8FAB7CCA3C89D9433B9F70B0A3AFDC008908B893647377203B49BD7435A5B0515C238ADA8C3BD30E0AF51B71D60D281C48270C4563AB7B7C4CB6545DB440C7EF1EF9BEB625FDFED2F9541CA72525D3D3AC16C30CC9DAF195A5EE35A886D56279467C0C62D9B4D1A849C1230979F62D62AD33EB5FB858FBAEF966FD0C8A4DC30CF828AD5EF696F8EEE8C85850F99BA9A76FAE9DFD2C1C1F61687FFA0EF0A15E835B8FB804444EB75F57FEFD947474458D69F34539460CFA6BBCC0F1C7F5E0BE2D9E5F29CA73DA3E9765A3975C24C10C6D4D8755284E742E617F744E5A7AE191F113788A105CB6778FBFB9A33235EF63675905ABB86E46FDE6EA3FCDFD2760C3C7F40CDA"
+  },
+  "hashes_ext": {
+    "h_e": "EFC65A7C47978BE3A0A2A2DB4962A0AE0FA5DC01C049F7499A179DCE870AAEAC"
+  }
+}

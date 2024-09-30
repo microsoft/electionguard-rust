@@ -457,6 +457,7 @@ def egtest_per_guardian [
 
     let guardian_secret_key_file = $guardian_secret_dir | path join $"guardian_($i).SECRET_key.json"
     let guardian_public_key_file = artifacts_public_dir | path join $"guardian_($i).public_key.json"
+    let guardian_public_key_canonical_file = artifacts_public_dir | path join $"guardian_($i).public_key_canonical.bin"
     let guardian_name = $"Guardian ($i)"
 
     log info ""
@@ -464,6 +465,7 @@ def egtest_per_guardian [
     log info ""
     log info $"Secret key file: ($guardian_secret_key_file)"
     log info $"Public key file: ($guardian_public_key_file)"
+    log info $"Public key \(canonical\) file: ($guardian_public_key_canonical_file)"
 
     if not ($guardian_secret_key_file | path exists) {
         if ($guardian_public_key_file | path exists) {
@@ -496,6 +498,21 @@ def egtest_per_guardian [
         
         if not $no_jsonschema {
             validate-jsonschema --json-file $guardian_public_key_file --schema-file 'guardian_public_key.json'
+        }
+    }
+
+    if not ($guardian_public_key_canonical_file | path exists) {
+        run-subprocess --delimit [
+            (eg_exe) --insecure-deterministic guardian-secret-key-write-public-key --i $i --canonical
+        ]
+
+        if not ($guardian_public_key_canonical_file | path exists) {
+            log error $"Guardian ($i) public key file \(canonical\) does not exist: ($guardian_public_key_canonical_file)"
+            exit 1
+        }
+        
+        if not $no_jsonschema {
+            validate-jsonschema --json-file $guardian_public_key_canonical_file --schema-file 'guardian_public_key.json'
         }
     }
 }

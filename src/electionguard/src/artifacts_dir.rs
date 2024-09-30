@@ -13,6 +13,13 @@ use anyhow::{bail, Context, Result};
 use eg::guardian::GuardianIndex;
 use eg::hash::HValue;
 
+/// Specifies whether to use the canonical or pretty form of an artifact.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CanonicalPretty {
+    Canonical,
+    Pretty,
+}
+
 /// Provides access to files in the artifacts directory.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ArtifactFile {
@@ -25,7 +32,7 @@ pub(crate) enum ArtifactFile {
     PreVotingData,
     BallotEncrypted(u128, HValue),
     GuardianSecretKey(GuardianIndex),
-    GuardianPublicKey(GuardianIndex),
+    GuardianPublicKey(GuardianIndex, CanonicalPretty),
     JointElectionPublicKey,
     // #preencrypted_ballot#
     // PreEncryptedBallotMetadata(u128),
@@ -69,8 +76,12 @@ impl From<ArtifactFile> for PathBuf {
             GuardianSecretKey(i) => {
                 guardian_secret_dir(i).join(format!("guardian_{i}.SECRET_key.json"))
             }
-            GuardianPublicKey(i) => {
-                election_public_dir().join(format!("guardian_{i}.public_key.json"))
+            GuardianPublicKey(i, canonical_pretty) => {
+                let cp = match canonical_pretty {
+                    CanonicalPretty::Canonical => "_canonical.bin",
+                    CanonicalPretty::Pretty => ".json",
+                };
+                election_public_dir().join(format!("guardian_{i}.public_key{cp}.json"))
             }
             Hashes => election_public_dir().join("hashes.json"),
             JointElectionPublicKey => election_public_dir().join("joint_election_public_key.json"),

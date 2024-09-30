@@ -19,7 +19,7 @@ use eg::{
 };
 use util::csprng::Csprng;
 
-use crate::artifacts_dir::{ArtifactFile, ArtifactsDir};
+use crate::artifacts_dir::{ArtifactFile, ArtifactsDir, CanonicalPretty};
 #[allow(dead_code)]
 pub(crate) enum ElectionManifestSource {
     ArtifactFileElectionManifestPretty,
@@ -121,6 +121,7 @@ pub(crate) fn load_guardian_secret_key(
 
 pub(crate) fn load_guardian_public_key(
     opt_i: Option<GuardianIndex>,
+    opt_canonical_pretty: Option<CanonicalPretty>,
     opt_public_key_path: &Option<PathBuf>,
     artifacts_dir: &ArtifactsDir,
     election_parameters: &ElectionParameters,
@@ -130,9 +131,11 @@ pub(crate) fn load_guardian_public_key(
         "Need the guardian number 'i' or public key file path"
     );
 
+    let canonical_pretty = opt_canonical_pretty.unwrap_or(CanonicalPretty::Canonical);
+
     let (mut stdioread, path) = artifacts_dir.in_file_stdioread(
         opt_public_key_path,
-        opt_i.map(ArtifactFile::GuardianPublicKey),
+        opt_i.map(|i| ArtifactFile::GuardianPublicKey(i, canonical_pretty)),
     )?;
 
     let guardian_public_key =
@@ -241,7 +244,7 @@ pub(crate) fn load_all_guardian_public_keys(
     let mut guardian_public_keys = Vec::<GuardianPublicKey>::new();
 
     for i in election_parameters.varying_parameters.each_guardian_i() {
-        let gpk = load_guardian_public_key(Some(i), &None, artifacts_dir, election_parameters)?;
+        let gpk = load_guardian_public_key(Some(i), None, &None, artifacts_dir, election_parameters)?;
 
         guardian_public_keys.push(gpk);
     }

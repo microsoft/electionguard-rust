@@ -9,10 +9,10 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
-use eg::{guardian::GuardianIndex, serializable::SerializablePretty};
+use eg::{guardian::GuardianIndex, serializable::{SerializableCanonical, SerializablePretty}};
 
 use crate::{
-    artifacts_dir::ArtifactFile,
+    artifacts_dir::{ArtifactFile, CanonicalPretty},
     common_utils::{load_election_parameters, load_guardian_secret_key},
     subcommand_helper::SubcommandHelper,
     subcommands::Subcommand,
@@ -34,6 +34,10 @@ pub(crate) struct GuardianSecretKeyWritePublicKey {
     /// If "-", write to stdout.
     #[arg(long)]
     public_key_out: Option<PathBuf>,
+
+    /// Write the canonical form of the public key.
+    #[arg(long)]
+    pub canonical: bool,
 }
 
 impl Subcommand for GuardianSecretKeyWritePublicKey {
@@ -64,16 +68,21 @@ impl Subcommand for GuardianSecretKeyWritePublicKey {
 
         let public_key = guardian_secret_key.make_public_key();
 
+        let canonical_pretty = if self.canonical { CanonicalPretty::Canonical } else { CanonicalPretty::Pretty };
+
         let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
             &self.public_key_out,
-            Some(ArtifactFile::GuardianPublicKey(i)),
+            Some(ArtifactFile::GuardianPublicKey(i, canonical_pretty)),
         )?;
 
-        public_key
-            .to_stdiowrite_pretty(stdiowrite.as_mut())
-            .with_context(|| {
-                format!("Writing public key for guardian {i} to: {}", path.display())
-            })?;
+        let result = if self.canonical {
+            public_key.to_stdiowrite_canonical(stdiowrite.as_mut())
+        } else {
+            public_key.to_stdiowrite_pretty(stdiowrite.as_mut())
+        };
+        result.with_context(|| {
+            format!("Writing public key for guardian {i} to: {}", path.display())
+        })?;
 
         drop(stdiowrite);
 

@@ -101,7 +101,7 @@ impl Subcommand for GenerateGuardianShares {
                         &String::from_utf8(read_path(
                             &subcommand_helper
                                 .artifacts_dir
-                                .path(ArtifactFile::GuardianPublicKey(l as u16)),
+                                .path(ArtifactFile::GuardianPublicKey(l as u16, Canonical)),
                         ))
                         .unwrap(),
                     ),
