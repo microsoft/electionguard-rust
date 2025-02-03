@@ -5,21 +5,29 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+use tracing::{
+    debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
+    warn,
+};
+use util::{
+    uint31::Uint31,
+    vec1::{HasIndexType, Vec1},
+};
 
 use crate::{
     ciphertext::{Ciphertext, CiphertextIndex},
     contest_option_fields::ContestOptionFieldsPlaintexts,
+    eg::Eg,
     election_manifest::ContestIndex,
     errors::{EgError, EgResult},
     pre_voting_data::PreVotingData,
-    u31::Uint31,
-    vec1::{HasIndexType, Vec1},
 };
 
-/// Value of a contest data field, which could be either a selectable option or additional data.
+/// Value (plaintext) of a contest data fields, which could be a selectable option or additional data.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ContestDataFieldPlaintext(Uint31);
 
@@ -41,25 +49,28 @@ impl ContestDataFieldPlaintext {
     }
 }
 
-/// A `u32` can be made from a [`ContestDataFieldPlaintext`].
 impl From<ContestDataFieldPlaintext> for u32 {
-    fn from(cdfpt: ContestDataFieldPlaintext) -> Self {
-        cdfpt.0.into()
+    /// A [`u32`] can always be made from a [`ContestDataFieldPlaintext`].
+    #[inline]
+    fn from(src: ContestDataFieldPlaintext) -> Self {
+        src.0.into()
     }
 }
 
-/// A `u64` can be made from a [`ContestDataFieldPlaintext`].
 impl From<ContestDataFieldPlaintext> for u64 {
-    fn from(cdfpt: ContestDataFieldPlaintext) -> Self {
-        cdfpt.0.into()
+    /// A [`u64`] can always be made from a [`ContestDataFieldPlaintext`].
+    #[inline]
+    fn from(src: ContestDataFieldPlaintext) -> Self {
+        src.0.into()
     }
 }
 
-/// A `usize` can be made from a [`ContestDataFieldPlaintext`].
 impl From<ContestDataFieldPlaintext> for usize {
-    fn from(cdfpt: ContestDataFieldPlaintext) -> Self {
+    /// A [`usize`] can always be made from a [`ContestDataFieldPlaintext`].
+    #[inline]
+    fn from(src: ContestDataFieldPlaintext) -> Self {
         static_assertions::const_assert!(31 <= usize::BITS);
-        u32::from(cdfpt) as usize
+        u32::from(src) as usize
     }
 }
 
@@ -70,35 +81,32 @@ impl From<ContestDataFieldPlaintext> for BigUint {
     }
 }
 
-/// A [`Vec1`] of [`ContestDataFieldPlaintext`] is indexed with the same type as [`Ciphertext`]
-/// Same as [`ContestOption`], [`ContestOptionFieldPlaintext`], and possibly others.
 impl HasIndexType for ContestDataFieldPlaintext {
-    type IndexType = Ciphertext;
+    type IndexTypeParam = Ciphertext;
 }
 
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestOptionFieldPlaintextIndex`], [`ContestDataFieldIndex`], etc.
-pub type ContestDataFieldPlaintextIndex = CiphertextIndex;
-
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestOptionFieldPlaintextIndex`], [`ContestDataFieldPlaintextIndex`], etc.
+/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`], etc.
 pub type ContestDataFieldIndex = CiphertextIndex;
 
 //-------------------------------------------------------------------------------------------------|
 
-/// Values of the voter selectable options of a single contest.
+/// Values (plaintext) of the data fields, which could be a selectable option or additional data, of a single contest.
 ///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContestDataFieldsPlaintexts(Vec1<ContestDataFieldPlaintext>);
 
 impl ContestDataFieldsPlaintexts {
-    /// - `contest_option_fields_plaintexts` should have the same length as the
+    /// - `option_fields_plaintexts` should have the same length as the
     ///   number of options in the contest.
     pub fn try_from_option_fields(
-        _pre_voting_data: &PreVotingData,
+        _eg: &Eg,
         _contest_ix: ContestIndex,
         option_fields_plaintexts: ContestOptionFieldsPlaintexts,
     ) -> EgResult<Self> {
         //? TODO: This is probably where we want to add additional data fields for under/overvote
         //? and enforce selection limit is satisfied
+        warn!("ContestDataFieldsPlaintexts::try_from_option_fields does not yet verify the count of option fields");
+        warn!("ContestDataFieldsPlaintexts::try_from_option_fields does not yet include additional data fields");
 
         let v1_option_fields_plaintexts = option_fields_plaintexts.into_inner();
 
@@ -106,7 +114,6 @@ impl ContestDataFieldsPlaintexts {
             Vec1::<ContestDataFieldPlaintext>::with_capacity(v1_option_fields_plaintexts.len());
         for (_option_field_ix, &option_field_plaintext) in v1_option_fields_plaintexts.enumerate() {
             let data_field_plaintext = ContestDataFieldPlaintext::new(option_field_plaintext);
-
             v1.try_push(data_field_plaintext)?;
         }
         Ok(Self(v1))
@@ -123,11 +130,19 @@ impl ContestDataFieldsPlaintexts {
     pub fn as_slice(&self) -> &[ContestDataFieldPlaintext] {
         self.0.as_slice()
     }
-}
 
-/// Access to the inner [`Vec1`] of [`ContestDataFieldsPlaintexts`].
-impl AsRef<Vec1<ContestDataFieldPlaintext>> for ContestDataFieldsPlaintexts {
-    fn as_ref(&self) -> &Vec1<ContestDataFieldPlaintext> {
+    #[allow(non_snake_case)]
+    pub fn as_Vec1_ContestDataFieldPlaintext(&self) -> &Vec1<ContestDataFieldPlaintext> {
         &self.0
+    }
+
+    /// Gets the [`ContestDataFieldPlaintext`] at the specified index, if present.
+    pub fn get(
+        &self,
+        contest_data_field_ix: ContestDataFieldIndex,
+    ) -> Option<ContestDataFieldPlaintext> {
+        self.as_Vec1_ContestDataFieldPlaintext()
+            .get(contest_data_field_ix)
+            .copied()
     }
 }

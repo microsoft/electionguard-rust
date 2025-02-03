@@ -14,10 +14,6 @@ use crate::{subcommand_helper::SubcommandHelper, subcommands::Subcommand};
 pub(crate) struct None {}
 
 impl Subcommand for None {
-    fn uses_csprng(&self) -> bool {
-        false
-    }
-
     fn do_it(&mut self, _subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         Ok(())
     }

@@ -47,11 +47,18 @@ impl Subcommand for GenerateGuardianShares {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng(b"VerifyStandardParameters")?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("GenerateGuardianShares")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         use eg::guardian::Guardian;
 
-        if self.example_manifest && self.manifest.is_some() {
+        if self.example_manifest && self.election_manifest().is_some() {
             bail!("Specify either --example-manifest or --manifest, but not both.");
         }
 
@@ -59,7 +66,7 @@ impl Subcommand for GenerateGuardianShares {
         let election_manifest: ElectionManifest;
 
         if self.example_manifest {
-            election_parameters = example_election_parameters();
+            election_parameters = example_election_parameters()?;
             election_manifest = example_election_manifest_small();
         } else {
             return Err(anyhow::anyhow!("Not implemented yet"));
@@ -67,7 +74,7 @@ impl Subcommand for GenerateGuardianShares {
 
         let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters.n);
+        assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters().n());
 
         // Read guardian private data
         let guardian = Guardian::from_json(
@@ -83,7 +90,7 @@ impl Subcommand for GenerateGuardianShares {
         let mut public_keys = <HashMap<u16, PublicKey>>::new();
 
         // Read public keys associated with other guardians
-        for l in 1..election_parameters.varying_parameters.n + 1 {
+        for l in 1..election_parameters.varying_parameters().n() + 1 {
             if guardian.i != l as usize {
                 // let their_artifacts = ArtifactsDir::new(
                 //     subcommand_helper
@@ -111,10 +118,10 @@ impl Subcommand for GenerateGuardianShares {
 
         // let mut shares = Vec::with_capacity(election_parameters.varying_parameters.n as usize - 1);
         // Generate encrypted share for each other guardian
-        for l in 1..election_parameters.varying_parameters.n + 1 {
+        for l in 1..election_parameters.varying_parameters().n() + 1 {
             if guardian.i != l as usize {
                 let share = guardian.share_for(
-                    &mut csprng,
+                    csprng,
                     &election_parameters,
                     &hashes.h_p,
                     l as usize,

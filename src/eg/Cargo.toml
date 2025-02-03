@@ -5,27 +5,64 @@ edition = "2021"
 publish = false
 
 [features]
-default = ["eg-allow-unsafe-code", "eg-test-data-generation"]
-eg-allow-unsafe-code = []
-eg-test-data-generation = []
+default = [
+    "eg-allow-unsafe-code",
+    "eg-allow-insecure-deterministic-csprng",
+    "eg-allow-test-data-generation",
+    "eg-allow-toy-parameters",
+    #"eg-forbid-insecure-deterministic-csprng",
+    #"eg-forbid-test-data-generation",
+    #"eg-forbid-toy-parameters",
+]
+eg-allow-unsafe-code           = ["util/eg-allow-unsafe-code" ]
+eg-allow-insecure-deterministic-csprng  = ["util/eg-allow-insecure-deterministic-csprng" ]
+eg-forbid-insecure-deterministic-csprng = ["util/eg-forbid-insecure-deterministic-csprng" ]
+eg-allow-test-data-generation  = ["util/eg-allow-test-data-generation" ]
+eg-forbid-test-data-generation = ["util/eg-forbid-test-data-generation" ]
+eg-allow-toy-parameters = ["util/eg-allow-toy-parameters" ]
+eg-forbid-toy-parameters = ["util/eg-forbid-toy-parameters" ]
 
 [dependencies]
+
+#--- Defined in this workspace
+util.workspace = true
+
+#--- From crates.io
 anyhow.workspace = true
+bitflags.workspace = true
 cfg-if.workspace = true
-derive_more = { workspace = true, features = ["display"] }
-digest = "0.10"
+derive_more = { workspace = true, features = ["debug", "deref", "deref_mut", "display", "from", "into"] }
+downcast-rs.workspace = true
+either.workspace = true
+erased-serde.workspace = true
 hex-literal = "0.4"
-hmac = "0.12"
+inventory.workspace = true
 itertools.workspace = true
-lazy_static = "1.4"
+lazy_static.workspace = true
+maybe-owned = "0.3.4"
 num-bigint.workspace = true
 #num-integer.workspace = true
 num-traits.workspace = true
-nutype.workspace = true
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha2 = "0.10"
 static_assertions.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
 thiserror.workspace = true
-util.workspace = true
+
+#--- Tracing
+tracing.workspace = true
+#valuable.workspace = true
+
+#--- RustCrypto
+# crypto-common.workspace = true
+digest.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+# sha3.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+derive_more = { workspace = true, features = ["add_assign"] }
+insta = { version = "1.42.1", features = ["ron"] }

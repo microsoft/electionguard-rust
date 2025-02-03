@@ -2,23 +2,45 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 //! This module provides wrappers around `BigUnit` to separate group and field elements in the code.
 
-use crate::{
-    algebra_utils::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad},
-    csprng::Csprng,
-    prime::is_prime,
-};
+use std::ops::Deref;
+
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use crate::{
+    algebra_utils::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad},
+    base16::to_string_uppercase_hex_infer_len,
+    csrng::Csrng,
+    prime::is_prime,
+};
+
+/// Sub-optimal method of zeroing-out [`BigUint`] type on a best-effort basis.
+/// Unfortunately, BigUint does not expose enough of its internals to provide
+/// any guarantees.
+fn try_to_zeroize_biguint(b: &mut BigUint) {
+    //? TODO perhaps move this function somewhere commmon?
+
+    // Setting bits in LSB to MSB order should avoid reallocation until we've overwritten
+    // the internal data. Setting them to `1` looks like it might be a little faster.
+    for ix in 0..b.bits().next_multiple_of(32) {
+        b.set_bit(ix, true)
+    }
+
+    b.set_zero();
+}
 
 /// A an element of field `Z_q` as defined by [`ScalarField`].
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct FieldElement(
     #[serde(
+        //? TODO don't hardcode 256 bits
         serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
         deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
     )]
@@ -112,6 +134,23 @@ impl FieldElement {
         to_be_bytes_left_pad(&self.0, 32)
     }
 
+    /// Returns the big-endian encoding of the field element left-padded to 32 bytes.
+    /// Returns `None` if the field element doesn't fit for some reason.
+    pub fn try_into_32_be_bytes_arr(&self) -> Option<[u8; 32]> {
+        let mut by_arr = [0u8; 32];
+        let mut it_src_u64 = self.0.iter_u64_digits();
+        for dst_chunk in by_arr.rchunks_exact_mut(8) {
+            let u = it_src_u64.next()?;
+            dst_chunk.clone_from_slice(&u.to_be_bytes());
+        }
+        for u in it_src_u64 {
+            if u != 0 {
+                return None;
+            }
+        }
+        Some(by_arr)
+    }
+
     /// Returns the left padded big-endian encoding of the field element.
     ///
     /// The encoding follows Section 5.1.2 in the specs.
@@ -133,11 +172,76 @@ impl FieldElement {
     }
 }
 
+impl std::ops::Deref for FieldElement {
+    type Target = BigUint;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::fmt::Debug for FieldElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let alternate = f.alternate();
+        let mut dt = f.debug_tuple("FieldElement");
+        if alternate {
+            dt.field(&to_string_uppercase_hex_infer_len(&self.0));
+            dt.finish()
+        } else {
+            dt.finish_non_exhaustive()
+        }
+    }
+}
+
+impl std::fmt::Display for FieldElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl Zeroize for FieldElement {
+    fn zeroize(&mut self) {
+        try_to_zeroize_biguint(&mut self.0)
+    }
+}
+
+impl Drop for FieldElement {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for FieldElement {}
+
+#[derive(thiserror::Error, Clone, Debug)]
+pub enum FieldError {
+    #[error("Could not convert field element to `{0}`: {1}")]
+    FieldElementConvertTo(&'static str, String),
+}
+
+impl TryFrom<&FieldElement> for u64 {
+    type Error = FieldError;
+    #[inline]
+    fn try_from(fe: &FieldElement) -> Result<u64, Self::Error> {
+        u64::try_from(fe.deref())
+            .map_err(|e| FieldError::FieldElementConvertTo("u64", e.to_string()))
+    }
+}
+
+impl TryFrom<FieldElement> for u64 {
+    type Error = FieldError;
+    #[inline]
+    fn try_from(fe: FieldElement) -> Result<u64, Self::Error> {
+        TryFrom::<&FieldElement>::try_from(&fe)
+    }
+}
+
 /// The finite field `Z_q` of integers modulo prime `q`.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScalarField {
     /// Subgroup order.
     #[serde(
+        //? TODO don't hardcode 256 bits
         serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
         deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
     )]
@@ -152,9 +256,9 @@ impl ScalarField {
     /// A field should therefore be constructed once and then reused as much as possible.
     ///
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`ScalarField::new_unchecked`].
-    pub fn new(order: BigUint, csprng: &mut Csprng) -> Option<Self> {
+    pub fn new(order: BigUint, csrng: &dyn Csrng) -> Option<Self> {
         let f = ScalarField { q: order };
-        if f.is_valid(csprng) {
+        if f.is_valid(csrng) {
             return Some(f);
         }
         None
@@ -168,8 +272,8 @@ impl ScalarField {
     }
 
     /// The function validates the given field by checking that the modulus is prime. The call is expensive.
-    pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
-        is_prime(&self.q, csprng)
+    pub fn is_valid(&self, csrng: &dyn Csrng) -> bool {
+        is_prime(&self.q, csrng)
     }
 
     /// Returns one, the neutral element of multiplication, as a field element.
@@ -182,11 +286,12 @@ impl ScalarField {
         FieldElement(BigUint::zero())
     }
 
-    /// Returns a random field element, i.e., a uniform random integer in `[0,q)` where `q` is the field order.
-    ///
-    /// The given `csprng` is assumed to be a secure randomness generator.
-    pub fn random_field_elem(&self, csprng: &mut Csprng) -> FieldElement {
-        FieldElement(csprng.next_biguint_lt(&self.q))
+    /// Returns a random field element, i.e., a uniform random integer in `[0,q)` where `q` is the
+    /// field order.
+    pub fn random_field_elem(&self, csrng: &dyn Csrng) -> FieldElement {
+        // Unwrap() is justified here because the field order was checked for validity.
+        #[allow(clippy::unwrap_used)]
+        FieldElement(csrng.next_biguint_lt(&self.q).unwrap())
     }
 
     /// Returns the order `q` of the field
@@ -202,40 +307,35 @@ impl ScalarField {
     }
 }
 
+impl std::fmt::Debug for ScalarField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let alternate = f.alternate();
+        let mut ds = f.debug_struct("ScalarField");
+        if alternate {
+            ds.field("q", &to_string_uppercase_hex_infer_len(&self.q));
+            ds.finish()
+        } else {
+            ds.finish_non_exhaustive()
+        }
+    }
+}
+
+impl std::fmt::Display for ScalarField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
 /// An element of the multiplicative group `Z_p^r` as defined by [`Group`].
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GroupElement(
     #[serde(
+        //? TODO don't hardcode 4096 bits
         serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
         deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
     )]
     BigUint,
 );
-
-/// The group `Z_p^r`, a multiplicative subgroup of `Z_p`.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Group {
-    /// Prime modulus `p`.
-    #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
-    )]
-    p: BigUint,
-
-    /// Subgroup generator `g`.
-    #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
-    )]
-    g: BigUint,
-
-    /// Group order `q`.
-    #[serde(
-        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
-    )]
-    q: BigUint,
-}
 
 impl GroupElement {
     /// Multiplies the group element with another group element.
@@ -288,6 +388,67 @@ impl GroupElement {
     }
 }
 
+impl std::fmt::Debug for GroupElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let alternate = f.alternate();
+        let mut dt = f.debug_tuple("GroupElement");
+        if alternate {
+            dt.field(&to_string_uppercase_hex_infer_len(&self.0));
+            dt.finish()
+        } else {
+            dt.finish_non_exhaustive()
+        }
+    }
+}
+
+impl std::fmt::Display for GroupElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl Zeroize for GroupElement {
+    fn zeroize(&mut self) {
+        try_to_zeroize_biguint(&mut self.0)
+    }
+}
+
+impl Drop for GroupElement {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for GroupElement {}
+
+/// The group `Z_p^r`, a multiplicative subgroup of `Z_p`.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Group {
+    /// Prime modulus `p`.
+    #[serde(
+        //? TODO don't hardcode 4096 bits
+        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
+    )]
+    p: BigUint,
+
+    /// Subgroup generator `g`.
+    #[serde(
+        //? TODO don't hardcode 4096 bits
+        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
+    )]
+    g: BigUint,
+
+    /// Group order `q`.
+    #[serde(
+        //? TODO don't hardcode 256 bits
+        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
+    )]
+    q: BigUint,
+}
+
 impl Group {
     /// Constructs a new multiplicative integer group `Z_p^r`.
     ///
@@ -305,14 +466,14 @@ impl Group {
         modulus: BigUint,
         order: BigUint,
         generator: BigUint,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
     ) -> Option<Self> {
         let group = Group {
             p: modulus,
             g: generator,
             q: order,
         };
-        if group.is_valid(csprng) {
+        if group.is_valid(csrng) {
             return Some(group);
         }
         None
@@ -334,7 +495,7 @@ impl Group {
     /// - the `order` is prime, divides `modulus-1`, but not `(modulus-1)/order`,
     /// - the `generator` has order `order`,
     /// - and `(modulus-1)/ 2order` is prime
-    pub fn is_valid(&self, csprng: &mut Csprng) -> bool {
+    pub fn is_valid(&self, csrng: &dyn Csrng) -> bool {
         // Expensive primality testing is done last
 
         // The order `q` must divide `p-1` but not `(p-1)/q` for modulus `p`.
@@ -357,7 +518,7 @@ impl Group {
         }
         let r_2 = cofactor / BigUint::from(2_u8);
         // All primality testing
-        is_prime(&self.q, csprng) || is_prime(&self.p, csprng) || is_prime(&r_2, csprng)
+        is_prime(&self.q, csrng) || is_prime(&self.p, csrng) || is_prime(&r_2, csrng)
     }
 
     /// Returns a uniform random group element
@@ -365,9 +526,11 @@ impl Group {
     /// The element is generated by selecting a random integer `x` in `[0,q)`
     /// and computing `g^x % p` where `q` is the group order, `g` a generator, and `p` the modulus.
     ///
-    /// The given `csprng` is assumed to be a secure randomness generator.
-    pub fn random_group_elem(&self, csprng: &mut Csprng) -> GroupElement {
-        let field_elem = FieldElement(csprng.next_biguint_lt(&self.q));
+    /// The given `csrng` is assumed to be a secure randomness generator.
+    pub fn random_group_elem(&self, csrng: &dyn Csrng) -> GroupElement {
+        // Unwrap() is justified here because the field order was checked for validity.
+        #[allow(clippy::unwrap_used)]
+        let field_elem = FieldElement(csrng.next_biguint_lt(&self.q).unwrap());
         self.g_exp(&field_elem)
     }
 
@@ -416,13 +579,37 @@ impl Group {
     }
 }
 
+impl std::fmt::Debug for Group {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let alternate = f.alternate();
+        let mut ds = f.debug_struct("Group");
+        if alternate {
+            ds.field("p", &to_string_uppercase_hex_infer_len(&self.p));
+            ds.field("g", &to_string_uppercase_hex_infer_len(&self.g));
+            ds.field("q", &to_string_uppercase_hex_infer_len(&self.q));
+            ds.finish()
+        } else {
+            ds.finish_non_exhaustive()
+        }
+    }
+}
+
+impl std::fmt::Display for Group {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
 // Unit tests for algebra.
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
-    use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
-    use crate::csprng::Csprng;
     use num_bigint::BigUint;
+
+    use crate::{
+        algebra::{FieldElement, Group, GroupElement, ScalarField},
+        csrng::{Csrng, DeterministicCsrng},
+    };
 
     fn get_toy_algebras() -> (ScalarField, Group) {
         (
@@ -437,7 +624,7 @@ mod test {
 
     #[test]
     fn test_field_operations() {
-        // Toy parameters according to specs
+        // Toy election parameters according to specs
         let (field, _) = get_toy_algebras();
 
         let a = FieldElement::from(115_u8, &field);
@@ -471,8 +658,9 @@ mod test {
 
     #[test]
     fn test_group_operations() {
-        let mut csprng = Csprng::new(b"testing group operations");
-        // Toy parameters according to specs
+        let csrng: &dyn Csrng = &DeterministicCsrng::from_seed_str("testing group operations");
+
+        // Toy election parameters according to specs
         let (field, group) = get_toy_algebras();
 
         let a = FieldElement::from(115_u8, &field);
@@ -503,7 +691,7 @@ mod test {
         assert_eq!(g.pow(14_u32, &group), g2);
 
         for _ in 0..100 {
-            let u = group.random_group_elem(&mut csprng);
+            let u = group.random_group_elem(csrng);
             assert!(u.is_valid(&group));
         }
 
@@ -513,7 +701,8 @@ mod test {
 
     #[test]
     fn test_field_group_validity() {
-        let mut csprng = Csprng::new(b"testing field/group validity");
+        let csrng: &dyn Csrng = &DeterministicCsrng::from_seed_str("testing field/group validity");
+
         let (field, group) = get_toy_algebras();
         let invalid_field = ScalarField::new_unchecked(BigUint::from(125_u8));
         let invalid_modulus_group = Group::new_unchecked(
@@ -534,32 +723,29 @@ mod test {
         );
 
         // Testing correctness
+        assert!(field.is_valid(csrng), "Prime order fields should validate!");
         assert!(
-            field.is_valid(&mut csprng),
-            "Prime order fields should validate!"
-        );
-        assert!(
-            group.is_valid(&mut csprng),
+            group.is_valid(csrng),
             "Prime order groups with proper parameters should validate!"
         );
         assert!(group.matches_field(&field));
 
         // Testing soundness
         assert!(
-            !invalid_field.is_valid(&mut csprng),
+            !invalid_field.is_valid(csrng),
             "Non-prime order fields should fail!"
         );
         assert!(!group.matches_field(&invalid_field));
         assert!(
-            !invalid_modulus_group.is_valid(&mut csprng),
+            !invalid_modulus_group.is_valid(csrng),
             "Groups with a non-prime modulus should fail!"
         );
         assert!(
-            !invalid_generator_group.is_valid(&mut csprng),
+            !invalid_generator_group.is_valid(csrng),
             "Groups with an invalid generator should fail!"
         );
         assert!(
-            !invalid_cofactor_group.is_valid(&mut csprng),
+            !invalid_cofactor_group.is_valid(csrng),
             "Groups with an invalid cofactor should fail!"
         );
 
@@ -568,7 +754,7 @@ mod test {
             BigUint::from(19_u8),
             BigUint::from(3_u8),
             BigUint::from(7_u8),
-            &mut csprng,
+            csrng,
         );
         assert_eq!(invalid_group, None);
     }

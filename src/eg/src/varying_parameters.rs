@@ -4,11 +4,14 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use anyhow::{ensure, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::guardian::GuardianIndex;
+use crate::{
+    eg::Eg, errors::EgError, guardian::GuardianIndex, serializable::SerializableCanonical,
+};
 
 /// Ballot chaining.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,8 +22,8 @@ pub enum BallotChaining {
 }
 
 /// The parameters for a specific election.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VaryingParameters {
+#[derive(Debug, Clone, Serialize)]
+pub struct VaryingParametersInfo {
     /// Number of guardians.
     pub n: GuardianIndex,
 
@@ -38,38 +41,209 @@ pub struct VaryingParameters {
     pub date: String,
 }
 
-impl VaryingParameters {
-    /// Verifies the `VaryingParameters` meet some basic validity requirements.
-    #[allow(clippy::nonminimal_bool)]
-    pub fn validate(&self) -> Result<()> {
+crate::impl_knows_friendly_type_name! { VaryingParametersInfo }
+
+crate::impl_Resource_for_simple_ElectionDataObjectId_info_type! { VaryingParametersInfo, VaryingParameters }
+
+impl SerializableCanonical for VaryingParametersInfo {}
+
+impl<'de> Deserialize<'de> for VaryingParametersInfo {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{Error, MapAccess, Visitor};
+        use strum::{IntoStaticStr, VariantNames};
+
+        #[derive(Deserialize, IntoStaticStr, VariantNames)]
+        #[serde(field_identifier)]
+        #[allow(non_camel_case_types)]
+        enum Field {
+            n,
+            k,
+            info,
+            ballot_chaining,
+            date,
+        }
+
+        struct VaryingParametersInfoVisitor;
+
+        impl<'de> Visitor<'de> for VaryingParametersInfoVisitor {
+            type Value = VaryingParametersInfo;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("VaryingParametersInfo")
+            }
+
+            #[allow(dependency_on_unit_never_type_fallback)] //? TODO temp code
+            fn visit_map<MapAcc>(
+                self,
+                mut map: MapAcc,
+            ) -> Result<VaryingParametersInfo, MapAcc::Error>
+            where
+                MapAcc: MapAccess<'de>,
+            {
+                let Some((Field::n, n)) = map.next_entry()? else {
+                    return Err(MapAcc::Error::missing_field(Field::n.into()));
+                };
+
+                let Some((Field::k, k)) = map.next_entry()? else {
+                    return Err(MapAcc::Error::missing_field(Field::k.into()));
+                };
+
+                let Some((Field::info, info)) = map.next_entry()? else {
+                    return Err(MapAcc::Error::missing_field(Field::info.into()));
+                };
+
+                let Some((Field::ballot_chaining, ballot_chaining)) = map.next_entry()? else {
+                    return Err(MapAcc::Error::missing_field(Field::ballot_chaining.into()));
+                };
+
+                let (opt_date, next_entry): (Option<String>, _) = match map.next_key()? {
+                    Some(Field::date) => (map.next_value()?, map.next_entry()?),
+                    Some(key) => (None, Some((key, map.next_value()?))),
+                    None => (None, None),
+                };
+
+                if let Some((field, _)) = next_entry {
+                    return Err(MapAcc::Error::unknown_field(field.into(), &[]));
+                }
+
+                Ok(VaryingParametersInfo {
+                    n,
+                    k,
+                    info,
+                    ballot_chaining,
+                    date: opt_date.unwrap_or_default(),
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = Field::VARIANTS;
+
+        deserializer.deserialize_struct("VaryingParameters", FIELDS, VaryingParametersInfoVisitor)
+    }
+}
+
+crate::impl_validatable_validated! {
+    src: VaryingParametersInfo, eg => EgResult<VaryingParameters> {
+        let VaryingParametersInfo {
+            n,
+            k,
+            info,
+            ballot_chaining,
+            date,
+        } = src;
+
+        //----- Validate `n`.
+
         // `n` must be greater than or equal to 1
-        ensure!(
-            1 <= self.n.get_one_based_u32(),
-            "Varying parameters failed check: 1 <= n"
-        );
+        // Guaranteed by `GuardianIndex`.
+
+        //----- Validate `k`.
 
         // `k` must be greater than or equal to 1
-        ensure!(
-            1 <= self.k.get_one_based_u32(),
-            "Varying parameters failed check: 1 <= k"
-        );
+        // Guaranteed by `GuardianIndex`.
 
         // `k` must be less than or equal to `n`
-        ensure!(self.k <= self.n, "Varying parameters failed check: k <= n");
+        EgError::unless(
+            k <= n,
+            || EgValidateError::from(format!("k={k} <= n={n}")))?;
 
-        Ok(())
+        //----- Validate `info`.
+
+        //? TODO
+
+        //----- Validate `ballot_chaining`.
+
+        //? TODO
+
+        //----- Validate `date`.
+
+        //? TODO
+
+        //----- Construct the object from the validated data.
+
+        let self_ = VaryingParameters {
+            n,
+            k,
+            info,
+            ballot_chaining,
+            date,
+        };
+
+        //----- Return the fully constructed and validated `VaryingParameters` object.
+
+        Ok(self_)
+    }
+}
+
+impl From<VaryingParameters> for VaryingParametersInfo {
+    /// Convert from VaryingParameters back to a VaryingParametersInfo for re-validation.
+    fn from(src: VaryingParameters) -> Self {
+        let VaryingParameters {
+            n,
+            k,
+            info,
+            ballot_chaining,
+            date,
+        } = src;
+
+        Self {
+            n,
+            k,
+            info,
+            ballot_chaining,
+            date,
+        }
+    }
+}
+
+/// The election manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct VaryingParameters {
+    n: GuardianIndex,
+    k: GuardianIndex,
+    info: String,
+    ballot_chaining: BallotChaining,
+    date: String,
+}
+
+impl VaryingParameters {
+    /// Number of guardians.
+    pub fn n(&self) -> GuardianIndex {
+        self.n
     }
 
-    pub fn is_valid_guardian_i<T>(&self, i: T) -> bool
-    where
-        T: Into<u32>,
-    {
-        let i: u32 = i.into();
-        (1..=self.n.get_one_based_u32()).contains(&i)
+    /// Decryption quorum threshold value.
+    pub fn k(&self) -> GuardianIndex {
+        self.k
     }
 
-    /// Iterates over the valid guardian numbers, 1 <= i <= [`VaryingParameters::n`].
-    pub fn each_guardian_i(&self) -> impl Iterator<Item = GuardianIndex> {
+    /// Jurisdictional information string. This can be used to specify a location.
+    pub fn info(&self) -> &str {
+        &self.info
+    }
+
+    /// Ballot chaining.
+    pub fn ballot_chaining(&self) -> BallotChaining {
+        self.ballot_chaining
+    }
+
+    /// Date. Optional, can be empty.
+    /// Consider using [RFC 3339](https://datatracker.ietf.org/doc/rfc3339/) or "ISO 8601" format.
+    pub fn date(&self) -> &str {
+        &self.date
+    }
+
+    /// Iterates over the valid guardian indices, `1 <= ix <= [VaryingParameters::n`].
+    pub fn each_guardian_ix(&self) -> impl Iterator<Item = GuardianIndex> {
         GuardianIndex::iter_range_inclusive(GuardianIndex::MIN, self.n)
     }
 }
+
+crate::impl_knows_friendly_type_name! { VaryingParameters }
+
+crate::impl_Resource_for_simple_ElectionDataObjectId_validated_type! { VaryingParameters, VaryingParameters }
+
+impl SerializableCanonical for VaryingParameters {}

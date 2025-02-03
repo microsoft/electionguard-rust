@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 use crate::{confirmation_code::confirmation_code, contest::ContestPreEncrypted};
 use anyhow::{anyhow, Context, Result};
 use eg::{
-    ballot::{BallotEncrypted, BallotError, BallotState},
+    ballot::{Ballot, BallotError, BallotState},
     ballot_style::BallotStyleIndex,
     contest_option_fields::ContestOptionFieldsPlaintexts,
     election_manifest::{ContestIndex, ElectionManifest},
@@ -20,7 +20,7 @@ use eg::{
     vec1::Vec1,
 };
 use serde::{Deserialize, Serialize};
-use util::{csprng::Csprng, logging::Logging};
+use util::{csrng::Csrng, logging::Logging};
 // use voter::ballot::BallotSelections;
 
 /// A pre-encrypted ballot.
@@ -48,20 +48,20 @@ pub struct VoterSelection {
 
 impl VoterSelection {
     pub fn new_pick_random(
-        manifest: &ElectionManifest,
+        election_manifest: &ElectionManifest,
         ballot_style_index: BallotStyleIndex,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
     ) -> Self {
         let mut selections = Vec1::new();
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-        let ballot_style = manifest.ballot_styles().get(ballot_style_index).unwrap();
+        let ballot_style = election_manifest.ballot_styles().get(ballot_style_index).unwrap();
         ballot_style.contests().iter().for_each(|i| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let contest = manifest.contests().get(*i).unwrap();
+            let contest = election_manifest.contests().get(*i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             selections
                 .try_push(ContestOptionFieldsPlaintexts::new_pick_random(
-                    csprng,
+                    csrng,
                     contest.selection_limit,
                     contest.contest_options.len(),
                 ))
@@ -83,7 +83,7 @@ impl VoterSelection {
     }
 }
 
-impl SerializablePretty for BallotPreEncrypted {}
+impl SerializableCanonical for BallotPreEncrypted {}
 
 impl PartialEq for BallotPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
@@ -100,10 +100,10 @@ impl BallotPreEncrypted {
     ) -> BallotPreEncrypted {
         let b_aux = "Sample aux information.".as_bytes();
 
-        // Find contests in manifest corresponding to requested ballot style
+        // Find contests in election_manifest corresponding to requested ballot style
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
         let ballot_style = header
-            .manifest
+            .election_manifest()
             .ballot_styles
             .get(ballot_style_index)
             .unwrap();
@@ -111,7 +111,7 @@ impl BallotPreEncrypted {
         let mut contests = Vec1::new();
         ballot_style.contests().iter().for_each(|i| {
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
-            let c = header.manifest.contests().get(*i).unwrap();
+            let c = header.election_manifest().contests().get(*i).unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             contests
                 .try_push(ContestPreEncrypted::new(
@@ -123,7 +123,7 @@ impl BallotPreEncrypted {
                 ))
                 .unwrap()
         });
-        let confirmation_code = confirmation_code(&header.hashes_ext.h_e, &contests, b_aux);
+        let confirmation_code = confirmation_code(&header.h_e(), &contests, b_aux);
 
         BallotPreEncrypted {
             ballot_style_index,
@@ -135,11 +135,11 @@ impl BallotPreEncrypted {
     pub fn new(
         pv_data: &PreVotingData,
         ballot_style_index: BallotStyleIndex,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         store_nonces: bool,
     ) -> (BallotPreEncrypted, HValue) {
         let mut primary_nonce = [0u8; 32];
-        (0..32).for_each(|i| primary_nonce[i] = csprng.next_u8());
+        (0..32).for_each(|i| primary_nonce[i] = csrng.next_u8());
 
         (
             BallotPreEncrypted::new_with(pv_data, ballot_style_index, &primary_nonce, store_nonces),
@@ -166,9 +166,9 @@ impl BallotPreEncrypted {
     pub fn finalize(
         &self,
         pre_voting_data: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         voter_ballot: &VoterSelection,
-    ) -> Result<BallotEncrypted, BallotError> {
+    ) -> Result<Ballot, BallotError> {
         let mut contests = BTreeMap::new();
 
         #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
@@ -178,7 +178,7 @@ impl BallotPreEncrypted {
             let correct_content_index = contest.contest_ix;
 
             let c = pre_voting_data
-                .manifest
+                .election_manifest()
                 .contests
                 .get(correct_content_index)
                 .unwrap();
@@ -188,7 +188,7 @@ impl BallotPreEncrypted {
                     contest
                         .finalize(
                             pre_voting_data,
-                            csprng,
+                            csrng,
                             voter_ballot.selections.get(c_idx).unwrap().get_vote(),
                             c.selection_limit,
                             c.contest_options.len(),
@@ -198,12 +198,12 @@ impl BallotPreEncrypted {
                 .unwrap();
         }
 
-        Ok(BallotEncrypted::new(
+        Ok(Ballot::new(
             self.ballot_style_index,
             &contests,
             BallotState::Cast,
             self.confirmation_code,
-            &device.pre_voting_data.parameters.varying_parameters.date,
+            &device.pre_voting_data().election_parameters().varying_parameters().date(),
             device.get_uuid(),
         ))
     }
@@ -223,4 +223,4 @@ impl BallotPreEncrypted {
     }
 }
 
-impl SerializablePretty for VoterSelection {}
+impl SerializableCanonical for VoterSelection {}

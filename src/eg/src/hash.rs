@@ -6,36 +6,68 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 
+use std::marker::PhantomData;
+
 use anyhow::{anyhow, Context, Result};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use util::{
+    algebra::{FieldElement, ScalarField},
+    array_ascii::ArrayAscii,
+    csrng::{Csrng, CsrngOps},
+};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use util::array_ascii::ArrayAscii;
-
-use crate::serializable::SerializablePretty;
+use crate::{errors::EgError, serializable::SerializableCanonical};
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 
 // "In ElectionGuard, all inputs that are used as the HMAC key, i.e. all inputs to the first
 // argument of H have a fixed length of exactly 32 bytes."
+pub const HVALUE_BYTE_LEN: usize = 32;
+
 // "The output of SHA-256 and therefore H is a 256-bit string, which can be interpreted as a
 // byte array of 32 bytes."
-pub const HVALUE_BYTE_LEN: usize = 32;
-type HValueByteArray = [u8; HVALUE_BYTE_LEN];
+pub type HValueByteArray = [u8; HVALUE_BYTE_LEN];
+
+impl From<HValue> for HValueByteArray {
+    #[inline]
+    fn from(value: HValue) -> Self {
+        value.0
+    }
+}
 
 //-------------------------------------------------------------------------------------------------|
 
 /// Represents a hash output value of the ElectionGuard hash function ‘H’. It is also
 /// the type used as the first parameter, the HMAC key.
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Zeroize,
+    ZeroizeOnDrop
+)]
 pub struct HValue(pub HValueByteArray);
 
 impl HValue {
-    pub fn from_csprng(csprng: &mut util::csprng::Csprng) -> HValue {
-        let mut bytes: HValueByteArray = Default::default();
-        rand::RngCore::fill_bytes(csprng, &mut bytes);
-        HValue(bytes)
+    /// The number of bits in an HValue.
+    pub const fn bit_len() -> usize {
+        HVALUE_BYTE_LEN * 8
+    }
+
+    /// The number of bytes in an HValue.
+    pub const fn byte_len() -> usize {
+        HVALUE_BYTE_LEN
+    }
+
+    /// Generates a random [`HValue`] from a [`Csrng`].
+    pub fn generate_random(csrng: &dyn Csrng) -> Self {
+        Self(csrng.next_arr_u8())
     }
 
     /// Reads `HValue` from a `std::io::Read`.
@@ -135,8 +167,6 @@ impl HValue {
     }
 }
 
-impl SerializablePretty for HValue {}
-
 impl From<HValueByteArray> for HValue {
     #[inline]
     fn from(value: HValueByteArray) -> Self {
@@ -151,6 +181,27 @@ impl From<&HValueByteArray> for HValue {
     }
 }
 
+impl TryFrom<&[u8]> for HValue {
+    type Error = EgError;
+
+    #[inline]
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        TryInto::<&HValueByteArray>::try_into(value)
+            .map_err(|_| EgError::HValueByteLenMismatch {
+                expected: HVALUE_BYTE_LEN,
+                actual: value.len(),
+            })
+            .map(Into::into)
+    }
+}
+
+impl AsRef<HValue> for HValue {
+    #[inline]
+    fn as_ref(&self) -> &HValue {
+        self
+    }
+}
+
 impl AsRef<HValueByteArray> for HValue {
     #[inline]
     fn as_ref(&self) -> &HValueByteArray {
@@ -158,33 +209,33 @@ impl AsRef<HValueByteArray> for HValue {
     }
 }
 
-impl From<HValue> for HValueByteArray {
+impl AsRef<[u8]> for HValue {
     #[inline]
-    fn from(value: HValue) -> Self {
-        value.0
-    }
-}
-
-impl std::fmt::Display for HValue {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(self.display_as_ascii().as_str())
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
 impl std::fmt::Debug for HValue {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(self, f)
     }
 }
 
-impl Serialize for HValue {
+impl std::fmt::Display for HValue {
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.display_as_ascii().as_str())
+    }
+}
+
+impl serde::Serialize for HValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
-        self.display_as_ascii().as_str().serialize(serializer)
+        util::serde::serialize_bytes_as_uppercase_hex(self, serializer)
     }
 }
 
@@ -257,53 +308,248 @@ impl std::str::FromStr for HValue {
     }
 }
 
-impl<'de> Deserialize<'de> for HValue {
+impl<'de> serde::Deserialize<'de> for HValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::de::Deserializer<'de>,
     {
         use serde::de::Error;
-
         let s = String::deserialize(deserializer)?;
-
         s.parse().map_err(D::Error::custom)
     }
 }
 
 impl rand::Fill for HValue {
-    fn try_fill<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) -> Result<(), rand::Error> {
-        rng.try_fill(&mut self.0)
+    fn fill<R: rand::Rng + ?Sized>(&mut self, rng: &mut R) {
+        rng.fill(&mut self.0)
     }
 }
 
-/// ElectionGuard `H` hash function.
-pub fn eg_h(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
-    // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
-    // to only fail on slice of incorrect size.
-    #[allow(clippy::unwrap_used)]
-    let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
+impl SerializableCanonical for HValue {}
 
-    AsRef::<[u8; 32]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
+//=================================================================================================|
+
+/// Hash value with a specific meaning.
+///
+/// `T` is a simply a tag for disambiguation. It can be any type.
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct SpecificHValue<T>(HValue, PhantomData<fn(T) -> T>)
+where
+    T: ?Sized;
+
+impl<T: ?Sized> SpecificHValue<T> {
+    /// The number of bits in an HValue.
+    pub const fn bit_len() -> usize {
+        HVALUE_BYTE_LEN * 8
+    }
+
+    /// The number of bytes in an HValue.
+    pub const fn byte_len() -> usize {
+        HVALUE_BYTE_LEN
+    }
+
+    /// ElectionGuard `H` hash function, returning this [`SpecificHValue`].
+    pub fn compute_from_eg_h<K, D>(key: K, data: D) -> Self
+    where
+        K: AsRef<HValue>,
+        D: AsRef<[u8]>,
+    {
+        eg_h(key, data).into()
+    }
+
+    /// Generates a random [`SpecificHValue<T>`] from a [`Csrng`].
+    pub fn generate_random(csrng: &dyn Csrng) -> Self {
+        HValue::generate_random(csrng).into()
+    }
+
+    #[inline]
+    fn as_slice(&self) -> &[u8] {
+        self.0.as_ref()
+    }
 }
 
-/// Identical to `H` but separate to follow the specification used to for [`crate::guardian_share::GuardianEncryptedShare`]
+impl<T: ?Sized> Clone for SpecificHValue<T> {
+    /// Clone trait must be implmented manually because of the [`PhantomData`].
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), Default::default())
+    }
+}
+
+impl<T: ?Sized> PartialEq for SpecificHValue<T> {
+    /// [`PartialEq`] trait must be implmented manually because of the [`PhantomData`].
+    #[inline]
+    fn eq(&self, rhs: &Self) -> bool {
+        let lhs: &HValueByteArray = self.as_ref();
+        let rhs: &HValueByteArray = rhs.as_ref();
+        lhs.eq(rhs)
+    }
+}
+
+/// [`Eq`] trait must be implmented manually because of the [`PhantomData`].
+impl<T: ?Sized> Eq for SpecificHValue<T> {}
+
+impl<T: ?Sized> AsRef<SpecificHValue<T>> for SpecificHValue<T> {
+    #[inline]
+    fn as_ref(&self) -> &SpecificHValue<T> {
+        self
+    }
+}
+
+impl<T: ?Sized> AsRef<HValue> for SpecificHValue<T> {
+    #[inline]
+    fn as_ref(&self) -> &HValue {
+        &self.0
+    }
+}
+
+impl<T: ?Sized> AsRef<HValueByteArray> for SpecificHValue<T> {
+    #[inline]
+    fn as_ref(&self) -> &HValueByteArray {
+        self.0.as_ref()
+    }
+}
+
+impl<T: ?Sized> AsRef<[u8]> for SpecificHValue<T> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_slice()
+    }
+}
+
+impl<T: ?Sized> std::fmt::Debug for SpecificHValue<T> {
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl<T: ?Sized> std::fmt::Display for SpecificHValue<T> {
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl<T: ?Sized> std::str::FromStr for SpecificHValue<T> {
+    type Err = <HValue as std::str::FromStr>::Err;
+
+    /// Attempts to parse a string `s` to return a [`SpecificHValue<T>`].
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        HValue::from_str(s).map(Self::from)
+    }
+}
+
+impl<T: ?Sized> From<HValue> for SpecificHValue<T> {
+    /// A [`SpecificHValue<T>`] can always be made from a [`HValue`].
+    #[inline]
+    fn from(src: HValue) -> Self {
+        Self(src, Default::default())
+    }
+}
+
+impl<T: ?Sized> From<HValueByteArray> for SpecificHValue<T> {
+    /// A [`SpecificHValue<T>`] can always be made from a [`HValueByteArray`].
+    #[inline]
+    fn from(src: HValueByteArray) -> Self {
+        let hv = HValue::from(src);
+        Self::from(hv)
+    }
+}
+
+impl<T: ?Sized> serde::Serialize for SpecificHValue<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de, T: ?Sized> serde::Deserialize<'de> for SpecificHValue<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        HValue::deserialize(deserializer).map(Self::from)
+    }
+}
+
+impl<T: ?Sized> SerializableCanonical for SpecificHValue<T> {}
+
+//=================================================================================================|
+
+/// ElectionGuard `H` hash function.
+pub fn eg_h<K, D>(key: K, data: D) -> HValue
+where
+    K: AsRef<HValue>,
+    D: AsRef<[u8]>,
+{
+    fn eg_h_(key: &HValue, data: &[u8]) -> HValue {
+        // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
+        // to only fail on slice of incorrect size.
+        #[allow(clippy::unwrap_used)]
+        let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
+
+        AsRef::<[u8; HVALUE_BYTE_LEN]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
+    }
+
+    eg_h_(key.as_ref(), data.as_ref())
+}
+
+/// `H_q` hash function. ElectionGuard DS 2.1.0 sec 3.2.2 footnote 32.
+/// It is basically just `H(...) mod q`
+#[inline]
+pub fn eg_h_q_as_field_element<K, D>(key: K, data: D, field: &ScalarField) -> FieldElement
+where
+    K: AsRef<HValue>,
+    D: AsRef<[u8]>,
+{
+    let hv = eg_h::<K, D>(key, data);
+
+    FieldElement::from_bytes_be(hv.as_ref(), field)
+}
+
+/// `H_q` hash function. ElectionGuard DS 2.1.0 sec 3.2.2 footnote 32.
+/// It is basically just `H(...) mod q`
+#[inline]
+pub fn eg_h_q<K, D>(key: K, data: D, field: &ScalarField) -> HValue
+where
+    K: AsRef<HValue>,
+    D: AsRef<[u8]>,
+{
+    let fe = eg_h_q_as_field_element::<K, D>(key, data, field);
+
+    // Unwrap() is justified here because field `q` is matched to 32 byte hash value by design.
+    #[allow(clippy::unwrap_used)]
+    let aby32 = fe.try_into_32_be_bytes_arr().unwrap();
+
+    HValue::from(aby32)
+}
+
+/// Identical to `H` but separate to follow the specification used for [`crate::guardian_share::GuardianEncryptedShare`]
 pub fn eg_hmac(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
     // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
     // to only fail on slice of incorrect size.
     #[allow(clippy::unwrap_used)]
     let hmac_sha256 = HmacSha256::new_from_slice(key.as_ref()).unwrap();
 
-    AsRef::<[u8; 32]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
+    AsRef::<[u8; HVALUE_BYTE_LEN]>::as_ref(&hmac_sha256.chain(data).finalize_fixed()).into()
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test_eg_h {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn test_hvalue_std_fmt() {
+        assert_eq!(HValue::byte_len(), 32);
+        assert_eq!(HValue::byte_len() * 8, HValue::bit_len());
+
         let h: HValue = std::array::from_fn(|ix| ix as u8).into();
 
         let expected = "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F";
@@ -331,7 +577,7 @@ mod test_eg_h {
 
         let data = [0u8; 0];
 
-        let actual = eg_h(&key, &data);
+        let actual = eg_h(&key, data);
 
         let expected =
             HValue::from_str("B613679A0814D9EC772F95D778C35FC5FF1697C493715653C6C712144292C5AD")

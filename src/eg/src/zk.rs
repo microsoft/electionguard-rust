@@ -5,14 +5,16 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 //! This module provides the implementation of the range proof [`ProofRange`] for [`Ciphertext`]s.
-//! For more details see Section `3.3.5` of the Electionguard specification `2.0.0`.
+//! For more details see Section `3.3.5` of the Electionguard specification `2.0.0`. [TODO fix ref]
 
 use serde::{Deserialize, Serialize};
 use util::{
     algebra::{FieldElement, GroupElement, ScalarField},
-    csprng::Csprng,
+    csrng::Csrng,
+    vec1::HasIndexType,
 };
 
 use crate::{
@@ -20,7 +22,6 @@ use crate::{
     hash::eg_h,
     nonce::NonceFE,
     pre_voting_data::PreVotingData,
-    vec1::HasIndexType,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,25 +35,21 @@ pub struct ProofRangeSingle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRange(Vec<ProofRangeSingle>);
 
-/// A [`Vec1`] of [`ProofRange`] is indexed with the same type as [`Ciphertext`]
-/// Same as [`ContestOption`], [`ContestDataFieldPlaintext`], and others.
 impl HasIndexType for ProofRange {
-    type IndexType = Ciphertext;
+    type IndexTypeParam = Ciphertext;
 }
 
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestDataFieldPlaintextIndex`], etc.
+/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
 pub type ProofRangeIndex = CiphertextIndex;
 
-#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+#[derive(thiserror::Error, Clone, Debug)]
 pub enum ZkProofRangeError {
-    #[error(
-        "It must be the case that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l})."
-    )]
+    #[error("It must be that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l}).")]
     RangeNotSatisfied { small_l: usize, big_l: usize },
 }
 
 impl ProofRange {
-    /// This function computes the challenge for the range proof as specified in Equation `46`.
+    /// This function computes the challenge for the range proof as specified in Equation `46`. [TODO fix ref]
     ///
     /// The arguments are
     /// - `pvd` - the pre voting data
@@ -60,19 +57,26 @@ impl ProofRange {
     /// - `a` - the a vector of the commit message
     /// - `b` - the b vector of the commit message
     pub fn challenge(
-        pvd: &PreVotingData,
+        pre_voting_data: &PreVotingData,
         ct: &Ciphertext,
         a: &[GroupElement],
         b: &[GroupElement],
     ) -> FieldElement {
-        let field = &pvd.parameters.fixed_parameters.field;
-        let group = &pvd.parameters.fixed_parameters.group;
+        let field = pre_voting_data
+            .election_parameters()
+            .fixed_parameters()
+            .field();
+        let group = pre_voting_data
+            .election_parameters()
+            .fixed_parameters()
+            .group();
 
         // v = 0x21 | b(K,512) | b(alpha,4) | b(beta,512) | b(a_0,512) | ... | b(b_L,512) for standard parameters
         let mut v = vec![0x21];
         v.extend_from_slice(
-            pvd.public_key
-                .joint_election_public_key
+            pre_voting_data
+                .jvepk_k()
+                .group_element
                 .to_be_bytes_left_pad(group)
                 .as_slice(),
         );
@@ -85,8 +89,9 @@ impl ProofRange {
             v.extend_from_slice(b_i.to_be_bytes_left_pad(group).as_slice());
         });
 
-        // Equation `46`
-        let c = eg_h(&pvd.hashes_ext.h_e, &v);
+        // Equation `46` [TODO fix ref]
+        let c = eg_h(pre_voting_data.h_e(), &v);
+        //? TODO can we use eg::hash::eg_h_q() for this?
         FieldElement::from_bytes_be(c.0.as_slice(), field)
     }
 
@@ -94,13 +99,13 @@ impl ProofRange {
     ///
     /// The arguments are
     /// - `pre_voting_data` - pre-voting data
-    /// - `csprng` - secure randomness generator
+    /// - `csrng` - secure randomness generator
     /// - `ct` - the ciphertext
     /// - `small_l` - the encrypted number
     /// - `big_l` - the range bound
     pub fn new(
         pre_voting_data: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         ct: &Ciphertext,
         nonce: &NonceFE,
         small_l: usize,
@@ -109,15 +114,22 @@ impl ProofRange {
         if small_l > big_l {
             return Err(ZkProofRangeError::RangeNotSatisfied { small_l, big_l });
         }
-        let field = &pre_voting_data.parameters.fixed_parameters.field;
-        let group = &pre_voting_data.parameters.fixed_parameters.group;
+
+        let field = pre_voting_data
+            .election_parameters()
+            .fixed_parameters()
+            .field();
+        let group = pre_voting_data
+            .election_parameters()
+            .fixed_parameters()
+            .group();
 
         // Compute commit message and simulated challenges
         let u = (0..big_l + 1)
-            .map(|_| field.random_field_elem(csprng))
+            .map(|_| field.random_field_elem(csrng))
             .collect::<Vec<FieldElement>>();
         let mut c = (0..big_l + 1)
-            .map(|_| field.random_field_elem(csprng))
+            .map(|_| field.random_field_elem(csrng))
             .collect::<Vec<FieldElement>>();
         let a = (0..big_l + 1)
             .map(|j| group.g_exp(&u[j]))
@@ -132,12 +144,7 @@ impl ProofRange {
             }
         }
         let b = (0..big_l + 1)
-            .map(|j| {
-                pre_voting_data
-                    .public_key
-                    .joint_election_public_key
-                    .exp(&t[j], group)
-            })
+            .map(|j| pre_voting_data.jvepk_k().group_element.exp(&t[j], group))
             .collect::<Vec<GroupElement>>();
 
         // Compute real challenge c_{small_l}
@@ -174,8 +181,8 @@ impl ProofRange {
     ///
     /// This is essentially Verification (5).
     pub fn verify(&self, pvd: &PreVotingData, ct: &Ciphertext, big_l: u32) -> bool {
-        let field = &pvd.parameters.fixed_parameters.field;
-        let group = &pvd.parameters.fixed_parameters.group;
+        let field = pvd.election_parameters().fixed_parameters().field();
+        let group = pvd.election_parameters().fixed_parameters().group();
 
         let Ok(big_l_usize) = TryInto::<usize>::try_into(big_l) else {
             return false;
@@ -189,6 +196,7 @@ impl ProofRange {
                     .mul(&ct.alpha.exp(&self.0[j].c, group), group)
             })
             .collect::<Vec<GroupElement>>();
+
         // (5.2)
         let w = (0..big_l_usize + 1)
             .map(|j| {
@@ -196,13 +204,15 @@ impl ProofRange {
                 self.0[j].v.sub(&j_scalar.mul(&self.0[j].c, field), field)
             })
             .collect::<Vec<FieldElement>>();
+
         let b = (0..big_l_usize + 1)
             .map(|j| {
-                let k_w = pvd.public_key.joint_election_public_key.exp(&w[j], group);
+                let k_w = pvd.jvepk_k().group_element.exp(&w[j], group);
                 let b_c = ct.beta.exp(&self.0[j].c, group);
                 k_w.mul(&b_c, group)
             })
             .collect::<Vec<GroupElement>>();
+
         // (5.3)
         let c = Self::challenge(pvd, ct, &a, &b);
 
@@ -307,12 +317,12 @@ impl ProofGuardian {
         v.extend_from_slice(j.to_be_bytes().as_slice());
         v.extend_from_slice(capital_k_i_j.to_bytes_be().as_slice());
         v.extend_from_slice(h_i_j.to_bytes_be().as_slice());
-        // Equation 11
+        // Equation 11 [TODO fix ref]
         let c = eg_h(&h_p, &v);
         BigUint::from_bytes_be(c.0.as_slice()) % fixed_parameters.q.as_ref()
     }
     pub fn new(
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         fixed_parameters: &FixedParameters,
         h_p: HValue,
         zmulq: Rc<ZMulPrime>,
@@ -322,7 +332,7 @@ impl ProofGuardian {
         a_i: &[BigUint],
     ) -> Self {
         let u = (0..k)
-            .map(|_| ZMulPrimeElem::new_pick_random(zmulq.clone(), csprng))
+            .map(|_| ZMulPrimeElem::new_pick_random(zmulq.clone(), csrng))
             .collect::<Vec<ZMulPrimeElem>>();
         let h = u
             .iter()

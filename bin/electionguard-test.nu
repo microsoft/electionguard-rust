@@ -17,11 +17,14 @@ def main [
     --no-jsonschema   # Do not validate files against JSON schema.
     --no-insecure-deterministic # Do not use the --insecure-deterministic flag.
     --dump-imports    # Dump the imports of the resulting binary (currently windows only)
+    --num-guardians: int = 5 # Number of guardians to use in test (default 5)
+    --num-quorum: int = 3    # Number of guardians required for quorum (default 3)
+    --num-ballots: int = 5   # Number of ballots to use in test (default 5)
 ] {
     figure_eg_top_dir
     std log info $"Started ($env.CURRENT_FILE | path relative-to (eg_top_dir))"
     std log info $"Checkout top dir: (eg_top_dir)"
-    
+
     figure_artifacts_dir
     std log info $"Artifacts dir: (artifacts_dir)"
 
@@ -35,8 +38,8 @@ def main [
 
     # Specify the election parameters.
     let election_parameters = {
-        n: 5
-        k: 3
+        n: $num_guardians
+        k: $num_quorum
         date: (date now | format date "%Y-%m-%d")
         info: $"The United Realms of Imaginaria General Election ((date now | date to-record).year)"
     }
@@ -58,7 +61,7 @@ def main [
     figure_eg_exe $cargo_target_dir
 
     #  Figure out RUSTFLAGS
-    # 
+    #
     std log info $"Previous RUSTFLAGS: ($env.RUSTFLAGS? | default "")"
     let xxx_some_cfg_setting = false
     if $xxx_some_cfg_setting {
@@ -67,7 +70,7 @@ def main [
     std log info $"Subsequent RUSTFLAGS: ($env.RUSTFLAGS? | default "")"
 
     #  Cargo clean
-    # 
+    #
     if $clean {
         run-subprocess --delimit [ cargo clean $cargo_profile_build_flag ]
     }
@@ -86,7 +89,7 @@ def main [
     }
 
     #  Cargo build
-    # 
+    #
     let cargo_build_flag_vv = null
     if not $no_build {
         run-subprocess --delimit [ cargo build $cargo_build_flag_vv $cargo_profile_build_flag ]
@@ -97,19 +100,19 @@ def main [
     }
 
     #  Cargo check
-    # 
+    #
     if not $no_check {
         run-subprocess --delimit [ cargo check $cargo_profile_build_flag ]
     }
 
     #  Cargo clippy
-    # 
+    #
     if not $no_clippy {
         run-subprocess --delimit [ cargo clippy $cargo_profile_build_flag ]
     }
 
     #  Cargo test
-    # 
+    #
     if not $no_test {
         run-subprocess --delimit [
             cargo test $cargo_profile_build_flag --
@@ -118,7 +121,7 @@ def main [
     }
 
     #  Build docs
-    # 
+    #
     if not $no_build_docs {
         let build_docs = ($electionguard_bin_dir | path join build-docs.cmd)
         std log info $"build_docs: ($build_docs)"
@@ -133,15 +136,16 @@ def main [
     }
 
     #  Run ElectionGuard tests
-    # 
+    #
     if not $no_egtest {
         (egtests $election_parameters
             --cargo_profile_build_flag $cargo_profile_build_flag
+            --num-ballots=$num_ballots
             --no-jsonschema=$no_jsonschema )
     }
 
     #  Success!
-    # 
+    #
     log info "Success!"
 }
 
@@ -150,7 +154,7 @@ def --env figure_eg_top_dir [] {
     $env._eg_top_dir = $dir
 }
 
-def eg_top_dir [] -> string {    
+def eg_top_dir [] -> string {
     $env._eg_top_dir
 }
 
@@ -213,7 +217,7 @@ def --env figure_eg_exe [$cargo_target_dir] {
     log info $"electionguard executable: ($env._eg_exe)"
 }
 
-def eg_exe [] -> string {    
+def eg_exe [] -> string {
     $env._eg_exe
 }
 
@@ -233,11 +237,11 @@ def --env figure_jsonschema_command [] {
     }
 }
 
-def jsonschema_command [] -> string {    
+def jsonschema_command [] -> string {
     $env._jsonschema_command
 }
 
-def --env figure_jsonschema_dir [] {    
+def --env figure_jsonschema_dir [] {
     let dir = (eg_top_dir | path join "doc/specs/ElectionGuard_2.0_jsonschema")
 
     $env._eg_jsonschema_dir = $dir
@@ -245,7 +249,7 @@ def --env figure_jsonschema_dir [] {
     std log info $"jsonschema dir: ($env._eg_jsonschema_dir)"
 }
 
-def eg_jsonschema_dir [] -> string {    
+def eg_jsonschema_dir [] -> string {
     $env._eg_jsonschema_dir
 }
 
@@ -253,9 +257,12 @@ def egtests [
     election_parameters: record<n: int, k: int, date: string, info: string>
     --cargo_profile_build_flag: string
     --no-jsonschema
+    --num-ballots: int
 ] {
+    std log info $"num_ballots=($num_ballots)"
+
     #  Build electionguard.exe and its dependents
-    # 
+    #
     run-subprocess --delimit [
         cargo build $cargo_profile_build_flag -p electionguard
     ]
@@ -265,16 +272,16 @@ def egtests [
         exit
     }
 
-    # 
-    #  Write random seed
-    # 
-    if not (artifacts_public_dir | path join "pseudorandom_seed_defeats_all_secrecy.bin" | path exists) {
-        run-subprocess --delimit [ (eg_exe) write-random-seed ]
+    #
+    #  Write insecure deterministic seed data file
+    #
+    if not (artifacts_public_dir | path join "insecure_deterministic_seed_data.bin" | path exists) {
+        run-subprocess --delimit [ (eg_exe) write-insecure-deterministic-seed-data ]
     }
 
-    # 
+    #
     #  Write election parameters
-    # 
+    #
     let election_parameters_json_file = artifacts_public_dir | path join "election_parameters.json"
     if not ($election_parameters_json_file | path exists) {
         run-subprocess --delimit [
@@ -296,9 +303,9 @@ def egtests [
         validate-jsonschema --json-file $election_parameters_json_file --schema-file 'election_parameters.json'
     }
 
-    # 
+    #
     #  Verify standard parameters
-    # 
+    #
     let standard_parameters_verified_file = artifacts_public_dir | path join "standard_parameters_verified.txt"
     if not ($standard_parameters_verified_file | path exists) {
         run-subprocess --delimit [
@@ -308,10 +315,10 @@ def egtests [
         log info $"Standard parameters: Verified! >($standard_parameters_verified_file)"
     }
 
-    # 
+    #
     #  Write election manifest (canonical and pretty), then validate them with the schema
     #
-    
+
     let election_manifest_pretty_json_file = artifacts_public_dir | path join "election_manifest.json"
     let election_manifest_canonical_json_file = artifacts_public_dir | path join "election_manifest_canonical.bin"
 
@@ -319,7 +326,7 @@ def egtests [
         run-subprocess --delimit [
             (eg_exe) write-manifest --in-example --out-format pretty
         ]
-    
+
         if not ($election_manifest_pretty_json_file | path exists) {
             log error $"ERROR: Election manifest \(pretty) file does not exist: ($election_manifest_pretty_json_file)"
             exit 1
@@ -342,9 +349,9 @@ def egtests [
         validate-jsonschema --json-file $election_manifest_canonical_json_file --schema-file 'election_manifest.json'
     }
 
-    # 
+    #
     #  Write hashes
-    # 
+    #
     let hashes_json_file = artifacts_public_dir | path join "hashes.json"
     if not ($hashes_json_file | path exists) {
         run-subprocess --delimit [
@@ -361,7 +368,7 @@ def egtests [
         validate-jsonschema --json-file $hashes_json_file --schema-file 'hashes.json'
     }
 
-    # 
+    #
     #  For each guardian
     #
     for $i in 1..$election_parameters.n {
@@ -371,9 +378,9 @@ def egtests [
     log info ""
     log info "---- All guardians done."
 
-    # 
+    #
     #  Write joint election public key
-    # 
+    #
     let joint_election_public_key_json_file = artifacts_public_dir | path join "joint_election_public_key.json"
     if not ($joint_election_public_key_json_file | path exists) {
         run-subprocess --delimit [
@@ -385,14 +392,14 @@ def egtests [
         log error $"ERROR: Joint election public key .json file does not exist: ($joint_election_public_key_json_file)"
         exit 1
     }
-    
+
     if not $no_jsonschema {
         validate-jsonschema --json-file $joint_election_public_key_json_file --schema-file 'joint_election_public_key.json'
     }
 
-    # 
+    #
     #  Write HashesExt
-    # 
+    #
     let hashes_ext_json_file = artifacts_public_dir | path join "hashes_ext.json"
     if not ($hashes_ext_json_file | path exists) {
         run-subprocess --delimit [ (eg_exe) --insecure-deterministic write-hashes-ext ]
@@ -402,14 +409,14 @@ def egtests [
         log error $"ERROR: Hashes ext .json file does not exist: ($hashes_ext_json_file)"
         exit 1
     }
-    
+
     if not $no_jsonschema {
         validate-jsonschema --json-file $hashes_ext_json_file --schema-file 'hashes_ext.json'
     }
-    
-    # 
+
+    #
     #  Write PreVotingData
-    # 
+    #
     let pre_voting_data_json_file = artifacts_public_dir | path join "pre_voting_data.json"
     if not ($pre_voting_data_json_file | path exists) {
         run-subprocess --delimit [ (eg_exe) --insecure-deterministic write-pre-voting-data ]
@@ -419,14 +426,18 @@ def egtests [
         log error $"ERROR: Hashes ext .json file does not exist: ($pre_voting_data_json_file)"
         exit 1
     }
-    
-    #if not $no_jsonschema {
-    #    validate-jsonschema --json-file $pre_voting_data_json_file --schema-file 'pre_voting_data.json'
-    #}
 
-    # 
+    #
+    #  Write GeneratedTestDataVoterSelections
+    #
+
+    for $i in 1..$num_ballots {
+        egtest_per_random_voter $i --no-jsonschema=$no_jsonschema
+    }
+
+    #
     #  Tests success!
-    # 
+    #
     log info ""
     log info "ElectionGuard tests successful!"
     log info ""
@@ -495,7 +506,7 @@ def egtest_per_guardian [
             log error $"Guardian ($i) public key file does not exist: ($guardian_public_key_file)"
             exit 1
         }
-        
+
         if not $no_jsonschema {
             validate-jsonschema --json-file $guardian_public_key_file --schema-file 'guardian_public_key.json'
         }
@@ -513,6 +524,53 @@ def egtest_per_guardian [
         
         if not $no_jsonschema {
             validate-jsonschema --json-file $guardian_public_key_canonical_file --schema-file 'guardian_public_key.json'
+        }
+    }
+}
+
+def egtest_per_random_voter [
+    i: int
+    --no-jsonschema
+] {
+    let random_voter_selections_dir = (artifacts_dir) | path join "random_voter_selections"
+    if not ($random_voter_selections_dir | path exists) {
+        mkdir $random_voter_selections_dir
+    }
+
+    let voter_selections_file = $random_voter_selections_dir | path join $"random_($i).voter_selections.json"
+    let random_voter_name = $"Random Voter ($i)"
+
+    log info ""
+    log info $"---- ($random_voter_name)"
+    log info ""
+    log info $"Random voter selections file: ($voter_selections_file)"
+
+    if not ($voter_selections_file | path exists) {
+        run-subprocess --delimit [
+            (eg_exe) --insecure-deterministic generate-random-voter-selections --seed $i --out-file $voter_selections_file
+        ]
+
+        if not $no_jsonschema {
+            validate-jsonschema --json-file $voter_selections_file --schema-file 'voter_selections.json'
+        }
+    }
+
+    let ballots_dir = (artifacts_dir) | path join "ballots"
+    if not ($ballots_dir | path exists) {
+        mkdir $ballots_dir
+    }
+
+    let ballot_file = $ballots_dir | path join $"ballots_($i).voter_selections.json"
+
+    log info $"Ballot file: ($ballot_file)"
+
+    if not ($voter_selections_file | path exists) {
+        run-subprocess --delimit [
+            (eg_exe) --insecure-deterministic create-ballot-from-voter-selections --voter-selections $voter_selections_file --out-file $ballot_file
+        ]
+
+        if not $no_jsonschema {
+            validate-jsonschema --json-file $ballot_file --schema-file 'ballot.json'
         }
     }
 }

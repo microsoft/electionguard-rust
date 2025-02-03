@@ -8,7 +8,10 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
-use eg::serializable::{SerializableCanonical, SerializablePretty};
+use eg::{
+    serializable::{SerializableCanonical, SerializablePretty},
+    eg::Eg,
+};
 
 use crate::{
     artifacts_dir::ArtifactFile, common_utils::ElectionManifestSource,
@@ -54,10 +57,6 @@ pub(crate) struct WriteManifest {
 }
 
 impl Subcommand for WriteManifest {
-    fn uses_csprng(&self) -> bool {
-        false
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         let cnt_in_specified = self.in_pretty as usize
             + self.in_canonical as usize
@@ -66,6 +65,16 @@ impl Subcommand for WriteManifest {
         if cnt_in_specified > 1 {
             bail!("Specify at most one of `--in-pretty`, `--in-canonical`, `--in-file`, or `--in-example`");
         }
+
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("WriteManifest")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        #[expect(unused_variables)]
+        let eg = &mut eg;
 
         // Resolve the options to a ElectionManifestSource.
         let election_manifest_source = if self.in_pretty {
@@ -89,7 +98,7 @@ impl Subcommand for WriteManifest {
 
         let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
-            .out_file_stdiowrite(&self.out_file, Some(artifact_file))?;
+            .out_file_stdiowrite(self.out_file.as_ref(), Some(&artifact_file))?;
 
         let write_result = match self.out_format {
             Canonical => election_manifest.to_stdiowrite_canonical(&mut stdiowrite),

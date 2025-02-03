@@ -25,16 +25,22 @@ pub(crate) struct VoterWriteConfirmationCode {
 }
 
 impl Subcommand for VoterWriteConfirmationCode {
-    fn uses_csprng(&self) -> bool {
-        false
-    }
     #[allow(unused_variables)]
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        //let mut eg = {
+        //    let csprng = subcommand_helper
+        //        .build_csprng()?
+        //        .write_str("VoterWriteConfirmationCode")
+        //        .finish();
+        //    Eg::from_csprng(csprng)
+        //};
+        //let eg = &mut eg;
+
         // match VoterConfirmationQRCode::new(&self.code) {
         //     Some(qr_code) => {
         //         let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
         //             &self.out_file,
-        //             Some(ArtifactFile::VoterConfirmationCode(
+        //             Some(&ArtifactFile::VoterConfirmationCode(
         //                 HValue::from_str(&self.code).unwrap(),
         //             )),
         //         )?;

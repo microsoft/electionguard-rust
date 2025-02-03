@@ -9,7 +9,10 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::{joint_election_public_key::JointElectionPublicKey, serializable::SerializablePretty};
+use eg::{
+    joint_public_key::JointPublicKey, serializable::SerializablePretty,
+    eg::Eg,
+};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -19,9 +22,7 @@ use crate::{
 };
 
 #[derive(clap::Args, Debug, Default)]
-pub(crate) struct WriteJointElectionPublicKey {
-    //? TODO do we need to be able to specify a file for every guardian public key?
-    /* */
+pub(crate) struct WriteJointPublicKey {
     /// File to which to write the election public key.
     /// Default is in the artifacts dir.
     /// If "-", write to stdout.
@@ -29,30 +30,35 @@ pub(crate) struct WriteJointElectionPublicKey {
     out_file: Option<PathBuf>,
 }
 
-impl Subcommand for WriteJointElectionPublicKey {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
+impl Subcommand for WriteJointPublicKey {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng(b"WriteHashes")?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("WriteJointPublicKey")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
-        //? TODO: Do we need a command line arg to specify the election parameters source?
-        let election_parameters =
-            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
+        {
+            //? TODO: Do we need a command line arg to specify the election parameters source?
+            let _election_parameters =
+                load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
 
-        //? TODO: Do we need a command line arg to specify all the guardian public key source files?
-        let guardian_public_keys =
-            load_all_guardian_public_keys(&subcommand_helper.artifacts_dir, &election_parameters)?;
+            //? TODO: Do we need a command line arg to specify all the guardian public key source files?
+            let _guardian_public_keys =
+                load_all_guardian_public_keys(eg, &subcommand_helper.artifacts_dir)?;
+        }
 
-        let joint_election_public_key =
-            JointElectionPublicKey::compute(&election_parameters, guardian_public_keys.as_slice())?;
+        let joint_public_key = JointPublicKey::get_or_compute(eg)?;
 
-        let (mut stdiowrite, path) = subcommand_helper
-            .artifacts_dir
-            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::JointElectionPublicKey))?;
+        let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+            self.out_file.as_ref(),
+            Some(&ArtifactFile::JointPublicKey),
+        )?;
 
-        joint_election_public_key
+        joint_public_key
             .to_stdiowrite_pretty(stdiowrite.as_mut())
             .with_context(|| format!("Writing joint election public key to: {}", path.display()))?;
 

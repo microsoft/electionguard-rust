@@ -1,6 +1,7 @@
 **/.cargo
 **/.DS_Store
 **/.errorviz-version
+**/*.pending-snap
 **/.vscode
 **/artifacts
 **/local.settings.json

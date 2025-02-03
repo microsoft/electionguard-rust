@@ -1,0 +1,36 @@
+[package]
+name = "formulator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+#--- Defined in this workspace
+util.workspace = true
+
+#--- From crates.io
+anyhow.workspace = true
+arbitrary.workspace = true
+bimap.workspace = true
+derive_arbitrary.workspace = true
+hashbrown.workspace = true
+indoc.workspace = true
+itertools.workspace = true
+pathfinding.workspace = true
+proptest.workspace = true
+proptest-arbitrary-interop.workspace = true
+rustc-stable-hash.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+smallbitvec.workspace = true
+static_assertions.workspace = true
+thiserror.workspace = true
+
+tinyset = "0.5.1"
+ 
+#--- Tracing
+tracing.workspace = true
+#valuable.workspace = true
+
+[dev-dependencies]
+insta = { version = "1.42.1", features = [] }

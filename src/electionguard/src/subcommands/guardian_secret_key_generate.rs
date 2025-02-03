@@ -5,13 +5,15 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
-use std::path::PathBuf;
+use std::{ops::DerefMut, path::PathBuf};
 
 use anyhow::{bail, Context, Result};
 
 use eg::{
-    guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey,
+    guardian::{GuardianIndex, GuardianKeyPurpose},
+    guardian_secret_key::GuardianSecretKey,
     serializable::SerializablePretty,
+    eg::Eg,
 };
 
 use crate::{
@@ -37,19 +39,21 @@ pub(crate) struct GuardianSecretKeyGenerate {
 }
 
 impl Subcommand for GuardianSecretKeyGenerate {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper
-            .get_csprng(format!("GuardianSecretKeyGenerate({})", self.i).as_bytes())?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("GuardianSecretKeyGenerate")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let election_parameters =
-            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
+            load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
 
-        let varying_parameters = &election_parameters.varying_parameters;
+        let varying_parameters = &election_parameters.varying_parameters();
 
         #[allow(clippy::nonminimal_bool)]
         if !(self.i <= varying_parameters.n) {
@@ -60,16 +64,19 @@ impl Subcommand for GuardianSecretKeyGenerate {
             );
         }
 
+        let name: String = self.name.clone().unwrap_or_default();
+
         let secret_key = GuardianSecretKey::generate(
-            &mut csprng,
             &election_parameters,
             self.i,
-            self.name.clone(),
+            name,
+            GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
+            eg.csrng(),
         );
 
         let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
-            &self.secret_key_out_file,
-            Some(ArtifactFile::GuardianSecretKey(self.i)),
+            self.secret_key_out_file.as_ref(),
+            Some(&ArtifactFile::GuardianSecretKey(self.i)),
         )?;
 
         let description = format!("secret key for guardian {} to: {}", self.i, path.display());

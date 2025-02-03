@@ -8,14 +8,19 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use eg::ballot_style::BallotStyleIndex;
-use eg::pre_voting_data::PreVotingData;
-use eg::hash::{eg_h, HValue, HVALUE_BYTE_LEN};
-use eg::ciphertext::Ciphertext
-use eg::joint_election_public_key::JointElectionPublicKey;
-use eg::vec1::Vec1;
-use util::csprng::Csprng;
-use util::logging::Logging;
+
+use eg::{
+    ballot_style::BallotStyleIndex,
+    pre_voting_data::PreVotingData,
+    hash::{eg_h, HValue, HVALUE_BYTE_LEN},
+    ciphertext::Ciphertext,
+    joint_public_key::JointPublicKey,
+};
+use util::{
+    csrng::Csrng,
+    logging::Logging,
+    vec1::Vec1,
+};
 
 use crate::ballot::BallotPreEncrypted;
 use crate::contest::ContestPreEncrypted;
@@ -28,7 +33,7 @@ pub struct BallotEncryptingTool {
     pub ballot_style_index: BallotStyleIndex,
 
     /// Encryption key used to encrypt the primary nonce.
-    pub encryption_key: Option<JointElectionPublicKey>,
+    pub encryption_key: Option<JointPublicKey>,
 }
 
 pub struct EncryptedNonce {
@@ -39,7 +44,7 @@ impl BallotEncryptingTool {
     pub fn new(
         pvd: PreVotingData,
         ballot_style_index: BallotStyleIndex,
-        encryption_key: Option<JointElectionPublicKey>,
+        encryption_key: Option<JointPublicKey>,
     ) -> Self {
         Self {
             pv_data: pvd,
@@ -74,7 +79,7 @@ impl BallotEncryptingTool {
 
     pub fn generate_ballots(
         &self,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         num_ballots: usize,
     ) -> (Vec<BallotPreEncrypted>, Vec<HValue>) {
         let mut ballots = Vec::new();
@@ -82,7 +87,7 @@ impl BallotEncryptingTool {
 
         while ballots.len() < num_ballots {
             let (ballot, nonce) =
-                BallotPreEncrypted::new(&self.pv_data, self.ballot_style_index, csprng, false);
+                BallotPreEncrypted::new(&self.pv_data, self.ballot_style_index, csrng, false);
             if Self::are_unique_shortcodes(&ballot.contests) {
                 ballots.push(ballot);
                 primary_nonces.push(nonce);
@@ -114,18 +119,18 @@ impl BallotEncryptingTool {
         format!("{:02x}", full_hash.0[HVALUE_BYTE_LEN - 1])
     }
 
-    /// Generates a selection hash (Equation 93/94)
+    /// Generates a selection hash (Equation 93/94) [TODO fix ref]
     ///
     /// ψ_i = H(H_E;40,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
     pub fn selection_hash(header: &PreVotingData, selections: &[Ciphertext]) -> HValue {
-        let group = &header.parameters.fixed_parameters.group;
+        let group = &header.election_parameters.fixed_parameters().group();
 
         let mut v = vec![0x40];
 
         v.extend_from_slice(
             header
                 .public_key
-                .joint_election_public_key
+                .joint_public_key
                 .to_be_bytes_left_pad(group)
                 .as_slice(),
         );
@@ -135,7 +140,7 @@ impl BallotEncryptingTool {
             v.extend_from_slice(s.beta.to_be_bytes_left_pad(group).as_slice());
         });
 
-        eg_h(&header.hashes_ext.h_e, &v)
+        eg_h(&header.h_e(), &v)
     }
 
     /// Returns true iff all shortcodes within each preencrypted contest on a ballot are unique
@@ -170,26 +175,26 @@ impl BallotEncryptingTool {
 
 //     #[test]
 //     fn test_pre_encrypted_ballot_generation() {
-//         let election_parameters = example_election_parameters();
+//         let election_parameters = example_election_parameters()?;
 //         let election_manifest = example_election_manifest_small();
 //         let fixed_parameters = &*STANDARD_PARAMETERS;
 
-//         let mut csprng = util::csprng::Csprng::new(1234);
+//         let mut csrng = util::csrng::Csrng::new(1234);
 
-//         let sk = PrivateKey::new(&mut csprng, fixed_parameters);
+//         let sk = PrivateKey::new(csrng, fixed_parameters);
 
 //         let hashes = Hashes::new(&election_parameters, &election_manifest);
-//         // eprintln!("{:#?}", manifest.contests);
+//         // eprintln!("{:#?}", election_manifest.contests);
 
 //         let config = PreEncryptedBallotConfig {
-//             manifest: election_manifest,
+//             election_manifest,
 //             election_public_key: sk.public_key().clone(),
 //             encrypt_nonce: false,
 //             h_e: hashes.h_p,
 //         };
 
 //         let mut primary_nonce = [0u8; 32];
-//         (0..32).for_each(|i| primary_nonce[i] = csprng.next_u8());
+//         (0..32).for_each(|i| primary_nonce[i] = csrng.next_u8());
 
 //         let ballot = BallotEncryptingTool::generate_ballot_with(
 //             &config,

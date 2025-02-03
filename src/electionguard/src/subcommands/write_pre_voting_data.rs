@@ -10,12 +10,15 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::{pre_voting_data::PreVotingData, serializable::SerializablePretty};
+use eg::{
+    hashes::Hashes, extended_base_hash::ExtendedBaseHash, joint_public_key::JointPublicKey,
+    pre_voting_data::PreVotingData, serializable::SerializablePretty, eg::Eg,
+};
 
 use crate::{
     artifacts_dir::ArtifactFile,
     common_utils::{
-        load_election_parameters, load_hashes, load_hashes_ext, load_joint_election_public_key,
+        load_election_parameters, load_hashes, load_extended_base_hash, load_joint_public_key,
         ElectionManifestSource,
     },
     subcommand_helper::SubcommandHelper,
@@ -32,44 +35,45 @@ pub(crate) struct WritePreVotingData {
 }
 
 impl Subcommand for WritePreVotingData {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng(b"WritePreVotingData")?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("WritePreVotingData")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
-        let election_parameters =
-            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
+        let _election_parameters =
+            load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
 
         //? TODO: Do we need a command line arg to specify the election manifest source?
         let election_manifest_source =
             ElectionManifestSource::ArtifactFileElectionManifestCanonical;
-        let election_manifest =
+        let _election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
         //? TODO: Do we need a command line arg to specify the hashes source?
-        let hashes = load_hashes(&subcommand_helper.artifacts_dir)?;
+        load_hashes(eg, &subcommand_helper.artifacts_dir)?;
 
         //? TODO: Do we need a command line arg to specify the joint election public key source?
-        let joint_election_public_key =
-            load_joint_election_public_key(&subcommand_helper.artifacts_dir, &election_parameters)?;
+        load_joint_public_key(eg, &subcommand_helper.artifacts_dir)?;
 
-        //? TODO: Do we need a command line arg to specify the hashes_ext source?
-        let hashes_ext = load_hashes_ext(&subcommand_helper.artifacts_dir)?;
+        //? TODO: Do we need a command line arg to specify the extended_base_hash source?
+        load_extended_base_hash(eg, &subcommand_helper.artifacts_dir)?;
 
-        let pre_voting_data = PreVotingData {
-            parameters: election_parameters,
-            manifest: election_manifest,
-            hashes,
-            public_key: joint_election_public_key,
-            hashes_ext,
-        };
+        Hashes::get_or_compute(eg)?;
+        JointPublicKey::get_or_compute(eg)?;
+        ExtendedBaseHash::get_or_compute(eg)?;
+
+        PreVotingData::get_or_compute(eg)?;
+        let pre_voting_data = eg.pre_voting_data()?;
 
         let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
-            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::PreVotingData))?;
+            .out_file_stdiowrite(self.out_file.as_ref(), Some(&ArtifactFile::PreVotingData))?;
 
         pre_voting_data
             .to_stdiowrite_pretty(stdiowrite.as_mut())

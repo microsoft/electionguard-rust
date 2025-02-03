@@ -264,7 +264,7 @@ non-negative integers. In practice, the cryptographic values are far too large t
 represent directly in JSON. But basic JSON integers are used to represent real-world
 quantities.
 
-### Small integers
+### <a id="Small_integers"></a>Small integers
 
 Small integers (less than 2^31) are used for things like the number of guardians in a
 quorum, or a 1-based index identifying a specific element in a sequence.
@@ -304,9 +304,7 @@ The `HMAC-SHA-256` function used in ElectionGuard 2.0 produces fixed size of 32 
 which are interpreted (using big-endian) as [large integers](#Large_integers) of that size and
 written as described above. See the [Design Specification][EGDS20] sections 5.1 and 5.4 for more information.
 
-## Specific Data Structures
-
-### Election Parameters
+## Election Parameters
 
 The public `election_parameters.json` file is validated by the
 [`election_parameters.json`](./ElectionGuard_2.0_jsonschema/election_parameters.json) schema file.
@@ -348,7 +346,7 @@ Example in non-canonical form:
 }
 ```
 
-### Hashes
+## Hashes
 
 The public `hashes.json` file is validated by the
 [`hashes.json`](./ElectionGuard_2.0_jsonschema/hashes.json) schema file.
@@ -363,10 +361,65 @@ Example in non-canonical form:
 }
 ```
 
-### Election Manifest
+## Election Manifest
 
 The public `election_manifest_canonical.bin` file is validated by the
 [`election_manifest.json`](./ElectionGuard_2.0_jsonschema/election_manifest.json) schema file.
+
+### Selection Limits
+
+Selection limits define the number of "votes" a voter may cast for each option in a specific
+contest. In the most traditional type of election contest, each voter may cast exactly one
+vote. But there is a variety of other contest types in common use, and ElectionGuard can
+support many of them. For example, an election may be held to fill two or more seats on some
+Council or Board. If these seats are to be truly indistinguishable, they cannot have separate
+contests because these contests would have to have the same set of candidates, which would
+introduce the potential for conflicting outcomes, etc. So voting systems must support the
+ability to select multiple candidates in a single contest.
+
+The *default* selection limit, to be used when not stated in the manifest:
+
+* Is `1` for both contests and contest options.
+
+Writers of canonical form objects MUST NOT emit the `selection_limit` property if it
+has this value. It MUST be omitted whenever possible.
+
+The *stated* selection limit in an election manifest:
+
+table
+
+|             |     |
+| ----------- | --- |
+| Contest | MUST be either a [small integer](#Small_integers) or the string `"NO_LIMIT"`. |
+| Option  | MUST be either a [small integer](#Small_integers) or the string `"CONTEST_LIMIT"` |
+
+However, if the contest specifies `"NO_LIMIT"` all its options MUST specify (or default to)
+integer selection limits.
+
+* Contest - MUST be either a [small integer](#Small_integers) or the string `"NO_LIMIT"`.
+
+* Contest option - MUST be either a [small integer](#Small_integers) or, if its containing contest
+specifies an integer selection limit, the string `"CONTEST_LIMIT"`. This implies that for every
+option, at least one of itself or its containing contest MUST specify (or default to) an integer
+limit.
+
+The *effective* selection limit, which is always a small integer, is:
+
+* Contest - The same as its stated (or defaulted-to) contest selection limit, unless all its
+options have integer-valued selection limits, in which case it is the smaller of its limit and the
+sum of its options' selection limits.
+
+* Contest option - The same as its stated (or defaulted-to) contest selection limit, unless
+its containing contest has an integer-valued selection limit, in which case the option limit
+is the smaller of its limit and the contest's selection limit.
+* The `selection_limit` of a contest MUST be either a [small integer](#Small_integers) or
+the string `"NO_LIMIT"`.
+
+Note that in figuring a contest's effective selection limit from its options, or an option's
+effective selection limit from its containing contest, it does not actually matter whether
+the stated or effective selection limits are employed.
+
+### Example
 
 Example in non-canonical form:
 
@@ -376,7 +429,7 @@ Example in non-canonical form:
   "contests": [
     {
       "label": "For President and Vice President of The United Realms of Imaginaria",
-      "contest_options": [
+      "options": [
         {
           "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)"
         }, {
@@ -386,7 +439,7 @@ Example in non-canonical form:
     },
     {
       "label": "Minister of Arcane Sciences",
-      "contest_options": [
+      "options": [
         {
           "label": "Élyria Moonshadow\n(Crystâlheärt)"
         }, {
@@ -400,7 +453,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Minister of Elemental Resources",
-      "contest_options": [
+      "options": [
         {
           "label": "Tïtus Stormforge\n(Ætherwïng)"
         }, {
@@ -411,7 +464,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Minister of Dance",
-      "contest_options": [
+      "options": [
         {
           "label": "Äeliana Sunsong\n(Crystâlheärt)"
         }, {
@@ -422,8 +475,8 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
-      "selection_limit": 6,
-      "contest_options": [
+      "selection_limit": 3,
+      "options": [
         {
           "label": "Ìgnatius Gearsøul\n(Crystâlheärt)"
         }, {
@@ -439,7 +492,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
-      "contest_options": [
+      "options": [
         {
           "label": "For",
           "selection_limit": "CONTEST_LIMIT"
@@ -449,7 +502,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Privacy Protection in Techno-Magical Communications Act",
-      "contest_options": [
+      "options": [
         {
           "label": "Prō"
         }, {
@@ -458,7 +511,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Public Transport Modernization and Enchantment Proposal",
-      "contest_options": [
+      "options": [
         {
           "label": "Prō"
         }, {
@@ -467,7 +520,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Renewable Ætherwind Infrastructure Initiative",
-      "contest_options": [
+      "options": [
         {
           "label": "Prō"
         }, {
@@ -477,7 +530,7 @@ Example in non-canonical form:
     }, {
       "label": "For Librarian-in-Chief of Smoothstone County",
       "selection_limit": 2147483647,
-      "contest_options": [
+      "options": [
         {
           "label": "Élise Planetes",
           "selection_limit": "CONTEST_LIMIT"
@@ -488,7 +541,7 @@ Example in non-canonical form:
       ]
     }, {
       "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
-      "contest_options": [
+      "options": [
         {
           "label": "Retain",
           "selection_limit": 375
@@ -514,7 +567,7 @@ Example in non-canonical form:
 }
 ```
 
-### Guardian Secret Key
+## Guardian Secret Key
 
 The secret for Guardian N `guardian_N.SECRET_key.json` file is validated by the
 [`guardian_secret_key.json`](./ElectionGuard_2.0_jsonschema/guardian_secret_key.json) schema file.
@@ -552,7 +605,7 @@ Example in non-canonical form:
 }
 ```
 
-### Guardian Public Key
+## Guardian Public Key
 
 The public `guardian_N.public_key.json` file is validated by the
 [`guardian_public_key.json`](./ElectionGuard_2.0_jsonschema/guardian_public_key.json) schema file.
@@ -585,7 +638,7 @@ Example in non-canonical form:
 }
 ```
 
-### Extended Hashes
+## Extended Hashes
 
 The public `hashes_ext.json` file is validated by the
 [`hashes_ext.json`](./ElectionGuard_2.0_jsonschema/hashes_ext.json) schema file.
@@ -598,7 +651,7 @@ Example in non-canonical form:
 }
 ```
 
-### Joint Election Public Key
+## Joint Election Public Key
 
 The public `joint_election_public_key.json` file is validated by the
 [`joint_election_public_key.json`](./ElectionGuard_2.0_jsonschema/joint_election_public_key.json)
@@ -612,7 +665,7 @@ Example in non-canonical form:
 }
 ```
 
-### Pre-voting Data
+## Pre-voting Data
 
 The `PreVotingData` structure is simply a collection of the structures that must be known
 before ballots can be produced.
@@ -670,10 +723,9 @@ Example in non-canonical form:
     "h_e": "6CDFB2F4750E7A6BF7D99D9E05E87784C2C9A289E3DBB2AC958670A38989231E"
   }
 }
-
 ```
 
-### VoterSelectionsPlaintext
+## VoterSelectionsPlaintext
 
 This identifies a BallotStyle and voter selections. It is supplied as input to create a `Ballot`.
 
@@ -698,7 +750,7 @@ Example of a ballot in `VoterSelectionsPlaintext` in non-canonical form:
 }
 ```
 
-### Ballot
+## Ballot
 
 A ballot can be in one of the following states:
 
@@ -787,11 +839,22 @@ TODO
 
 ### Tally
 
-TODO
+The `Tally` contains the totals of the votes for each contest option.
+
+Example in non-canonical form:
+
+```json
+```
 
 ### ElectionRecord
 
-TODO
+The `ElectionRecord` is formed by the combination of all public structures known after the tally has
+been produced.
+
+Example in non-canonical form:
+
+```json
+```
 
 ## References
 

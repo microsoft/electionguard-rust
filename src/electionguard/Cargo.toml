@@ -5,15 +5,35 @@ edition = "2021"
 publish = false
 
 [features]
-default = ["eg-allow-unsafe-code", "eg-test-data-generation"]
-eg-allow-unsafe-code = []
-eg-test-data-generation = ["eg/eg-test-data-generation"]
+default = [
+    "eg-allow-unsafe-code",
+    #"eg-forbid-insecure-deterministic-csprng",
+    #"eg-forbid-test-data-generation",
+    #"eg-forbid-toy-parameters",
+]
+eg-allow-unsafe-code           = ["util/eg-allow-unsafe-code" ]
+eg-allow-insecure-deterministic-csprng  = ["util/eg-allow-insecure-deterministic-csprng" ]
+eg-forbid-insecure-deterministic-csprng = ["util/eg-forbid-insecure-deterministic-csprng" ]
+eg-allow-test-data-generation  = ["util/eg-allow-test-data-generation" ]
+eg-forbid-test-data-generation = ["util/eg-forbid-test-data-generation" ]
+eg-allow-toy-parameters = ["util/eg-allow-toy-parameters" ]
+eg-forbid-toy-parameters = ["util/eg-forbid-toy-parameters" ]
 
 [dependencies]
+
+#--- Defined in this workspace
+eg.workspace = true
+# preencrypted.workspace = true
+util.workspace = true
+
+#--- From crates.io
 anyhow.workspace = true
 clap.workspace = true
-rand_core = { workspace = true, features = ["getrandom"] }
 
-eg.workspace = true
-util.workspace = true
-# preencrypted.workspace = true
+#--- RustCrypto
+# crypto-common.workspace = true
+# digest.workspace = true
+# hmac.workspace = true
+# sha2.workspace = true
+# sha3.workspace = true
+zeroize.workspace = true

@@ -14,24 +14,24 @@ use eg::{
 
 use crate::contest_selection::ContestSelectionPreEncrypted;
 
-/// Contest hash for pre-encrypted ballots (Equation 95)
+/// Contest hash for pre-encrypted ballots (Equation 95) [TODO fix ref]
 ///
 /// ψ_i = H(H_E;40,λ_i,K,α_1,β_1,α_2,β_2 ...,α_m,β_m),
 ///
 pub fn contest_hash(
-    header: &PreVotingData,
+    pvd: &PreVotingData,
     contest_ix: ContestIndex,
     selections: &Vec1<ContestSelectionPreEncrypted>,
 ) -> HValue {
-    let group = &header.parameters.fixed_parameters.group;
+    let group = &pvd.election_parameters().fixed_parameters().group();
 
     let mut v = vec![0x41];
 
-    v.extend_from_slice(contest_ix.get_one_based_u32().to_be_bytes().as_slice());
+    v.extend_from_slice(contest_ix.get_one_based_4_be_bytes());
     v.extend_from_slice(
-        header
+        pvd
             .public_key
-            .joint_election_public_key
+            .joint_public_key
             .to_be_bytes_left_pad(group)
             .as_slice(),
     );
@@ -50,5 +50,5 @@ pub fn contest_hash(
         v.extend(s.as_ref());
     });
 
-    eg_h(&header.hashes_ext.h_e, &v)
+    eg_h(&pvd.h_e(), &v)
 }

@@ -3,41 +3,49 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 //! This module provides the implementation of verifiable decryption for
-//! [`Ciphertext`]s. For more details see Section `3.6` of the Electionguard
-//! specification `2.0.0`.
+//! [`Ciphertext`]s. For more details see
+//! Section `3.6` of the Electionguard specification `2.0.0`. [TODO fix ref]
 
-use crate::{
-    ciphertext::Ciphertext,
-    election_manifest::ElectionManifest,
-    election_parameters::ElectionParameters,
-    fixed_parameters::FixedParameters,
-    guardian::GuardianIndex,
-    guardian_public_key::GuardianPublicKey,
-    guardian_share::GuardianSecretKeyShare,
-    hash::{eg_h, HValue},
-    hashes::Hashes,
-    hashes_ext::HashesExt,
-    joint_election_public_key::JointElectionPublicKey,
-    pre_voting_data::PreVotingData,
-};
+use std::rc::Rc;
+
 use itertools::izip;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use util::{
     algebra::{FieldElement, Group, GroupElement, ScalarField},
     algebra_utils::{get_single_coefficient_at_zero, group_lagrange_at_zero, DiscreteLog},
-    csprng::Csprng,
+    csrng::Csrng,
+};
+
+use crate::{
+    ciphertext::Ciphertext,
+    contest_data_fields_plaintexts::ContestDataFieldIndex,
+    eg::Eg,
+    election_manifest::ContestIndex,
+    election_parameters::ElectionParameters,
+    errors::{EgError, EgResult},
+    extended_base_hash::ExtendedBaseHash_H_E,
+    fixed_parameters::FixedParameters,
+    guardian::{GuardianIndex, GuardianKeyPurpose},
+    guardian_public_key::GuardianPublicKey,
+    guardian_public_key_trait::GuardianKeyInfoTrait,
+    guardian_share::GuardianSecretKeyShare,
+    hash::{eg_h, HValue},
+    hashes::Hashes,
+    joint_public_key::JointPublicKey,
+    pre_voting_data::PreVotingData,
 };
 
 /// A decryption share is a guardian's partial decryption of a given ciphertext.
 ///
-/// This corresponds to the `M_i` in Section `3.6.2`.
+/// This corresponds to the `M_i` in Section `3.6.2`. [TODO fix ref]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionShare {
     /// The guardian's index
     pub i: GuardianIndex,
+
     /// The decryption share value
     pub m_i: GroupElement,
 }
@@ -56,10 +64,10 @@ impl DecryptionShare {
         secret_key_share: &GuardianSecretKeyShare,
         ciphertext: &Ciphertext,
     ) -> Self {
-        let group = &fixed_parameters.group;
-        let m_i = ciphertext.alpha.exp(&secret_key_share.p_i, group);
+        let group = fixed_parameters.group();
+        let m_i = ciphertext.alpha.exp(&secret_key_share.z_i, group);
         DecryptionShare {
-            i: secret_key_share.i,
+            i: secret_key_share.guardian_ix,
             m_i,
         }
     }
@@ -72,20 +80,23 @@ impl DecryptionShare {
 #[derive(Debug)]
 pub struct CombinedDecryptionShare(GroupElement);
 
-/// Represents errors occurring while combining [`DecryptionShare`]s into a
-/// [`CombinedDecryptionShare`].
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum ShareCombinationError {
+/// Represents errors occurring while combining [`DecryptionShare`]s
+/// into a  [`CombinedDecryptionShare`].
+#[derive(thiserror::Error, Clone, Debug)]
+pub enum DecryptionShareCombinationError {
     /// Occurs if not enough shares were provided. Combination requires shares
     /// from at least `k` out of `n` guardians.
     #[error("Only {l} decryption shares given, but at least {k} required.")]
     NotEnoughShares { l: usize, k: u32 },
+
     /// Occurs if the guardian index is out of bounds.
     #[error("Guardian {i} is has an index bigger than {n}")]
     InvalidGuardian { i: GuardianIndex, n: GuardianIndex },
+
     /// Occurs if multiple shares from the same guardian are provided.
     #[error("Guardian {i} is represented more than once in the decryption shares.")]
     DuplicateGuardian { i: GuardianIndex },
+
     /// Occurs if the Lagrange interpolation fails.
     #[error("Could not compute the polynomial interpolation.")]
     InterpolationFailure,
@@ -98,27 +109,28 @@ impl CombinedDecryptionShare {
     /// - `election_parameters` - the election parameters
     /// - `decryption_shares` - a vector of decryption shares
     ///
-    /// The computation follows Equation `68`.
+    /// The computation follows Equation `68`. [TODO fix ref]
     pub fn combine<'a, I>(
         election_parameters: &ElectionParameters,
         decryption_shares: I,
-    ) -> Result<Self, ShareCombinationError>
+    ) -> Result<Self, DecryptionShareCombinationError>
     where
         I: IntoIterator<Item = &'a DecryptionShare>,
         I::IntoIter: ExactSizeIterator,
     {
-        let fixed_parameters = &election_parameters.fixed_parameters;
-        let varying_parameters = &election_parameters.varying_parameters;
-        let n = varying_parameters.n.get_one_based_usize();
-        let k = varying_parameters.k.get_one_based_u32();
+        let fixed_parameters = election_parameters.fixed_parameters();
+        let varying_parameters = &election_parameters.varying_parameters();
+        let n = varying_parameters.n().get_one_based_usize();
+        let k = varying_parameters.k().get_one_based_u32();
 
-        let field = &fixed_parameters.field;
+        let field = fixed_parameters.field();
+        let group = fixed_parameters.group();
 
         let decryption_shares = decryption_shares.into_iter();
         let l = decryption_shares.len();
         // Ensure that we have at least k decryption shares
         if l < k as usize {
-            return Err(ShareCombinationError::NotEnoughShares { l, k });
+            return Err(DecryptionShareCombinationError::NotEnoughShares { l, k });
         }
         // Verify that every guardian (index) is represented at most once and that all
         // guardians indices are within the bounds.
@@ -128,24 +140,24 @@ impl CombinedDecryptionShare {
         for share in decryption_shares {
             let seen_ix = share.i.get_zero_based_usize();
             if seen_ix >= n {
-                return Err(ShareCombinationError::InvalidGuardian {
+                return Err(DecryptionShareCombinationError::InvalidGuardian {
                     i: share.i,
-                    n: varying_parameters.n,
+                    n: varying_parameters.n(),
                 });
             }
             if seen[seen_ix] {
-                return Err(ShareCombinationError::DuplicateGuardian { i: share.i });
+                return Err(DecryptionShareCombinationError::DuplicateGuardian { i: share.i });
             }
             seen[seen_ix] = true;
             xs.push(FieldElement::from(share.i.get_one_based_u32(), field));
             ys.push(share.m_i.clone());
         }
 
-        let m = group_lagrange_at_zero(&xs, &ys, &fixed_parameters.field, &fixed_parameters.group);
+        let m = group_lagrange_at_zero(&xs, &ys, field, group);
 
         match m {
             // This should not happen
-            None => Err(ShareCombinationError::InterpolationFailure),
+            None => Err(DecryptionShareCombinationError::InterpolationFailure),
             Some(m) => Ok(CombinedDecryptionShare(m)),
         }
     }
@@ -153,13 +165,15 @@ impl CombinedDecryptionShare {
 
 /// The commitment share of a single guardian for a [`DecryptionProof`].
 ///
-/// This corresponds to `(a_i,b_i)` in Equation `69`.
+/// This corresponds to `(a_i,b_i)` in Equation `69`. [TODO fix ref]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofCommitShare {
     /// The guardian's index
     pub i: GuardianIndex,
+
     /// First part of the commit share
     pub a_i: GroupElement,
+
     /// Second part of the commit share
     pub b_i: GroupElement,
 }
@@ -167,58 +181,75 @@ pub struct DecryptionProofCommitShare {
 /// The secret state for a commitment share of a single guardian for a
 /// [`DecryptionProof`].
 ///
-/// This corresponds to `u_i` as in Equation `69`.
+/// This corresponds to `u_i` as in Equation `69`. [TODO fix ref]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofStateShare {
     /// The guardian's index
     pub i: GuardianIndex,
+
     /// The commit state
     pub u_i: FieldElement,
 }
 
 /// The response share of a single guardian for a [`DecryptionProof`].
 ///
-/// This corresponds to `v_i` as in Equation `73`.
+/// This corresponds to `v_i` as in Equation `73`. [TODO fix ref]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProofResponseShare {
     /// The guardian's index
     pub i: GuardianIndex,
+
     /// The response share
     pub v_i: FieldElement,
 }
 
 /// Represents errors occurring while computing a response share.
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ResponseShareError {
     /// Occurs if one tries to compute the response from a state share that does
     /// not match the secret key share.
     #[error("Indices of key share (here {i}) and state share (here {j}) must match!")]
     KeyStateShareIndexMismatch { i: GuardianIndex, j: GuardianIndex },
+
     /// Occurs if the Lagrange coefficient can not be computed.
     #[error("Computation of the Lagrange coefficient failed.")]
     CoefficientFailure,
+
+    #[error("Response share error: {0}")]
+    EgError(#[from] Box<EgError>),
+}
+
+impl From<EgError> for ResponseShareError {
+    fn from(e: EgError) -> Self {
+        ResponseShareError::EgError(Box::new(e))
+    }
 }
 
 /// Represents errors occurring while combining the commit and response shares
 /// into a single [`DecryptionProof`].
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(thiserror::Error, Clone, Debug)]
 pub enum CombineProofError {
     /// Occurs if the input list are not of the same length
     #[error("The given lists must be of the same length!")]
     ListLengthMismatch,
+
     /// Occurs if the input list are not ordered the same way.
     #[error("The given lists must be ordered the same way!")]
     IndexMismatch,
+
     /// Occurs if the joint public key does not match the list of public keys.
     #[error("Could not compute the joint public key from the list of public keys!")]
     JointPKFailure,
+
     /// Occurs if the decryption shares could not be combined.
     #[error("Could not combine the given decryption shares: {0}")]
-    ShareCombinationError(ShareCombinationError),
+    ShareCombinationError(DecryptionShareCombinationError),
+
     /// Occurs if the commitment and response shares are inconsistent (Checks
     /// `9.A` and `9.B`).
     #[error("The commit message ({1}) of guardian {0} is inconsistent!")]
     CommitInconsistency(GuardianIndex, String),
+
     /// Occurs if the Lagrange coefficient can not be computed.
     #[error("Computation of the Lagrange coefficient failed!")]
     CoefficientFailure,
@@ -228,11 +259,12 @@ pub enum CombineProofError {
 /// relative to a given public key.
 ///
 /// This is a Sigma protocol for a discrete logarithm relation. It corresponds
-/// to the proof from Section `3.6.3`.
+/// to the proof from EGDS 2.1.0 Section 3.6.5.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DecryptionProof {
     /// Challenge
     pub challenge: FieldElement,
+
     /// Response
     pub response: FieldElement,
 }
@@ -242,111 +274,144 @@ impl DecryptionProof {
     /// decryption proof.
     ///
     /// The arguments are
-    /// - `csprng` - secure randomness generator
+    /// - `csrng` - secure randomness generator
     /// - `fixed_parameters` - the fixed parameters
     /// - `ciphertext` - the ElGamal ciphertext
     /// - `i` - the guardian index
     ///
-    /// The computation follows Equations `69` and `70`.
+    /// The computation follows EGDS 2.1.0 sec 3.6.5 eq. 87 and 88.
     pub fn generate_commit_share(
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         fixed_parameters: &FixedParameters,
         ciphertext: &Ciphertext,
-        i: &GuardianIndex,
+        guardian_ix: GuardianIndex,
     ) -> (DecryptionProofCommitShare, DecryptionProofStateShare) {
-        let group = &fixed_parameters.group;
-        let field = &fixed_parameters.field;
+        let group = fixed_parameters.group();
+        let field = fixed_parameters.field();
 
-        let u_i = field.random_field_elem(csprng);
+        let u_i = field.random_field_elem(csrng);
         let a_i = group.g_exp(&u_i);
         let b_i = ciphertext.alpha.exp(&u_i, group);
-        let dcs = DecryptionProofCommitShare { i: *i, a_i, b_i };
-        let dss = DecryptionProofStateShare { i: *i, u_i };
+        let dcs = DecryptionProofCommitShare {
+            i: guardian_ix,
+            a_i,
+            b_i,
+        };
+        let dss = DecryptionProofStateShare {
+            i: guardian_ix,
+            u_i,
+        };
         (dcs, dss)
     }
 
     /// This function computes the challenge for the decryption NIZK.
     ///
-    /// The computation corresponds to Equation `71`.
+    /// The computation corresponds to EGDS 2.1.0 sec 3.6.5 eq. 90.
     ///
     /// The arguments are
     /// - `fixed_parameters` - the fixed parameters
     /// - `h_e` - the extended bash hash
-    /// - `k` - the joint election public key
+    /// - `contest_ix` - context index
+    /// - `contest_data_field_ix` - selectable option or additional data field index
+    /// - `j` - the coefficient index
     /// - `c` - the ciphertext
     /// - `a` - first part of the commit message
     /// - `b` - second part of the commit message
     /// - `m` - combined decryption share
+    #[allow(clippy::too_many_arguments)]
     fn challenge(
         fixed_parameters: &FixedParameters,
-        h_e: &HValue,
-        k: &JointElectionPublicKey,
+        h_e: &ExtendedBaseHash_H_E,
+        contest_ix: ContestIndex,
+        contest_data_field_ix: ContestDataFieldIndex,
         c: &Ciphertext,
         a: &GroupElement,
         b: &GroupElement,
         m: &CombinedDecryptionShare,
     ) -> FieldElement {
-        let field = &fixed_parameters.field;
-        let group = &fixed_parameters.group;
-        // v = 0x30 | b(k,512) | b(c.A,512)| b(c.B,512) | b(a,512) | b(b,512) | b(m,512)
-        let mut v = vec![0x30];
-        v.extend_from_slice(
-            k.joint_election_public_key
-                .to_be_bytes_left_pad(group)
-                .as_slice(),
-        );
+        let field = fixed_parameters.field();
+        let group = fixed_parameters.group();
+
+        let expected_len = 2569; // EGDS 2.1.0 pg. 77 (90)
+
+        // v = 0x31 | b(ind_c(Λ), 4) | b(ind_o(λ), 4)
+        // | b(c.A, 512) | b(c.B, 512)
+        // | b(a, 512) | b(b, 512) | b(m, 512)
+        let mut v = Vec::with_capacity(expected_len);
+        v.push(0x31);
+        v.extend(contest_ix.get_one_based_u32().to_be_bytes());
+        v.extend(contest_data_field_ix.get_one_based_u32().to_be_bytes());
         v.extend_from_slice(c.alpha.to_be_bytes_left_pad(group).as_slice());
         v.extend_from_slice(c.beta.to_be_bytes_left_pad(group).as_slice());
         v.extend_from_slice(a.to_be_bytes_left_pad(group).as_slice());
         v.extend_from_slice(b.to_be_bytes_left_pad(group).as_slice());
         v.extend_from_slice(m.0.to_be_bytes_left_pad(group).as_slice());
+        assert_eq!(v.len(), expected_len);
+
         let c = eg_h(h_e, &v);
-        //The challenge is not reduced modulo q (cf. Section 5.4)
+        // TODO The challenge is not reduced modulo q (cf. Section 5.4)
         FieldElement::from_bytes_be(c.0.as_slice(), field)
     }
 
     /// This function computes a guardian's response share for the decryption
     /// NIZK.
     ///
-    /// This corresponds to the computation specified in Equation `73`.
+    /// This corresponds to the computation specified in Equation `73`. [TODO fix ref]
     ///
     /// The arguments are
-    /// - `pre_voting_data` - includes the extended bash hash and the joint election public key
-    /// - `m` - combined decryption share
+    /// - `eg` - overall `Eg` context
+    /// - `contest_ix` - context index
+    /// - `contest_data_field_ix` - selectable option or additional data field index
     /// - `ciphertext` - the ciphertext
+    /// - `m` - combined decryption share
     /// - `proof_commit_shares` - the shares of the commit message
     /// - `proof_commit_state` - the guardian's commit state
     /// - `secret_key_share` - the guardian's key share
     #[allow(clippy::too_many_arguments)]
     pub fn generate_response_share(
-        pre_voting_data: &PreVotingData,
+        eg: &Eg,
+        contest_ix: ContestIndex,
+        contest_data_field_ix: ContestDataFieldIndex,
         ciphertext: &Ciphertext,
         m: &CombinedDecryptionShare,
         proof_commit_shares: &[DecryptionProofCommitShare],
         proof_commit_state: &DecryptionProofStateShare,
         secret_key_share: &GuardianSecretKeyShare,
     ) -> Result<DecryptionProofResponseShare, ResponseShareError> {
-        let fixed_parameters = &pre_voting_data.parameters.fixed_parameters;
-        let h_e = &pre_voting_data.hashes_ext.h_e;
-        let k = &pre_voting_data.public_key;
+        let election_parameters = eg.election_parameters().map_err(ResponseShareError::from)?;
+        let fixed_parameters = election_parameters.fixed_parameters();
+        let group = fixed_parameters.group();
+        let field = fixed_parameters.field();
 
-        if proof_commit_state.i != secret_key_share.i {
+        let extended_base_hash = eg.extended_base_hash().map_err(ResponseShareError::from)?;
+
+        if proof_commit_state.i != secret_key_share.guardian_ix {
             return Err(ResponseShareError::KeyStateShareIndexMismatch {
                 i: proof_commit_state.i,
-                j: secret_key_share.i,
+                j: secret_key_share.guardian_ix,
             });
         }
-        let group = &fixed_parameters.group;
-        let field = &fixed_parameters.field;
-        // Equation `70`
+
+        // EGDS 2.1.0 Sec 3.6.5 eq. 89
         let (a, b) = proof_commit_shares
             .iter()
             .fold((Group::one(), Group::one()), |(a, b), share| {
                 (a.mul(&share.a_i, group), b.mul(&share.b_i, group))
             });
-        // Equation `71`
-        let c = Self::challenge(fixed_parameters, h_e, k, ciphertext, &a, &b, m);
-        // Equation `72` c_i = (c*w_i)
+
+        // EGDS 2.1.0 Sec 3.6.5 eq. 90
+        let c = Self::challenge(
+            fixed_parameters,
+            extended_base_hash.h_e(),
+            contest_ix,
+            contest_data_field_ix,
+            ciphertext,
+            &a,
+            &b,
+            m,
+        );
+
+        // EGDS 2.1.0 Sec 3.6.5 eq. 91
         let i_scalar = FieldElement::from(proof_commit_state.i.get_one_based_u32(), field);
         let xs: Vec<FieldElement> = proof_commit_shares
             .iter()
@@ -357,10 +422,13 @@ impl DecryptionProof {
             None => return Err(ResponseShareError::CoefficientFailure),
         };
         let c_i = c.mul(&w_i, field);
-        // Equation `73` v_i = (u_i - c_i*P(i))
+
+        // EGDS 2.1.0 Sec 3.6.5 eq. 92
+        // v_i = (u_i - c_i*z_i)
         let v_i = proof_commit_state
             .u_i
-            .sub(&c_i.mul(&secret_key_share.p_i, field), field);
+            .sub(&c_i.mul(&secret_key_share.z_i, field), field);
+
         Ok(DecryptionProofResponseShare {
             i: proof_commit_state.i,
             v_i,
@@ -370,9 +438,11 @@ impl DecryptionProof {
     /// This function computes a decryption proof given the commit and response
     /// shares.
     ///
-    /// The arguments are
-    /// - `election_parameters` - the election parameters
-    /// - `h_e` - the extended bash hash
+    /// The arguments are:
+    ///
+    /// - `eg` - overall `Eg` context
+    /// - `contest_ix` - context index
+    /// - `contest_data_field_ix` - selectable option or additional data field index
     /// - `ciphertext` - the ciphertext
     /// - `decryption_shares` - the decryption shares
     /// - `proof_commit_shares` - the shares of the commit message
@@ -384,15 +454,17 @@ impl DecryptionProof {
     /// i.e. the i-th element in each list belongs to the same guardian.
     /// The function also checks that `guardian_public_keys` contains all n
     /// public keys.
+    #[allow(clippy::too_many_arguments)]
     pub fn combine_proof<'a, Shares, CommitShares, ResponseShares>(
-        election_parameters: &ElectionParameters,
-        h_e: &HashesExt,
+        eg: &Eg,
+        contest_ix: ContestIndex,
+        contest_data_field_ix: ContestDataFieldIndex,
         ciphertext: &Ciphertext,
         decryption_shares: Shares,
         proof_commit_shares: CommitShares,
         proof_response_shares: ResponseShares,
-        guardian_public_keys: &[GuardianPublicKey],
-    ) -> Result<Self, CombineProofError>
+        guardian_public_keys: &[&GuardianPublicKey],
+    ) -> EgResult<Self>
     where
         Shares: IntoIterator<Item = &'a DecryptionShare>,
         CommitShares: IntoIterator<Item = &'a DecryptionProofCommitShare>,
@@ -401,7 +473,15 @@ impl DecryptionProof {
         CommitShares::IntoIter: ExactSizeIterator + Clone,
         ResponseShares::IntoIter: ExactSizeIterator,
     {
-        let fixed_parameters = &election_parameters.fixed_parameters;
+        let election_parameters = eg.election_parameters()?;
+        let election_parameters = election_parameters.as_ref();
+        let fixed_parameters = election_parameters.fixed_parameters();
+        let group = fixed_parameters.group();
+        let field = fixed_parameters.field();
+
+        let extended_base_hash = eg.extended_base_hash()?;
+        let extended_base_hash = extended_base_hash.as_ref();
+        let h_e = extended_base_hash.h_e();
 
         let decryption_shares = decryption_shares.into_iter();
         let proof_commit_shares = proof_commit_shares.into_iter();
@@ -410,25 +490,16 @@ impl DecryptionProof {
         if decryption_shares.len() != proof_commit_shares.len()
             || decryption_shares.len() != proof_response_shares.len()
         {
-            return Err(CombineProofError::ListLengthMismatch);
+            return Err(CombineProofError::ListLengthMismatch.into());
         }
 
         // Check that the joint key matches the given public keys
         // This also checks that all public keys are given
-        let joint_key =
-            match JointElectionPublicKey::compute(election_parameters, guardian_public_keys) {
-                Err(_) => return Err(CombineProofError::JointPKFailure),
-                Ok(pk) => pk,
-            };
-
         let m = CombinedDecryptionShare::combine(election_parameters, decryption_shares.clone());
         let m = match m {
             Ok(res) => res,
-            Err(e) => return Err(CombineProofError::ShareCombinationError(e)),
+            Err(e) => return Err(CombineProofError::ShareCombinationError(e).into()),
         };
-
-        let group = &fixed_parameters.group;
-        let field = &fixed_parameters.field;
 
         let (a, b) = proof_commit_shares
             .clone()
@@ -437,8 +508,9 @@ impl DecryptionProof {
             });
         let c = Self::challenge(
             fixed_parameters,
-            &h_e.h_e,
-            &joint_key,
+            h_e,
+            contest_ix,
+            contest_data_field_ix,
             ciphertext,
             &a,
             &b,
@@ -453,16 +525,17 @@ impl DecryptionProof {
         for cs in proof_commit_shares.clone() {
             let i = cs.i.get_one_based_u32();
             let i = FieldElement::from(i, field);
-            let w_i = match get_single_coefficient_at_zero(&xs, &i, &fixed_parameters.field) {
+            let w_i = match get_single_coefficient_at_zero(&xs, &i, field) {
                 Some(w_i) => w_i,
-                None => return Err(CombineProofError::CoefficientFailure),
+                None => return Err(CombineProofError::CoefficientFailure.into()),
             };
             let c_i = c.mul(&w_i, field);
             c_i_vec.push(c_i);
         }
 
         let mut v = ScalarField::zero();
-        // Check Equations (74) and (75)
+
+        // EGDS 2.1.0 Sec 3.6.5 eq. 94 and 95
         for (ds, cs, rs, c_i) in izip!(
             decryption_shares,
             proof_commit_shares,
@@ -472,7 +545,7 @@ impl DecryptionProof {
             let g_v = group.g_exp(&rs.v_i);
             let i_scalar = FieldElement::from(ds.i.get_one_based_u32(), field);
             let k_prod = guardian_public_keys.iter().fold(Group::one(), |prod, pk| {
-                let inner_p = pk.coefficient_commitments.0.iter().enumerate().fold(
+                let inner_p = pk.coefficient_commitments().iter().enumerate().fold(
                     Group::one(),
                     |prod, (m, k_m)| {
                         let i_pow_m = i_scalar.pow(m, field);
@@ -482,22 +555,19 @@ impl DecryptionProof {
                 prod.mul(&inner_p, group)
             });
             let a_i = g_v.mul(&k_prod.exp(&c_i, group), group);
-
             let a_v = ciphertext.alpha.exp(&rs.v_i, group);
             let m_c = ds.m_i.exp(&c_i, group);
             let b_i = a_v.mul(&m_c, group);
 
             if a_i != cs.a_i {
-                return Err(CombineProofError::CommitInconsistency(
-                    ds.i,
-                    "a_i != a_i'".into(),
-                ));
+                return Err(
+                    CombineProofError::CommitInconsistency(ds.i, "a_i != a_i'".into()).into(),
+                );
             }
             if b_i != cs.b_i {
-                return Err(CombineProofError::CommitInconsistency(
-                    ds.i,
-                    "b_i != b_i'".into(),
-                ));
+                return Err(
+                    CombineProofError::CommitInconsistency(ds.i, "b_i != b_i'".into()).into(),
+                );
             }
             v = v.add(&rs.v_i, field);
         }
@@ -513,26 +583,31 @@ impl DecryptionProof {
     /// The arguments are
     /// - `self` - the decryption proof
     /// - `fixed_parameters` - the fixed parameters
-    /// - `h_e` - the extended bash hash
-    /// - `joint_key` - the joint election public key
+    /// - `h_e` - the extended base hash
+    /// - `jpk` - the joint public key
+    /// - `contest_ix` - context index
+    /// - `contest_data_field_ix` - selectable option or additional data field index
     /// - `ciphertext` - the ciphertext
     /// - `m` - combined decryption share
+    #[allow(clippy::too_many_arguments)]
     pub fn validate(
         &self,
         fixed_parameters: &FixedParameters,
-        h_e: &HashesExt,
-        joint_key: &JointElectionPublicKey,
+        h_e: &ExtendedBaseHash_H_E,
+        jpk: &JointPublicKey,
+        contest_ix: ContestIndex,
+        contest_data_field_ix: ContestDataFieldIndex,
         ciphertext: &Ciphertext,
         m: &CombinedDecryptionShare,
     ) -> bool {
-        let group = &fixed_parameters.group;
-        let field = &fixed_parameters.field;
+        let group = fixed_parameters.group();
+        let field = fixed_parameters.field();
 
-        let key = &joint_key.joint_election_public_key;
+        let jpk_group_elem = &jpk.group_element;
 
         let a = group
             .g_exp(&self.response)
-            .mul(&key.exp(&self.challenge, group), group);
+            .mul(&jpk_group_elem.exp(&self.challenge, group), group);
         let a_v = ciphertext.alpha.exp(&self.response, group);
         let m_c = m.0.exp(&self.challenge, group);
         let b = a_v.mul(&m_c, group);
@@ -541,7 +616,18 @@ impl DecryptionProof {
         if !self.response.is_valid(field) {
             return false;
         }
-        let c = Self::challenge(fixed_parameters, &h_e.h_e, joint_key, ciphertext, &a, &b, m);
+
+        let c = Self::challenge(
+            fixed_parameters,
+            h_e,
+            contest_ix,
+            contest_data_field_ix,
+            ciphertext,
+            &a,
+            &b,
+            m,
+        );
+
         //Check (9.B)
         if c != self.challenge {
             return false;
@@ -551,26 +637,16 @@ impl DecryptionProof {
 }
 
 /// Represents errors occurring during decryption.
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(thiserror::Error, Clone, Debug)]
 pub enum DecryptionError {
     /// Occurs if the combined decryption share has no inverse.
     #[error("The combined decryption share has no inverse!")]
     NoInverse,
+
     /// Occurs if the computation of the plain-text from `T` and the joint
     /// public-key fails.
     #[error("Could not compute the plaintext using dlog!")]
     NoDlog,
-}
-
-/// Represents a "in-the-exponent" plain-text with a [`DecryptionProof`].
-///
-/// This corresponds to `t` and `(c,v)` as in Section `3.6.3`.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct VerifiableDecryption {
-    /// The decrypted plain-text
-    pub plain_text: FieldElement,
-    /// The proof of correctness
-    pub proof: DecryptionProof,
 }
 
 /// Decryption posted by the guardian together with a commitment.
@@ -580,16 +656,31 @@ pub struct DecryptionShareResult {
     pub proof_commit: DecryptionProofCommitShare,
 }
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(thiserror::Error, Clone, Debug)]
 pub enum ComputeDecryptionError {
     #[error("Failed to decrypt: {0}")]
     Decryption(#[from] DecryptionError),
+
     #[error("Failed to combine shares: {0}")]
-    CombineShares(#[from] ShareCombinationError),
+    CombineShares(#[from] DecryptionShareCombinationError),
+
     #[error("Failed to combine proof shares: {0}")]
     CombineProofShares(#[from] CombineProofError),
-    #[error("One or more input parameters were not hashable.")]
+
+    #[error("One or more input election_parameters were not hashable.")]
     InvalidParameters,
+}
+
+/// Represents a "in-the-exponent" plaintext with a [`DecryptionProof`].
+///
+/// This corresponds to `t` and `(c,v)` as in Section `3.6.3`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct VerifiableDecryption {
+    /// The decrypted plain-text
+    pub plaintext: FieldElement,
+
+    /// The proof of correctness
+    pub proof: DecryptionProof,
 }
 
 impl VerifiableDecryption {
@@ -597,31 +688,31 @@ impl VerifiableDecryption {
     ///
     /// The arguments are
     /// - `fixed_parameters` - the fixed parameters
-    /// - `joint_key` - the joint election public key
+    /// - `jpk` - the joint public key
     /// - `ciphertext` - the ciphertext
     /// - `m` - combined decryption share
     /// - `proof` - the proof of correctness
     pub fn new(
         fixed_parameters: &FixedParameters,
-        joint_key: &JointElectionPublicKey,
+        jpk: &JointPublicKey,
         ciphertext: &Ciphertext,
         m: &CombinedDecryptionShare,
         proof: &DecryptionProof,
     ) -> Result<Self, DecryptionError> {
-        let field = &fixed_parameters.field;
-        let group = &fixed_parameters.group;
+        let field = fixed_parameters.field();
+        let group = fixed_parameters.group();
         let group_msg = match m.0.inv(group) {
             None => return Err(DecryptionError::NoInverse),
             Some(m_inv) => ciphertext.beta.mul(&m_inv, group),
         };
-        let base = &joint_key.joint_election_public_key;
+        let base = &jpk.group_element;
         let dlog = DiscreteLog::from_group(base, group);
         let plain_text = match dlog.ff_find(&group_msg, field) {
             None => return Err(DecryptionError::NoDlog),
             Some(x) => x,
         };
         Ok(VerifiableDecryption {
-            plain_text,
+            plaintext: plain_text,
             proof: proof.clone(),
         })
     }
@@ -630,54 +721,56 @@ impl VerifiableDecryption {
     /// with proofs.
     ///
     /// The arguments are
-    /// - `fixed_parameters` - the fixed parameters
-    /// - `joint_key` - the joint election public key
+    /// - `eg` - overall `Eg` context
+    /// - `jpk` - the relevant joint public key
+    /// - `contest_ix` - context index
+    /// - `contest_data_field_ix` - selectable option or additional data field index
     /// - `ciphertext` - the ciphertext
     /// - `m` - combined decryption share
     /// - `proof` - the proof of correctness
     pub fn compute<'a, Shares, Proofs>(
-        manifest: &ElectionManifest,
-        parameters: &ElectionParameters,
-        guardian_public_keys: &[GuardianPublicKey],
+        eg: &Eg,
+        jpk: &JointPublicKey,
+        contest_ix: ContestIndex,
+        contest_data_field_ix: ContestDataFieldIndex,
         ciphertext: &Ciphertext,
         decryptions: Shares,
         response_shares: Proofs,
-    ) -> Result<Self, ComputeDecryptionError>
+    ) -> EgResult<Self>
     where
         Shares: IntoIterator<Item = &'a DecryptionShareResult>,
         Shares::IntoIter: ExactSizeIterator + Clone,
         Proofs: IntoIterator<Item = &'a DecryptionProofResponseShare>,
         Proofs::IntoIter: ExactSizeIterator,
     {
+        let election_parameters = eg.election_parameters()?;
+        let election_parameters = election_parameters.as_ref();
+
+        let key_purpose = jpk.key_purpose()?;
+
+        let gpks = eg.guardian_public_keys(key_purpose)?;
+        let gpks = gpks.map_into(Rc::as_ref);
+
         let decryptions = decryptions.into_iter();
-        let m =
-            CombinedDecryptionShare::combine(parameters, decryptions.clone().map(|d| &d.share))?;
-
-        let Ok(hashes) = Hashes::compute(parameters, manifest) else {
-            return Err(ComputeDecryptionError::InvalidParameters);
-        };
-
-        let Ok(joint_election_public_key) =
-            JointElectionPublicKey::compute(parameters, guardian_public_keys)
-        else {
-            return Err(CombineProofError::JointPKFailure.into());
-        };
-
-        let hashes_ext = HashesExt::compute(parameters, &hashes, &joint_election_public_key);
+        let m = CombinedDecryptionShare::combine(
+            election_parameters,
+            decryptions.clone().map(|d| &d.share),
+        )?;
 
         let proof = DecryptionProof::combine_proof(
-            parameters,
-            &hashes_ext,
+            eg,
+            contest_ix,
+            contest_data_field_ix,
             ciphertext,
             decryptions.clone().map(|d| &d.share),
             decryptions.map(|d| &d.proof_commit),
             response_shares,
-            guardian_public_keys,
+            gpks.as_slice(),
         )?;
 
         let r = Self::new(
-            &parameters.fixed_parameters,
-            &joint_election_public_key,
+            election_parameters.fixed_parameters(),
+            jpk,
             ciphertext,
             &m,
             &proof,
@@ -692,19 +785,21 @@ impl VerifiableDecryption {
     /// - `self` - the verifiable decryption
     /// - `fixed_parameters` - the fixed parameters
     /// - `h_e` - the extended bash hash
-    /// - `joint_key` - the joint election public key
+    /// - `jpk` - joint public key
+    /// - `contest_ix` - context index
+    /// - `contest_data_field_ix` - selectable option or additional data field index
     /// - `ciphertext` - the ciphertext
     pub fn verify(
         &self,
         fixed_parameters: &FixedParameters,
-        h_e: &HashesExt,
-        joint_key: &JointElectionPublicKey,
+        h_e: &ExtendedBaseHash_H_E,
+        jpk: &JointPublicKey,
+        contest_ix: ContestIndex,
+        contest_data_field_ix: ContestDataFieldIndex,
         ciphertext: &Ciphertext,
     ) -> bool {
-        let group = &fixed_parameters.group;
-        let t = joint_key
-            .joint_election_public_key
-            .exp(&self.plain_text, group);
+        let group = fixed_parameters.group();
+        let t = jpk.group_element.exp(&self.plaintext, group);
         let m = match t.inv(group) {
             None => return false,
             Some(t_inv) => ciphertext.beta.mul(&t_inv, group),
@@ -712,7 +807,9 @@ impl VerifiableDecryption {
         self.proof.validate(
             fixed_parameters,
             h_e,
-            joint_key,
+            jpk,
+            contest_ix,
+            contest_data_field_ix,
             ciphertext,
             &CombinedDecryptionShare(m),
         )
@@ -723,117 +820,63 @@ impl VerifiableDecryption {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod test {
-    use std::iter::zip;
+mod t1 {
+    use std::rc::Rc;
 
-    use util::{algebra::FieldElement, csprng::Csprng};
+    use either::Either;
+    use util::algebra::FieldElement;
 
+    use super::{CombinedDecryptionShare, DecryptionShare};
     use crate::{
-        election_manifest::ElectionManifest,
-        election_parameters::ElectionParameters,
-        errors::EgResult,
-        example_election_manifest::example_election_manifest,
-        example_election_parameters::example_election_parameters,
+        eg::Eg,
+        election_parameters::{ElectionParameters, ElectionParametersInfo},
         fixed_parameters::FixedParameters,
         guardian::GuardianIndex,
-        guardian_public_key::GuardianPublicKey,
-        guardian_secret_key::GuardianSecretKey,
-        guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
-        pre_voting_data::PreVotingData,
         standard_parameters::test_parameter_do_not_use_in_production::TOY_PARAMETERS_01,
-        varying_parameters::{BallotChaining, VaryingParameters},
-        verifiable_decryption::ShareCombinationError,
+        validatable::Validated,
+        varying_parameters::{BallotChaining, VaryingParameters, VaryingParametersInfo},
+        verifiable_decryption::DecryptionShareCombinationError,
     };
-
-    use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption};
-
-    fn key_setup(
-        csprng: &mut Csprng,
-        election_parameters: ElectionParameters,
-        election_manifest: ElectionManifest,
-    ) -> EgResult<(
-        PreVotingData,
-        Vec<GuardianPublicKey>,
-        Vec<GuardianSecretKeyShare>,
-    )> {
-        // Setup some keys
-        let guardian_secret_keys = election_parameters
-            .varying_parameters
-            .each_guardian_i()
-            .map(|i| GuardianSecretKey::generate(csprng, &election_parameters, i, None))
-            .collect::<Vec<_>>();
-
-        let guardian_public_keys = guardian_secret_keys
-            .iter()
-            .map(|secret_key| secret_key.make_public_key())
-            .collect::<Vec<_>>();
-
-        let pre_voting_data = PreVotingData::try_from_parameters_manifest_gpks(
-            election_parameters,
-            election_manifest,
-            &guardian_public_keys,
-        )?;
-        let election_parameters = &pre_voting_data.parameters;
-
-        let share_vecs = guardian_public_keys
-            .iter()
-            .map(|pk| {
-                guardian_secret_keys
-                    .iter()
-                    .map(|dealer_sk| {
-                        GuardianEncryptedShare::encrypt(csprng, election_parameters, dealer_sk, pk)
-                            .ciphertext
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
-        let key_shares = zip(&guardian_secret_keys, share_vecs)
-            .map(|(sk, shares)| {
-                GuardianSecretKeyShare::compute(
-                    &pre_voting_data,
-                    &guardian_public_keys,
-                    &shares,
-                    sk,
-                )
-                .unwrap()
-            })
-            .collect::<Vec<_>>();
-
-        Ok((pre_voting_data, guardian_public_keys, key_shares))
-    }
 
     #[test]
     fn test_decryption_share_combination() {
+        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+            "eg::verifiable_decryption::t1::test_decryption_share_combination",
+        );
+
         // Toy parameters according to specs
         let fixed_parameters: FixedParameters = (*TOY_PARAMETERS_01).clone();
 
-        let varying_parameters = VaryingParameters {
-            n: GuardianIndex::from_one_based_index(3).unwrap(),
-            k: GuardianIndex::from_one_based_index(3).unwrap(),
+        let varying_parameters_info = VaryingParametersInfo {
+            n: GuardianIndex::try_from_one_based_index_u32(3).unwrap(),
+            k: GuardianIndex::try_from_one_based_index_u32(3).unwrap(),
             date: "2023-05-02".to_string(),
             info: "The test election".to_string(),
             ballot_chaining: BallotChaining::Prohibited,
         };
-        let election_parameters = ElectionParameters {
-            fixed_parameters,
-            varying_parameters,
+
+        let election_parameters_info = ElectionParametersInfo {
+            fixed_parameters: Either::Right(Rc::new(fixed_parameters)),
+            varying_parameters: Either::Left(Rc::new(varying_parameters_info)),
         };
-        let field = &election_parameters.fixed_parameters.field;
-        let group = &election_parameters.fixed_parameters.group;
+        let election_parameters =
+            ElectionParameters::try_validate_from(election_parameters_info, eg).unwrap();
+
+        let field = election_parameters.fixed_parameters().field();
+        let group = election_parameters.fixed_parameters().group();
 
         // Using x^2-1 as polynomial
         let decryption_shares = [
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(1).unwrap(),
+                i: GuardianIndex::try_from_one_based_index_u32(1).unwrap(),
                 m_i: group.g_exp(&FieldElement::from(0_u8, field)),
             },
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                i: GuardianIndex::try_from_one_based_index_u32(2).unwrap(),
                 m_i: group.g_exp(&FieldElement::from(3_u8, field)),
             },
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(3).unwrap(),
+                i: GuardianIndex::try_from_one_based_index_u32(3).unwrap(),
                 m_i: group.g_exp(&FieldElement::from(8_u8, field)),
             },
         ];
@@ -846,139 +889,219 @@ mod test {
             exp_m.0
         );
 
-        assert_eq!(
-            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares[0..2])
-                .unwrap_err(),
-            ShareCombinationError::NotEnoughShares { l: 2, k: 3 }
-        );
+        let gi_1: GuardianIndex = 1.try_into().unwrap();
+        let gi_2: GuardianIndex = 2.try_into().unwrap();
+        let gi_3: GuardianIndex = 3.try_into().unwrap();
+        let gi_4: GuardianIndex = 4.try_into().unwrap();
+
+        assert!(matches!(
+            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares[0..2]),
+            Err(DecryptionShareCombinationError::NotEnoughShares { l: 2, k: 3 })
+        ));
 
         let decryption_shares = [
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(1).unwrap(),
+                i: gi_1,
                 m_i: group.g_exp(&FieldElement::from(0_u8, field)),
             },
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                i: gi_2,
                 m_i: group.g_exp(&FieldElement::from(3_u8, field)),
             },
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(4).unwrap(),
+                i: gi_4,
                 m_i: group.g_exp(&FieldElement::from(8_u8, field)),
             },
         ];
-        assert_eq!(
-            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares).unwrap_err(),
-            ShareCombinationError::InvalidGuardian {
-                i: GuardianIndex::from_one_based_index(4).unwrap(),
-                n: GuardianIndex::from_one_based_index(3).unwrap(),
-            }
-        );
+
+        assert!(matches!(
+            CombinedDecryptionShare::combine(&election_parameters, &decryption_shares),
+            Err(DecryptionShareCombinationError::InvalidGuardian { i, n })
+            if i == gi_4 && n == gi_3
+        ));
 
         let decryption_shares = [
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(1).unwrap(),
+                i: gi_1,
                 m_i: group.g_exp(&FieldElement::from(0_u8, field)),
             },
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                i: gi_2,
                 m_i: group.g_exp(&FieldElement::from(3_u8, field)),
             },
             DecryptionShare {
-                i: GuardianIndex::from_one_based_index(2).unwrap(),
+                i: gi_2,
                 m_i: group.g_exp(&FieldElement::from(8_u8, field)),
             },
         ];
-        assert_eq!(
+
+        assert!(matches!(
             CombinedDecryptionShare::combine(&election_parameters, &decryption_shares).unwrap_err(),
-            ShareCombinationError::DuplicateGuardian {
-                i: GuardianIndex::from_one_based_index(2).unwrap(),
-            }
-        );
+            DecryptionShareCombinationError::DuplicateGuardian { i } if i == gi_2
+        ));
     }
+}
+
+#[cfg(test)]
+//x TODO figure this out #[cfg(any(not(debug_assertions), miri))]
+#[allow(clippy::unwrap_used)]
+mod t2 {
+    use std::{iter::zip, rc::Rc};
+
+    use util::algebra::FieldElement;
+
+    use super::{CombinedDecryptionShare, DecryptionProof, DecryptionShare, VerifiableDecryption};
+    use crate::{
+        contest_data_fields_plaintexts::ContestDataFieldIndex,
+        eg::Eg,
+        election_manifest::ContestIndex,
+        errors::EgResult,
+        guardian::GuardianKeyPurpose,
+        guardian_share::{GuardianEncryptedShare, GuardianSecretKeyShare},
+    };
 
     #[test]
     fn test_decryption_overall() -> EgResult<()> {
-        let mut csprng = Csprng::new(b"test_proof_generation");
-
-        let election_parameters = example_election_parameters();
-        let election_manifest = example_election_manifest();
-        let (pre_voting_data, public_keys, key_shares) =
-            key_setup(&mut csprng, election_parameters, election_manifest)?;
-        let hashes_ext = &pre_voting_data.hashes_ext;
-
-        let election_parameters = &pre_voting_data.parameters;
-        let fixed_parameters = &election_parameters.fixed_parameters;
-        let field = &fixed_parameters.field;
-        let joint_election_public_key = &pre_voting_data.public_key;
-
-        let message: usize = 42;
-        let nonce = field.random_field_elem(&mut csprng);
-        let ciphertext = joint_election_public_key.encrypt_to(fixed_parameters, &nonce, message);
-
-        let dec_shares: Vec<_> = key_shares
-            .iter()
-            .map(|ks| DecryptionShare::from(fixed_parameters, ks, &ciphertext))
-            .collect();
-        let combined_dec_share =
-            CombinedDecryptionShare::combine(election_parameters, &dec_shares)?;
-
-        let mut com_shares = vec![];
-        let mut com_states = vec![];
-        for ks in key_shares.iter() {
-            let (share, state) = DecryptionProof::generate_commit_share(
-                &mut csprng,
-                fixed_parameters,
-                &ciphertext,
-                &ks.i,
-            );
-            com_shares.push(share);
-            com_states.push(state);
-        }
-        let rsp_shares: Vec<_> = com_states
-            .iter()
-            .zip(&key_shares)
-            .map(|(state, key_share)| {
-                DecryptionProof::generate_response_share(
-                    &pre_voting_data,
-                    &ciphertext,
-                    &combined_dec_share,
-                    &com_shares,
-                    state,
-                    key_share,
-                )
-                .unwrap()
-            })
-            .collect();
-
-        let proof = DecryptionProof::combine_proof(
-            election_parameters,
-            hashes_ext,
-            &ciphertext,
-            &dec_shares,
-            &com_shares,
-            &rsp_shares,
-            &public_keys,
-        )?;
-
-        let decryption = VerifiableDecryption::new(
-            fixed_parameters,
-            joint_election_public_key,
-            &ciphertext,
-            &combined_dec_share,
-            &proof,
-        )?;
-
-        assert_eq!(
-            decryption.plain_text,
-            FieldElement::from(message, field),
-            "Decryption should match the message."
+        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+            "eg::verifiable_decryption::t2::test_decryption_overall",
         );
-        assert!(decryption.verify(
-            fixed_parameters,
-            hashes_ext,
-            joint_election_public_key,
-            &ciphertext
-        ));
+
+        let election_parameters = eg.election_parameters()?;
+        let election_parameters = election_parameters.as_ref();
+        let fixed_parameters = election_parameters.fixed_parameters();
+        let field = fixed_parameters.field();
+
+        let extended_base_hash = eg.extended_base_hash()?;
+        let extended_base_hash = extended_base_hash.as_ref();
+        let h_e = extended_base_hash.h_e();
+
+        let contest_ix = ContestIndex::one();
+        let contest_data_field_ix = ContestDataFieldIndex::one();
+
+        for key_purpose in [
+            GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
+            GuardianKeyPurpose::Encrypt_Ballot_AdditionalFreeFormData,
+        ] {
+            let jpk = match key_purpose {
+                GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields => {
+                    eg.joint_vote_encryption_public_key_k()?
+                }
+                GuardianKeyPurpose::Encrypt_Ballot_AdditionalFreeFormData => {
+                    eg.joint_ballot_data_encryption_public_key_k_hat()?
+                }
+                _ => unreachable!(),
+            };
+            let jpk = jpk.as_ref();
+
+            let gpks = eg.guardian_public_keys(key_purpose)?;
+            let gpks = gpks.map_into(Rc::as_ref);
+
+            let gsks = eg.guardians_secret_keys(key_purpose)?;
+            let gsks = gsks.map_into(Rc::as_ref);
+
+            let vec_vec_guardian_encrypted_share = eg
+                .guardian_public_keys(key_purpose)?
+                .iter()
+                .map(|receiver_pk| {
+                    gsks.iter()
+                        .map(|sender_sk| {
+                            GuardianEncryptedShare::encrypt(
+                                eg.csrng(),
+                                election_parameters,
+                                sender_sk,
+                                receiver_pk,
+                            )
+                            .unwrap()
+                            .ciphertext
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+
+            let key_shares = zip(gsks.iter(), &vec_vec_guardian_encrypted_share)
+                .map(|(sk, shares)| {
+                    GuardianSecretKeyShare::generate(eg, gpks.as_slice(), shares, sk).unwrap()
+                })
+                .collect::<Vec<_>>();
+
+            let message: usize = 42;
+            let nonce = field.random_field_elem(eg.csrng());
+            let ciphertext = jpk.encrypt_to(fixed_parameters, &nonce, message);
+
+            let dec_shares: Vec<_> = key_shares
+                .iter()
+                .map(|ks| DecryptionShare::from(fixed_parameters, ks, &ciphertext))
+                .collect();
+            let combined_dec_share =
+                CombinedDecryptionShare::combine(election_parameters, &dec_shares)?;
+
+            let mut decryption_proof_commit_shares = vec![];
+            let mut decryption_proof_state_shares = vec![];
+            for key_share in key_shares.iter() {
+                let (decryption_proof_commit_share, decryption_proof_state_share) =
+                    DecryptionProof::generate_commit_share(
+                        eg.csrng(),
+                        fixed_parameters,
+                        &ciphertext,
+                        key_share.guardian_ix,
+                    );
+                decryption_proof_commit_shares.push(decryption_proof_commit_share);
+                decryption_proof_state_shares.push(decryption_proof_state_share);
+            }
+
+            let decryption_proof_response_shares: Vec<_> = decryption_proof_state_shares
+                .iter()
+                .zip(&key_shares)
+                .map(|(state, key_share)| {
+                    DecryptionProof::generate_response_share(
+                        eg,
+                        contest_ix,
+                        contest_data_field_ix,
+                        &ciphertext,
+                        &combined_dec_share,
+                        &decryption_proof_commit_shares,
+                        state,
+                        key_share,
+                    )
+                    .unwrap()
+                })
+                .collect();
+
+            let decryption_proof = DecryptionProof::combine_proof(
+                eg,
+                contest_ix,
+                contest_data_field_ix,
+                &ciphertext,
+                &dec_shares,
+                &decryption_proof_commit_shares,
+                &decryption_proof_response_shares,
+                gpks.as_slice(),
+            )?;
+
+            let decryption = VerifiableDecryption::new(
+                fixed_parameters,
+                jpk,
+                &ciphertext,
+                &combined_dec_share,
+                &decryption_proof,
+            )?;
+
+            assert_eq!(
+                decryption.plaintext,
+                FieldElement::from(message, field),
+                "Decryption should match the message."
+            );
+
+            assert!(decryption.verify(
+                fixed_parameters,
+                h_e,
+                jpk,
+                contest_ix,
+                contest_data_field_ix,
+                &ciphertext
+            ));
+        }
+
         Ok(())
     }
 }

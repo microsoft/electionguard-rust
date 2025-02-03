@@ -9,6 +9,95 @@ use std::num::{NonZeroU64, NonZeroUsize};
 
 use num_bigint::BigUint;
 use num_traits::{CheckedSub, Zero};
+use sha3::{digest::Update, Shake256, Shake256Reader};
+use zeroize::Zeroizing;
+
+use crate::const_minmax::{const_max_usize, const_min_usize};
+
+/// Builder for initializing a new CSPRNG.
+pub struct CsprngBuilder(Shake256);
+//? #[derive(Zeroize, ZeroizeOnDrop)]
+
+impl CsprngBuilder {
+    /// Writes a value as big-endian u64.
+    #[inline]
+    pub fn write_u64<IntoU64>(mut self, u: IntoU64) -> Self
+    where
+        IntoU64: Into<u64> + Copy,
+    {
+        self.0.update(&Into::<u64>::into(u).to_be_bytes());
+        self
+    }
+
+    /// Writes a string into the builder, as UTF-8 preceded by its length in bytes
+    /// as a big-endian u64.
+    #[inline]
+    pub fn write_str<AsRefStr>(self, s: AsRefStr) -> Self
+    where
+        AsRefStr: AsRef<str>,
+    {
+        self.write_bytes(s.as_ref().as_bytes())
+    }
+
+    /// Writes a slice of bytes into the builder, preceded by its length as a big-endian u64.
+    #[inline]
+    pub fn write_bytes<AsRefSliceU8>(self, data: AsRefSliceU8) -> Self
+    where
+        AsRefSliceU8: AsRef<[u8]>,
+    {
+        let slice_u8 = data.as_ref();
+        let mut self_ = self.write_u64(slice_u8.len() as u64);
+        self_.0.update(slice_u8);
+        self_
+    }
+
+    /// Writes a sequence of slices of bytes, each preceded by its length as a big-endian u64,
+    /// preceded and followed by `begin` and `end` symbols.
+    ///
+    /// The `begin` and `end` symbols are not plausible values for lengths, so
+    /// they should be unambiguous delimiters.
+    #[allow(non_camel_case_types)]
+    #[allow(dead_code)] // This warning seems to be a false positive.
+    #[inline]
+    fn write_seq_bytes<II_AsRefSliceU8, AsRefSliceU8>(self, seq_bytes: II_AsRefSliceU8) -> Self
+    where
+        II_AsRefSliceU8: IntoIterator<Item = AsRefSliceU8>,
+        AsRefSliceU8: AsRef<[u8]>,
+    {
+        const MARK_BEGIN: u64 = 0x_FFFFFFFF_FFFFFFFB_u64; // u64::MAX - 4;
+        const MARK_ENDIN: u64 = 0x_FFFFFFFF_FFFFFFFE_u64; // u64::MAX - 1;
+
+        let mut self_ = self.write_u64(MARK_BEGIN);
+        for as_ref_bytes in seq_bytes {
+            self_ = self_.write_bytes(as_ref_bytes);
+        }
+        self_.write_u64(MARK_ENDIN)
+    }
+
+    /// Finishes the builder and returns the CSPRNG.
+    #[inline]
+    pub fn finish(self) -> Csprng {
+        Csprng(sha3::digest::ExtendableOutput::finalize_xof(self.0))
+    }
+}
+
+impl Default for CsprngBuilder {
+    /// Constructs a new [`CsprngBuilder`] in the initial state.
+    ///
+    /// Equivalent to [`CsprngBuilder::default()`].
+    ///
+    /// ```
+    /// # use util::csprng::{Csprng, CsprngBuilder};
+    /// let mut csprng = CsprngBuilder::default()
+    ///     .write_str("Fixed customization string")
+    ///     .write_bytes(b"data containing sufficient entropy goes here")
+    ///     .finish();
+    /// assert_ne!(csprng.next_u128(), 0, "Unlikely");
+    /// ```
+    fn default() -> Self {
+        CsprngBuilder(Shake256::default())
+    }
+}
 
 /// CSPRNG based on the SHA-3 extendable output function SHAKE256.
 /// Defined By
@@ -19,9 +108,51 @@ use num_traits::{CheckedSub, Zero};
 /// KECCAK\[c\] = SPONGE\[KECCAK-p\[1600, 24\], pad10*1, 1600–c\]
 /// Capacity `c` = 512 bits
 /// Rate `r` = 1088 bits
-pub struct Csprng(Box<dyn sha3::digest::XofReader>);
+pub struct Csprng(Shake256Reader);
+//#[derive(Zeroize, ZeroizeOnDrop)]
 
 impl Csprng {
+    /// Max rated collision security strength in bits, for a sufficiently-long output.
+    pub const fn max_rated_collision_strength_bits() -> usize {
+        256 // NIST FIPS Pub 202 SHA-3 Standard, Table 4, pg 23
+    }
+
+    /// Rated collision security strength in bits.
+    pub const fn rated_collision_strength_bits(output_len: usize) -> usize {
+        // NIST FIPS Pub 202 SHA-3 Standard, Table 4, pg 23
+        const_min_usize(&[output_len / 2, Self::max_rated_collision_strength_bits()])
+    }
+
+    /// Max rated preimage security strength in bits, for a sufficiently-long output.
+    pub const fn max_rated_preimage_strength_bits() -> usize {
+        256 // NIST FIPS Pub 202 SHA-3 Standard, Table 4, pg 23
+    }
+
+    /// Rated preimage security strength in bits.
+    pub const fn rated_preimage_strength_bits(output_len: usize) -> usize {
+        // NIST FIPS Pub 202 SHA-3 Standard, Table 4, pg 23
+        if Self::max_rated_preimage_strength_bits() < output_len {
+            Self::max_rated_preimage_strength_bits()
+        } else {
+            output_len
+        }
+    }
+
+    /// Max rated second preimage security strength in bits, for a sufficiently-long output.
+    pub const fn max_rated_second_preimage_strength_bits() -> usize {
+        256 // NIST FIPS Pub 202 SHA-3 Standard, Table 4, pg 23
+    }
+
+    /// Rated second preimage security strength in bits.
+    pub const fn rated_second_preimage_strength_bits(output_len: usize) -> usize {
+        // NIST FIPS Pub 202 SHA-3 Standard, Table 4, pg 23
+        if Self::max_rated_second_preimage_strength_bits() < output_len {
+            Self::max_rated_second_preimage_strength_bits()
+        } else {
+            output_len
+        }
+    }
+
     /// Width of the underlying KECCAK permutation in bits.
     /// This is the effecitve internal state size or bandwidth.
     pub const fn permutation_bits() -> usize {
@@ -38,7 +169,7 @@ impl Csprng {
         Csprng::permutation_bits() - Csprng::capacity_bits()
     }
 
-    /// The effecitve internal state size or bandwidth, in bytes.
+    /// The effective internal state size or bandwidth, in bytes.
     pub const fn permutation_bytes() -> usize {
         Csprng::permutation_bits() / 8
     }
@@ -53,59 +184,124 @@ impl Csprng {
         Csprng::capacity_bits() / 8
     }
 
-    // The number of bytes needed to seed the entire internal state by processing the optimum
-    // number of message input blocks.
-    // But if you are planning to append more entropy or customization data to the seed data,
-    // consider just starting with `permutation_bytes()` instead.
-    pub const fn recommended_max_seed_bytes() -> usize {
-        // The number of blocks needed to completely fill the internal state.
-        let msg_blocks =
-            (Csprng::permutation_bits() + Csprng::rate_bits() - 1) / Csprng::rate_bits();
-
-        // The final message block is padded with at least 6 bits (1111 || 1 0* 1),
-        // so we take off one byte.
-        msg_blocks * Csprng::rate_bytes() - 1
+    /// The number of bytes needed to seed the entire internal state,
+    /// plus an additional 1/8 (or 200 bits, whichever is greater) for
+    /// good measure. There is probably no point to seeding with more
+    /// entropy than this.
+    ///
+    /// Guaranteed to be:
+    /// - at least 512 bits, and
+    /// - a multiple of 128 bits (16 bytes).
+    pub const fn max_entropy_seed_bytes() -> usize {
+        // Start with the width in bits of the underlying permutation.
+        let bits = Self::permutation_bits();
+        // Add ceil(bits * 1/8), or at least 200 bits.
+        let bits = bits + const_max_usize(&[200, (bits + 7) / 8]);
+        // Ensure is a multiple of 128 and at least 512.
+        let bits = const_max_usize(&[512, ((bits + 127) / 128) * 128]);
+        // Convert to bytes.
+        bits / 8
     }
 
-    pub fn new(seed: &[u8]) -> Csprng {
-        use sha3::digest::{ExtendableOutput, Update};
+    /// Initializes a new CSPRNG from a sequence of bytes.
+    ///
+    /// Equivalent to using a builder with a single call
+    /// to [`CsprngBuilder::write_bytes()`].
+    #[inline]
+    pub fn from_seed_bytes<AsRefSliceU8>(seed_bytes: AsRefSliceU8) -> Self
+    where
+        AsRefSliceU8: AsRef<[u8]>,
+    {
+        CsprngBuilder::default().write_bytes(seed_bytes).finish()
+    }
 
-        let mut hasher = sha3::Shake256::default();
+    /// Initializes a new CSPRNG from a string.
+    ///
+    /// Equivalent to using a builder with a single call
+    /// to [`CsprngBuilder::write_str()`].
+    #[inline]
+    pub fn from_seed_str<AsRefStr>(seed_str: AsRefStr) -> Self
+    where
+        AsRefStr: AsRef<str>,
+    {
+        CsprngBuilder::default().write_str(seed_str).finish()
+    }
 
-        let buf = b"csprng for electionguard-rust";
-        hasher.update(&(buf.len() as u64).to_be_bytes());
-        hasher.update(&buf[..]);
+    /// Returns a new default [`CsprngBuilder`], for initializing a new [`Csprng`].
+    ///
+    /// Equivalent to [`CsprngBuilder::default()`].
+    ///
+    /// ```
+    /// # use util::csprng::Csprng;
+    /// let mut csprng = Csprng::build()
+    ///     .write_str("Fixed customization string")
+    ///     .write_bytes(b"data containing sufficient entropy goes here")
+    ///     .finish();
+    /// assert_ne!(csprng.next_u128(), 0, "Unlikely");
+    /// ```
+    #[inline]
+    pub fn build() -> CsprngBuilder {
+        CsprngBuilder::default()
+    }
 
-        hasher.update(&(seed.len() as u64).to_be_bytes());
-        hasher.update(seed);
+    /// Fills the supplied buffer with generated bytes.
+    ///
+    /// Compare to `rand::RngCore::fill_bytes`.
+    pub fn fill_buf(&mut self, buf: &mut [u8]) {
+        use sha3::digest::XofReader;
+        self.0.read(buf);
+    }
 
-        Csprng(Box::new(hasher.finalize_xof()))
+    /// Returns an array of uniformly random `u8`s.
+    ///
+    /// ```
+    /// # use util::csprng::Csprng;
+    /// let csprng = &mut Csprng::from_seed_bytes(b"my seed data");
+    /// let buf: [u8; 32] = csprng.next_arr_u8();
+    /// assert_ne!(buf, [0_u8; 32]);
+    /// ```
+    pub fn next_arr_u8<const N: usize>(&mut self) -> [u8; N] {
+        let mut buf = [0_u8; N];
+        self.fill_buf(&mut buf);
+        buf
+    }
+
+    /// Returns a uniformly random `bool`.
+    ///
+    /// ```
+    /// # use util::csprng::Csprng;
+    /// let csprng = &mut Csprng::default();
+    /// let bools: [bool; 128] = std::array::from_fn(|_ix| csprng.next_bool());
+    /// assert!(bools.iter().any(|&b|b));
+    /// assert!(bools.iter().any(|&b|!b));
+    /// ```
+    pub fn next_bool(&mut self) -> bool {
+        self.next_u8() & 1 != 0
     }
 
     /// Returns a uniformly random `u8`.
     pub fn next_u8(&mut self) -> u8 {
-        let mut buf = [0u8];
-        self.0.read(&mut buf);
-        buf[0]
+        self.next_arr_u8::<1>()[0]
     }
 
     /// Returns a uniformly random `u32`.
     pub fn next_u32(&mut self) -> u32 {
-        let mut buf = [0u8; 4];
-        self.0.read(&mut buf);
-        u32::from_le_bytes(buf)
+        u32::from_le_bytes(self.next_arr_u8())
     }
 
     /// Returns a uniformly random `u64`.
     pub fn next_u64(&mut self) -> u64 {
-        let mut buf = [0u8; 8];
-        self.0.read(&mut buf);
-        u64::from_le_bytes(buf)
+        u64::from_le_bytes(self.next_arr_u8())
     }
 
-    /// Returns a uniformly random `bool`.
-    pub fn next_bool(&mut self) -> bool {
-        self.next_u8() & 1 != 0
+    /// Returns a uniformly random `u128`.
+    ///
+    /// ```
+    /// # use util::csprng::Csprng;
+    /// assert_ne!(Csprng::default().next_u128(), 0);
+    /// ```
+    pub fn next_u128(&mut self) -> u128 {
+        u128::from_le_bytes(self.next_arr_u8())
     }
 
     // Returns a random number chosen uniformly from 0 <= n < 2^bits.
@@ -127,7 +323,7 @@ impl Csprng {
 
         let cnt_bytes = (bits + 7) / 8;
         let mut buf = vec![0; cnt_bytes];
-        self.0.read(buf.as_mut_slice());
+        self.fill_buf(buf.as_mut_slice());
 
         if bits == 1 {
             buf[0] &= 1;
@@ -153,33 +349,34 @@ impl Csprng {
 
     /// Returns a random number uniformly from `0 <= n < end`.
     /// `end` must be greater than `0`.
-    pub fn next_biguint_lt(&mut self, end: &BigUint) -> BigUint {
-        assert!(!end.is_zero(), "end must be greater than 0");
+    pub fn next_biguint_lt(&mut self, end: &BigUint) -> Option<BigUint> {
+        debug_assert!(!end.is_zero(), "end must be greater than 0");
 
-        // The `.unwrap()` is justified here because `end` is nonzero.
-        #[allow(clippy::unwrap_used)]
-        let bits = NonZeroU64::new(end.bits()).unwrap();
-
-        // The `.unwrap()` is justified here because surely `log2(end)` will fit into `usize`.
-        #[allow(clippy::unwrap_used)]
-        let bits: NonZeroUsize = bits.try_into().unwrap();
+        let bits = NonZeroU64::new(end.bits())?;
+        let bits = NonZeroUsize::try_from(bits).ok()?;
 
         loop {
             let n = self.next_biguint(bits);
             if &n < end {
-                break n;
+                return Some(n);
             }
         }
     }
 
     /// Returns a random number uniformly from `start <= n < end`.
     /// `start` must be less than `end`.
-    pub fn next_biguint_range(&mut self, start: &BigUint, end: &BigUint) -> BigUint {
-        #[allow(clippy::expect_used)]
-        let diff = end
-            .checked_sub(start)
-            .expect("`start` must be less than `end`.");
-        start + &self.next_biguint_lt(&diff)
+    pub fn next_biguint_range(&mut self, start: &BigUint, end: &BigUint) -> Option<BigUint> {
+        debug_assert!(start < end, "`start` must be less than `end`");
+
+        end.checked_sub(start)
+            .and_then(|diff| self.next_biguint_lt(&diff))
+            .map(|add_to_start| start + &add_to_start)
+    }
+}
+
+impl Default for Csprng {
+    fn default() -> Self {
+        CsprngBuilder::default().finish()
     }
 }
 
@@ -187,28 +384,55 @@ impl rand::RngCore for Csprng {
     fn next_u32(&mut self) -> u32 {
         self.next_u32()
     }
+
     fn next_u64(&mut self) -> u64 {
         self.next_u64()
     }
+
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.read(dest);
+        self.fill_buf(dest);
     }
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        self.0.read(dest);
-        Ok(())
+}
+
+impl<const N: usize> From<Csprng> for [CsprngBuilder; N] {
+    /// Converts the [`Csprng`] into an array of [`CsprngBuilder`]s, each loaded
+    /// with the max effective entropy generated by the source.
+    ///
+    /// You may write additional data into the CsprngBuilder, or just call
+    /// [`.finish()`](CsprngBuilder::finish) immediately.
+    fn from(mut csprng: Csprng) -> Self {
+        const SEED_BYTES: usize = Csprng::max_entropy_seed_bytes();
+        let mut buf = Zeroizing::new([0_u8; SEED_BYTES]);
+        std::array::from_fn(|_i| {
+            // Init the CsprngBuilder
+            csprng.fill_buf(&mut buf[0..SEED_BYTES]);
+            CsprngBuilder::default().write_bytes(&mut buf[0..SEED_BYTES])
+        })
+    }
+}
+
+impl<const N: usize> From<Csprng> for [Csprng; N] {
+    /// Converts the [`Csprng`] into an array of `Csprng`s, each initialized
+    /// with the max effective entropy generated by the source.
+    fn from(csprng: Csprng) -> Self {
+        <[CsprngBuilder; N]>::from(csprng).map(CsprngBuilder::finish)
     }
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod test_csprng {
-    use super::*;
-    use num_traits::One;
-    use rand::prelude::Distribution;
+mod test {
     use std::num::NonZeroUsize;
 
+    use anyhow::Result;
+    use num_bigint::BigUint;
+    use num_traits::One;
+    use rand::prelude::Distribution;
+
+    use super::{Csprng, CsprngBuilder};
+
     #[test]
-    fn test_csprng_basics() {
+    fn test_csprng_consts() {
         // The bit quantities match the spec.
         assert_eq!(Csprng::permutation_bits(), 1600);
         assert_eq!(Csprng::rate_bits(), 1088);
@@ -219,27 +443,87 @@ mod test_csprng {
         assert_eq!(Csprng::rate_bits(), Csprng::rate_bytes() * 8);
         assert_eq!(Csprng::capacity_bits(), Csprng::capacity_bytes() * 8);
 
-        // The recommended seed bytes is not less than the internal state.
-        assert!(Csprng::permutation_bytes() <= Csprng::recommended_max_seed_bytes());
-
-        let mut csprng = Csprng::new(b"test_csprng::test_csprng_basics");
-        assert_eq!(csprng.next_u64(), 11117081707462498600);
-        assert_eq!(csprng.next_u8(), 202);
-        assert!(csprng.next_bool());
+        // The max seed entropy bytes is not less than the internal width.
+        assert!(Csprng::permutation_bytes() <= Csprng::max_entropy_seed_bytes());
     }
 
     #[test]
-    fn next_biguint() {
-        let mut csprng = Csprng::new(b"test_csprng::next_biguint");
+    fn test_csprng_builder() {
+        let mut csprng = Csprng::build()
+            .write_u64(0x_12345678_90ABCDEF_u64)
+            .write_bytes(b"this can be a slice")
+            .write_seq_bytes([
+                b"wow look".as_slice(),
+                b"a sequence".as_slice(),
+                b"of slices".as_slice(),
+            ])
+            .finish();
+
+        assert_eq!(csprng.next_u64(), 8717361090630221184);
+    }
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn csprng_new_default_equivalence() {
+        let a = CsprngBuilder::default().finish().next_u128();
+        assert_ne!(a, 0);
+        let b = Csprng::build().finish().next_u128();
+        assert_eq!(a, b);
+        let c = Csprng::default().next_u128();
+        assert_eq!(a, c);
+    }
+
+    #[allow(clippy::bool_assert_comparison)]
+    #[test]
+    fn csprng_initialization_effects() {
+        let a = Csprng::build().write_bytes(b"").finish().next_u128();
+        let b = Csprng::build().finish().next_u128();
+        assert_ne!(
+            a, b,
+            "Writing a 'bytes' of length 0 is different from not having written one at all."
+        );
+
+        let a = Csprng::build().write_bytes(b"a").finish().next_u128();
+        let b = Csprng::build().write_bytes(b"b").finish().next_u128();
+        assert_ne!(a, b, "Writing two different 'bytes'es is different.");
+
+        let a = Csprng::build().write_str("").finish().next_u128();
+        let b = Csprng::build().finish().next_u128();
+        assert_ne!(
+            a, b,
+            "Writing a 'str' of length 0 is different from not having written one at all."
+        );
+
+        let a = Csprng::build().write_str("a").finish().next_u128();
+        let b = Csprng::build().write_str("b").finish().next_u128();
+        assert_ne!(a, b, "Writing two different 'str's is different.");
+
+        let a = Csprng::build().write_bytes(b"a").finish().next_u128();
+        let b = Csprng::build().write_str("b").finish().next_u128();
+        assert_ne!(
+            a, b,
+            "Writing a 'bytes' and a 'str' with the same value is the same."
+        );
+
+        let a = Csprng::build().write_u64(0_u64).finish().next_u128();
+        let b = Csprng::build().write_u64(1_u64).finish().next_u128();
+        assert_ne!(a, b, "Writing two different 'u64's is different.");
+    }
+
+    #[test]
+    fn next_biguint() -> Result<()> {
+        let csprng = &mut Csprng::from_seed_bytes(b"t::next_biguint");
         for bits in 1..100 {
-            let j = csprng.next_biguint(NonZeroUsize::new(bits).unwrap());
+            //? let j = csprng.next_biguint(NonZeroUsize::new(bits).unwrap());
+            let j = csprng.next_biguint(bits.try_into()?);
             assert!(j < (BigUint::one() << bits));
         }
+        Ok(())
     }
 
     #[test]
     fn next_biguint_requiring_bits() {
-        let mut csprng = Csprng::new(b"test_csprng::next_biguint_requiring_bits");
+        let csprng = &mut Csprng::from_seed_bytes(b"t::next_biguint_requiring_bits");
         for bits in 1..100 {
             let j = csprng.next_biguint_requiring_bits(NonZeroUsize::new(bits).unwrap());
 
@@ -255,10 +539,10 @@ mod test_csprng {
 
     #[test]
     fn next_biguint_lt() {
-        let mut csprng = Csprng::new(b"test_csprng::next_biguint_lt");
+        let csprng = &mut Csprng::from_seed_bytes(b"t::next_biguint_lt");
         for end in 1usize..100 {
             let end: BigUint = end.into();
-            let j = csprng.next_biguint_lt(&end);
+            let j = csprng.next_biguint_lt(&end).unwrap();
             //dbg!((&j, &end));
             assert!(j < end);
         }
@@ -266,12 +550,12 @@ mod test_csprng {
 
     #[test]
     fn next_biguint_range() {
-        let mut csprng = Csprng::new(b"test_csprng::next_biguint_range");
+        let csprng = &mut Csprng::from_seed_bytes(b"t::next_biguint_range");
         for start_usize in 0usize..100 {
             let start: BigUint = start_usize.into();
             for end in start_usize + 1..101 {
                 let end: BigUint = end.into();
-                let j = csprng.next_biguint_range(&start, &end);
+                let j = csprng.next_biguint_range(&start, &end).unwrap();
                 assert!(start <= j && j < end);
             }
         }
@@ -279,9 +563,23 @@ mod test_csprng {
 
     #[test]
     fn test_csprng_rand_rngcore() {
-        let mut csprng = Csprng::new(b"test_csprng::test_csprng_rand_rngcore");
+        let csprng = &mut Csprng::from_seed_bytes(b"t::test_csprng_rand_rngcore");
 
-        let n: u64 = rand::distributions::Standard.sample(&mut csprng);
-        assert_eq!(n, 8275017704394333465);
+        let n: u64 = rand::distr::StandardUniform.sample(csprng);
+        assert_eq!(n, 9005870331027573340, "actual (left) != (right) expected");
+    }
+
+    #[test]
+    fn into_array() {
+        let csprng = Csprng::default();
+        let arr_builders = <[CsprngBuilder; 8]>::from(csprng);
+        for builder in arr_builders {
+            let mut csprng = builder.finish();
+            assert_ne!(csprng.next_u128(), 0, "Unlikely");
+        }
+
+        for mut csprng in <[Csprng; 8]>::from(Csprng::default()) {
+            assert_ne!(csprng.next_u128(), 0, "Unlikely");
+        }
     }
 }

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use eg::{hashes::Hashes, serializable::SerializablePretty};
+use eg::{hashes::Hashes, serializable::SerializablePretty, eg::Eg};
 
 use crate::{
     artifacts_dir::ArtifactFile,
@@ -32,28 +32,32 @@ pub(crate) struct WriteHashes {
 }
 
 impl Subcommand for WriteHashes {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng(b"WriteHashes")?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("WriteHashes")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
-        let election_parameters =
-            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
+        let _election_parameters =
+            load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
 
         //? TODO: Do we need a command line arg to specify the election manifest source?
         let election_manifest_source =
             ElectionManifestSource::ArtifactFileElectionManifestCanonical;
-        let election_manifest =
+        let _election_manifest =
             election_manifest_source.load_election_manifest(&subcommand_helper.artifacts_dir)?;
 
-        let hashes = Hashes::compute(&election_parameters, &election_manifest)?;
+        Hashes::get_or_compute(eg)?;
+        let hashes = eg.hashes()?;
 
         let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
-            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::Hashes))?;
+            .out_file_stdiowrite(self.out_file.as_ref(), Some(&ArtifactFile::Hashes))?;
 
         hashes
             .to_stdiowrite_pretty(stdiowrite.as_mut())

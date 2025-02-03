@@ -22,7 +22,8 @@ pub fn to_string_uppercase_hex_bits(u: &BigUint, fixed_len_bits: u32) -> Result<
     let value_bits = u.bits().max(1);
     ensure!(
         value_bits <= fixed_len_bits,
-        "Value of {value_bits} bits is too large for specified fixed length of {fixed_len_bits} bit result." );
+        "Value of {value_bits} bits is too large for specified fixed length of {fixed_len_bits} bit result."
+    );
 
     let value_digits = (value_bits + 3) / 4;
 
@@ -43,34 +44,80 @@ pub fn to_string_uppercase_hex_bits(u: &BigUint, fixed_len_bits: u32) -> Result<
     Ok(s)
 }
 
+/// Converts a `BigUint` to a string using uppercase hex digits with no prefix. Pads with leading
+/// zeroes to match the smallest power-of-2 *number of bytes* required to hold the value.
+///
+/// This heuristic is not appropriate for every situation.
+pub fn to_string_uppercase_hex_infer_len(u: &BigUint) -> String {
+    let value_bits = u.bits().max(1);
+    let value_digits = value_bits.div_ceil(4);
+    let value_bytes = value_digits.div_ceil(2);
+
+    let fixed_len_bytes = value_bytes.next_power_of_two();
+    let fixed_len_digits = fixed_len_bytes * 2;
+
+    if value_digits < fixed_len_digits {
+        let prepend_leading = fixed_len_digits - value_digits;
+        let leading_zeros = "0".repeat(prepend_leading as usize);
+        format!("{leading_zeros}{u:X}")
+    } else {
+        format!("{u:X}")
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod to_string {
-    use super::*;
     use insta::assert_ron_snapshot;
 
-    fn r<T: Into<BigUint>>(u: T, fixed_len_bits: u32) -> std::result::Result<String, String> {
-        let u: BigUint = u.into();
-        to_string_uppercase_hex_bits(&u, fixed_len_bits).map_err(|e| e.to_string())
-    }
+    use super::*;
 
     #[test]
     fn fixed_len_specified() {
-        assert_ron_snapshot!(r(0x00_u8,    0), @r###"Ok("00")"###);
-        assert_ron_snapshot!(r(0x01_u8,    1), @r###"Ok("01")"###);
-        assert_ron_snapshot!(r(0x00_u8,    2), @r###"Ok("00")"###);
-        assert_ron_snapshot!(r(0x00_u8,    3), @r###"Ok("00")"###);
-        assert_ron_snapshot!(r(0x00_u8,    4), @r###"Ok("00")"###);
-        assert_ron_snapshot!(r(0x00_u8,    5), @r###"Ok("00")"###);
-        assert_ron_snapshot!(r(0x00_u8,    8), @r###"Ok("00")"###);
-        assert_ron_snapshot!(r(0x0a_u8,    9), @r###"Ok("000A")"###);
-        assert_ron_snapshot!(r(0x000_u16,  12), @r###"Ok("0000")"###);
-        assert_ron_snapshot!(r(0xABC_u16,  12), @r###"Ok("0ABC")"###);
+        fn r<T: Into<BigUint>>(u: T, fixed_len_bits: u32) -> std::result::Result<String, String> {
+            let u: BigUint = u.into();
+            to_string_uppercase_hex_bits(&u, fixed_len_bits).map_err(|e| e.to_string())
+        }
+
+        assert_ron_snapshot!(r(  0x00_u8,  0),  @r###"Ok("00")"###);
+        assert_ron_snapshot!(r(  0x01_u8,  1),  @r###"Ok("01")"###);
+        assert_ron_snapshot!(r(  0x00_u8,  2),  @r###"Ok("00")"###);
+        assert_ron_snapshot!(r(  0x00_u8,  3),  @r###"Ok("00")"###);
+        assert_ron_snapshot!(r(  0x00_u8,  4),  @r###"Ok("00")"###);
+        assert_ron_snapshot!(r(  0x00_u8,  5),  @r###"Ok("00")"###);
+        assert_ron_snapshot!(r(  0x00_u8,  8),  @r###"Ok("00")"###);
+        assert_ron_snapshot!(r(  0x0A_u8,  9),  @r###"Ok("000A")"###);
+        assert_ron_snapshot!(r( 0x000_u16, 12), @r###"Ok("0000")"###);
+        assert_ron_snapshot!(r( 0xABC_u16, 12), @r###"Ok("0ABC")"###);
         assert_ron_snapshot!(r(0x0000_u16, 13), @r###"Ok("0000")"###);
         assert_ron_snapshot!(r(0x0ABC_u16, 13), @r###"Ok("0ABC")"###);
         assert_ron_snapshot!(r(0x0ABC_u16, 15), @r###"Ok("0ABC")"###);
         assert_ron_snapshot!(r(0x0ABC_u16, 16), @r###"Ok("0ABC")"###);
         assert_ron_snapshot!(r(0x0ABC_u16, 17), @r###"Ok("000ABC")"###);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    #[allow(clippy::unusual_byte_groupings)]
+    fn infer_len() {
+        fn r(u: u64) -> String {
+            let u: BigUint = u.into();
+            to_string_uppercase_hex_infer_len(&u)
+        }
+
+        assert_ron_snapshot!(r(0x________________00),               @r###""00""###);
+        assert_ron_snapshot!(r(0x________________01),               @r###""01""###);
+        assert_ron_snapshot!(r(0x________________FF),               @r###""FF""###);
+        assert_ron_snapshot!(r(0x________________00),               @r###""00""###);
+        assert_ron_snapshot!(r(0x________________00),               @r###""00""###);
+        assert_ron_snapshot!(r(0x________________00),               @r###""00""###);
+        assert_ron_snapshot!(r(0x________________00),               @r###""00""###);
+        assert_ron_snapshot!(r(0x______________0100),             @r###""0100""###);
+        assert_ron_snapshot!(r(0x______________FFFF),             @r###""FFFF""###);
+        assert_ron_snapshot!(r(0x__________00010000),         @r###""00010000""###);
+        assert_ron_snapshot!(r(0x__________FFFFFFFF),         @r###""FFFFFFFF""###);
+        assert_ron_snapshot!(r(0x_00000001_00000000), @r###""0000000100000000""###);
+        assert_ron_snapshot!(r(0x_FFFFFFFF_FFFFFFFF), @r###""FFFFFFFFFFFFFFFF""###);
     }
 }
 
@@ -127,8 +174,9 @@ pub fn biguint_from_str_uppercase_hex_bits(s: &str, fixed_len_bits: u32) -> Resu
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod from_str {
-    use super::*;
     use insta::assert_ron_snapshot;
+
+    use super::*;
 
     fn r(s: &str, fixed_len_bits: u32) -> std::result::Result<String, String> {
         biguint_from_str_uppercase_hex_bits(s, fixed_len_bits)

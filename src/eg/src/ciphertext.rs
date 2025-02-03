@@ -5,19 +5,23 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use serde::{Deserialize, Serialize};
 
-use util::algebra::{FieldElement, Group, GroupElement};
+use util::{
+    algebra::{FieldElement, Group, GroupElement},
+    index::Index,
+    vec1::HasIndexType,
+};
 
 use crate::{
+    eg::Eg,
     election_manifest::ContestIndex,
     errors::{EgError, EgResult},
     fixed_parameters::FixedParameters,
-    index::Index,
     pre_voting_data::PreVotingData,
-    selection_limit::EffectiveOptionSelectionLimit,
-    vec1::HasIndexTypeMarker,
+    selection_limits::EffectiveOptionSelectionLimit,
     zk::ProofRange,
 };
 
@@ -27,23 +31,28 @@ pub struct Ciphertext {
     pub beta: GroupElement,
 }
 
-impl HasIndexTypeMarker for Ciphertext {}
+impl HasIndexType for Ciphertext {
+    type IndexTypeParam = Ciphertext;
+}
 
-/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`ElectionManifest`].
+/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`ElectionManifest`](crate::election_manifest::ElectionManifest).
 ///
-/// Same type as [`ContestOptionIndex`], [`ContestOptionFieldPlaintextIndex`], [`ContestDataFieldPlaintextIndex`], etc.
+/// Same type as [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
 pub type CiphertextIndex = Index<Ciphertext>;
 
 impl Ciphertext {
     /// Verify the proof that the cipher text is an encryption of 0 or 1.
     pub fn verify_ballot_correctness(
         &self,
-        pre_voting_data: &PreVotingData,
+        eg: &Eg,
         proof: &ProofRange,
         effective_option_selection_limit: EffectiveOptionSelectionLimit,
         contest_ix_for_errs: ContestIndex,
         ciphertext_ix_for_errs: CiphertextIndex,
     ) -> EgResult<()> {
+        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = pre_voting_data.as_ref();
+
         if proof.verify(
             pre_voting_data,
             self,
@@ -72,8 +81,9 @@ impl Ciphertext {
     /// Scale a ciphertext by a factor. The scaling of an encryption of `x` with a factor `k`
     /// gives an encryption of `k*x`.
     pub fn scale(&self, fixed_parameters: &FixedParameters, factor: &FieldElement) -> Ciphertext {
-        let alpha = self.alpha.exp(factor, &fixed_parameters.group);
-        let beta = self.beta.exp(factor, &fixed_parameters.group);
+        let group = fixed_parameters.group();
+        let alpha = self.alpha.exp(factor, group);
+        let beta = self.beta.exp(factor, group);
 
         Ciphertext { alpha, beta }
     }

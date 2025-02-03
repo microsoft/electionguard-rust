@@ -1,0 +1,37 @@
+[package]
+name = "eg-dataproducer-filesystem"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+default = [
+    "eg-allow-unsafe-code",
+    "eg-allow-insecure-deterministic-csprng",
+    "eg-allow-test-data-generation",
+    "eg-allow-toy-parameters",
+    #"eg-forbid-insecure-deterministic-csprng",
+    #"eg-forbid-test-data-generation",
+    #"eg-forbid-toy-parameters",
+]
+eg-allow-unsafe-code           = ["util/eg-allow-unsafe-code" ]
+eg-allow-insecure-deterministic-csprng  = ["util/eg-allow-insecure-deterministic-csprng" ]
+eg-forbid-insecure-deterministic-csprng = ["util/eg-forbid-insecure-deterministic-csprng" ]
+eg-allow-test-data-generation  = ["util/eg-allow-test-data-generation" ]
+eg-forbid-test-data-generation = ["util/eg-forbid-test-data-generation" ]
+eg-allow-toy-parameters = ["util/eg-allow-toy-parameters" ]
+eg-forbid-toy-parameters = ["util/eg-forbid-toy-parameters" ]
+
+[dependencies]
+
+#--- Defined in this workspace
+eg.workspace = true
+util.workspace = true
+
+#--- From crates.io
+anyhow.workspace = true
+serde.workspace = true
+static_assertions.workspace = true
+
+[dev-dependencies]
+insta = { version = "1.42.1", features = ["ron"] }

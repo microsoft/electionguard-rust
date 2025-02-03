@@ -1,0 +1,5 @@
+merge_derives = false
+
+#---- Nighty-only as of 2024-10-14 rustc 1.81.0
+#style_edition = "2024"
+#group_imports = "StdExternalCrate"

@@ -20,7 +20,7 @@ use util::file::create_path;
 use crate::{
     artifacts_dir::ArtifactFile,
     common_utils::{
-        load_election_parameters, load_hashes, load_hashes_ext, load_joint_election_public_key,
+        load_election_parameters, load_hashes, load_extended_base_hash, load_joint_public_key,
         ElectionManifestSource,
     },
     subcommand_helper::SubcommandHelper,
@@ -44,12 +44,15 @@ pub(crate) struct PreEncryptedBallotGenerate {
 }
 
 impl Subcommand for PreEncryptedBallotGenerate {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng("PreEncryptedBallotGenerate".as_bytes())?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("PreEncryptedBallotGenerate")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         let pv_data = load_pre_voting_data(&subcommand_helper.artifacts_dir)?;
 
@@ -58,7 +61,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
         let tool = BallotEncryptingTool::new(&pre_voting_data, ballot_style_index, None);
 
-        let (ballots, primary_nonces) = tool.generate_ballots(&mut csprng, self.num_ballots);
+        let (ballots, primary_nonces) = tool.generate_ballots(csprng, self.num_ballots);
 
         let label = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         create_path(
@@ -80,7 +83,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
             let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                 &None,
-                Some(ArtifactFile::PreEncryptedBallot(
+                Some(&ArtifactFile::PreEncryptedBallot(
                     label as u128,
                     ballots[b_idx].confirmation_code,
                 )),
@@ -96,7 +99,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
             let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                 &None,
-                Some(ArtifactFile::PreEncryptedBallotNonce(
+                Some(&ArtifactFile::PreEncryptedBallotNonce(
                     label as u128,
                     ballots[b_idx].confirmation_code,
                 )),
@@ -113,7 +116,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
 
         let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
             &None,
-            Some(ArtifactFile::PreEncryptedBallotMetadata(label as u128)),
+            Some(&ArtifactFile::PreEncryptedBallotMetadata(label as u128)),
         )?;
 
         tool.metadata_to_stdiowrite(&confirmation_codes, bx_write.as_mut())

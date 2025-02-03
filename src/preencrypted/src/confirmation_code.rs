@@ -12,7 +12,7 @@ use eg::{
 
 use crate::contest::ContestPreEncrypted;
 
-/// Confirmation code for a pre-encrypted ballot (Equation 96)
+/// Confirmation code for a pre-encrypted ballot (Equation 96) [TODO fix ref]
 ///
 /// H(B) = H(H_E;42,χ_1,χ_2,...,χ_m ,B_aux)
 ///

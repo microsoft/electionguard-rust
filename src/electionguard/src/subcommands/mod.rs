@@ -7,7 +7,7 @@
 #![allow(clippy::assertions_on_constants)]
 
 mod guardian_secret_key_generate;
-//? TODO #preencrypted_ballot# mod guardian_secret_key_write_encrypted_share;
+//? TODO guardian_secret_key_write_encrypted_share;
 mod guardian_secret_key_write_public_key;
 mod none;
 //? TODO #preencrypted_ballot# mod preencrypted_ballot_generate;
@@ -15,15 +15,17 @@ mod none;
 mod verify_standard_parameters;
 mod voter_write_confirmation_code;
 mod write_hashes;
-mod write_hashes_ext;
-mod write_joint_election_public_key;
+mod write_extended_base_hash;
+mod write_joint_public_key;
 mod write_manifest;
 mod write_parameters;
 mod write_pre_voting_data;
 mod write_random_seed;
 
-#[cfg(feature = "eg-test-data-generation")]
-mod voter_write_random_selections;
+#[cfg(feature = "eg-allow-test-data-generation")]
+mod generate_random_voter_selections;
+
+mod create_ballot_from_voter_selections;
 
 use anyhow::Result;
 
@@ -31,9 +33,6 @@ use crate::subcommand_helper::SubcommandHelper;
 
 /// Trait to be implemented by each Subcommand enum variant data type.
 pub(crate) trait Subcommand {
-    // If returns `true` the subcommand may use the csprng.
-    fn uses_csprng(&self) -> bool;
-
     // Call to perform the subcommand.
     fn do_it(&mut self, subcommand_info: &mut SubcommandHelper) -> Result<()>;
 }
@@ -44,9 +43,11 @@ pub(crate) enum Subcommands {
     #[clap(skip)]
     None(crate::subcommands::none::None),
 
-    /// Writes a random seed file to the artifacts directory.
+    /// Writes some random seed data to an artifact file.
     /// Future commands will use this seed to make their operation deterministic.
-    WriteRandomSeed(crate::subcommands::write_random_seed::WriteRandomSeed),
+    WriteInsecureDeterministicSeedData(
+        crate::subcommands::write_random_seed::WriteInsecureDeterministicSeedData,
+    ),
 
     /// Verify standard parameters. Primarily for testing.
     VerifyStandardParameters(
@@ -73,26 +74,31 @@ pub(crate) enum Subcommands {
     ),
 
     /// Compute the joint election public key from the guardian public keys and write it to a file.
-    WriteJointElectionPublicKey(
-        crate::subcommands::write_joint_election_public_key::WriteJointElectionPublicKey,
+    WriteJointPublicKey(
+        crate::subcommands::write_joint_public_key::WriteJointPublicKey,
     ),
 
     /// Write the extended hash to a file.
-    WriteHashesExt(crate::subcommands::write_hashes_ext::WriteHashesExt),
+    WriteExtendedBaseHash(crate::subcommands::write_extended_base_hash::WriteExtendedBaseHash),
 
     /// Write the pre voting data to a file.
     WritePreVotingData(crate::subcommands::write_pre_voting_data::WritePreVotingData),
 
     /// Write random ballot selections to a file for testing.
-    #[cfg(feature = "eg-test-data-generation")]
-    VoterWriteRandomSelections(
-        crate::subcommands::voter_write_random_selections::VoterWriteRandomSelection,
+    #[cfg(feature = "eg-allow-test-data-generation")]
+    GenerateRandomVoterSelections(
+        crate::subcommands::generate_random_voter_selections::GenerateRandomVoterSelections,
     ),
 
-    /// Write the confirmation QR code for a voter.
-    VoterWriteConfirmationCode(
-        crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode,
+    /// Produce a ballot from voter selections.
+    CreateBallotFromVoterSelections(
+        crate::subcommands::create_ballot_from_voter_selections::CreateBallotFromVoterSelections,
     ),
+    //? TODO /// Write the confirmation QR code for a voter.
+    // VoterWriteConfirmationCode(
+    //     crate::subcommands::voter_write_confirmation_code::VoterWriteConfirmationCode,
+    // ),
+
     //? TODO #preencrypted_ballot#
     // /// Generate an encrypted share of the guardian secret key.
     // GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
@@ -119,7 +125,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
         use Subcommands::*;
         match subcommands {
             None(a) => a,
-            WriteRandomSeed(a) => a,
+            WriteInsecureDeterministicSeedData(a) => a,
             VerifyStandardParameters(a) => a,
             WriteParameters(a) => a,
             WriteManifest(a) => a,
@@ -127,14 +133,15 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
             //TODO GuardianSecretKeyWriteEncryptedShare(a) => a,
-            WriteJointElectionPublicKey(a) => a,
-            WriteHashesExt(a) => a,
+            WriteJointPublicKey(a) => a,
+            WriteExtendedBaseHash(a) => a,
             WritePreVotingData(a) => a,
 
-            #[cfg(feature = "eg-test-data-generation")]
-            VoterWriteRandomSelections(a) => a,
+            #[cfg(feature = "eg-allow-test-data-generation")]
+            GenerateRandomVoterSelections(a) => a,
 
-            VoterWriteConfirmationCode(a) => a,
+            CreateBallotFromVoterSelections(a) => a,
+            //? TODO VoterWriteConfirmationCode(a) => a,
             //? TODO #preencrypted_ballot# PreEncryptedBallotGenerate(a) => a,
             //? TODO #preencrypted_ballot# PreEncryptedBallotRecord(a) => a,
         }

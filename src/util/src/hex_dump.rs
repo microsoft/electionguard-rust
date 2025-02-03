@@ -136,13 +136,13 @@ pub struct HexDumpDisplay<'a> {
     bytes: &'a [u8],
 }
 
-impl<'a> Display for HexDumpDisplay<'a> {
+impl Display for HexDumpDisplay<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         HexDumpOperation::dump_to_formatter(self, f)
     }
 }
 
-impl<'a> Debug for HexDumpDisplay<'a> {
+impl Debug for HexDumpDisplay<'_> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         HexDumpOperation::dump_to_formatter(self, f)
     }
@@ -185,7 +185,9 @@ impl<'b, 'f, 'g> HexDumpOperation<'b, 'f, 'g> {
 
         let bytes_iter = self.bytes.iter().clone().cloned();
 
-        let cnt_lines = (cnt_bytes_total + self.hd.bytes_per_line - 1) / self.hd.bytes_per_line;
+        //#[allow(clippy::manual_div_ceil)]
+        //let cnt_lines = (cnt_bytes_total + self.hd.bytes_per_line - 1) / self.hd.bytes_per_line;
+        let cnt_lines = cnt_bytes_total.div_ceil(self.hd.bytes_per_line);
 
         let addr_last_line = self.hd.addr_start + cnt_lines * self.hd.bytes_per_line;
 

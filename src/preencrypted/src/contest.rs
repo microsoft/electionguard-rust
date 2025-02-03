@@ -6,7 +6,7 @@
 #![deny(clippy::manual_assert)]
 
 use eg::{
-    contest_encrypted::ContestDataFieldsCiphertexts,
+    contest_data_fields_ciphertexts::ContestDataFieldsCiphertexts,
     contest_option_fields::ContestDataFieldPlaintext,
     election_manifest::{Contest, ContestIndex, ContestDataFieldIndex},
     pre_voting_data::PreVotingData,
@@ -14,11 +14,11 @@ use eg::{
     hash::HValue,
     index::Index,
     ciphertext::{Ciphertext, Nonce},
-    vec1::{HasIndexType, HasIndexTypeMarker, Vec1},
+    vec1::{HasIndexType, Vec1},
     zk::{ProofRange, ZkProofRangeError},
 };
 use serde::{Deserialize, Serialize};
-use util::csprng::Csprng;
+use util::csrng::Csrng;
 
 use crate::{
     contest_hash::contest_hash,
@@ -43,9 +43,8 @@ pub struct ContestPreEncrypted {
 }
 
 impl HasIndexType for ContestPreEncrypted {
-    type IndexType = Contest;
+    type IndexTypeParam = Contest;
 }
-impl HasIndexTypeMarker for ContestSelectionPreEncrypted {}
 
 impl PartialEq for ContestPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
@@ -117,7 +116,7 @@ impl ContestPreEncrypted {
     pub fn proof_ballot_correctness(
         &self,
         pvd: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
     ) -> Result<Vec1<Vec1<ProofRange>>, ZkProofRangeError> {
         let mut proofs = Vec1::new();
         for i in self.selections.indices() {
@@ -127,7 +126,7 @@ impl ContestPreEncrypted {
             proofs
                 .try_push(selection.proof_ballot_correctness(
                     pvd,
-                    csprng,
+                    csrng,
                     i.get_one_based_usize(),
                 )?)
                 .unwrap();
@@ -143,8 +142,8 @@ impl ContestPreEncrypted {
     ) -> Vec<(Ciphertext, Nonce)> {
         assert!(voter_selections.len() + selection_limit == self.selections.len());
 
-        let field = &fixed_parameters.field;
-        let group = &fixed_parameters.group;
+        let field = fixed_parameters.field();
+        let group = fixed_parameters.group();
 
         let mut selections = <Vec<&Vec<(Ciphertext, Option<Nonce>)>>>::new();
 
@@ -207,13 +206,13 @@ impl ContestPreEncrypted {
     pub fn finalize(
         &self,
         pre_voting_data: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         voter_selections: &[u8],
         selection_limit: usize,
         num_options: usize,
     ) -> Result<ContestDataFieldsCiphertexts, ZkProofRangeError> {
         let selection = self.combine_voter_selections(
-            &pre_voting_data.parameters.fixed_parameters,
+            pre_voting_data.election_parameters().fixed_parameters(),
             voter_selections,
             selection_limit,
         );
@@ -227,7 +226,7 @@ impl ContestPreEncrypted {
             proof_ballot_correctness
                 .try_push(selection[i].0.generate_range_proof_of_contest_data_field(
                     &pre_voting_data,
-                    csprng,
+                    csrng,
                     voter_selections[i] == 1u8,
                     nonce,
                 )?)
@@ -239,7 +238,7 @@ impl ContestPreEncrypted {
 
         let proof_selection_limit = ContestDataFieldsCiphertexts::proof_selection_limit(
             &pre_voting_data,
-            csprng,
+            csrng,
             &selection,
             num_selections as usize,
             selection_limit,

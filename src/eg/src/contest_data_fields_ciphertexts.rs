@@ -5,40 +5,44 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use util::{algebra::FieldElement, csprng::Csprng};
+use util::vec1::Vec1;
+use util::{algebra::FieldElement, csrng::Csrng};
 
+/// Same type as [`CiphertextIndex`](crate::ciphertext::CiphertextIndex), [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
+pub use crate::contest_data_fields_plaintexts::ContestDataFieldIndex;
 use crate::{
+    ballot::BallotNonce_xi_B,
+    ballot::HValue_H_I,
     ballot_scaled::ContestEncryptedScaled,
     ciphertext::Ciphertext,
-    contest_data_fields::ContestDataFieldsPlaintexts,
+    contest_data_fields_plaintexts::{ContestDataFieldPlaintext, ContestDataFieldsPlaintexts},
     contest_hash::contest_hash_chi_l,
+    eg::Eg,
     election_manifest::ContestIndex,
     errors::{EgError, EgResult},
     fixed_parameters::FixedParameters,
     hash::HValue,
-    nonce::NonceFE,
+    nonce::{derive_xi_i_j_as_hvalue, NonceFE},
     pre_voting_data::PreVotingData,
-    selection_limit::EffectiveContestSelectionLimit,
-    vec1::Vec1,
+    selection_limits::EffectiveContestSelectionLimit,
     zk::ProofRange,
 };
-
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestOptionFieldPlaintextIndex`], [`ContestDataFieldPlaintextIndex`], etc.
-pub use crate::contest_data_fields::ContestDataFieldIndex;
 
 //-------------------------------------------------------------------------------------------------|
 
 /// A contest in an encrypted ballot.
+///
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ContestDataFieldsCiphertexts {
     /// 1-based index of the contest within the [`ElectionManifest`].
     contest_ix: ContestIndex,
 
-    /// Ciphertexts produced by encrypting contest data field values.
-    /// Additional data fields may be present after the selectable options.
+    /// [`Ciphertext`]s produced by encrypting contest data fields, which can be selectable
+    /// options or additional data.
     pub ciphertexts: Vec1<Ciphertext>,
 
     //? TODO Preencrypted ballots
@@ -59,23 +63,30 @@ impl ContestDataFieldsCiphertexts {
     /// Also constructs the proof of ballot correctness.
     #[allow(non_snake_case)]
     pub fn from_contest_data_fields_plaintexts(
-        pre_voting_data: &PreVotingData,
-        ballot_nonce_xi_B: HValue,
+        eg: &Eg,
+        h_i: &HValue_H_I,
+        ballot_nonce_xi_B: &BallotNonce_xi_B,
         contest_ix: ContestIndex,
         data_fields_plaintexts: ContestDataFieldsPlaintexts,
-        csprng: &mut Csprng,
     ) -> EgResult<ContestDataFieldsCiphertexts> {
+        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = pre_voting_data.as_ref();
+        let election_parameters = pre_voting_data.election_parameters();
+        let fixed_parameters = election_parameters.fixed_parameters();
+
         let contest = pre_voting_data
-            .manifest
+            .election_manifest()
             .get_contest_without_checking_ballot_style(contest_ix)?;
 
         let contest_data_fields_ciphertexts_and_nonces =
             Self::encrypt_contest_data_fields_plaintexts(
-                pre_voting_data,
+                eg,
+                fixed_parameters,
+                h_i,
                 ballot_nonce_xi_B,
                 contest_ix,
                 &data_fields_plaintexts,
-            );
+            )?;
         debug_assert_eq!(
             contest_data_fields_ciphertexts_and_nonces.len(),
             data_fields_plaintexts.len()
@@ -89,9 +100,18 @@ impl ContestDataFieldsCiphertexts {
                 .iter()
                 .cloned()
                 .map(|(ct, _)| ct),
-        )?;
+        )
+        .map_err(Into::<EgError>::into)?;
 
-        let contest_hash = contest_hash_chi_l(pre_voting_data, contest_ix, ciphertexts.as_slice());
+        //? TODO
+        let encrypted_contest_data_blocks: [HValue; 0] = [];
+
+        let contest_hash = contest_hash_chi_l(
+            pre_voting_data,
+            contest_ix,
+            ciphertexts.as_slice(),
+            encrypted_contest_data_blocks.as_slice(),
+        );
 
         let proof_ballot_correctness = {
             let mut v_range_proofs = Vec::with_capacity(contest.contest_options.len());
@@ -105,15 +125,16 @@ impl ContestDataFieldsCiphertexts {
                 // Unwrap() is justified here because we are iterating over collection ultimately derived from a Vec1.
                 #[allow(clippy::unwrap_used)]
                 let contest_data_field_ix =
-                    ContestDataFieldIndex::from_zero_based_index(contest_data_field_ix_0based)
+                    ContestDataFieldIndex::try_from_zero_based_index(contest_data_field_ix_0based)
                         .unwrap();
 
-                // Unwrap() is justified here because we are iterating over collection ultimately derived from a Vec1.
-                #[allow(clippy::unwrap_used)]
-                let data_field_pt = *data_fields_plaintexts
-                    .as_ref()
+                let data_field_plaintext: ContestDataFieldPlaintext = data_fields_plaintexts
                     .get(contest_data_field_ix)
-                    .unwrap();
+                    .ok_or_else(|| {
+                        EgError::ContestOptionIxOutOfRange(
+                            contest_data_field_ix.get_one_based_u32(),
+                        )
+                    })?;
 
                 // Only data fields that are contest options get range proofs.
                 let Some(&effective_option_selection_limit) =
@@ -124,15 +145,16 @@ impl ContestDataFieldsCiphertexts {
 
                 let data_field_range_proof = ProofRange::new(
                     pre_voting_data,
-                    csprng,
+                    eg.csrng(),
                     contest_data_field_ciphertext,
                     contest_data_field_nonce,
-                    data_field_pt.into(),
+                    data_field_plaintext.into(),
                     effective_option_selection_limit.into(),
                 )?;
 
                 v_range_proofs.push(data_field_range_proof);
             }
+
             Vec1::try_from(v_range_proofs)?
         };
 
@@ -147,18 +169,23 @@ impl ContestDataFieldsCiphertexts {
         // Figure the sum of the values of the option fields.
         let mut option_fields_value_total: u64 = 0;
         for option_field_ix in contest.contest_options.indices() {
-            let &option_field = data_fields_plaintexts
-                .as_ref()
-                .get(option_field_ix)
-                .ok_or_else(|| {
+            let option_field_plaintext =
+                data_fields_plaintexts.get(option_field_ix).ok_or_else(|| {
                     EgError::ContestOptionIxOutOfRange(option_field_ix.get_one_based_u32())
                 })?;
-            option_fields_value_total += u64::from(option_field);
+
+            let option_field_pt_u64 = u64::from(option_field_plaintext);
+            option_fields_value_total = option_fields_value_total
+                .checked_add(option_field_pt_u64)
+                .ok_or_else(|| EgError::OverflowInOptionFieldTotal {
+                    contest_ix: contest_ix.get_one_based_u32(),
+                    option_field_ix: option_field_ix.get_one_based_u32(),
+                })?;
         }
 
         let proof_selection_limit = Self::proof_selection_limit(
             pre_voting_data,
-            csprng,
+            eg.csrng(),
             contest_data_fields_ciphertexts_and_nonces.as_slice(),
             option_fields_value_total.try_into()?,
             contest.selection_limit.into(),
@@ -177,43 +204,42 @@ impl ContestDataFieldsCiphertexts {
     fn generate_range_proof_for_contest_data_field(
         &self,
         pre_voting_data: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &Csprng,
         ciphertext: bool,
         xi_i_j: &ContestDataFieldEncryptionNonce_xi_i_j,
     ) -> Result<ProofRange, ZkProofRangeError> {
         ProofRange::new(
             pre_voting_data,
-            csprng,
+            eg.csrng(),
             self,
             xi_i_j.as_ref(),
             ciphertext.into(),
             1)
     } */
 
-    /// Encrypts a [`ContestDataFieldsPlaintexts`] to the [`JointElectionPublicKey`] and returns
-    /// the resulting ciphertexts and nonces.
+    /// Encrypts a [`ContestDataFieldsPlaintexts`] to the joint_vote_encryption_public_key_k
+    /// and returns the resulting ciphertexts and nonces.
     #[allow(non_snake_case)]
     fn encrypt_contest_data_fields_plaintexts(
-        pre_voting_data: &PreVotingData,
-        ballot_nonce_xi_B: HValue,
+        eg: &Eg,
+        fixed_parameters: &FixedParameters,
+        h_i: &HValue_H_I,
+        ballot_nonce_xi_B: &BallotNonce_xi_B,
         contest_i: ContestIndex,
         data_fields_plaintexts: &ContestDataFieldsPlaintexts,
-    ) -> Vec<(Ciphertext, NonceFE)> {
-        let fixed_parameters = &pre_voting_data.parameters.fixed_parameters;
-        let joint_election_public_key = &pre_voting_data.public_key;
+    ) -> EgResult<Vec<(Ciphertext, NonceFE)>> {
+        let field = fixed_parameters.field();
 
-        data_fields_plaintexts
-            .as_ref()
+        let joint_vote_encryption_public_key_k = eg.joint_vote_encryption_public_key_k()?;
+
+        let v_cts_nonces = data_fields_plaintexts
+            .as_Vec1_ContestDataFieldPlaintext()
             .enumerate()
             .map(|(data_field_j, &data_field_plaintext)| {
-                let nonce_xi_i_j = NonceFE::derive_from_xi_B(
-                    pre_voting_data,
-                    ballot_nonce_xi_B,
-                    contest_i,
-                    data_field_j,
-                );
+                let nonce_xi_i_j =
+                    NonceFE::new_xi_i_j(field, h_i, ballot_nonce_xi_B, contest_i, data_field_j);
 
-                let ciphertext = joint_election_public_key.encrypt_to(
+                let ciphertext = joint_vote_encryption_public_key_k.encrypt_to(
                     fixed_parameters,
                     nonce_xi_i_j.as_ref(),
                     data_field_plaintext,
@@ -221,24 +247,26 @@ impl ContestDataFieldsCiphertexts {
 
                 (ciphertext, nonce_xi_i_j)
             })
-            .collect()
+            .collect();
+
+        Ok(v_cts_nonces)
     }
 
     fn proof_selection_limit(
         pre_voting_data: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         selection: &[(Ciphertext, NonceFE)],
         num_selections: usize,
         selection_limit: usize,
     ) -> EgResult<ProofRange> {
         let (combined_ct, combined_nonce) = Self::sum_selection_nonce_vector(
-            &pre_voting_data.parameters.fixed_parameters,
+            pre_voting_data.election_parameters().fixed_parameters(),
             selection,
         );
 
         Ok(ProofRange::new(
             pre_voting_data,
-            csprng,
+            csrng,
             &combined_ct,
             &combined_nonce,
             num_selections,
@@ -249,9 +277,12 @@ impl ContestDataFieldsCiphertexts {
     /// Verify the proof that the selection limit is satisfied.
     fn verify_contest_selection_limit(
         &self,
-        pre_voting_data: &PreVotingData,
+        eg: &Eg,
         effective_contest_selection_limit: EffectiveContestSelectionLimit,
     ) -> EgResult<()> {
+        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = pre_voting_data.as_ref();
+
         let combined_ct = self.sum_selection_vector(pre_voting_data);
 
         let verified = ProofRange::verify(
@@ -280,8 +311,8 @@ impl ContestDataFieldsCiphertexts {
         fixed_parameters: &FixedParameters,
         selection_with_nonces: &[(Ciphertext, NonceFE)],
     ) -> (Ciphertext, NonceFE) {
-        let group = &fixed_parameters.group;
-        let field = &fixed_parameters.field;
+        let group = fixed_parameters.group();
+        let field = fixed_parameters.field();
 
         let mut sum_ct = Ciphertext::one();
         let mut sum_nonce_fe = FieldElement::zero();
@@ -298,7 +329,10 @@ impl ContestDataFieldsCiphertexts {
     /// Sum up the encrypted votes on a contest. The sum is needed when checking that the selection
     /// limit is satisfied.
     pub fn sum_selection_vector(&self, pre_voting_data: &PreVotingData) -> Ciphertext {
-        let group = &pre_voting_data.parameters.fixed_parameters.group;
+        let group = pre_voting_data
+            .election_parameters()
+            .fixed_parameters()
+            .group();
 
         let mut sum_ct = Ciphertext::one();
         for ct in self.ciphertexts.iter() {
@@ -311,10 +345,14 @@ impl ContestDataFieldsCiphertexts {
 
     /// Verify the proof that each encrypted vote is an encryption of 0 or 1,
     /// and that the selection limit is satisfied.
-    pub fn verify(&self, pre_voting_data: &PreVotingData) -> EgResult<()> {
-        let manifest = &pre_voting_data.manifest;
+    pub fn verify_proofs_for_all_data_fields_in_contest(&self, eg: &Eg) -> EgResult<()> {
+        let election_manifest = eg.election_manifest()?;
+        let election_manifest = election_manifest.as_ref();
 
-        let contest = manifest.get_contest_without_checking_ballot_style(self.contest_ix)?;
+        let contest =
+            election_manifest.get_contest_without_checking_ballot_style(self.contest_ix)?;
+
+        let cnt_data_fields_in_contest = contest.num_data_fields();
 
         let mut cnt_ciphertexts_verified = 0;
         for (ciphertext_ix, ciphertext) in self.ciphertexts.enumerate() {
@@ -331,7 +369,7 @@ impl ContestDataFieldsCiphertexts {
                 contest_option.effective_selection_limit(contest)?;
 
             ciphertext.verify_ballot_correctness(
-                pre_voting_data,
+                eg,
                 proof,
                 effective_option_selection_limit,
                 self.contest_ix,
@@ -340,8 +378,6 @@ impl ContestDataFieldsCiphertexts {
 
             cnt_ciphertexts_verified += 1;
         }
-
-        let cnt_data_fields_in_contest = self.ciphertexts.len(); //? TODO get number from authoritative source eg manifest.
 
         if cnt_ciphertexts_verified != cnt_data_fields_in_contest {
             return Err(
@@ -355,7 +391,7 @@ impl ContestDataFieldsCiphertexts {
 
         let effective_contest_selection_limit = contest.effective_contest_selection_limit()?;
 
-        self.verify_contest_selection_limit(pre_voting_data, effective_contest_selection_limit)?;
+        self.verify_contest_selection_limit(eg, effective_contest_selection_limit)?;
 
         Ok(())
     }

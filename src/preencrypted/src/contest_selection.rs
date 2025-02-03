@@ -11,17 +11,14 @@ use eg::{
     hash::HValue,
     index::Index,
     ciphertext::{Ciphertext, Nonce},
-    vec1::Vec1,
+    vec1::{HasIndexType, Vec1},
     zk::{ProofRange, ZkProofRangeError},
 };
 
 use serde::{Deserialize, Serialize};
-use util::csprng::Csprng;
+use util::csrng::Csrng;
 
 use crate::{ballot_encrypting_tool::BallotEncryptingTool, nonce::option_nonce};
-
-/// A 1-based index of a [`ContestSelectionPreEncrypted`] in the order it is defined in the [`crate::contest::ContestPreEncrypted`].
-pub type ContestSelectionPreEncryptedIndex = Index<ContestSelectionPreEncrypted>;
 
 /// A contest option in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,6 +37,14 @@ pub struct ContestSelectionPreEncrypted {
     /// Shortcode for this selection.
     pub shortcode: String,
 }
+
+//? TODO should this be the same as CiphertextIndex, which most of the other selections use as well?
+impl HasIndexType for ContestSelectionPreEncrypted {
+    type IndexTypeParam = ContestSelectionPreEncrypted;
+    //type IndexTypeParam = <CiphertextIndex as HasIndexType>::IndexTypeParam;
+}
+
+pub type ContestSelectionPreEncryptedIndex = Index<<ContestSelectionPreEncrypted as HasIndexType>::IndexTypeParam>;
 
 impl PartialEq for ContestSelectionPreEncrypted {
     fn eq(&self, other: &Self) -> bool {
@@ -85,7 +90,7 @@ impl ContestSelectionPreEncrypted {
             let k = ContestDataFieldIndex::from_one_based_index(k as u32).unwrap();
             let nonce = option_nonce(pvd, primary_nonce, contest_ix, j, k);
             let ciphertext = pvd.public_key.encrypt_to(
-                &pvd.parameters.fixed_parameters,
+                pvd.election_parameters.fixed_parameters(),
                 &nonce,
                 (j == k) as usize,
             );
@@ -128,7 +133,7 @@ impl ContestSelectionPreEncrypted {
             let nonce = option_nonce(pvd, primary_nonce, contest_ix, null_index, k);
             let ciphertext =
                 pvd.public_key
-                    .encrypt_to(&pvd.parameters.fixed_parameters, &nonce, 0);
+                    .encrypt_to(pvd.election_parameters.fixed_parameters(), &nonce, 0);
             let maybe_nonce = if store_nonces {
                 Some(Nonce::new(nonce))
             } else {
@@ -153,7 +158,7 @@ impl ContestSelectionPreEncrypted {
     pub fn proof_ballot_correctness(
         &self,
         pvd: &PreVotingData,
-        csprng: &mut Csprng,
+        csrng: &dyn Csrng,
         sequence_order: usize,
     ) -> Result<Vec1<ProofRange>, ZkProofRangeError> {
         let mut proofs = Vec1::new();
@@ -163,7 +168,7 @@ impl ContestSelectionPreEncrypted {
             let nonce = c.1.as_ref().unwrap();
             #[allow(clippy::unwrap_used)] //? TODO: Remove temp development code
             proofs
-                .try_push(c.0.generate_range_proof_for_contest_data_field(pvd, csprng, sequence_order == i, nonce)?)
+                .try_push(c.0.generate_range_proof_for_contest_data_field(pvd, csrng, sequence_order == i, nonce)?)
                 .unwrap();
         }
         Ok(proofs)

@@ -1,0 +1,30 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "h_e": { "$ref": "#/$defs/hash_value" },
+        "ballot_style": { "$ref": "#/$defs/integer_small" },
+        "contests": { "type": "array", "items": { "$ref": "#/$defs/contest" } }
+    },
+    "required": [ "h_e", "ballot_style", "contests" ],
+
+    "$defs": {
+        "contest": {
+            "type": "object",
+            "properties": {
+                "contest": { "$ref": "#/$defs/integer_small" },
+                "selections": { "type": "array", "items": { "$ref": "#/$defs/integer_small" } }
+            },
+            "required": [ "contest", "selections" ]
+        },
+        "hash_value" : {
+            "type": "string",
+            "pattern": "^[0-9A-F]{64}$"
+        },
+        "integer_small": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+        }
+    }
+}

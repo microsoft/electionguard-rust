@@ -18,7 +18,6 @@ use eg::{
     election_manifest::ElectionManifest,
     election_parameters::ElectionParameters,
     example_election_manifest::example_election_manifest_small,
-    example_election_parameters::example_election_parameters,
     // guardian::{shares_from_json, verify_share_from},
     hashes::Hashes,
     nizk::ProofGuardian,
@@ -41,14 +40,10 @@ pub(crate) struct VerifyGuardianShares {
 }
 
 impl Subcommand for VerifyGuardianShares {
-    fn uses_csprng(&self) -> bool {
-        false
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
         // // use eg::guardian::Guardian;
 
-        // if self.example_manifest && self.manifest.is_some() {
+        // if self.example_manifest && self.election_manifest().is_some() {
         //     bail!("Specify either --example-manifest or --manifest, but not both.");
         // }
 
@@ -56,7 +51,7 @@ impl Subcommand for VerifyGuardianShares {
         // let election_manifest: ElectionManifest;
 
         // if self.example_manifest {
-        //     election_parameters = example_election_parameters();
+        //     election_parameters = example_election_parameters()?;
         //     election_manifest = example_election_manifest_small();
         // } else {
         //     return Err(anyhow::anyhow!("Not implemented yet"));
@@ -64,7 +59,7 @@ impl Subcommand for VerifyGuardianShares {
 
         // let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        // assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters.n);
+        // assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters().n());
 
         // // Read guardian private data
         // // let our_artifacts = ArtifactsDir::new(
@@ -84,7 +79,7 @@ impl Subcommand for VerifyGuardianShares {
         // );
         // assert!(guardian.i == self.i as usize);
 
-        // for l in 1..election_parameters.varying_parameters.n + 1 {
+        // for l in 1..election_parameters.varying_parameters().n() + 1 {
         //     if guardian.i != l as usize {
         //         let their_artifacts = ArtifactsDir::new(
         //             subcommand_helper
@@ -132,7 +127,7 @@ impl Subcommand for VerifyGuardianShares {
         //                 "  Share from {} (verified): {:?}",
         //                 l,
         //                 verify_share_from(
-        //                     &election_parameters.fixed_parameters,
+        //                     election_parameters.fixed_parameters(),
         //                     guardian.i as usize,
         //                     &p_i_l,
         //                     &proof.capital_k,

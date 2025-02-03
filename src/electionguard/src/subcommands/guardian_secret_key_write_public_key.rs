@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 
-use eg::{guardian::GuardianIndex, serializable::{SerializableCanonical, SerializablePretty}};
+use eg::{guardian::GuardianIndex, serializable::SerializablePretty, eg::Eg};
 
 use crate::{
     artifacts_dir::{ArtifactFile, CanonicalPretty},
@@ -41,27 +41,29 @@ pub(crate) struct GuardianSecretKeyWritePublicKey {
 }
 
 impl Subcommand for GuardianSecretKeyWritePublicKey {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper
-            .get_csprng(format!("GuardianSecretKeyWritePublicKey({:?})", self.i).as_bytes())?;
+        let mut eg = {
+            // We don't include the guardian number in the csprng seed here, because we may not know it yet.
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("GuardianSecretKeyWritePublicKey")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         if self.secret_key_in.is_none() && self.i.is_none() {
             bail!("Specify at least one of --i or --secret-key-in");
         }
 
         //? TODO: Do we need a command line arg to specify the election parameters source?
-        let election_parameters =
-            load_election_parameters(&subcommand_helper.artifacts_dir, &mut csprng)?;
+        load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
 
         let guardian_secret_key = load_guardian_secret_key(
+            eg,
             self.i,
-            &self.secret_key_in,
+            self.secret_key_in.as_ref(),
             &subcommand_helper.artifacts_dir,
-            &election_parameters,
         )?;
 
         let i = guardian_secret_key.i;
@@ -71,8 +73,8 @@ impl Subcommand for GuardianSecretKeyWritePublicKey {
         let canonical_pretty = if self.canonical { CanonicalPretty::Canonical } else { CanonicalPretty::Pretty };
 
         let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
-            &self.public_key_out,
-            Some(ArtifactFile::GuardianPublicKey(i, canonical_pretty)),
+            self.public_key_out.as_ref(),
+            Some(&ArtifactFile::GuardianPublicKey(i)),
         )?;
 
         let result = if self.canonical {

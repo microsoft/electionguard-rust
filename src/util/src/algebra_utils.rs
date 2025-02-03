@@ -4,12 +4,13 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 //! This module provides various utility functions for field and group elements.
 
-use itertools::Itertools;
 use std::{borrow::Borrow, collections::HashMap, iter::zip, mem};
 
+use itertools::Itertools;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_traits::{One, Zero};
 
@@ -138,13 +139,11 @@ impl DiscreteLog {
         let mut gamma = y.clone();
         let m = (1 << 20) as u64; // The size of the pre-computed table.
         let n_over_m = (1 << 18) as u64; // n/m = 2^38/2^20 = 2^18.
-        let alpha_to_minus_m = match mod_inverse(
+        let alpha_to_minus_m = mod_inverse(
             &self.base.modpow(&BigUint::from(m), &self.modulus),
             &self.modulus,
-        ) {
-            Some(x) => x,
-            None => return None,
-        };
+        )?;
+
         for i in 0..n_over_m {
             match self.table.get(&gamma) {
                 Some(j) => {
@@ -176,7 +175,7 @@ impl DiscreteLog {
 
 /// Computes a single Lagrange coefficient mod q.
 ///
-/// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+/// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`. [TODO fix ref]
 ///
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
@@ -200,7 +199,7 @@ fn get_single_coefficient_at_zero_unchecked(
 
 /// Computes a single Lagrange coefficient mod q.
 ///
-/// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+/// That is `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`. [TODO fix ref]
 ///
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
@@ -221,7 +220,7 @@ pub fn get_single_coefficient_at_zero(
 
 /// Computes the Lagrange coefficients mod q
 ///
-/// That is the list of  `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`.
+/// That is the list of  `w_i = \prod_{l != i} l/(l-i) % q` as in Equation `67` of EG `2.0.0`. [TODO fix ref]
 /// The arguments are
 /// - `xs` - the list of nodes, field elements in Z_q
 /// - `field` - the field Z_q
@@ -290,10 +289,10 @@ pub fn group_lagrange_at_zero(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::csprng::Csprng;
+    use num_traits::Num;
 
     use super::*;
-    use num_traits::Num;
+    use crate::csrng::{Csrng, DeterministicCsrng};
 
     #[test]
     fn test_cnt_bits_repr_usize() {
@@ -354,14 +353,16 @@ mod tests {
 
     #[test]
     fn test_group_dlog() {
-        let mut csprng = Csprng::new(&[0u8]);
+        let csrng: &dyn Csrng =
+            &DeterministicCsrng::from_seed_str("util::algebra_utils::test_group_dlog");
+
         let (field, group) = get_medium_toy_algebras();
 
-        let h = group.random_group_elem(&mut csprng);
+        let h = group.random_group_elem(csrng);
         let dl = DiscreteLog::from_group(&h, &group);
 
         for _ in 0..10 {
-            let i = csprng.next_u32();
+            let i = csrng.next_u32();
             let y = h.pow(i, &group);
             assert_eq!(
                 dl.ff_find(&y, &field).unwrap(),
@@ -372,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_lagrange_interpolation() {
-        // Toy parameters according to specs
+        // Toy election parameters according to specs
         let (field, group) = get_toy_algebras();
 
         // Test polynomial x^2-1
@@ -420,7 +421,7 @@ mod tests {
 
     #[test]
     fn test_single_lagrange_coefficient() {
-        // Toy parameters according to specs
+        // Toy election parameters according to specs
         let (field, _) = get_toy_algebras();
         // Test polynomial x^2 -1
         let xs = [

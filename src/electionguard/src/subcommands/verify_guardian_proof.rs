@@ -33,20 +33,25 @@ pub(crate) struct VerifyGuardianProof {
 }
 
 impl Subcommand for VerifyGuardianProof {
-    fn uses_csprng(&self) -> bool {
-        false
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        if self.example_manifest && self.manifest.is_some() {
+        if self.example_manifest && self.election_manifest().is_some() {
             bail!("Specify either --example-manifest or --manifest, but not both.");
         }
+
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("VerifyGuardianProof")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         let election_parameters: ElectionParameters;
         let election_manifest: ElectionManifest;
 
         if self.example_manifest {
-            election_parameters = example_election_parameters();
+            election_parameters = example_election_parameters()?;
             election_manifest = example_election_manifest_small();
         } else {
             return Err(anyhow::anyhow!("Not implemented yet"));
@@ -54,7 +59,7 @@ impl Subcommand for VerifyGuardianProof {
 
         let hashes = Hashes::new(&election_parameters, &election_manifest);
 
-        assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters.n);
+        assert!(self.i != 0 && self.i as u16 <= election_parameters.varying_parameters().n());
 
         let proof = ProofGuardian::from_json(
             &String::from_utf8(read_path(
@@ -71,10 +76,10 @@ impl Subcommand for VerifyGuardianProof {
             &format!(
                 "\tProof: {:?}",
                 proof.verify(
-                    &election_parameters.fixed_parameters,
+                    election_parameters.fixed_parameters(),
                     hashes.h_p,
                     self.i as u16,
-                    election_parameters.varying_parameters.k,
+                    election_parameters.varying_parameters().k(),
                 )
             ),
             line!(),

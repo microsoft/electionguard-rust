@@ -5,15 +5,16 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
-use derive_more::Display;
 use serde::{Deserialize, Serialize};
+use util::vec1::HasIndexType;
 
 use crate::{
     ciphertext::{Ciphertext, CiphertextIndex},
+    eg::Eg,
     election_manifest::{Contest, ContestOption},
     errors::{EgError, EgResult},
-    vec1::HasIndexType,
 };
 
 /// The maximum number of selections ("votes") that may be distributed over all the selectable
@@ -21,8 +22,21 @@ use crate::{
 ///
 /// For compatibility with other "small" integers used in ElectionGuard, the largest
 /// value is [`i32::MAX`] or `2,147,483,647`.
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord
+)]
 pub struct ContestSelectionLimit(pub u32);
+
+//? TODO make enum with 'NoLimit' variant
 
 impl ContestSelectionLimit {
     /// The largest possible contest selection limit as `u32`, equal to
@@ -98,7 +112,16 @@ impl TryFrom<u32> for ContestSelectionLimit {
 /// limit and any specified option limit. Also, the sum of all applied selections must not
 /// exceed the contest selection limit. However, enforcing that constraint is outside the scope
 /// of this type.
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord
+)]
 pub enum OptionSelectionLimit {
     /// An option selection limit is specified.
     Limit(u32), //? TODO u31 instead
@@ -108,11 +131,9 @@ pub enum OptionSelectionLimit {
 }
 
 use serde::ser::Serializer;
+
 impl Serialize for OptionSelectionLimit {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use OptionSelectionLimit::*;
         match self {
             Limit(n) => serializer.serialize_u32(*n),
@@ -130,7 +151,7 @@ impl<'de> Deserialize<'de> for OptionSelectionLimit {
 
         struct OptionSelectionLimitVisitor;
 
-        impl<'de> de::Visitor<'de> for OptionSelectionLimitVisitor {
+        impl de::Visitor<'_> for OptionSelectionLimitVisitor {
             type Value = OptionSelectionLimit;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -178,7 +199,7 @@ impl OptionSelectionLimit {
     }
 
     /// If the option selection limit is [`Limit(n)`](OptionSelectionLimit::Limit), returns
-    /// the limit as a `u32`. Returns [`None`](Option::None) if it's
+    /// the limit as a `u32`. Returns [`None`] if it's
     /// [`LimitedOnlyByContest`](`OptionSelectionLimit::LimitedOnlyByContest`).
     pub fn limit_u32(self) -> Option<u32> {
         self.try_into().ok()
@@ -274,7 +295,16 @@ impl std::iter::Sum<Self> for OptionSelectionLimit {
 
 /// The effective selection limit for a contest is the smaller of this contest's selection limit
 /// and the sum of the options' selection limits.
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord
+)]
 pub struct EffectiveContestSelectionLimit(u32);
 
 impl EffectiveContestSelectionLimit {
@@ -307,16 +337,23 @@ impl From<EffectiveContestSelectionLimit> for u32 {
 
 /// The effective selection limit for an option is the smaller of the options's selection limit
 /// and its contest's selection limit.
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord
+)]
 pub struct EffectiveOptionSelectionLimit(pub u32);
 
-/// A [`Vec1`] of [`EffectiveOptionSelectionLimit`] is indexed with the same type as [`Ciphertext`]
-/// Same as [`ContestOption`], [`ContestOptionFieldPlaintext`], [`ContestDataFieldPlaintext`], etc.
 impl HasIndexType for EffectiveOptionSelectionLimit {
-    type IndexType = Ciphertext;
+    type IndexTypeParam = Ciphertext;
 }
 
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestOptionFieldPlaintextIndex`], [`ContestDataFieldPlaintextIndex`], etc.
+/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
 pub type EffectiveOptionSelectionLimitIndex = CiphertextIndex;
 
 impl EffectiveOptionSelectionLimit {

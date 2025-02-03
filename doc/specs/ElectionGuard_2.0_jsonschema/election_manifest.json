@@ -18,13 +18,13 @@
             "properties": {
                 "label": { "type": "string" },
                 "selection_limit": { "$ref": "#/$defs/integer_small" },
-                "contest_options": {
+                "options": {
                     "type": "array",
                     "items": { "$ref": "#/$defs/contest_option" }
                 }
             },
             "required": [
-                "label", "contest_options"
+                "label", "options"
             ]
         },
         "contest_option": {

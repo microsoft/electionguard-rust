@@ -1,32 +1,46 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-#![deny(clippy::panic)]
-#![deny(clippy::manual_assert)]
+#![allow(clippy::assertions_on_constants)]
+#![allow(clippy::expect_used)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
+#![allow(clippy::manual_assert)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
+#![allow(clippy::new_without_default)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
+#![allow(clippy::panic)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
+#![allow(clippy::unwrap_used)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
+
+use std::rc::Rc;
+
+use either::Either;
 
 use crate::{
-    election_parameters::ElectionParameters,
-    fixed_parameters::FixedParameters,
+    eg::Eg,
+    election_parameters::{ElectionParameters, ElectionParametersInfo},
+    errors::EgResult,
     guardian::GuardianIndex,
-    standard_parameters::STANDARD_PARAMETERS,
-    varying_parameters::{BallotChaining, VaryingParameters},
+    validatable::Validated,
+    varying_parameters::{BallotChaining, VaryingParametersInfo},
 };
 
-/// An example ElectionParameters object, based on the standard parameters.
-pub fn example_election_parameters() -> ElectionParameters {
-    let fixed_parameters: FixedParameters = (*STANDARD_PARAMETERS).clone();
-
+pub fn example_election_parameters(eg: &Eg) -> ElectionParameters {
     let n = 5;
     let k = 3;
 
-    // `unwrap()` is justified here because these values are fixed.
+    // Unwrap() is justified here because we test this function with these parameters extensively.
     #[allow(clippy::unwrap_used)]
-    let n = GuardianIndex::from_one_based_index(n).unwrap();
-    #[allow(clippy::unwrap_used)]
-    let k = GuardianIndex::from_one_based_index(k).unwrap();
+    example_election_parameters2(eg, n, k).unwrap()
+}
 
-    let varying_parameters = VaryingParameters {
+/// An example ElectionParameters object, based on the standard parameters.
+pub fn example_election_parameters2(
+    eg: &Eg,
+    varying_parameter_n: u32,
+    varying_parameter_k: u32,
+) -> EgResult<ElectionParameters> {
+    let fixed_parameters = crate::standard_parameters::make_standard_parameters(eg).unwrap();
+
+    let n = GuardianIndex::try_from_one_based_index(varying_parameter_n)?;
+    let k = GuardianIndex::try_from_one_based_index(varying_parameter_k)?;
+
+    let varying_parameters_info = VaryingParametersInfo {
         n,
         k,
         date: "2023-05-02".to_string(),
@@ -34,8 +48,10 @@ pub fn example_election_parameters() -> ElectionParameters {
         ballot_chaining: BallotChaining::Prohibited,
     };
 
-    ElectionParameters {
-        fixed_parameters,
-        varying_parameters,
-    }
+    let election_parameters_info = ElectionParametersInfo {
+        fixed_parameters: Either::Right(Rc::new(fixed_parameters)),
+        varying_parameters: Either::Left(Rc::new(varying_parameters_info)),
+    };
+
+    ElectionParameters::try_validate_from(election_parameters_info, eg)
 }

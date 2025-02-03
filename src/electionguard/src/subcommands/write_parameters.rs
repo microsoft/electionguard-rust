@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use eg::{
     election_parameters::ElectionParameters, guardian::GuardianIndex,
     serializable::SerializablePretty, standard_parameters::STANDARD_PARAMETERS,
-    varying_parameters::VaryingParameters,
+    eg::Eg, varying_parameters::VaryingParameters,
 };
 
 use crate::{
@@ -67,11 +67,17 @@ pub(crate) struct WriteParameters {
 }
 
 impl Subcommand for WriteParameters {
-    fn uses_csprng(&self) -> bool {
-        false
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("WriteParameters")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        #[expect(unused_variables)]
+        let eg = &mut eg;
+
         // eprint!("Initializing standard parameters...");
         let fixed_parameters = STANDARD_PARAMETERS.clone();
         // eprintln!("Done.");
@@ -89,9 +95,10 @@ impl Subcommand for WriteParameters {
             varying_parameters,
         };
 
-        let (mut stdiowrite, path) = subcommand_helper
-            .artifacts_dir
-            .out_file_stdiowrite(&self.out_file, Some(ArtifactFile::ElectionParameters))?;
+        let (mut stdiowrite, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
+            self.out_file.as_ref(),
+            Some(&ArtifactFile::ElectionParameters),
+        )?;
 
         election_parameters
             .to_stdiowrite_pretty(stdiowrite.as_mut())

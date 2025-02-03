@@ -5,14 +5,18 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use serde::{Deserialize, Serialize};
+use util::{
+    uint31::Uint31,
+    vec1::{HasIndexType, Vec1},
+};
 
 use crate::{
     ciphertext::{Ciphertext, CiphertextIndex},
+    eg::Eg,
     errors::{EgError, EgResult},
-    u31::Uint31,
-    vec1::{HasIndexType, Vec1},
 };
 
 //-------------------------------------------------------------------------------------------------|
@@ -44,13 +48,11 @@ impl ContestOptionFieldPlaintext {
     }
 }
 
-/// A [`Vec1`] of [`ContestOptionFieldPlaintext`] is indexed with the same type as [`Ciphertext`]
-/// Same as [`ContestOption`], [`ContestDataFieldPlaintext`], and possibly others.
 impl HasIndexType for ContestOptionFieldPlaintext {
-    type IndexType = Ciphertext;
+    type IndexTypeParam = Ciphertext;
 }
 
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`], [`ContestDataFieldPlaintextIndex`], etc.
+/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
 pub type ContestOptionFieldPlaintextIndex = CiphertextIndex;
 
 /// A [`ContestOptionFieldPlaintext`] can be made from a [`u8`].
@@ -153,9 +155,10 @@ impl ContestOptionFieldsPlaintexts {
     }
 }
 
-impl From<Vec1<ContestOptionFieldPlaintext>> for ContestOptionFieldsPlaintexts {
-    fn from(v: Vec1<ContestOptionFieldPlaintext>) -> Self {
-        Self(v)
+impl AsRef<ContestOptionFieldsPlaintexts> for ContestOptionFieldsPlaintexts {
+    #[inline]
+    fn as_ref(&self) -> &ContestOptionFieldsPlaintexts {
+        self
     }
 }
 
@@ -163,6 +166,12 @@ impl From<Vec1<ContestOptionFieldPlaintext>> for ContestOptionFieldsPlaintexts {
 impl AsRef<Vec1<ContestOptionFieldPlaintext>> for ContestOptionFieldsPlaintexts {
     fn as_ref(&self) -> &Vec1<ContestOptionFieldPlaintext> {
         &self.0
+    }
+}
+
+impl From<Vec1<ContestOptionFieldPlaintext>> for ContestOptionFieldsPlaintexts {
+    fn from(v: Vec1<ContestOptionFieldPlaintext>) -> Self {
+        Self(v)
     }
 }
 

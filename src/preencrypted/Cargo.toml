@@ -5,9 +5,16 @@ edition = "2021"
 publish = false
 
 [features]
-default = ["eg-allow-unsafe-code", "eg-test-data-generation"]
+default = [
+    "eg-allow-unsafe-code",
+    #"eg-forbid-test-data-generation",
+    #"eg-forbid-toy-parameters",
+]
 eg-allow-unsafe-code = []
-eg-test-data-generation = ["eg/eg-test-data-generation"]
+eg-allow-test-data-generation = []
+eg-forbid-test-data-generation = []
+eg-allow-toy-parameters = []
+eg-forbid-toy-parameters = []
 
 [dependencies]
 anyhow.workspace = true
@@ -20,3 +27,11 @@ serde_json.workspace = true
 
 eg.workspace = true
 util.workspace = true
+
+#--- RustCrypto
+# crypto-common.workspace = true
+# digest.workspace = true
+# hmac.workspace = true
+# sha2.workspace = true
+# sha3.workspace = true
+# zeroize.workspace = true

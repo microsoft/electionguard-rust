@@ -20,7 +20,7 @@ use util::file::create_path;
 use crate::{
     artifacts_dir::ArtifactFile,
     common_utils::{
-        load_election_parameters, load_hashes, load_hashes_ext, load_joint_election_public_key,
+        load_election_parameters, load_hashes, load_extended_base_hash, load_joint_public_key,
         ElectionManifestSource,
     },
     subcommand_helper::SubcommandHelper,
@@ -53,7 +53,15 @@ impl Subcommand for PreEncryptedBallotRecord {
     }
 
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng("PreEncryptedBallotGenerate".as_bytes())?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("PreEncryptedBallotRecord")
+                .write_u64(self.ballot_style_index)
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         let pv_data = load_pre_voting_data(&subcommand_helper.artifacts_dir)?;
 
@@ -64,7 +72,7 @@ impl Subcommand for PreEncryptedBallotRecord {
 
         let codes = {
             let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
-                &None, Some(ArtifactFile::PreEncryptedBallotMetadata(self.ballots_in)))?;
+                &None, Some(&ArtifactFile::PreEncryptedBallotMetadata(self.ballots_in)))?;
             tool.metadata_from_stdioread(&mut stdioread)?
         };
 
@@ -79,7 +87,7 @@ impl Subcommand for PreEncryptedBallotRecord {
             let pre_encrypted_ballot = {
                 let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
-                    Some(ArtifactFile::PreEncryptedBallot(
+                    Some(&ArtifactFile::PreEncryptedBallot(
                         self.ballots_in,
                         codes[b_idx - 1],
                     )),
@@ -90,7 +98,7 @@ impl Subcommand for PreEncryptedBallotRecord {
             let nonce = {
                 let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                     &None,
-                    Some(ArtifactFile::PreEncryptedBallotNonce(
+                    Some(&ArtifactFile::PreEncryptedBallotNonce(
                         self.ballots_in,
                         codes[b_idx - 1],
                     )),
@@ -108,7 +116,7 @@ impl Subcommand for PreEncryptedBallotRecord {
                 let voter_ballot = {
                     let (mut stdioread, _) = subcommand_helper.artifacts_dir.in_file_stdioread(
                         &None,
-                        Some(ArtifactFile::VoterSelection(
+                        Some(&ArtifactFile::VoterSelection(
                             self.selections_in,
                             b_idx as u64,
                         )),
@@ -117,11 +125,11 @@ impl Subcommand for PreEncryptedBallotRecord {
                     VoterSelection::from_stdioread(&mut stdioread)?
                 };
                 let encrypted_ballot =
-                    regenerated_ballot.finalize(&device, &mut csprng, &voter_ballot)?;
+                    regenerated_ballot.finalize(&device, csprng, &voter_ballot)?;
 
                 let (mut bx_write, path) = subcommand_helper.artifacts_dir.out_file_stdiowrite(
                     &None,
-                    Some(ArtifactFile::EncryptedBallot(
+                    Some(&ArtifactFile::EncryptedBallot(
                         self.ballots_in,
                         encrypted_ballot.confirmation_code,
                     )),

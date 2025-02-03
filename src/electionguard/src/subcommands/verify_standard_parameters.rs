@@ -5,9 +5,11 @@
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
 
+use std::ops::DerefMut;
+
 use anyhow::{Context, Result};
 
-use eg::standard_parameters::STANDARD_PARAMETERS;
+use eg::{standard_parameters::STANDARD_PARAMETERS, eg::Eg};
 
 use crate::{subcommand_helper::SubcommandHelper, subcommands::Subcommand};
 
@@ -19,12 +21,15 @@ pub(crate) struct VerifyStandardParameters {
 }
 
 impl Subcommand for VerifyStandardParameters {
-    fn uses_csprng(&self) -> bool {
-        true
-    }
-
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut csprng = subcommand_helper.get_csprng(b"VerifyStandardParameters")?;
+        let mut eg = {
+            let csprng = subcommand_helper
+                .build_csprng()?
+                .write_str("VerifyStandardParameters")
+                .finish();
+            Eg::from_csprng(csprng)
+        };
+        let eg = &mut eg;
 
         eprint!("Initializing standard parameters...");
         let fixed_parameters = &*STANDARD_PARAMETERS;
@@ -34,7 +39,7 @@ impl Subcommand for VerifyStandardParameters {
         for pass in 0..self.passes {
             eprintln!("    Starting pass {pass}/{}...", self.passes);
             fixed_parameters
-                .validate(&mut csprng)
+                .validate(eg.csrng())
                 .context("Parameter verification failed")?;
         }
 

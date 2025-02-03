@@ -1,0 +1,20 @@
+---
+source: formulator/src/lib.rs
+expression: "(domain, sym)"
+---
+(
+    Domain {
+        symbols: {
+            'a',
+        },
+        symbol_to_sym: {
+            'a' -> 0,
+        },
+        sym_to_symbol: {
+            0 -> 'a',
+        },
+        rules: [
+        ],
+    },
+    0,
+)

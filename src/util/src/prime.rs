@@ -6,13 +6,17 @@
 #![deny(clippy::manual_assert)]
 
 use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::num::NonZeroUsize;
 
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{One, Zero};
 
-use crate::csprng::Csprng;
+use crate::{
+    csprng::Csprng,
+    csrng::{Csrng, DeterministicCsrng},
+};
 
 pub const PRIMES_TABLE_U8: [u8; 54] = [
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
@@ -26,70 +30,111 @@ pub const PRIMES_TABLE_U8_MAX: usize = 257;
 /// The range of bit lengths covered by PRIMES_TABLE_U8.
 pub const PRIMES_TABLE_U8_BITS_RANGE: std::ops::Range<usize> = 2..9;
 
-const EXHAUSTIVE_TRIAL_DIVISION_MAX_L2: usize = 20;
-const EXHAUSTIVE_TRIAL_DIVISION_MAX: usize = 1 << EXHAUSTIVE_TRIAL_DIVISION_MAX_L2;
+// The log_2 of the largest number for which we'll do exhaustive trial division.
+const EXHAUSTIVE_TRIAL_DIVISION_MAX_L2: u8 = 20;
 
-const MILLER_RABIN_ITERATIONS: usize = 50;
+/// The largest number for which the [`is_prime()`] primality test is not probabalistic.
+pub const MAX_NON_PROBABALISTIC: u32 = 1_u32 << EXHAUSTIVE_TRIAL_DIVISION_MAX_L2;
 
-//? TODO Would prefer to use AsRef instead of Borrow, but it doesn't have
-// an automatic `impl AsRef<T> for T`, and we can't `impl AsRef<BigUint> for BigUint`
-// since it's in a cargo crate.
+/// The number of Miller-Rabin iterations to perform when for a probablistic primality test.
+pub const MILLER_RABIN_ITERATIONS: usize = 50;
 
-/// This function provides a probabilistic primality test. For large numbers this call is expensive.
+/// Primality test.
 ///
-/// Internally, the function uses the Miller-Rabin test.
-pub fn is_prime<T: Borrow<BigUint>>(n: &T, csprng: &mut Csprng) -> bool {
-    //? OPT: Maybe somehow we could defer Csprng creation until we know that we need randomized primality testing.
+/// For numbers above [`MAX_NON_PROBABALISTIC`], the test is probabalistic using
+/// [`MILLER_RABIN_ITERATIONS`] of Miller-Rabin.
+///
+/// Calling this function on very large numbers can get quite expensive.
+///
+pub fn is_prime<T: Borrow<BigUint>>(n: &T, csrng: &dyn Csrng) -> bool {
+    is_prime_impl_(n.borrow(), Some(csrng))
+}
 
-    let n: &BigUint = n.borrow();
-
+fn is_prime_impl_(n: &BigUint, opt_csrng: Option<&dyn Csrng>) -> bool {
     use num_integer::Roots;
 
-    match TryInto::<u8>::try_into(n) {
-        Ok(n) => {
-            debug_assert!(
-                (n as usize) < PRIMES_TABLE_U8_MAX,
-                "n must be found within PRIMES_TABLE_U8"
-            );
-            PRIMES_TABLE_U8.iter().any(|&p| n == p)
+    const EXHAUSTIVE_TRIAL_DIVISION_MAX_L2_U64: u64 = EXHAUSTIVE_TRIAL_DIVISION_MAX_L2 as u64;
+
+    let n_low_u32 = n.iter_u32_digits().next().unwrap_or_default();
+
+    let mut is_prime = false;
+    match n.bits() {
+        0..=1 => {
+            // `0` and `1` are not prime
+            debug_assert!(!is_prime);
         }
-        Err(_) => {
-            debug_assert!(n.bits() > 8, "we can assume n is odd or nonprime");
-            if n <= &EXHAUSTIVE_TRIAL_DIVISION_MAX.into() {
-                // `unwrap()` is justified here because `n` < (value of type `usize`).
-                #[allow(clippy::unwrap_used)]
-                let n: usize = n.try_into().unwrap();
+        2 => {
+            // `2` and `3` are prime
+            is_prime = true
+        }
+        n_bits => {
+            if n_low_u32 % 2 == 0 {
+                // Values divisible by 2 are not prime
+                debug_assert!(!is_prime);
+            } else {
+                match n_bits {
+                    0..=8 => {
+                        let n_u8 = n_low_u32 as u8;
+                        for p in PRIMES_TABLE_U8 {
+                            match n_u8.cmp(&p) {
+                                Ordering::Less => {
+                                    break;
+                                }
+                                Ordering::Equal => {
+                                    is_prime = true;
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    9..=EXHAUSTIVE_TRIAL_DIVISION_MAX_L2_U64 => {
+                        // Since we use n_low_u32 here,
+                        static_assertions::const_assert!(EXHAUSTIVE_TRIAL_DIVISION_MAX_L2 < 32);
 
-                if n & 1 == 0 {
-                    return false;
-                }
+                        let n = n_low_u32;
+                        let n_sqrt = n.sqrt();
 
-                for p in (3..=n.sqrt()).step_by(2) {
-                    if n % p == 0 {
-                        return false;
+                        is_prime = true;
+                        for p in (3_u32..=n_sqrt).step_by(2) {
+                            if n % p == 0 {
+                                is_prime = false;
+                                break;
+                            }
+                        }
+                    }
+                    n_bits => {
+                        if let Some(csrng) = opt_csrng {
+                            is_prime = miller_rabin(n, MILLER_RABIN_ITERATIONS, csrng);
+                        } else {
+                            let seed =
+                                b"electionguard-rust/src/util::prime::is_prime_default_csprng";
+                            let builder = Csprng::build().write_bytes(seed).write_u64(n_bits);
+                            let csprng_builder = n
+                                .iter_u64_digits()
+                                .fold(builder, |builder, u| builder.write_u64(u));
+                            let csrng: &dyn Csrng =
+                                &DeterministicCsrng::new(csprng_builder.finish());
+                            is_prime = miller_rabin(n, MILLER_RABIN_ITERATIONS, csrng);
+                        }
                     }
                 }
-
-                true
-            } else {
-                let n: &BigUint = n;
-
-                if !n.bit(0) {
-                    return false;
-                }
-
-                miller_rabin(n, MILLER_RABIN_ITERATIONS, csprng)
             }
         }
     }
+
+    is_prime
 }
 
+/// Probabilistic primality test, using a fixed Csprng. For large numbers this call is expensive.
+///
+/// Internally, the function uses the Miller-Rabin test.
+///
 pub fn is_prime_default_csprng<T: Borrow<BigUint>>(n: &T) -> bool {
-    let mut csprng = Csprng::new(b"electionguard-rust/util::prime::is_prime_default_csprng");
-    is_prime(n, &mut csprng)
+    is_prime_impl_(n.borrow(), None)
 }
 
-fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
+fn miller_rabin(w: &BigUint, iterations: usize, csrng: &dyn Csrng) -> bool {
     // NIST FIPS 186-5 DIGITAL SIGNATURE STANDARD (DSS)
     // B.3.1 Miller-Rabin Probabilistic Primality Test
     // Let DRBG be an approved deterministic random bit generator.
@@ -126,7 +171,7 @@ fn miller_rabin(w: &BigUint, iterations: usize, csprng: &mut Csprng) -> bool {
         let b = loop {
             // 4.1 Obtain a string b of wlen bits from a DRBG. Convert b to an integer using the
             // algorithm in B.2.1.
-            let b = csprng.next_biguint(wlen);
+            let b = csrng.next_biguint(wlen);
 
             // 4.2 If ((b ≤ 1) or (b ≥ w − 1)), then go to step 4.1.
             if !(b.is_zero() || b.is_one() || b >= w_minus_1) {
@@ -183,6 +228,7 @@ mod test_primes {
     use num_traits::Num;
 
     use super::*;
+    use crate::csrng::{Csrng, DeterministicCsrng};
 
     #[test]
     fn test_largest_integer_a_such_that_2_to_a_divides_even_n() {
@@ -193,21 +239,23 @@ mod test_primes {
             assert!(a < 32);
             let two_to_a = 1_usize << a;
 
-            assert!(n.is_multiple_of(&two_to_a));
+            assert!(num_integer::Integer::is_multiple_of(&n, &two_to_a));
 
             for invalid_a in (a + 1)..32 {
                 let two_to_invalid_a = 1_usize << invalid_a;
-                if n.is_multiple_of(&two_to_invalid_a) {
-                    println!("\n\nn={n}, a={a}, invalid_a={invalid_a}, two_to_invalid_a={two_to_invalid_a}\n");
+                if num_integer::Integer::is_multiple_of(&n, &two_to_invalid_a) {
+                    println!(
+                        "\n\nn={n}, a={a}, invalid_a={invalid_a}, two_to_invalid_a={two_to_invalid_a}\n"
+                    );
                 }
-                assert!(!n.is_multiple_of(&two_to_invalid_a));
+                assert!(!num_integer::Integer::is_multiple_of(&n, &two_to_invalid_a));
             }
         }
     }
 
     #[test]
     fn test_is_prime() {
-        let mut csprng = Csprng::new(b"test_is_prime");
+        let csrng: &dyn Csrng = &DeterministicCsrng::from_seed_str("test_is_prime");
 
         // Test first 10 integers.
         for (n, expected_prime) in [
@@ -217,7 +265,7 @@ mod test_primes {
         .into_iter()
         .enumerate()
         {
-            assert_eq!(is_prime(&BigUint::from(n), &mut csprng), expected_prime);
+            assert_eq!((n, is_prime(&BigUint::from(n), csrng)), (n, expected_prime));
         }
 
         // Test miscellaneous primes having p-2 and p+2 not prime.
@@ -251,7 +299,7 @@ mod test_primes {
 
             let mut n = p - BigUint::from(2_u8);
             for expected_prime in (-2..=2).map(|offset| offset == 0) {
-                assert_eq!(is_prime(&n, &mut csprng), expected_prime);
+                assert_eq!((&n, is_prime(&n, csrng)), (&n, expected_prime));
                 n += BigUint::one();
             }
         }

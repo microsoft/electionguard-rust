@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Clone, Debug)]
 pub enum ArrayAsciiError {
     #[error("Supplied byte value is not a non-NUL 7-bit ASCII value")]
     SuppliedNotNonnul7bitAscii,
@@ -91,8 +91,8 @@ impl<const N: usize> ArrayAscii<N> {
     pub fn as_str(&self) -> &str {
         if cfg!(feature = "eg-allow-unsafe-code") {
             unsafe {
-                // `from_utf8_unchecked()` is justified here because we took pains to ensure
-                // all values are non-NUL 7-bit ASCII values.
+                // `from_utf8_unchecked()` is justified here because during construction we
+                // took care to ensure that all values are non-NUL 7-bit ASCII.
                 std::str::from_utf8_unchecked(&self.0)
             }
         } else {

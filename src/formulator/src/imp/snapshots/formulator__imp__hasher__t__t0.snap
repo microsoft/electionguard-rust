@@ -1,0 +1,21 @@
+---
+source: formulator/src/imp/hasher.rs
+expression: bhxrs
+---
+[
+    BuildHasher_StableSipHasher128 { finish: 0xbe5074ddd1fadb52 },
+    BuildHasher_StableSipHasher128 { finish: 0xf836886f9787673e },
+    BuildHasher_StableSipHasher128 { finish: 0xb52407fb434d60d2 },
+    BuildHasher_StableSipHasher128 { finish: 0xe215048853a288f0 },
+    BuildHasher_StableSipHasher128 { finish: 0x37a9ed24f7586ac8 },
+    BuildHasher_StableSipHasher128 { finish: 0x0f3f011aa629c3d9 },
+    BuildHasher_StableSipHasher128 { finish: 0x96f7a891b8264d6d },
+    BuildHasher_StableSipHasher128 { finish: 0x407e938cc82b60a7 },
+    BuildHasher_StableSipHasher128 { finish: 0x70b5a7ab749b8e49 },
+    BuildHasher_StableSipHasher128 { finish: 0xcf175d66006da462 },
+    BuildHasher_StableSipHasher128 { finish: 0x2630d9663b269a8a },
+    BuildHasher_StableSipHasher128 { finish: 0x81ce8ef043b745df },
+    BuildHasher_StableSipHasher128 { finish: 0xcbc645d902eed406 },
+    BuildHasher_StableSipHasher128 { finish: 0x1be2911d5c793bd4 },
+    BuildHasher_StableSipHasher128 { finish: 0x39983bffd62bcfaf },
+]
