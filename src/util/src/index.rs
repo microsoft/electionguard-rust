@@ -15,7 +15,7 @@ use static_assertions::const_assert;
 use crate::uint31::Uint31;
 
 /// The [`std::error::Error`] type returned by the `Index` type.
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum IndexError {
     #[error("Value `{0}` out of range `0 <= n < 2^31-1` for a zero-based index")]
     ValueOutOfRangeForZeroBasedIndex(i128),
@@ -27,7 +27,11 @@ pub enum IndexError {
     IndexOutOfRange(u32),
 
     #[error("One-based Index could not be parsed from `{0}`: {1}")]
-    ParseErr(String, std::num::ParseIntError),
+    ParseErr(
+        String,
+        #[serde(serialize_with = "crate::serde::serialize_std_num_parseinterror")]
+        std::num::ParseIntError,
+    ),
 }
 
 pub type IndexResult<T> = std::result::Result<T, IndexError>;

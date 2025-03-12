@@ -19,7 +19,7 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-use std::{borrow::Cow, rc::Rc};
+use std::{borrow::Cow, sync::Arc};
 
 use serde::Serialize;
 use tracing::{
@@ -29,7 +29,9 @@ use tracing::{
 
 use crate::{
     eg::Eg,
-    resource::{Resource, ResourceFormat, ResourceId, ResourceIdFormat},
+    resource::{
+        ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+    },
     resource_producer::{
         ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionError,
         ResourceProductionResult, ResourceSource,
@@ -45,134 +47,18 @@ use crate::{
 
 //=================================================================================================|
 
-/*
-/// A built-in [`ResourceProducer`] that provides [`ResourceId::ElectionGuardDesignSpecificationVersion`].
-#[allow(non_camel_case_types)]
-#[derive(Clone, Debug, Default, Serialize)]
-pub(crate) struct ResourceProducer_ElectionGuardDesignSpecificationVersion;
-
-impl ResourceProducer_ElectionGuardDesignSpecificationVersion {
-    fn rc_new() -> Rc<dyn ResourceProducer_Any_Debug_Serialize> {
-        let self_ = Self;
-        Rc::new(self_)
-    }
-}
-
-impl ResourceProducer for ResourceProducer_ElectionGuardDesignSpecificationVersion {
-    fn name(&self) -> Cow<'static, str> {
-        "ElectionGuardDesignSpecificationVersion".into()
-    }
-
-    fn fn_rc_new(&self) -> FnNewResourceProducer {
-        Self::rc_new
-    }
-
-    #[instrument(
-        name = "ResourceProducer_ElectionGuardDesignSpecificationVersion::maybe_produce",
-        fields(rf = trace_display(&rp_op.target_ridfmt)),
-        skip(self, _eg, rp_op),
-        ret
-    )]
-    fn maybe_produce(
-        &self,
-        _eg: &Eg,
-        rp_op: &mut RpOp,
-    ) -> Option<ResourceProductionResult> {
-        use ResourceFormat::{ConcreteType, SliceBytes};
-        use ResourceId::ElectionGuardDesignSpecificationVersion;
-        match rp_op.target_ridfmt {
-            ResourceIdFormat {
-                rid: ElectionGuardDesignSpecificationVersion,
-                fmt: SliceBytes,
-            } => {
-                // Unwrap() is justified here because this is a fixed structure that should
-                // predictably convert to json.
-                #[allow(clippy::unwrap_used)]
-                let vby = serde_json::to_vec(&crate::EGDS_VERSION).unwrap();
-                let drsb = ResourceSliceBytes::new(&rp_op.target_ridfmt.rid, vby);
-                let rc: Rc<dyn Resource> = Rc::new(drsb);
-                let rpsrc = ResourceSource::slicebytes_serializedfrom_constructed_concretetype();
-                let result: ResourceProductionResult = Ok((rc, rpsrc));
-                Some(result)
-            }
-            ResourceIdFormat {
-                rid: ElectionGuardDesignSpecificationVersion,
-                fmt: ConcreteType,
-            } => {
-                let rc: Rc<dyn Resource> = Rc::new(crate::EGDS_VERSION);
-                let rpsrc = ResourceSource::constructed_concretetype();
-                let result: ResourceProductionResult = Ok((rc, rpsrc));
-                Some(result)
-            }
-            _ => None,
-        }
-        None
-    }
-}
-
-fn gather_resourceproducer_registrations_ElectionGuardDesignSpecificationVersion(
-    f: &mut dyn FnMut(&[ResourceProducerRegistration]),
-) {
-    f(&[ResourceProducerRegistration::new_defaultproducer(
-        "ElectionGuardDesignSpecificationVersion",
-        ResourceProducer_ElectionGuardDesignSpecificationVersion::rc_new,
-    )]);
-}
-
-inventory::submit! {
-    GatherResourceProducerRegistrationsFnWrapper(gather_resourceproducer_registrations_ElectionGuardDesignSpecificationVersion)
-}
-// */
-
-//=================================================================================================|
-
-#[allow(non_snake_case)]
-fn maybe_produce_ElectionGuardDesignSpecificationVersion_SliceBytes(
-    _eg: &Eg,
-    rp_op: &mut RpOp,
-) -> Option<ResourceProductionResult> {
-    let ridfmt_expected = ResourceIdFormat {
-        rid: ResourceId::ElectionGuardDesignSpecificationVersion,
-        fmt: ResourceFormat::SliceBytes,
-    };
-
-    let ridfmt_requested = rp_op.target_ridfmt();
-
-    if rp_op.target_ridfmt() != &ridfmt_expected {
-        return Some(Err(
-            ResourceProductionError::UnexpectedResourceIdFormatRequested {
-                ridfmt_expected,
-                ridfmt_requested: ridfmt_requested.clone(),
-            },
-        ));
-    }
-
-    // Unwrap() is justified here because this is a fixed structure that should
-    // predictably convert to json.
-    #[allow(clippy::unwrap_used)]
-    let vby = serde_json::to_vec(&crate::EGDS_VERSION).unwrap();
-    let drsb = ResourceSliceBytes::new(&rp_op.target_ridfmt.rid, vby);
-    let rc: Rc<dyn Resource> = Rc::new(drsb);
-    let rpsrc = ResourceSource::slicebytes_serializedfrom_constructed_concretetype();
-    let result: ResourceProductionResult = Ok((rc, rpsrc));
-    Some(result)
-}
-
-//=================================================================================================|
-
 #[allow(non_snake_case)]
 fn maybe_produce_ElectionGuardDesignSpecificationVersion_ConcreteType(
-    _eg: &Eg,
-    rp_op: &mut RpOp,
+    rp_op: &Arc<RpOp>,
 ) -> Option<ResourceProductionResult> {
     let ridfmt_expected = ResourceIdFormat {
         rid: ResourceId::ElectionGuardDesignSpecificationVersion,
         fmt: ResourceFormat::ConcreteType,
     };
 
-    let ridfmt_requested = rp_op.target_ridfmt();
+    let ridfmt_requested = rp_op.requested_ridfmt();
 
-    if rp_op.target_ridfmt() != &ridfmt_expected {
+    if rp_op.requested_ridfmt() != &ridfmt_expected {
         return Some(Err(
             ResourceProductionError::UnexpectedResourceIdFormatRequested {
                 ridfmt_expected,
@@ -181,15 +67,16 @@ fn maybe_produce_ElectionGuardDesignSpecificationVersion_ConcreteType(
         ));
     }
 
-    let rc: Rc<dyn Resource> = Rc::new(crate::EGDS_VERSION);
+    let arc: Arc<dyn Resource> = Arc::new(crate::EGDS_VERSION.clone());
     let rpsrc = ResourceSource::constructed_concretetype();
-    let result: ResourceProductionResult = Ok((rc, rpsrc));
+    let result: ResourceProductionResult = Ok((arc, rpsrc));
     Some(result)
 }
 
 //=================================================================================================|
 
 fn gather_rpspecific_registrations(register_fn: &mut dyn FnMut(RPFnRegistration)) {
+    /* //? TODO remove, this should now be handled by resourceproducer_SerializeFromValidated
     register_fn(RPFnRegistration::new_defaultproducer(
         ResourceIdFormat {
             rid: ResourceId::ElectionGuardDesignSpecificationVersion,
@@ -197,6 +84,7 @@ fn gather_rpspecific_registrations(register_fn: &mut dyn FnMut(RPFnRegistration)
         },
         Box::new(maybe_produce_ElectionGuardDesignSpecificationVersion_SliceBytes),
     ));
+    // */
 
     register_fn(RPFnRegistration::new_defaultproducer(
         ResourceIdFormat {
@@ -221,10 +109,15 @@ mod t {
     use super::*;
 
     #[test]
-    fn t0() {
-        let eg = &Eg::new_with_insecure_deterministic_csprng_seed(
+    fn t1() {
+        async_global_executor::block_on(t1_async());
+    }
+
+    async fn t1_async() {
+        let eg = Eg::new_with_insecure_deterministic_csprng_seed(
             "eg::resourceproducer_egdsversion::t::t0",
         );
+        let eg = eg.as_ref();
 
         // Trivial success cases.
 
@@ -233,26 +126,33 @@ mod t {
                 rid: ResourceId::ElectionGuardDesignSpecificationVersion,
                 fmt: ResourceFormat::SliceBytes,
             })
+            .await
             .unwrap();
 
         assert_ron_snapshot!(dr_rc.rid(), @r#"ElectionGuardDesignSpecificationVersion"#);
         assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
         assert_ron_snapshot!(dr_src, @"SerializedFrom(SliceBytes, Constructed(ConcreteType))");
         assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
-            @r#"Some("{\"number\":[2,1]}")"#);
+            @r#"Some("{\"version_number\":[2,1],\"qualifier\":\"Released_Specification_Version\",\"fixed_parameters_kind\":\"Standard_Parameters\"}")"#);
     }
 
     #[test]
-    fn t1() {
-        let eg = &Eg::new_with_insecure_deterministic_csprng_seed(
+    fn t2() {
+        async_global_executor::block_on(t2_async());
+    }
+
+    async fn t2_async() {
+        let eg = Eg::new_with_insecure_deterministic_csprng_seed(
             "eg::resourceproducer_egdsversion::t::t1",
         );
+        let eg = eg.as_ref();
 
         let (dr_rc, dr_src) = eg
             .produce_resource(&ResourceIdFormat {
                 rid: ResourceId::ElectionGuardDesignSpecificationVersion,
                 fmt: ResourceFormat::ConcreteType,
             })
+            .await
             .unwrap();
 
         assert_ron_snapshot!(dr_rc.rid(), @r#"ElectionGuardDesignSpecificationVersion"#);

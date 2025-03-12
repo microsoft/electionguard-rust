@@ -5,7 +5,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum ArrayAsciiError {
     #[error("Supplied byte value is not a non-NUL 7-bit ASCII value")]
     SuppliedNotNonnul7bitAscii,

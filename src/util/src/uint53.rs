@@ -9,10 +9,27 @@
 const UINT53_MAX_U64: u64 = (1_u64 << 53) - 1;
 
 /// The main [`std::error::Error`] type returned by the `Uint53` type.
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum U53Error {
     #[error("Value `{0}` out of range `0 <= n < 2^53` for a `Uint53`")]
     ValueOutOfRangeForUint53(i128),
+
+    #[error("Value must be `>= 0` for a `Uint53`.")]
+    ValueTooSmall,
+
+    #[error("Value must be `<= 2^53 - 1` for a `Uint53`.")]
+    ValueTooLarge,
+}
+
+impl From<Uint53Error> for U53Error {
+    /// A [`U53Error`] can always be made from a [`Uint53Error`].
+    #[inline]
+    fn from(src: Uint53Error) -> Self {
+        match src {
+            Uint53Error::LessOrEqualViolated => U53Error::ValueTooSmall,
+            Uint53Error::GreaterOrEqualViolated => U53Error::ValueTooLarge,
+        }
+    }
 }
 
 #[nutype::nutype(

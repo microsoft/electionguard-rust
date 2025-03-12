@@ -25,7 +25,7 @@ use std::{
     //collections::{HashSet, HashMap},
     //io::{BufRead, Cursor},
     //path::{Path, PathBuf},
-    //rc::Rc,
+    //sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -43,7 +43,8 @@ use util::abbreviation::Abbreviation;
 use crate::{
     //eg::Eg,
     //errors::EgResult,
-    guardian::{GuardianKeyId, GuardianKeyPurpose},
+    guardian::{GuardianKeyPartId, GuardianKeyPurpose},
+    resource::Resource,
     resource_path::ResourceNamespacePath,
 };
 
@@ -82,7 +83,7 @@ pub enum ElectionDataObjectId {
 
     /// A guardian key (either a public or secret part), identified by the [`GuardianKeyId`].
     #[display("GuardianKeyPart({_0})")]
-    GuardianKeyPart(GuardianKeyId),
+    GuardianKeyPart(GuardianKeyPartId),
 
     ///? TODO Consider making this two separate identifiers, as there's no joint key for `kappa`.
     #[display("JointPublicKey({_0})")]
@@ -99,6 +100,9 @@ pub enum ElectionDataObjectId {
     #[cfg(feature = "eg-allow-test-data-generation")]
     /// Voter selections randomly generated from the hash of a seed string in compliance with the ElectionManifest.
     GeneratedTestDataVoterSelections(crate::hash::HValue),
+
+    /// EGDS 2.1.0 Sec 3.4.3 Voting Device Information
+    VotingDeviceInformation,
 
     /// The election tallies.
     ElectionTallies,
@@ -119,13 +123,13 @@ impl ElectionDataObjectId {
     pub const fn validated_type_ridfmt(self) -> ResourceIdFormat {
         ResourceIdFormat {
             rid: ResourceId::ElectionDataObject(self),
-            fmt: ResourceFormat::ValidatedElectionDataObject,
+            fmt: ResourceFormat::ValidElectionDataObject,
         }
     }
 }
 
 impl Abbreviation for ElectionDataObjectId {
-    /// Returns an excessively short string hinting at the value useful only for logging.
+    /// Returns an excessively short string hinting at the value. Useful only for logging.
     fn abbreviation(&self) -> Cow<'static, str> {
         use ElectionDataObjectId::*;
         match self {
@@ -141,10 +145,11 @@ impl Abbreviation for ElectionDataObjectId {
             ExtendedBaseHash => "ExtendedBaseHash".into(),
             PreVotingData => "PreVotingData".into(),
             GeneratedTestDataVoterSelections(hv) => format!(
-                "GeneratedTestDataVoterSel({})",
+                "GeneratedTestDataVoterSelections_{}",
                 hv.to_string_hex_no_prefix_suffix()
             )
             .into(),
+            VotingDeviceInformation => "VotingDeviceInformation".into(),
             ElectionTallies => "ElectionTallies".into(),
         }
     }
@@ -175,9 +180,6 @@ pub enum ResourceId {
     /// a successful-by-default case for testing.
     ElectionGuardDesignSpecificationVersion,
 
-    /// The [`Resource_Csrng`], providing a source of random numbers.
-    Csrng,
-
     ElectionDataObject(ElectionDataObjectId),
     // TODO Others? Config?
 }
@@ -190,14 +192,21 @@ impl ResourceId {
 }
 
 impl Abbreviation for ResourceId {
-    /// Returns an excessively short string hinting at the value useful only for logging.
+    /// Returns an excessively short string hinting at the value. Useful only for logging.
     fn abbreviation(&self) -> Cow<'static, str> {
         use ResourceId::*;
         match self {
             ElectionGuardDesignSpecificationVersion => "Egdsv".into(),
-            Csrng => "Csrng".into(),
             ElectionDataObject(edoid) => edoid.abbreviation(),
         }
+    }
+}
+
+impl From<ElectionDataObjectId> for ResourceId {
+    /// A [`ResourceId`] can always be made from a [`ElectionDataObjectId`].
+    #[inline]
+    fn from(edo_id: ElectionDataObjectId) -> Self {
+        ResourceId::ElectionDataObject(edo_id)
     }
 }
 
@@ -227,31 +236,36 @@ pub enum ResourceFormat {
 
     /// A slice of bytes. This implies the object will be read into memory.
     ///
-    /// Any resulting Resource object will return Some from [`as_slice_bytes()`](Resource::as_slice_bytes).
+    /// Any resulting [`Resource`] object will return Some from [`as_slice_bytes()`](Resource::as_slice_bytes).
     SliceBytes,
 
-    /// An object of the concrete type defined to represent the data.
+    /// An object of the concrete type defined to represent the [`ElectionDataObject`] data,
+    /// but not (yet) a ['Valid' or 'Validated'](crate::validatable::Validated)
+    /// [ElectionDataObject](ElectionDataObjectId) type.
     ///
-    /// Any resulting Resource object will return `Some` from
+    /// Any resulting [`Resource`] object will return [`Some`](std::option::Option::Some) from
     /// [`downcast_ref<T>()`](std::any::Any), if `T` is the appropriate type for the
     /// [`ResourceId`].
     ///
     /// Note that this will never be a validated EDO type.
     ConcreteType,
 
-    /// A fully-validated [`ElectionDataObject`].
+    /// An object of the concrete type defined to represent the Election Data Object data.
+    /// A ['Valid' or 'Validated'](crate::validatable::Validated)
+    /// [ElectionDataObject](ElectionDataObjectId) type.
+    /// Could be created as validvalid, or validated from a [`ConcreteType`](ResourceFormat::ConcreteType).
     ///
-    ValidatedElectionDataObject,
+    ValidElectionDataObject,
 }
 
 impl Abbreviation for ResourceFormat {
-    /// Returns an excessively short string hinting at the value useful only for logging.
+    /// Returns an excessively short string hinting at the value. Useful only for logging.
     fn abbreviation(&self) -> Cow<'static, str> {
         use ResourceFormat::*;
         match self {
             SliceBytes => "SliceBytes",
             ConcreteType => "ConcreteType",
-            ValidatedElectionDataObject => "ValidatedEdo",
+            ValidElectionDataObject => "ValidEdo",
         }
         .into()
     }
@@ -282,7 +296,7 @@ pub struct ResourceIdFormat {
 }
 
 impl Abbreviation for ResourceIdFormat {
-    /// Returns an excessively short string hinting at the value useful only for logging.
+    /// Returns an excessively short string hinting at the value. Useful only for logging.
     fn abbreviation(&self) -> Cow<'static, str> {
         format!(
             "({0},{1})",
@@ -295,12 +309,19 @@ impl Abbreviation for ResourceIdFormat {
 
 impl std::fmt::Debug for ResourceIdFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "({},{})",
-            self.rid.abbreviation(),
-            self.fmt.abbreviation()
-        )
+        if f.alternate() {
+            f.debug_struct("ResourceIdFormat")
+                .field("rid", &self.rid)
+                .field("fmt", &self.fmt)
+                .finish()
+        } else {
+            write!(
+                f,
+                "({},{})",
+                self.rid.abbreviation(),
+                self.fmt.abbreviation()
+            )
+        }
     }
 }
 

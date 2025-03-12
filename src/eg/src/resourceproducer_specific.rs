@@ -25,7 +25,7 @@ use std::{
     //collections::{HashSet, HashMap},
     //io::{BufRead, Cursor},
     //path::{Path, PathBuf},
-    rc::Rc,
+    sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -34,17 +34,18 @@ use std::{
 //use either::Either;
 //use rand::{distr::Uniform, Rng, RngCore};
 //use serde::{Deserialize, Serialize};
-//use static_assertions::{assert_obj_safe, assert_impl_all, assert_cfg, const_assert};
+use static_assertions::{assert_cfg, assert_impl_all, assert_obj_safe, const_assert};
 use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
 
 use crate::{
-    eg::{Eg, RsrcCacheMap},
+    eg::Eg,
     loadable::KnowsFriendlyTypeName,
     resource::{
-        ElectionDataObjectId as EdoId, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+        ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, Resource,
+        ResourceFormat, ResourceId, ResourceIdFormat,
     },
     resource_producer::{
         ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionResult,
@@ -69,9 +70,9 @@ pub(crate) struct ResourceProducer_Specific {
 }
 
 impl ResourceProducer_Specific {
-    fn rc_new() -> Rc<dyn ResourceProducer_Any_Debug_Serialize> {
+    fn arc_new() -> Arc<dyn ResourceProducer_Any_Debug_Serialize> {
         let self_ = Self::new();
-        Rc::new(self_)
+        Arc::new(self_)
     }
 
     fn new() -> Self {
@@ -102,22 +103,22 @@ impl ResourceProducer for ResourceProducer_Specific {
     }
 
     fn fn_rc_new(&self) -> FnNewResourceProducer {
-        Self::rc_new
+        Self::arc_new
     }
 
+    /*
     #[instrument(
         name = "ResourceProducer_Specific::maybe_produce",
         fields(rf = trace_display(&rp_op.target_ridfmt)),
         skip(self, eg, rp_op),
         ret
     )]
-    fn maybe_produce(&self, eg: &Eg, rp_op: &mut RpOp) -> Option<ResourceProductionResult> {
-        //? TODO cache
-
+    // */
+    fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
         for rpspecific_registration in &self.v {
-            if rpspecific_registration.ridfmt() == rp_op.target_ridfmt() {
+            if rpspecific_registration.ridfmt() == rp_op.requested_ridfmt() {
                 let fn_maybe_produce = rpspecific_registration.fn_maybe_produce.as_ref();
-                let opt_rp_result = (*fn_maybe_produce)(eg, rp_op);
+                let opt_rp_result = fn_maybe_produce(rp_op);
                 if opt_rp_result.is_some() {
                     //?? TODO double check resulting ridfmt? Or does the caller do that?
                     return opt_rp_result;
@@ -128,6 +129,8 @@ impl ResourceProducer for ResourceProducer_Specific {
         None
     }
 }
+
+assert_impl_all!(ResourceProducer_Specific: Send, Sync, Unpin);
 
 //-------------------------------------------------------------------------------------------------|
 
@@ -142,11 +145,11 @@ inventory::collect!(GatherRPFnRegistrationsFnWrapper);
 //=================================================================================================|
 
 fn gather_resourceproducer_registrations_Specific(
-    f: &mut dyn FnMut(&[ResourceProducerRegistration]),
+    f: &mut dyn for<'a> FnMut(&'a [ResourceProducerRegistration]),
 ) {
     f(&[ResourceProducerRegistration::new_defaultproducer(
         "Specific",
-        ResourceProducer_Specific::rc_new,
+        ResourceProducer_Specific::arc_new,
     )]);
 }
 
@@ -164,16 +167,21 @@ mod t {
     use super::*;
 
     #[test]
-    fn t0() {
-        let eg = &Eg::new_with_insecure_deterministic_csprng_seed(
-            "eg::resourceproducer_egdsversion::t::t1",
-        );
+    fn t1() {
+        async_global_executor::block_on(t1_async());
+    }
+
+    async fn t1_async() {
+        let eg =
+            Eg::new_with_insecure_deterministic_csprng_seed("eg::resourceproducer_specific::t::t0");
+        let eg = eg.as_ref();
 
         let (dr_rc, dr_src) = eg
             .produce_resource(&ResourceIdFormat {
                 rid: ResourceId::ElectionGuardDesignSpecificationVersion,
                 fmt: ResourceFormat::ConcreteType,
             })
+            .await
             .unwrap();
 
         assert_ron_snapshot!(dr_rc.rid(), @"ElectionGuardDesignSpecificationVersion");

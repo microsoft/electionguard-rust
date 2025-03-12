@@ -6,7 +6,7 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use num_bigint::BigUint;
 
 /// Converts a `BigUint` to a string using uppercase hex digits with no prefix.

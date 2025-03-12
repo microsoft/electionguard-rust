@@ -19,16 +19,17 @@
 
 use std::{
     borrow::BorrowMut,
-    cell::{RefCell, RefMut},
     num::NonZeroUsize,
     ops::RangeInclusive,
+    sync::{Mutex, MutexGuard},
 };
 
 use num_bigint::BigUint;
 use rand::{
-    distr::{Distribution, Uniform},
     RngCore,
+    distr::{Distribution, Uniform},
 };
+use static_assertions::assert_impl_all;
 
 use crate::csprng::Csprng;
 
@@ -124,17 +125,27 @@ where
 //=================================================================================================|
 
 /// Wraps a [`Csprng`] and uses interior mutability to provide a [`Csrng`] interface.
-pub struct DeterministicCsrng(RefCell<Csprng>);
+pub struct DeterministicCsrng(Mutex<Csprng>);
 
 impl DeterministicCsrng {
     /// Creates a new [`DeterministicCsrng`] wrapping the provided [`Csprng`].
     #[inline]
     pub fn new(csprng: Csprng) -> DeterministicCsrng {
-        Self(RefCell::new(csprng))
+        Self(Mutex::new(csprng))
     }
 
-    /// Creates a new [`DeterministicCsrng`] using a CSPRNG initialized from a string.
-    ///
+    /// Creates a new [`DeterministicCsrng`] using a [`Csprng`] initialized from
+    /// a sequence of bytes preceded by its length as a big-endian u64.
+    #[inline]
+    pub fn from_seed_bytes<AsRefSliceU8>(seed_bytes: AsRefSliceU8) -> Self
+    where
+        AsRefSliceU8: AsRef<[u8]>,
+    {
+        Self::new(Csprng::from_seed_bytes(seed_bytes))
+    }
+
+    /// Creates a new [`DeterministicCsrng`] using a [`Csprng`] initialized from
+    /// a [`UTF-8 string`](std::string::str)  preceded by its length in bytes as a big-endian u64.
     #[inline]
     pub fn from_seed_str<AsRefStr>(seed_str: AsRefStr) -> Self
     where
@@ -143,17 +154,17 @@ impl DeterministicCsrng {
         Self::new(Csprng::from_seed_str(seed_str))
     }
 
-    /// Consumes the [`DeterministicCsrng`], returning the wrapped [`Csprng`].
-    pub fn into_inner(self) -> Csprng {
-        self.0.into_inner()
+    /// Consumes the [`DeterministicCsrng`], returning the
+    /// [`Mutex`](std::sync::Mutex)`<`[`Csprng`]`>`.
+    pub fn into_inner_mutex(self) -> Mutex<Csprng> {
+        self.0
     }
 
-    fn borrow_csprng(&self) -> RefMut<'_, Csprng> {
-        // Unwrap() is justified here because DeterministicCsrng::0 could not have already been
-        // borrowed as it is never visible outside of this struct, and none of the implementation
-        // is re-entrant.
+    fn borrow_csprng(&self) -> MutexGuard<'_, Csprng> {
+        // Unwrap() is justified here because the MutexGuard is never externally exposed,
+        // and none of the implementation is believed to panic.
         #[allow(clippy::unwrap_used)]
-        self.0.try_borrow_mut().unwrap()
+        self.0.lock().unwrap()
     }
 }
 
@@ -234,5 +245,39 @@ impl Csrng for DeterministicCsrng {
         Some(distr.sample(csprng))
     }
 }
+
+impl Clone for DeterministicCsrng {
+    /// Returns a copy of the [`DeterministicCsrng`].
+    #[inline]
+    fn clone(&self) -> Self {
+        let csprng = self.borrow_csprng().next_csprng();
+        Self::new(csprng)
+    }
+}
+
+impl std::fmt::Display for DeterministicCsrng {
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DeterministicCsrng")
+    }
+}
+
+impl std::fmt::Debug for DeterministicCsrng {
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl serde::Serialize for DeterministicCsrng {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        "DeterministicCsrng".serialize(serializer)
+    }
+}
+
+assert_impl_all!(DeterministicCsrng: Send, Sync);
 
 //=================================================================================================|

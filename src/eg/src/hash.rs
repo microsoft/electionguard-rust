@@ -8,7 +8,7 @@
 
 use std::marker::PhantomData;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use util::{

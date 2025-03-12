@@ -15,8 +15,8 @@ mod none;
 mod verify_standard_parameters;
 mod voter_write_confirmation_code;
 mod write_hashes;
-mod write_extended_base_hash;
-mod write_joint_public_key;
+//? mod write_extended_base_hash;
+//? mod write_joint_public_key;
 mod write_manifest;
 mod write_parameters;
 mod write_pre_voting_data;
@@ -73,14 +73,13 @@ pub(crate) enum Subcommands {
         crate::subcommands::guardian_secret_key_write_public_key::GuardianSecretKeyWritePublicKey,
     ),
 
-    /// Compute the joint election public key from the guardian public keys and write it to a file.
-    WriteJointPublicKey(
-        crate::subcommands::write_joint_public_key::WriteJointPublicKey,
-    ),
+    //? /// Compute the joint election public key from the guardian public keys and write it to a file.
+    //? WriteJointPublicKey(
+    //?     crate::subcommands::write_joint_public_key::WriteJointPublicKey,
+    //? ),
 
-    /// Write the extended hash to a file.
-    WriteExtendedBaseHash(crate::subcommands::write_extended_base_hash::WriteExtendedBaseHash),
-
+    //? /// Write the extended hash to a file.
+    //? WriteExtendedBaseHash(crate::subcommands::write_extended_base_hash::WriteExtendedBaseHash),
     /// Write the pre voting data to a file.
     WritePreVotingData(crate::subcommands::write_pre_voting_data::WritePreVotingData),
 
@@ -133,8 +132,8 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
             //TODO GuardianSecretKeyWriteEncryptedShare(a) => a,
-            WriteJointPublicKey(a) => a,
-            WriteExtendedBaseHash(a) => a,
+            //? WriteJointPublicKey(a) => a,
+            //? WriteExtendedBaseHash(a) => a,
             WritePreVotingData(a) => a,
 
             #[cfg(feature = "eg-allow-test-data-generation")]

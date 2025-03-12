@@ -9,10 +9,27 @@
 const UINT31_MAX_U32: u32 = (1_u32 << 31) - 1;
 
 /// The main [`std::error::Error`] type returned by the `Uint31` type.
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum U31Error {
     #[error("Value `{0}` out of range `0 <= n < 2^31` for a `Uint31`")]
     ValueOutOfRangeForUint31(i128),
+
+    #[error("Value must be `>= 0` for a `Uint31`.")]
+    ValueTooSmall,
+
+    #[error("Value must be `<= 2^31 - 1` for a `Uint31`.")]
+    ValueTooLarge,
+}
+
+impl From<Uint31Error> for U31Error {
+    /// A [`U32Error`] can always be made from a [`Uint31Error`].
+    #[inline]
+    fn from(src: Uint31Error) -> Self {
+        match src {
+            Uint31Error::LessOrEqualViolated => U31Error::ValueTooSmall,
+            Uint31Error::GreaterOrEqualViolated => U31Error::ValueTooLarge,
+        }
+    }
 }
 
 #[nutype::nutype(

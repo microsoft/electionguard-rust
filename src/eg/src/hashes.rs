@@ -7,7 +7,9 @@
 #![allow(clippy::assertions_on_constants)]
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
-use anyhow::{anyhow, Context, Result};
+use std::sync::Arc;
+
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use util::algebra_utils::to_be_bytes_left_pad;
 
@@ -15,12 +17,24 @@ use crate::{
     eg::Eg,
     election_parameters::ElectionParameters,
     errors::EgResult,
-    hash::{eg_h, HValue},
+    hash::{HValue, eg_h},
+    resource::{
+        ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+    },
+    resource_id::ElectionDataObjectId as EdoId,
+    resource_producer::{ResourceProductionResult, ResourceSource, RpOp, ValidReason},
+    resource_producer_registry::RPFnRegistration,
+    resourceproducer_specific::GatherRPFnRegistrationsFnWrapper,
     serializable::SerializableCanonical,
 };
 
-/// Parameter base hash (Eq. 4 in EGDS 2.1.0 Section 3.1.2)
-/// This is used to compute guardian keys..
+//=================================================================================================|
+
+//? TODO Validatable
+
+/// Parameter Base Hash
+///
+/// EGDS 2.1.0 Section 3.1.2 pg. 16 eq. 4
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParameterBaseHash {
     pub h_p: HValue,
@@ -50,7 +64,8 @@ impl ParameterBaseHash {
         v.extend(varying_parameters.n().get_one_based_4_be_bytes());
         v.extend(varying_parameters.k().get_one_based_4_be_bytes());
 
-        let expected_len = 1065; // EGDS 2.1.0 pg. 74 (4)
+        let expected_len = 1065; // EGDS 2.1.0 §3.1.2 pg. 74 eq. 4
+
         assert_eq!(v.len(), expected_len);
 
         let h_p = eg_h(&h_v, &v);
@@ -70,11 +85,13 @@ pub struct Hashes {
 
 impl Hashes {
     /// Computes the [`Hashes`].
-    pub fn compute(eg: &Eg) -> EgResult<Hashes> {
-        let election_parameters = eg.election_parameters()?;
+    pub async fn compute(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<Hashes> {
+        let election_parameters = produce_resource.election_parameters().await?;
         let election_parameters = election_parameters.as_ref();
 
-        let election_manifest = eg.election_manifest()?;
+        let election_manifest = produce_resource.election_manifest().await?;
         let election_manifest = election_manifest.as_ref();
 
         // Computation of the base parameter hash H_P.
@@ -85,9 +102,17 @@ impl Hashes {
             let mut v = vec![0x01];
 
             let mut v_manifest_bytes = election_manifest.to_canonical_bytes()?;
-            v.append(&mut v_manifest_bytes);
+            let manifest_len = v_manifest_bytes.len();
 
-            let expected_len = 5 + v_manifest_bytes.len(); // EGDS 2.1.0 pg. 74 (5)
+            let expected_len = 5 + manifest_len; // EGDS 2.1.0 pg. 74, S3.1.4 (5)
+
+            let manifest_len_u32 = u32::try_from(manifest_len)?;
+            v.extend_from_slice(&manifest_len_u32.to_be_bytes());
+            assert_eq!(v.len(), 1 + 4);
+
+            v.append(&mut v_manifest_bytes);
+            assert_eq!(v.len(), 1 + 4 + manifest_len);
+
             assert_eq!(v.len(), expected_len);
 
             eg_h(&h_p, &v)
@@ -125,14 +150,57 @@ impl std::fmt::Display for Hashes {
 
 impl SerializableCanonical for Hashes {}
 
+crate::impl_MayBeValidatableUnsized_for_non_ValidatableUnsized! { Hashes }
+
 crate::impl_Resource_for_simple_ElectionDataObjectId_validated_type! { Hashes, Hashes }
 
-//-------------------------------------------------------------------------------------------------|
+//=================================================================================================|
+
+#[allow(non_upper_case_globals)]
+const RID_Hashes: ResourceId = ResourceId::ElectionDataObject(EdoId::Hashes);
+
+#[allow(non_upper_case_globals)]
+const RIDFMT_Hashes_ValidatedEdo: ResourceIdFormat = ResourceIdFormat {
+    rid: RID_Hashes,
+    fmt: ResourceFormat::ValidElectionDataObject,
+};
+
+#[allow(non_snake_case)]
+fn maybe_produce_Hashes_ValidatedEdo(rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
+    Some(produce_Hashes_ValidatedEdo(rp_op))
+}
+
+#[allow(non_snake_case)]
+fn produce_Hashes_ValidatedEdo(rp_op: &Arc<RpOp>) -> ResourceProductionResult {
+    rp_op.check_ridfmt(&RIDFMT_Hashes_ValidatedEdo)?;
+
+    let extended_base_hash = async_global_executor::block_on(Hashes::compute(rp_op.as_ref()))?;
+
+    let arc: Arc<dyn Resource> = Arc::new(extended_base_hash);
+
+    let rpsrc = ResourceSource::Valid(ValidReason::Inherent);
+    Ok((arc, rpsrc))
+}
+
+//=================================================================================================|
+
+fn gather_rpspecific_registrations(register_fn: &mut dyn FnMut(RPFnRegistration)) {
+    register_fn(RPFnRegistration::new_defaultproducer(
+        RIDFMT_Hashes_ValidatedEdo,
+        Box::new(maybe_produce_Hashes_ValidatedEdo),
+    ));
+}
+
+inventory::submit! {
+    GatherRPFnRegistrationsFnWrapper(gather_rpspecific_registrations)
+}
+
+//=================================================================================================|
 
 // Unit tests for the ElectionGuard hashes.
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod test {
+mod t {
     use anyhow::{Context, Result};
     use hex_literal::hex;
 
@@ -140,25 +208,34 @@ mod test {
     use crate::eg::Eg;
 
     #[test]
-    fn t0() -> Result<()> {
-        let eg = &{
-            let mut config = crate::eg::EgConfig::new();
-            config.use_insecure_deterministic_csprng_seed_str("eg::hashes::test::t0");
-            config.enable_test_data_generation_n_k(5, 3)?;
-            Eg::from(config)
-        };
+    fn t1() {
+        async_global_executor::block_on(t1_async());
+    }
 
-        let hashes = Hashes::compute(eg).with_context(|| "Hashes::compute() failed")?;
+    async fn t1_async() {
+        let eg = {
+            let mut config = crate::eg::EgConfig::new();
+            config.use_insecure_deterministic_csprng_seed_str("eg::hashes::t::t1");
+            config.enable_test_data_generation_n_k(5, 3).unwrap();
+            Eg::from_config(config)
+        };
+        let eg = eg.as_ref();
+
+        let hashes = eg
+            .hashes()
+            .await
+            .with_context(|| "Hashes::compute() failed")
+            .unwrap();
 
         // These hashes are to get notified if the hash computation is changed. They have
         // not been computed externally.
 
         let expected_h_p = HValue::from(hex!(
-            "2B3B025E50E09C119CBA7E9448ACD1CABC9447EF39BF06327D81C665CDD86296"
+            "944286970EAFDB6F347F4EB93B30D48FA3EDCC89BFBAEA6F5AE8F29AFB05DDCE"
         ));
 
         let expected_h_b = HValue::from(hex!(
-            "D2D97122C932F34EC8591E06252EDB38C7953D0B7F4013907432DDC6B0D15048"
+            "53675B5383394C92BDECF826A7FEBD64DB1E8E1BE69AE517FFA46054C8F6E4BB"
         ));
 
         assert_eq!(
@@ -169,7 +246,5 @@ mod test {
             hashes.h_b, expected_h_b,
             "hashes.h_b (left) != (right) expected_h_b"
         );
-
-        Ok(())
     }
 }

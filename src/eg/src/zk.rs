@@ -42,14 +42,14 @@ impl HasIndexType for ProofRange {
 /// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
 pub type ProofRangeIndex = CiphertextIndex;
 
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum ZkProofRangeError {
     #[error("It must be that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l}).")]
     RangeNotSatisfied { small_l: usize, big_l: usize },
 }
 
 impl ProofRange {
-    /// This function computes the challenge for the range proof as specified in Equation `46`. [TODO fix ref]
+    /// Computes the challenge for the range proof as specified in Equation `46`. [TODO fix ref]
     ///
     /// The arguments are
     /// - `pvd` - the pre voting data
@@ -95,7 +95,7 @@ impl ProofRange {
         FieldElement::from_bytes_be(c.0.as_slice(), field)
     }
 
-    /// This function computes a [`ProofRange`] from given [`Ciphertext`] and encrypted `small_l`.
+    /// Computes a [`ProofRange`] from given [`Ciphertext`] and encrypted `small_l`.
     ///
     /// The arguments are
     /// - `pre_voting_data` - pre-voting data
@@ -171,7 +171,7 @@ impl ProofRange {
         ))
     }
 
-    /// This function verifies a [`ProofRange`] with respect to a given [`Ciphertext`] and context.
+    /// Verifies a [`ProofRange`] with respect to a given [`Ciphertext`] and context.
     ///
     /// The arguments are
     /// - `self` - the range proof
@@ -325,7 +325,7 @@ impl ProofGuardian {
         csrng: &dyn Csrng,
         fixed_parameters: &FixedParameters,
         h_p: HValue,
-        zmulq: Rc<ZMulPrime>,
+        zmulq: Arc<ZMulPrime>,
         i: u16,
         k: u16,
         capital_k_i: &[BigUint],
@@ -380,8 +380,8 @@ impl ProofGuardian {
                     % fixed_parameters.p.as_ref()
             })
             .collect::<Vec<BigUint>>();
-        // let zmulp = Rc::new(ZMulPrime::new(fixed_parameters.p.clone()));
-        // let zmulq = Rc::new(ZMulPrime::new(fixed_parameters.q.clone()));
+        // let zmulp = Arc::new(ZMulPrime::new(fixed_parameters.p.clone()));
+        // let zmulq = Arc::new(ZMulPrime::new(fixed_parameters.q.clone()));
         let mut verified = true;
         let zero = BigUint::from(0u8);
         // let one = BigUint::from(1u8);

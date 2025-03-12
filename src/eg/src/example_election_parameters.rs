@@ -7,35 +7,41 @@
 #![allow(clippy::panic)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
 #![allow(clippy::unwrap_used)] // This is `cfg(feature = "eg-allow-test-data-generation")` code
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use either::Either;
 
 use crate::{
-    eg::Eg,
     election_parameters::{ElectionParameters, ElectionParametersInfo},
     errors::EgResult,
     guardian::GuardianIndex,
+    resource::ProduceResource,
     validatable::Validated,
     varying_parameters::{BallotChaining, VaryingParametersInfo},
 };
 
-pub fn example_election_parameters(eg: &Eg) -> ElectionParameters {
+#[allow(unused_imports)]
+use crate::resource::ProduceResourceExt;
+
+pub fn example_election_parameters(
+    produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+) -> ElectionParameters {
     let n = 5;
     let k = 3;
 
     // Unwrap() is justified here because we test this function with these parameters extensively.
     #[allow(clippy::unwrap_used)]
-    example_election_parameters2(eg, n, k).unwrap()
+    example_election_parameters2(produce_resource, n, k).unwrap()
 }
 
 /// An example ElectionParameters object, based on the standard parameters.
 pub fn example_election_parameters2(
-    eg: &Eg,
+    produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     varying_parameter_n: u32,
     varying_parameter_k: u32,
 ) -> EgResult<ElectionParameters> {
-    let fixed_parameters = crate::standard_parameters::make_standard_parameters(eg).unwrap();
+    let fixed_parameters =
+        crate::standard_parameters::make_standard_parameters(produce_resource).unwrap();
 
     let n = GuardianIndex::try_from_one_based_index(varying_parameter_n)?;
     let k = GuardianIndex::try_from_one_based_index(varying_parameter_k)?;
@@ -49,9 +55,9 @@ pub fn example_election_parameters2(
     };
 
     let election_parameters_info = ElectionParametersInfo {
-        fixed_parameters: Either::Right(Rc::new(fixed_parameters)),
-        varying_parameters: Either::Left(Rc::new(varying_parameters_info)),
+        fixed_parameters: Either::Right(Arc::new(fixed_parameters)),
+        varying_parameters: Either::Left(Arc::new(varying_parameters_info)),
     };
 
-    ElectionParameters::try_validate_from(election_parameters_info, eg)
+    ElectionParameters::try_validate_from(election_parameters_info, produce_resource)
 }

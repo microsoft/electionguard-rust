@@ -26,8 +26,9 @@ use crate::{
     errors::{EgError, EgResult},
     fixed_parameters::FixedParameters,
     hash::HValue,
-    nonce::{derive_xi_i_j_as_hvalue, NonceFE},
+    nonce::{NonceFE, derive_xi_i_j_as_hvalue},
     pre_voting_data::PreVotingData,
+    resource::{ProduceResource, ProduceResourceExt},
     selection_limits::EffectiveContestSelectionLimit,
     zk::ProofRange,
 };
@@ -62,14 +63,14 @@ impl ContestDataFieldsCiphertexts {
     /// Attempts to create a [`ContestDataFieldsCiphertexts`] by encrypting a [`ContestDataFieldsPlaintexts`].
     /// Also constructs the proof of ballot correctness.
     #[allow(non_snake_case)]
-    pub fn from_contest_data_fields_plaintexts(
-        eg: &Eg,
+    pub async fn from_contest_data_fields_plaintexts(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         h_i: &HValue_H_I,
         ballot_nonce_xi_B: &BallotNonce_xi_B,
         contest_ix: ContestIndex,
         data_fields_plaintexts: ContestDataFieldsPlaintexts,
     ) -> EgResult<ContestDataFieldsCiphertexts> {
-        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
         let pre_voting_data = pre_voting_data.as_ref();
         let election_parameters = pre_voting_data.election_parameters();
         let fixed_parameters = election_parameters.fixed_parameters();
@@ -80,13 +81,14 @@ impl ContestDataFieldsCiphertexts {
 
         let contest_data_fields_ciphertexts_and_nonces =
             Self::encrypt_contest_data_fields_plaintexts(
-                eg,
+                produce_resource,
                 fixed_parameters,
                 h_i,
                 ballot_nonce_xi_B,
                 contest_ix,
                 &data_fields_plaintexts,
-            )?;
+            )
+            .await?;
         debug_assert_eq!(
             contest_data_fields_ciphertexts_and_nonces.len(),
             data_fields_plaintexts.len()
@@ -108,6 +110,7 @@ impl ContestDataFieldsCiphertexts {
 
         let contest_hash = contest_hash_chi_l(
             pre_voting_data,
+            h_i,
             contest_ix,
             ciphertexts.as_slice(),
             encrypted_contest_data_blocks.as_slice(),
@@ -145,7 +148,7 @@ impl ContestDataFieldsCiphertexts {
 
                 let data_field_range_proof = ProofRange::new(
                     pre_voting_data,
-                    eg.csrng(),
+                    produce_resource.csrng(),
                     contest_data_field_ciphertext,
                     contest_data_field_nonce,
                     data_field_plaintext.into(),
@@ -160,10 +163,9 @@ impl ContestDataFieldsCiphertexts {
 
         // We should have generated a proof for each contest option.
         if proof_ballot_correctness.len() != contest.contest_options.len() {
-            return Err(anyhow!(
+            Err(anyhow!(
                 "Mismatch between number of contest options and number of range proofs."
-            )
-            .into());
+            ))?;
         }
 
         // Figure the sum of the values of the option fields.
@@ -185,7 +187,7 @@ impl ContestDataFieldsCiphertexts {
 
         let proof_selection_limit = Self::proof_selection_limit(
             pre_voting_data,
-            eg.csrng(),
+            produce_resource.csrng(),
             contest_data_fields_ciphertexts_and_nonces.as_slice(),
             option_fields_value_total.try_into()?,
             contest.selection_limit.into(),
@@ -220,8 +222,8 @@ impl ContestDataFieldsCiphertexts {
     /// Encrypts a [`ContestDataFieldsPlaintexts`] to the joint_vote_encryption_public_key_k
     /// and returns the resulting ciphertexts and nonces.
     #[allow(non_snake_case)]
-    fn encrypt_contest_data_fields_plaintexts(
-        eg: &Eg,
+    async fn encrypt_contest_data_fields_plaintexts(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         fixed_parameters: &FixedParameters,
         h_i: &HValue_H_I,
         ballot_nonce_xi_B: &BallotNonce_xi_B,
@@ -230,7 +232,9 @@ impl ContestDataFieldsCiphertexts {
     ) -> EgResult<Vec<(Ciphertext, NonceFE)>> {
         let field = fixed_parameters.field();
 
-        let joint_vote_encryption_public_key_k = eg.joint_vote_encryption_public_key_k()?;
+        let joint_vote_encryption_public_key_k = produce_resource
+            .joint_vote_encryption_public_key_k()
+            .await?;
 
         let v_cts_nonces = data_fields_plaintexts
             .as_Vec1_ContestDataFieldPlaintext()
@@ -277,12 +281,9 @@ impl ContestDataFieldsCiphertexts {
     /// Verify the proof that the selection limit is satisfied.
     fn verify_contest_selection_limit(
         &self,
-        eg: &Eg,
+        pre_voting_data: &PreVotingData,
         effective_contest_selection_limit: EffectiveContestSelectionLimit,
     ) -> EgResult<()> {
-        let pre_voting_data = eg.pre_voting_data()?;
-        let pre_voting_data = pre_voting_data.as_ref();
-
         let combined_ct = self.sum_selection_vector(pre_voting_data);
 
         let verified = ProofRange::verify(
@@ -345,8 +346,14 @@ impl ContestDataFieldsCiphertexts {
 
     /// Verify the proof that each encrypted vote is an encryption of 0 or 1,
     /// and that the selection limit is satisfied.
-    pub fn verify_proofs_for_all_data_fields_in_contest(&self, eg: &Eg) -> EgResult<()> {
-        let election_manifest = eg.election_manifest()?;
+    pub async fn verify_proofs_for_all_data_fields_in_contest(
+        &self,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<()> {
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
+        let pre_voting_data = pre_voting_data.as_ref();
+
+        let election_manifest = produce_resource.election_manifest().await?;
         let election_manifest = election_manifest.as_ref();
 
         let contest =
@@ -369,7 +376,7 @@ impl ContestDataFieldsCiphertexts {
                 contest_option.effective_selection_limit(contest)?;
 
             ciphertext.verify_ballot_correctness(
-                eg,
+                pre_voting_data,
                 proof,
                 effective_option_selection_limit,
                 self.contest_ix,
@@ -391,7 +398,7 @@ impl ContestDataFieldsCiphertexts {
 
         let effective_contest_selection_limit = contest.effective_contest_selection_limit()?;
 
-        self.verify_contest_selection_limit(eg, effective_contest_selection_limit)?;
+        self.verify_contest_selection_limit(pre_voting_data, effective_contest_selection_limit)?;
 
         Ok(())
     }

@@ -1,0 +1,32 @@
+cargo tree --offline -e normal -f "{p} {f}" --duplicates
+
+rand_core v0.6.4
+└── crypto-common v0.1.6 rand_core,std
+    └── digest v0.10.7 alloc,block-buffer,core-api,default,mac,rand_core,std,subtle
+        ├── eg v0.1.0 (src/eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code,eg-forbid-nonstandard-egds-version
+        │   ├── demo-eg v0.1.0 (src/demo-eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
+        │   ├── eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
+        │   ├── electionguard v0.1.0 (src/electionguard) default,eg-allow-insecure-deterministic-csprng,eg-allow-unsafe-code
+        │   └── test-electionguard v0.1.0 (src/test-electionguard) default,eg-allow-insecure-deterministic-csprng,eg-allow-unsafe-code
+        ├── hmac v0.12.1 reset,std
+        │   └── eg v0.1.0 (src/eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code,eg-forbid-nonstandard-egds-version (*)
+        ├── sha2 v0.10.8 compress,std
+        │   └── eg v0.1.0 (src/eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code,eg-forbid-nonstandard-egds-version (*)
+        └── sha3 v0.10.8 reset,std
+            └── util v0.1.0 (src/util) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
+                ├── demo-eg v0.1.0 (src/demo-eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
+                ├── eg v0.1.0 (src/eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code,eg-forbid-nonstandard-egds-version (*)
+                ├── eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
+                └── electionguard v0.1.0 (src/electionguard) default,eg-allow-insecure-deterministic-csprng,eg-allow-unsafe-code
+
+rand_core v0.9.3 std
+├── rand v0.9.0 alloc
+│   ├── eg v0.1.0 (src/eg) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code,eg-forbid-nonstandard-egds-version (*)
+│   ├── rand_distr v0.5.1 std_math
+│   │   ├── test-electionguard v0.1.0 (src/test-electionguard) default,eg-allow-insecure-deterministic-csprng,eg-allow-unsafe-code
+│   │   └── util v0.1.0 (src/util) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+│   └── util v0.1.0 (src/util) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+├── rand_xorshift v0.4.0
+│   └── util v0.1.0 (src/util) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+├── test-electionguard v0.1.0 (src/test-electionguard) default,eg-allow-insecure-deterministic-csprng,eg-allow-unsafe-code
+└── util v0.1.0 (src/util) default,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)

@@ -6,7 +6,7 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use either::*;
 use serde::{Deserialize, Serialize};
@@ -18,8 +18,8 @@ use util::{
 use crate::{
     ballot_style::{BallotStyle, BallotStyleIndex, BallotStyleInfo},
     ciphertext::{Ciphertext, CiphertextIndex},
-    eg::Eg,
     errors::{EgError, EgResult},
+    resource::ProduceResource,
     selection_limits::{
         ContestSelectionLimit, EffectiveContestSelectionLimit, EffectiveOptionSelectionLimit,
         OptionSelectionLimit,
@@ -28,6 +28,9 @@ use crate::{
     validatable::Validated,
     voting_device::VotingDeviceInformationSpec,
 };
+
+#[allow(unused_imports)]
+use crate::resource::ProduceResourceExt;
 
 /*
 /// The configuration options for recording Overvotes and Undervotes for each Contest
@@ -75,12 +78,29 @@ pub struct ElectionManifestInfo {
     ///
     /// The manifest specifies which data is to be included in the `S_device` string
     /// which is hashed to produce the [`VotingDeviceInformationHash`], `H_DI`.
-    pub voting_device_information_spec: Rc<VotingDeviceInformationSpec>,
+    pub voting_device_information_spec: Arc<VotingDeviceInformationSpec>,
+}
+
+impl ElectionManifestInfo {
+    /// Returns the number of [`Contest`]s.
+    pub fn qty_contests(&self) -> EgResult<ContestIndex> {
+        Ok(ContestIndex::try_from_one_based_index(self.contests.len())?)
+    }
+
+    /// Returns the number of [`BallotStyle`]s.
+    pub fn qty_ballot_styles(&self) -> EgResult<BallotStyleIndex> {
+        let qty_ballot_styles = match &self.ballot_styles {
+            Either::Left(v1) => BallotStyleIndex::try_from_one_based_index(v1.len())?,
+            Either::Right(v1) => BallotStyleIndex::try_from_one_based_index(v1.len())?,
+        };
+        Ok(qty_ballot_styles)
+    }
 }
 
 crate::impl_knows_friendly_type_name! { ElectionManifestInfo }
 
-crate::impl_Resource_for_simple_ElectionDataObjectId_info_type! { ElectionManifestInfo, ElectionManifest }
+crate::impl_Resource_for_simple_ElectionDataObjectId_info_type! {
+ElectionManifestInfo, ElectionManifest }
 
 impl SerializableCanonical for ElectionManifestInfo {}
 
@@ -131,13 +151,13 @@ impl<'de> Deserialize<'de> for ElectionManifestInfo {
 
                 //? TODO
                 let voting_device_information_spec = VotingDeviceInformationSpec::default();
-                let rc_voting_device_information_spec = Rc::new(voting_device_information_spec);
+                let arc_voting_device_information_spec = Arc::new(voting_device_information_spec);
 
                 Ok(ElectionManifestInfo {
                     label,
                     contests,
                     ballot_styles: Left(v1_bsi),
-                    voting_device_information_spec: rc_voting_device_information_spec,
+                    voting_device_information_spec: arc_voting_device_information_spec,
                 })
             }
         }
@@ -149,8 +169,9 @@ impl<'de> Deserialize<'de> for ElectionManifestInfo {
 }
 
 crate::impl_validatable_validated! {
-    src: ElectionManifestInfo, eg => EgResult<ElectionManifest> {
-        //? let election_parameters = eg.election_parameters()?.as_ref();
+    version_1:
+    src: ElectionManifestInfo, produce_resource => EgResult<ElectionManifest> {
+        //? let election_parameters = produce_resource.election_parameters().await?.as_ref();
 
         let ElectionManifestInfo {
             label,
@@ -185,7 +206,7 @@ crate::impl_validatable_validated! {
             Left(v1_bsi) => {
                 let mut v1_bs: Vec1<BallotStyle> = Vec1::new();
                 for bsi in v1_bsi {
-                    let bs = <BallotStyle as Validated>::try_validate_from(bsi, eg)?;
+                    let bs = <BallotStyle as Validated>::try_validate_from(bsi, produce_resource)?;
                     v1_bs.try_push(bs)?;
                 }
                 v1_bs
@@ -239,17 +260,17 @@ pub struct ElectionManifest {
     label: String,
     contests: Vec1<Contest>,
     ballot_styles: Vec1<BallotStyle>,
-    voting_device_information_spec: Rc<VotingDeviceInformationSpec>,
+    voting_device_information_spec: Arc<VotingDeviceInformationSpec>,
 }
 
 impl ElectionManifest {
     /// Creates and validates a new [`ElectionManifest`] composed of the supplied members.
     pub fn new(
-        eg: &Eg,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         label: String,
         contests: Vec1<Contest>,
         ballot_styles: Vec1<BallotStyle>,
-        voting_device_information_spec: Rc<VotingDeviceInformationSpec>,
+        voting_device_information_spec: Arc<VotingDeviceInformationSpec>,
     ) -> EgResult<Self> {
         let election_manifest_info = ElectionManifestInfo {
             label,
@@ -258,12 +279,18 @@ impl ElectionManifest {
             voting_device_information_spec,
         };
 
-        ElectionManifest::try_validate_from(election_manifest_info, eg)
+        ElectionManifest::try_validate_from(election_manifest_info, produce_resource)
     }
 
     /// Returns access to the label.
     pub fn label(&self) -> &str {
         &self.label
+    }
+
+    /// Returns the number of [`Contest`]s.
+    pub fn qty_contests(&self) -> EgResult<ContestIndex> {
+        let qty_contests = ContestIndex::try_from_one_based_index(self.contests.len())?;
+        Ok(qty_contests)
     }
 
     /// Returns access to the collection of [`Contest`]s.
@@ -273,6 +300,13 @@ impl ElectionManifest {
     /// - Otherwise, `election_manifest.get_contest_without_checking_ballot_style()`.
     pub fn contests(&self) -> &Vec1<Contest> {
         &self.contests
+    }
+
+    /// Returns the number of [`BallotStyle`]s.
+    pub fn qty_ballot_styles(&self) -> EgResult<BallotStyleIndex> {
+        let qty_ballot_styles =
+            BallotStyleIndex::try_from_one_based_index(self.ballot_styles.len())?;
+        Ok(qty_ballot_styles)
     }
 
     /// Returns access to the collection of [`BallotStyle`]s.
@@ -359,7 +393,9 @@ impl SerializableCanonical for ElectionManifest {}
 
 crate::impl_knows_friendly_type_name! { ElectionManifest }
 
-crate::impl_Resource_for_simple_ElectionDataObjectId_validated_type! { ElectionManifest, ElectionManifest }
+crate::impl_Resource_for_simple_ElectionDataObjectId_validated_type! {
+    ElectionManifest, ElectionManifest
+}
 
 /// A contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -418,8 +454,8 @@ impl Contest {
 
     /// The effective selection limit for this [`Contest`].
     ///
-    /// This is the smaller of this contest's selection limit and the sum of the selection limits of all
-    /// this `Contest`'s options'.
+    /// This is the smaller of this contest's selection limit and the sum of the selection limits
+    /// of all this `Contest`'s options'.
     pub fn effective_contest_selection_limit(&self) -> EgResult<EffectiveContestSelectionLimit> {
         EffectiveContestSelectionLimit::figure(self)
     }
@@ -436,8 +472,8 @@ impl Contest {
         v.try_into().map_err(Into::into)
     }
 
-    /// Informs the [`Contest`] of its [`ContestIndex`], and the [`ContestOption`](ContestOption)s of their
-    /// indices.
+    /// Informs the [`Contest`] of its [`ContestIndex`], and the [`ContestOption`](ContestOption)s
+    /// of their indices.
     fn inform_contest_of_its_index_and_its_options_of_theirs(
         &mut self,
         contest_ix: ContestIndex,
@@ -532,8 +568,8 @@ impl ContestOption {
         &self,
         containing_contest: &Contest,
     ) -> EgResult<EffectiveOptionSelectionLimit> {
-        // If we happen to know the contest index of this option and the contest index of the containing
-        // contest passed-in, verify they are the same.
+        // If we happen to know the contest index of this option and the contest index of the
+        // containing contest passed-in, verify they are the same.
         if let (Some(contestoption_contest_ix), Some(containing_contest_ix)) =
             (self.opt_contest_ix, containing_contest.opt_contest_ix)
         {
@@ -576,6 +612,7 @@ pub mod t {
 
     use super::*;
     use crate::{
+        eg::Eg,
         loadable::LoadableFromStdIoReadValidated,
         resource_id::ElectionDataObjectId,
         serializable::{SerializableCanonical, SerializablePretty},
@@ -583,21 +620,30 @@ pub mod t {
 
     #[test]
     fn t1() {
-        let election_manifest_ridfmt =
-            ElectionDataObjectId::ElectionParameters.validated_type_ridfmt();
+        async_global_executor::block_on(t1_async());
+    }
 
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::election_manifest::test::test_election_manifest",
+    async fn t1_async() {
+        let election_manifest_ridfmt =
+            ElectionDataObjectId::ElectionManifest.validated_type_ridfmt();
+
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+            "eg::election_manifest::t::t1_async",
         );
+        let eg = eg.as_ref();
 
         // Pretty
         {
             let json_pretty = {
                 let mut buf = Cursor::new(vec![0u8; 0]);
-                eg.produce_resource_downcast_no_src::<ElectionManifest>(&election_manifest_ridfmt)
-                    .unwrap()
-                    .to_stdiowrite_pretty(&mut buf)
-                    .unwrap();
+                let result = eg
+                    .produce_resource_downcast_no_src::<ElectionManifest>(&election_manifest_ridfmt)
+                    .await;
+                if let Err(e) = &result {
+                    eprintln!("Err(e): {e:#?}");
+                    eprintln!("eg: {eg:#?}");
+                }
+                result.unwrap().to_stdiowrite_pretty(&mut buf).unwrap();
                 buf.into_inner()
             };
             assert!(json_pretty.len() > 6);
@@ -619,7 +665,7 @@ pub mod t {
 
             assert_eq!(json_pretty, json_pretty_2);
             assert_eq!(
-                *eg.election_manifest().unwrap(),
+                *eg.election_manifest().await.unwrap(),
                 election_manifest_from_json_pretty
             );
         }
@@ -628,6 +674,7 @@ pub mod t {
         {
             let canonical_bytes = eg
                 .election_manifest()
+                .await
                 .unwrap()
                 .to_canonical_bytes()
                 .unwrap();
@@ -640,7 +687,7 @@ pub mod t {
                     .unwrap();
 
             assert_eq!(
-                *eg.election_manifest().unwrap(),
+                *eg.election_manifest().await.unwrap(),
                 election_manifest_from_canonical_bytes
             );
         }

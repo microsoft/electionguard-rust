@@ -5,20 +5,21 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use eg::{
-    hashes::Hashes, extended_base_hash::ExtendedBaseHash, joint_public_key::JointPublicKey,
-    pre_voting_data::PreVotingData, serializable::SerializablePretty, eg::Eg,
+    eg::Eg, extended_base_hash::ExtendedBaseHash, hashes::Hashes, joint_public_key::JointPublicKey,
+    pre_voting_data::PreVotingData, serializable::SerializablePretty,
 };
 
 use crate::{
     artifacts_dir::ArtifactFile,
     common_utils::{
-        load_election_parameters, load_hashes, load_extended_base_hash, load_joint_public_key,
+        //load_election_parameters, load_hashes, load_extended_base_hash, load_joint_public_key,
         ElectionManifestSource,
     },
     subcommand_helper::SubcommandHelper,
@@ -36,15 +37,11 @@ pub(crate) struct WritePreVotingData {
 
 impl Subcommand for WritePreVotingData {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut eg = {
-            let csprng = subcommand_helper
-                .build_csprng()?
-                .write_str("WritePreVotingData")
-                .finish();
-            Eg::from_csprng(csprng)
-        };
-        let eg = &mut eg;
+        let eg = subcommand_helper.get_eg("WritePreVotingData")?;
+        let _eg = eg.as_ref();
+        anyhow::bail!("TODO: finish implementing WritePreVotingData");
 
+        /*
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let _election_parameters =
             load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
@@ -69,7 +66,7 @@ impl Subcommand for WritePreVotingData {
         ExtendedBaseHash::get_or_compute(eg)?;
 
         PreVotingData::get_or_compute(eg)?;
-        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
 
         let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir
@@ -84,5 +81,6 @@ impl Subcommand for WritePreVotingData {
         eprintln!("Wrote pre voting data to: {}", path.display());
 
         Ok(())
+        // */
     }
 }

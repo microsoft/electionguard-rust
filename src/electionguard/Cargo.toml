@@ -1,13 +1,13 @@
 [package]
 name = "electionguard"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [features]
 default = [
     "eg-allow-unsafe-code",
-    #"eg-forbid-insecure-deterministic-csprng",
+    "eg-allow-insecure-deterministic-csprng",
     #"eg-forbid-test-data-generation",
     #"eg-forbid-toy-parameters",
 ]

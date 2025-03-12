@@ -6,6 +6,7 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(clippy::new_without_default)]
 #![allow(dead_code)] //? TODO: Remove temp development code
 #![allow(unused_assignments)] //? TODO: Remove temp development code
 #![allow(unused_braces)] //? TODO: Remove temp development code
@@ -17,75 +18,95 @@
 #![allow(non_snake_case)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-use std::{any::Any, cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::{
+    any::Any,
+    cell::RefCell,
+    collections::BTreeMap,
+    pin::Pin,
+    sync::{Arc, Weak},
+};
 
+use futures_lite::future::{self as fut_lite, FutureExt};
 use serde::Serialize;
-use tracing::{debug, debug_span, error, info, info_span, instrument, trace, trace_span, warn};
-use util::{abbreviation::Abbreviation, csprng::Csprng, csrng::Csrng, vec1::Vec1};
+use static_assertions::{assert_impl_all, assert_obj_safe};
+use tracing::{
+    Instrument, debug, debug_span, error, info, info_span, instrument, trace, trace_span, warn,
+};
+use util::{
+    abbreviation::Abbreviation,
+    csprng::{Csprng, CsprngBuilder},
+    csrng::{Csrng, DeterministicCsrng},
+    vec1::Vec1,
+};
 
 pub use crate::eg_config::EgConfig;
 use crate::{
     errors::{EgError, EgResult},
-    guardian::{AsymmetricKeyPart, GuardianKeyId, GuardianKeyPurpose},
+    guardian::{AsymmetricKeyPart, GuardianKeyPartId, GuardianKeyPurpose},
     guardian_public_key::GuardianPublicKey,
     guardian_secret_key::GuardianIndex,
     joint_public_key::JointPublicKey,
-    resource::{ElectionDataObjectId, Resource, ResourceFormat, ResourceId, ResourceIdFormat},
-    resource_csrng::Resource_Csrng,
+    resource::{
+        ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, ProductionBudget,
+        Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+    },
     resource_producer::{ResourceProductionError, ResourceProductionResult, ResourceSource},
-    resource_production::{produce_resource_impl_, RpOp},
+    resource_production::{RpOp, produce_resource_impl_},
+    resources::Resources,
     varying_parameters::VaryingParameters,
 };
 
 //=================================================================================================|
 
-pub(crate) type RsrcCacheMapKey = ResourceIdFormat;
-pub(crate) type RsrcCacheMapValue = (Rc<dyn Resource>, ResourceSource);
-pub(crate) type RsrcCacheMap = BTreeMap<RsrcCacheMapKey, RsrcCacheMapValue>;
-
-//=================================================================================================|
-
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Eg {
-    config: Rc<EgConfig>,
-    rsrc_csrng: Rc<Resource_Csrng>,
-    rsrc_cache: RefCell<RsrcCacheMap>,
+    weak_self: Weak<Self>,
+    config: Arc<EgConfig>,
+    csrng: DeterministicCsrng,
+    resources: Arc<Resources>,
 }
 
 impl Eg {
-    /// Creates a new [`Eg`] from an [`EgConfig`].
-    #[inline]
-    pub fn from_config(config: EgConfig) -> Self {
-        let rc_config = Rc::new(config);
-        Eg::from_rc_config(rc_config)
+    /// Creates an [`Eg`] with a default configuration.
+    pub fn new() -> Arc<Self> {
+        let config = EgConfig::new();
+        Eg::from_config(config)
     }
 
-    /// Creates a new [`Eg`] from an [`Rc<EgConfig>`].
-    pub fn from_rc_config(config: Rc<EgConfig>) -> Self {
-        let rc_rsrc_csrng: Rc<Resource_Csrng> = Rc::new(Resource_Csrng::new(&config));
-        let rc_rsrc_csrng_dyn: Rc<dyn Resource> = rc_rsrc_csrng.clone();
+    /// Creates a new [`Eg`] from an [`EgConfig`].
+    #[inline]
+    pub fn from_config(config: EgConfig) -> Arc<Self> {
+        let arc_config = Arc::new(config);
+        Eg::from_rc_config(arc_config)
+    }
 
-        // Preload the cache with the provided resource.
-        let mut rsrc_cache = [(
-            rc_rsrc_csrng_dyn.ridfmt().clone(),
-            (rc_rsrc_csrng_dyn, ResourceSource::Provided),
-        )]
-        .into_iter()
-        .collect();
+    /// Creates a new [`Eg`] from an [`Arc<EgConfig>`].
+    pub fn from_rc_config(config: Arc<EgConfig>) -> Arc<Self> {
+        let csprng = config.make_csprng_builder().finish();
 
-        Self {
+        Arc::new_cyclic(|w| Self {
+            weak_self: w.clone(),
             config,
-            rsrc_csrng: rc_rsrc_csrng,
-            rsrc_cache: RefCell::new(rsrc_cache),
-        }
+            csrng: DeterministicCsrng::new(csprng),
+            resources: Resources::new(),
+        })
     }
 
     #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
     pub fn new_with_insecure_deterministic_csprng_seed<S: AsRef<str>>(
         insecure_deterministic_seed_str: S,
-    ) -> Self {
+    ) -> Arc<Self> {
         let mut config = EgConfig::new();
         config.use_insecure_deterministic_csprng_seed_str(insecure_deterministic_seed_str);
+        Self::from_config(config)
+    }
+
+    #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
+    pub fn new_with_insecure_deterministic_csprng_seed_data<D: AsRef<[u8]>>(
+        insecure_deterministic_seed_data: D,
+    ) -> Arc<Self> {
+        let mut config = EgConfig::new();
+        config.use_insecure_deterministic_csprng_seed_data(insecure_deterministic_seed_data);
         Self::from_config(config)
     }
 
@@ -98,11 +119,23 @@ impl Eg {
     ))]
     pub fn new_with_test_data_generation_and_insecure_deterministic_csprng_seed<S: AsRef<str>>(
         insecure_deterministic_seed_str: S,
-    ) -> Self {
+    ) -> Arc<Self> {
         let mut config = EgConfig::new();
         config.use_insecure_deterministic_csprng_seed_str(insecure_deterministic_seed_str);
         config.enable_test_data_generation();
         Self::from_config(config)
+    }
+
+    /// Provides access to the [`Eg`] as [`Weak<Self>`].
+    #[inline]
+    pub fn weak_self(&self) -> Weak<Self> {
+        self.weak_self.clone()
+    }
+
+    /// Maybe provides access to the [`Eg`] as [`Arc<Self>`].
+    #[inline]
+    pub fn opt_self(&self) -> Option<Arc<Self>> {
+        self.weak_self.upgrade()
     }
 
     /// Provides access to the [`EgConfig`].
@@ -114,312 +147,77 @@ impl Eg {
     /// Provides access to the [`Csrng`].
     #[inline]
     pub fn csrng(&self) -> &dyn Csrng {
-        self.rsrc_csrng.as_csrng()
+        &self.csrng
     }
 
-    /// Provides the specified resource. It will be available later from the cache.
+    /// Provides access to the [`Resources`].
+    #[inline]
+    pub fn resources(&self) -> &Arc<Resources> {
+        &self.resources
+    }
+
+    /// Provides the specified resource. It will remain available from the cache.
+    ///
     /// Returns:
     ///
     /// - `Ok(())` if the resource was newly inserted, or
     /// - `Err(...)` if the resource already existed in the cache.
+    pub async fn provide_resource(&self, arc_dr: Arc<dyn Resource>) -> EgResult<()> {
+        self.resources.provide_resource(arc_dr).await?;
+        Ok(())
+    }
+
+    /// Provides the specified resource result for the specified [`ResourceIdFormat`]. It will
+    /// remain available from the cache.
     ///
-    /// Note that unlike other ways resources get added to the cache, this is considered
-    /// a mutating operation.
-    pub fn provide_resource(&mut self, rc_dr: Rc<dyn Resource>) -> EgResult<()> {
-        use std::collections::btree_map::{Entry::*, OccupiedEntry, VacantEntry};
-
-        let ridfmt = rc_dr.ridfmt();
-
-        let resource_cache = self.rsrc_cache.get_mut();
-        match resource_cache.entry(ridfmt.clone()) {
-            Vacant(vacant_entry) => {
-                vacant_entry.insert((rc_dr, ResourceSource::Provided));
-                Ok(())
-            }
-            Occupied(occupied_entry) => {
-                debug_assert_eq!(ridfmt, occupied_entry.get().0.ridfmt());
-                let e = ResourceProductionError::ResourceAlreadyStored {
-                    ridfmt: ridfmt.clone(),
-                    source_of_existing: occupied_entry.get().1.clone(),
-                };
-                Err(e.into())
-            }
-        }
-    }
-
-    /// Attempts to produce the requested resource.
-    pub fn produce_resource(&self, ridfmt: &ResourceIdFormat) -> ResourceProductionResult {
-        let span = trace_span!(
-            "produce",
-            rf = tracing::field::display(ridfmt.abbreviation())
-        );
-        let _enter_span = span.enter();
-
-        // Forward to implementation in other file.
-        let mut rp_op = RpOp::new(ridfmt.clone(), &span, None);
-        produce_resource_impl_(self, &mut rp_op)
-    }
-
-    /// Attempts to produce the requested resource.
-    /// Returns just the Rc<dyn Resource>, to simplify the many cases where the caller
-    /// isn't interested in the [`DRProductionSource`].
-    #[inline]
-    pub fn produce_resource_no_src(
+    /// Returns:
+    ///
+    /// - `Ok(())` if the result was newly inserted, or
+    /// - `Err(...)` if the result already existed in the cache.
+    pub async fn provide_resource_production_result(
         &self,
         ridfmt: &ResourceIdFormat,
-    ) -> Result<Rc<dyn Resource>, ResourceProductionError> {
+        provided_result: ResourceProductionResult,
+    ) -> EgResult<()> {
+        self.resources
+            .provide_resource_production_result(ridfmt, provided_result)
+            .await?;
+        Ok(())
+    }
+}
+
+impl ProduceResource for Eg {
+    fn csrng(&self) -> &dyn util::csrng::Csrng {
+        &self.csrng
+    }
+
+    fn trait_impl_produce_resource_<'a>(
+        &'a self,
+        ridfmt: ResourceIdFormat,
+        opt_prod_budget: Option<ProductionBudget>,
+    ) -> Pin<Box<dyn Future<Output = ResourceProductionResult> + Send + 'a>> {
+        let ridfmt = ridfmt.clone();
         let span = trace_span!(
-            "produce",
+            "<Eg as ProduceResource>::trait_impl_produce_resource_",
             rf = tracing::field::display(ridfmt.abbreviation())
-        );
-        let _enter_span = span.enter();
-
-        // Forward to implementation in other file.
-        let mut rp_op = RpOp::new(ridfmt.clone(), &span, None);
-        produce_resource_impl_(self, &mut rp_op).map(|(rc, _)| rc)
-    }
-
-    /// Attempts to produce the requested resource and downcast it as the specified type.
-    /// Returns the `Rc<T>`.
-    pub fn produce_resource_downcast<T: Resource + Any>(
-        &self,
-        ridfmt: &ResourceIdFormat,
-    ) -> Result<(Rc<T>, ResourceSource), ResourceProductionError> {
-        let span = trace_span!(
-            "produce",
-            rf = tracing::field::display(ridfmt.abbreviation())
-        );
-        let _enter_span = span.enter();
-
-        // Forward to implementation in other file.
-        let mut rp_op = RpOp::new(ridfmt.clone(), &span, None);
-        let (rc, rsrc) = produce_resource_impl_(self, &mut rp_op)?;
-
-        let downcast_result = rc.into_any_rc().downcast::<T>();
-
-        match downcast_result {
-            Err(rc) => {
-                let e = ResourceProductionError::CouldntDowncastResource {
-                    src_ridfmt: ridfmt.clone(),
-                    src_type: format!("{:?}", rc.type_id()),
-                    target_type: format!("{:?}", std::any::TypeId::of::<T>()),
-                };
-                error!("{e:?}");
-                Err(e)
-            }
-            Ok(rc) => Ok((rc, rsrc)),
-        }
-    }
-
-    /// Attempts to produce the requested resource and downcast it as the specified type.
-    ///
-    /// Returns just the `Rc<T>` without [source information](ResourceSource).
-    #[inline]
-    pub fn produce_resource_downcast_no_src<T: Resource + Any>(
-        &self,
-        ridfmt: &ResourceIdFormat,
-    ) -> Result<Rc<T>, ResourceProductionError> {
-        self.produce_resource_downcast::<T>(ridfmt)
-            .map(|(rc, _)| rc)
-    }
-
-    #[allow(clippy::needless_lifetimes)] //? TODO: Remove temp development code
-    pub(crate) fn resource_cache_try_borrow<'q>(
-        &'q self,
-    ) -> Result<std::cell::Ref<'q, RsrcCacheMap>, ResourceProductionError> {
-        self.rsrc_cache
-            .try_borrow()
-            .map_err(|_e| ResourceProductionError::ResourceCacheAlreadyMutablyInUse)
-    }
-
-    #[allow(clippy::needless_lifetimes)] //? TODO: Remove temp development code
-    pub(crate) fn resource_cache_try_borrow_mut<'q>(
-        &'q self,
-    ) -> Result<std::cell::RefMut<'q, RsrcCacheMap>, ResourceProductionError> {
-        self.rsrc_cache
-            .try_borrow_mut()
-            .map_err(|_e| ResourceProductionError::ResourceCacheAlreadyMutablyInUse)
-    }
-}
-
-impl From<EgConfig> for Eg {
-    /// A [`Eg`] can always be made from a [`EgConfig`].
-    #[inline]
-    fn from(config: EgConfig) -> Self {
-        Eg::from_config(config)
-    }
-}
-
-impl From<&EgConfig> for Eg {
-    /// A [`Eg`] can always be made from a [`&EgConfig`](EgConfig).
-    #[inline]
-    fn from(config: &EgConfig) -> Self {
-        Eg::from_config(config.clone())
-    }
-}
-
-impl From<Rc<EgConfig>> for Eg {
-    /// A [`Eg`] can always be made from a [`Rc<EgConfig>`].
-    #[inline]
-    fn from(config: Rc<EgConfig>) -> Self {
-        Eg::from_rc_config(config)
-    }
-}
-
-impl From<&Rc<EgConfig>> for Eg {
-    /// A [`Eg`] can always be made from a [`&Rc<EgConfig>`](Rc<EgConfig>).
-    #[inline]
-    fn from(config: &Rc<EgConfig>) -> Self {
-        Eg::from_rc_config(config.clone())
-    }
-}
-
-//=================================================================================================|
-
-macro_rules! helper_method_validated_edo_type {
-    { $method_name:ident, $edoid:ident, $concrete_dr_type:path } => {
-        /// Convenience method to obtain a [`ElectionDataObjectId::$edoid:ident`].
-        pub fn $method_name(&self) -> EgResult<Rc<$concrete_dr_type>> {
-            let ridfmt = crate::resource::ElectionDataObjectId::$edoid.validated_type_ridfmt();
-            self.produce_resource_downcast_no_src::<$concrete_dr_type>(&ridfmt)
-            .map_err(Into::into)
-        }
-    };
-}
-
-impl Eg {
-    helper_method_validated_edo_type!(
-        fixed_parameters,
-        FixedParameters,
-        crate::fixed_parameters::FixedParameters
-    );
-    helper_method_validated_edo_type!(
-        varying_parameters,
-        VaryingParameters,
-        crate::varying_parameters::VaryingParameters
-    );
-    helper_method_validated_edo_type!(
-        election_parameters,
-        ElectionParameters,
-        crate::election_parameters::ElectionParameters
-    );
-    helper_method_validated_edo_type!(
-        election_manifest,
-        ElectionManifest,
-        crate::election_manifest::ElectionManifest
-    );
-    helper_method_validated_edo_type!(hashes, Hashes, crate::hashes::Hashes);
-    //? todo helper_method_validated_edo_type!(guardian_key_part, GuardianKeyPart(GuardianKeyId),
-
-    //? TODO #[cfg(any(feature = "eg-allow-test-data-generation", test))] GeneratedTestDataVoterSelections(crate::hash::HValue),
-
-    //? TODO   Ballot ?
-
-    /// Provides the guardian public keys for the specified purpose.
-    ///
-    /// If any key part fails to load, the entire function returns `Err`.
-    pub fn guardian_public_keys(
-        &self,
-        key_purpose: GuardianKeyPurpose,
-    ) -> EgResult<Vec1<Rc<GuardianPublicKey>>> {
-        let varying_parameters = self.varying_parameters()?;
-        let varying_parameters = varying_parameters.as_ref();
-
-        let n: GuardianIndex = varying_parameters.n();
-
-        let mut v1 = Vec1::with_capacity(n.into());
-        for guardian_ix in GuardianIndex::iter_range_inclusive(GuardianIndex::one(), n) {
-            let guardian_key_id = GuardianKeyId {
-                guardian_ix,
-                key_purpose,
-                asymmetric_key_part: AsymmetricKeyPart::Public,
-            };
-            let edoid = ElectionDataObjectId::GuardianKeyPart(guardian_key_id);
-            let ridfmt = edoid.validated_type_ridfmt();
-            let public_key = self
-                .produce_resource_downcast_no_src::<GuardianPublicKey>(&ridfmt)
-                .map_err(Into::<EgError>::into)?;
-            v1.try_push(public_key)?;
-        }
-
-        Ok(v1)
-    }
-
-    /// Convenience method to obtain the "joint vote encryption public key K".
-    pub fn joint_vote_encryption_public_key_k(&self) -> EgResult<Rc<JointPublicKey>> {
-        self.joint_public_key(
-            GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
         )
-    }
+        .or_current();
 
-    /// Convenience method to obtain the "joint ballot data encryption public key ̂K" (K hat).
-    pub fn joint_ballot_data_encryption_public_key_k_hat(&self) -> EgResult<Rc<JointPublicKey>> {
-        self.joint_public_key(GuardianKeyPurpose::Encrypt_Ballot_AdditionalFreeFormData)
-    }
-
-    /// Convenience method to obtain a [`JointPublicKey`] for the specified key purpose.
-    ///
-    /// Prefer to use [`joint_vote_encryption_public_key_k`] or [`joint_ballot_data_encryption_public_key_k_hat`]
-    /// where possible.
-    pub fn joint_public_key(
-        &self,
-        key_purpose: GuardianKeyPurpose,
-    ) -> EgResult<Rc<JointPublicKey>> {
-        if !key_purpose.forms_joint_public_key() {
-            return Err(EgError::NoJointPublicKeyForPurpose { key_purpose });
+        if let Some(self_) = self.opt_self() {
+            let rp_op = RpOp::new(
+                self_,
+                self.resources.clone(),
+                ridfmt,
+                opt_prod_budget,
+                Some(span),
+                None,
+            );
+            produce_resource_impl_(rp_op).boxed()
+        } else {
+            let e = ResourceProductionError::ResourceNoLongerNeeded { ridfmt };
+            error!("Eg lost all incoming references: {e}");
+            std::future::ready(Err(e)).boxed()
         }
-
-        let ridfmt = crate::resource::ElectionDataObjectId::JointPublicKey(key_purpose)
-            .validated_type_ridfmt();
-
-        Ok(self.produce_resource_downcast_no_src::<JointPublicKey>(&ridfmt)?)
-    }
-
-    helper_method_validated_edo_type!(
-        extended_base_hash,
-        ExtendedBaseHash,
-        crate::extended_base_hash::ExtendedBaseHash
-    );
-
-    helper_method_validated_edo_type!(
-        pre_voting_data,
-        PreVotingData,
-        crate::pre_voting_data::PreVotingData
-    );
-
-    /// Provides the guardian secret keys for the specified purpose.
-    /// (Only available with feature `eg-allow-test-data-generation` or `cfg(test)`, and even
-    /// then there is no guarantee this data will be accessible to the caller.)
-    ///
-    /// If any key part fails to load, the entire function returns `Err`.
-    #[cfg(any(feature = "eg-allow-test-data-generation", test))]
-    pub fn guardians_secret_keys(
-        &self,
-        key_purpose: GuardianKeyPurpose,
-    ) -> EgResult<Vec1<Rc<crate::guardian_secret_key::GuardianSecretKey>>> {
-        let varying_parameters = self.varying_parameters()?;
-        let varying_parameters = varying_parameters.as_ref();
-
-        let n: GuardianIndex = varying_parameters.n();
-
-        let mut v1 = Vec1::with_capacity(n.into());
-        for guardian_ix in GuardianIndex::iter_range_inclusive(GuardianIndex::one(), n) {
-            let guardian_key_id = GuardianKeyId {
-                guardian_ix,
-                key_purpose,
-                asymmetric_key_part: AsymmetricKeyPart::Secret,
-            };
-            let edoid = ElectionDataObjectId::GuardianKeyPart(guardian_key_id);
-            let ridfmt = edoid.validated_type_ridfmt();
-            let secret_key = self
-                .produce_resource_downcast_no_src::<crate::guardian_secret_key::GuardianSecretKey>(
-                    &ridfmt,
-                )
-                .map_err(Into::<EgError>::into)?;
-            v1.try_push(secret_key)?;
-        }
-
-        Ok(v1)
     }
 }
 
@@ -431,35 +229,21 @@ impl serde::Serialize for Eg {
         use serde::ser::{Error, SerializeMap};
 
         let mut map = serializer.serialize_map(Some(3))?;
-
         map.serialize_entry("config", &self.config)?;
-
-        let resource_cache_summary: BTreeMap<ResourceIdFormat, ResourceSource> = {
-            let resource_cache = self
-                .rsrc_cache
-                .try_borrow()
-                .map_err(|e| S::Error::custom(e.to_string()))?;
-
-            resource_cache
-                .iter()
-                .map(|(k, v)| {
-                    let rps: ResourceSource = v.1.clone();
-                    (k.clone(), rps)
-                })
-                .collect()
-        };
-        map.serialize_entry("resource_cache_summary", &resource_cache_summary)?;
-
+        map.serialize_entry("csrng", &self.csrng)?;
+        map.serialize_entry("resource_states", &self.resources)?;
         map.end()
     }
 }
+
+assert_impl_all!(Eg: Send, Sync);
 
 //=================================================================================================|
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use anyhow::{anyhow, bail, ensure, Context, Result};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use insta::assert_ron_snapshot;
 
     use super::*;
@@ -476,24 +260,14 @@ mod t {
             rpregistry: ResourceProducerRegistry(
               map: {
                 RPRegistryEntry_Key(
-                  name: "ElectionParametersInfo",
-                  category: DefaultProducer,
-                ): RPRegistryEntry_Value(
-                  rc_key: RPRegistryEntry_Key(
-                    name: "ElectionParametersInfo",
-                    category: DefaultProducer,
-                  ),
-                  opt_rc_rp: None,
-                ),
-                RPRegistryEntry_Key(
                   name: "ExampleData",
                   category: DefaultProducer,
                 ): RPRegistryEntry_Value(
-                  rc_key: RPRegistryEntry_Key(
+                  arc_key: RPRegistryEntry_Key(
                     name: "ExampleData",
                     category: DefaultProducer,
                   ),
-                  opt_rc_rp: Some(ResourceProducer_ExampleData(
+                  opt_arc_rp: Some(ResourceProducer_ExampleData(
                     n: 5,
                     k: 3,
                   )),
@@ -502,31 +276,29 @@ mod t {
                   name: "Specific",
                   category: DefaultProducer,
                 ): RPRegistryEntry_Value(
-                  rc_key: RPRegistryEntry_Key(
+                  arc_key: RPRegistryEntry_Key(
                     name: "Specific",
                     category: DefaultProducer,
                   ),
-                  opt_rc_rp: None,
+                  opt_arc_rp: None,
                 ),
                 RPRegistryEntry_Key(
                   name: "ValidateToEdo",
                   category: DefaultProducer,
                 ): RPRegistryEntry_Value(
-                  rc_key: RPRegistryEntry_Key(
+                  arc_key: RPRegistryEntry_Key(
                     name: "ValidateToEdo",
                     category: DefaultProducer,
                   ),
-                  opt_rc_rp: None,
+                  opt_arc_rp: None,
                 ),
               },
             ),
             opt_insecure_deterministic_seed_data: "65673A3A65673A3A743A3A7430",
           ),
-          "resource_cache_summary": {
-            ResourceIdFormat(
-              rid: Csrng,
-              fmt: ConcreteType,
-            ): Provided,
+          "csrng": "DeterministicCsrng",
+          "resource_states": {
+            "resource_states": {},
           },
         }
         "#);

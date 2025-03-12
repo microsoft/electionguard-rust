@@ -23,7 +23,6 @@ use std::{
     any::Any,
     borrow::Cow,
     //path::{Path, PathBuf},
-    rc::Rc,
     sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
@@ -37,7 +36,7 @@ use std::{
 //use either::Either;
 //use proc_macro2::{Ident,Literal,TokenStream};
 //use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-use rand::{distr::Uniform, Rng, RngCore};
+use rand::{Rng, RngCore, distr::Uniform};
 //use serde::{Deserialize, Serialize};
 use static_assertions::{assert_impl_all, assert_obj_safe};
 use tracing::{debug, debug_span, error, info, info_span, instrument, trace, trace_span, warn};
@@ -47,12 +46,7 @@ use crate::{
     eg::Eg,
     errors::{EgError, EgResult},
     //guardian_secret_key::GuardianIndex,
-    resource::{
-        Resource,
-        // Resource, ResourceId,
-        ResourceFormat,
-        ResourceIdFormat,
-    },
+    resource::{ProductionBudget, Resource, ResourceFormat, ResourceIdFormat},
 };
 pub use crate::{
     resource_producer_registry::{
@@ -63,6 +57,37 @@ pub use crate::{
 };
 
 //=================================================================================================|
+
+#[allow(unreachable_patterns)] //? TODO: Remove temp development code
+#[derive(
+    Clone,
+    Debug,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Deserialize,
+    serde::Serialize
+)]
+pub enum ValidReason {
+    /// The Resource is inherently valid, valid due to its method of construction, or all possible
+    /// values of the type are equally valid.
+    Inherent,
+
+    /// Produced by validating a [`ConcreteType`](ResourceFormat::ConcreteType)
+    /// into its corresponding [`ValidatedElectionDataObject`](ResourceFormat::ValidatedElectionDataObject).
+    ///
+    /// See the [`Validated::try_validate_from()`](crate::validatable::Validated::try_validate_from)
+    /// trait function.
+    #[display("ValidatedFrom({_0}, {_1})")]
+    ValidatedFrom(ResourceFormat, Box<ResourceSource>),
+
+    /// Produced by extracting information entirely from already [`ValidatedElectionDataObject`](ResourceFormat::ValidatedElectionDataObject)s.
+    #[display("ValidlyExtractedFrom({_0}, {_1})")]
+    ValidlyExtractedFrom(ResourceFormat, Box<ResourceSource>),
+}
 
 /// Describes the source used to [produce](ResourceProducer) a [`Resource`](Resource).
 #[allow(unreachable_patterns)] //? TODO: Remove temp development code
@@ -79,14 +104,19 @@ pub use crate::{
     serde::Serialize
 )]
 pub enum ResourceSource {
+    /// Provided via the [`Eg::provide_resource`] function.
     Provided,
-    Cache,
+
+    /// Obtained from cache.
+    #[display("Cache({_0})")]
+    Cache(Box<ResourceSource>),
 
     /// Produced directly as example data.
     #[cfg(any(feature = "eg-allow-test-data-generation", test))]
     #[display("ExampleData({_0})")]
     ExampleData(ResourceFormat),
 
+    /// Produced by deserializing an object from persisted bytes.
     Depersisted,
 
     /// Produced by constructing a new object from available information.
@@ -97,8 +127,19 @@ pub enum ResourceSource {
     #[display("SerializedFrom({_0})")]
     SerializedFrom(ResourceFormat, Box<ResourceSource>),
 
-    #[display("ValidatedFrom({_0}, {_1})")]
-    ValidatedFrom(ResourceFormat, Box<ResourceSource>),
+    /// Known `Valid`, reason given.
+    Valid(ValidReason),
+
+    /// Produced by UN-validating a [`ValidatedElectionDataObject`](ResourceFormat::ValidatedElectionDataObject)
+    /// back into its original unvalidated [`ConcreteType`](ResourceFormat::ConcreteType).
+    ///
+    /// See the [`Validated::un_validate()`](crate::validatable::Validated::un_validate)
+    /// trait function.
+    #[display("UnValidatedFrom({_0})")]
+    UnValidatedFrom(Box<ResourceSource>),
+
+    //? TODO This situation needs design thought.
+    TodoItsComplicated,
 }
 
 impl ResourceSource {
@@ -107,7 +148,7 @@ impl ResourceSource {
     }
 
     pub fn constructed_validatededo() -> Self {
-        Self::Constructed(ResourceFormat::ValidatedElectionDataObject)
+        Self::Constructed(ResourceFormat::ValidElectionDataObject)
     }
 
     pub fn exampledata_slicebytes() -> Self {
@@ -125,12 +166,58 @@ impl ResourceSource {
 
     pub fn validated_from(fmt: ResourceFormat, rsrc: ResourceSource) -> Self {
         let bx_rsrc = Box::new(rsrc);
-        Self::ValidatedFrom(fmt, bx_rsrc)
+        Self::Valid(ValidReason::ValidatedFrom(fmt, bx_rsrc))
+    }
+
+    pub fn validly_extracted_from(rsrc: ResourceSource) -> Self {
+        let bx_rsrc = Box::new(rsrc);
+        Self::Valid(ValidReason::ValidlyExtractedFrom(
+            ResourceFormat::ValidElectionDataObject,
+            bx_rsrc,
+        ))
+    }
+
+    pub fn un_validated_from(rsrc: ResourceSource) -> Self {
+        let bx_rsrc = Box::new(rsrc);
+        Self::UnValidatedFrom(bx_rsrc)
+    }
+
+    /// Returns `true` iff the [`ResourceSource`] is [`Cache`](ResourceSource::Cache).
+    pub fn is_cache(&self) -> bool {
+        matches!(self, &ResourceSource::Cache(_))
+    }
+
+    /// Returns `true` iff the [`ResourceSource`] derives from [`ExampleData`], though possibly indirectly.
+    pub fn derives_from_test_data(&self) -> bool {
+        #[cfg(any(feature = "eg-allow-test-data-generation", test))]
+        {
+            let mut src = self;
+            loop {
+                match src {
+                    ResourceSource::Cache(bx_src) => {
+                        src = bx_src.as_ref();
+                    }
+                    ResourceSource::ExampleData(_) => {
+                        return true;
+                    }
+                    ResourceSource::SerializedFrom(fmt, bx_src) => {
+                        src = bx_src.as_ref();
+                    }
+                    ResourceSource::Valid(ValidReason::ValidatedFrom(fmt, bx_src)) => {
+                        src = bx_src.as_ref();
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+            }
+        }
+        false
     }
 }
 
 impl Abbreviation for ResourceSource {
-    /// Returns an excessively short string hinting at the value useful only for logging.
+    /// Returns an excessively short string hinting at the value. Useful only for logging.
     fn abbreviation(&self) -> Cow<'static, str> {
         self.to_string().into()
     }
@@ -139,7 +226,7 @@ impl Abbreviation for ResourceSource {
 //=================================================================================================|
 
 /// [`Result::Err`](std::result::Result) type of a data resource production operation.
-#[derive(thiserror::Error, Debug, serde::Serialize)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[allow(non_camel_case_types)]
 pub enum ResourceProductionError {
     //#[error(transparent)]
@@ -147,10 +234,6 @@ pub enum ResourceProductionError {
     #[error("No way was found to produce the requested `{0}` as `{1}`.",
     ridfmt.rid, ridfmt.fmt)]
     NoProducerFound { ridfmt: ResourceIdFormat },
-
-    #[error(transparent)]
-    #[serde(serialize_with = "util::serde::serialize_bxstdioerror")]
-    StdIoError(#[from] Box<std::io::Error>),
 
     #[error("While attempting to load `{0}` as `{1}`, failed to produce a needed dependency: {dep_err}",
         ridfmt_request.rid, ridfmt_request.fmt)]
@@ -169,12 +252,18 @@ pub enum ResourceProductionError {
         chain: String,
     },
 
-    #[error("The data resource, `{0}` as `{1}`, was already stored from: {source_of_existing}.",
-        ridfmt.rid, ridfmt.fmt)]
+    #[error(
+        "The already-stored resource, `{ridfmt}` from `{stored_resource_source}`, is not being replaced with `{rpr_err:?}`."
+    )]
     ResourceAlreadyStored {
         ridfmt: ResourceIdFormat,
-        source_of_existing: ResourceSource,
+        stored_resource_source: ResourceSource,
+        rpr_err: Box<ResourceProductionError>,
     },
+
+    #[error("While attempting to load `{0}` as `{1}`, it became no longer needed.",
+        ridfmt.rid, ridfmt.fmt)]
+    ResourceNoLongerNeeded { ridfmt: ResourceIdFormat },
 
     #[error(
         "Expecting to be asked to produce `{ridfmt_expected:?}` but was asked for `{ridfmt_requested:?}` instead."
@@ -185,31 +274,47 @@ pub enum ResourceProductionError {
     },
 
     #[error(
+        "The format for the resource provided `{ridfmt_provided}` does not match the resource's belief about its format `{ridfmt_internal}`."
+    )]
+    UnexpectedResourceIdFormatProvided {
+        ridfmt_provided: ResourceIdFormat,
+        ridfmt_internal: ResourceIdFormat,
+    },
+
+    #[error(
         "The data resource provider for example data is already configured, but it has different values."
     )]
     ResourceProducerExampleDataMismatch,
 
-    #[error("Could not downcast data resource `{0}` of type `{src_type}` to type `{target_type}`.",
-        src_ridfmt.abbreviation())]
+    #[error("Could not downcast data resource `{0}` from `{src_resource_source}` of type `{src_type}` to type `{target_type}`. The expected source type (if known) was: {1}",
+        src_ridfmt.abbreviation(), opt_src_type_expected.clone().unwrap_or_else(|| "[Unknown]".to_string()))]
     CouldntDowncastResource {
         src_ridfmt: ResourceIdFormat,
+        src_resource_source: ResourceSource,
         src_type: String,
+        opt_src_type_expected: Option<String>,
         target_type: String,
     },
 
-    #[error("The request was for {requested}, but we got {obtained}.")]
-    UnexpectedRidFmt {
+    #[error("The request was for {requested}, but {produced} was produced unexpectedly.")]
+    UnexpectedResourceIdFormatProduced {
         requested: ResourceIdFormat,
-        obtained: ResourceIdFormat,
+        produced: ResourceIdFormat,
+    },
+
+    #[error(
+        "The request for {requested} was given a production budget of {production_budget} which proved insufficient."
+    )]
+    ProductionBudgetInsufficient {
+        requested: ResourceIdFormat,
+        production_budget: ProductionBudget,
     },
 
     #[error(transparent)]
     EgError(Box<EgError>),
-
-    #[error(transparent)]
-    #[serde(serialize_with = "util::serde::serialize_anyhowerror")]
-    OtherError(#[from] anyhow::Error),
 }
+
+assert_impl_all!(ResourceProductionError: Send, Sync);
 
 impl From<EgError> for ResourceProductionError {
     /// A [`ResourceProductionError`] can always be made from a [`EgError`].
@@ -224,11 +329,27 @@ impl From<EgError> for ResourceProductionError {
     }
 }
 
+impl From<anyhow::Error> for ResourceProductionError {
+    /// A [`ResourceProductionError`] can always be made from a [`anyhow::Error`].
+    #[inline]
+    fn from(src: anyhow::Error) -> Self {
+        EgError::from(src).into()
+    }
+}
+
+impl From<std::io::Error> for ResourceProductionError {
+    /// A [`ResourceProductionError`] can always be made from a [`std::io::Error`].
+    #[inline]
+    fn from(std_io_error: std::io::Error) -> Self {
+        EgError::from(std_io_error).into()
+    }
+}
+
 //=================================================================================================|
 
 /// [`Result::Ok`](std::result::Result) type resulting from a successful [`Resource`](Resource)
 /// production operation.
-pub type ResourceProductionOk = (Rc<dyn Resource>, ResourceSource);
+pub type ResourceProductionOk = (Arc<dyn Resource + 'static>, ResourceSource);
 
 /// [`Result`](std::result::Result) type of a [`Resource`](Resource) production operation.
 pub type ResourceProductionResult = Result<ResourceProductionOk, ResourceProductionError>;
@@ -239,7 +360,7 @@ pub type ResourceProductionResult = Result<ResourceProductionOk, ResourceProduct
 /// It may assume that a cache has been checked before attempting to produce the object.
 ///
 /// [`serde::Serialize`] is just needed in unit tests.
-pub trait ResourceProducer: Any + std::fmt::Debug + erased_serde::Serialize {
+pub trait ResourceProducer: Any + std::fmt::Debug + erased_serde::Serialize + Send + Sync {
     /// Human-readable name of the [`ResourceProducer`].
     fn name(&self) -> Cow<'static, str>;
 
@@ -270,18 +391,19 @@ pub trait ResourceProducer: Any + std::fmt::Debug + erased_serde::Serialize {
     ///
     /// The producer returns
     ///
-    /// - [`None`] if it does not produce this type of resource, or if it failed for fully
-    ///   expected reasons
-    /// - Some((rc, )) ifexpects to provide this resource returns the result of attempting to
-    ///   produce it, [`None`] otherwise.
+    /// - [`None`] - If the produces does not produce this type of resource, or if it
+    ///   failed for an unexceptional cause.
+    /// - Some(Ok(arc, resource_source)) If it produced the resource successfully.
+    /// - Some(Err(..)) - If the producer attempted to produce the resource and failed,
+    ///   or other error, such as it didn't think it was even registered for this resource id.
     ///
-    fn maybe_produce(&self, eg: &Eg, rp_op: &mut RpOp) -> Option<ResourceProductionResult>;
+    fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult>;
 }
 
-erased_serde::serialize_trait_object!(ResourceProducer);
-
 assert_obj_safe!(ResourceProducer);
-assert_impl_all!(dyn ResourceProducer: Any, std::fmt::Debug, serde::Serialize);
+assert_impl_all!(dyn ResourceProducer: Any, std::fmt::Debug, serde::Serialize, Send, Sync);
+
+erased_serde::serialize_trait_object!(ResourceProducer);
 
 //-------------------------------------------------------------------------------------------------|
 
@@ -291,18 +413,18 @@ assert_impl_all!(dyn ResourceProducer: Any, std::fmt::Debug, serde::Serialize);
 /// = help: consider creating a new trait with all of these as supertraits and using that trait
 /// here instead: `trait NewTrait: resource_producer::ResourceProducer + Serialize {}`
 pub trait ResourceProducer_Any_Debug_Serialize:
-    ResourceProducer + Any + std::fmt::Debug + erased_serde::Serialize
+    ResourceProducer + Any + std::fmt::Debug + erased_serde::Serialize + Send + Sync
 {
 }
 
-erased_serde::serialize_trait_object!(ResourceProducer_Any_Debug_Serialize);
-
 assert_obj_safe!(ResourceProducer_Any_Debug_Serialize);
 assert_impl_all!(dyn ResourceProducer_Any_Debug_Serialize:
-    ResourceProducer, Any, std::fmt::Debug, serde::Serialize);
+    ResourceProducer, Any, std::fmt::Debug, serde::Serialize, Send, Sync);
+
+erased_serde::serialize_trait_object!(ResourceProducer_Any_Debug_Serialize);
 
 impl<T> ResourceProducer_Any_Debug_Serialize for T where
-    T: ResourceProducer + Any + std::fmt::Debug + erased_serde::Serialize
+    T: ResourceProducer + Any + std::fmt::Debug + erased_serde::Serialize + Send + Sync
 {
 }
 

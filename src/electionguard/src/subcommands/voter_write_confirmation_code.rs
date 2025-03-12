@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use crate::{subcommand_helper::SubcommandHelper, Subcommand};
+use crate::{Subcommand, subcommand_helper::SubcommandHelper};
 use anyhow::Result;
 use clap::Args;
 // use voter::ballot::VoterConfirmationQRCode;

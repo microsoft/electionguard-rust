@@ -8,6 +8,7 @@
 #![allow(clippy::assertions_on_constants)]
 #![allow(clippy::empty_line_after_doc_comments)] //? TODO: Remove temp development code
 #![allow(clippy::needless_lifetimes)] //? TODO: Remove temp development code
+#![allow(clippy::absurd_extreme_comparisons)] //? TODO: Remove temp development code
 #![allow(dead_code)] //? TODO: Remove temp development code
 #![allow(unused_assignments)] //? TODO: Remove temp development code
 #![allow(unused_braces)] //? TODO: Remove temp development code
@@ -20,8 +21,25 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
+#[rustfmt::skip] //? TODO: Remove temp development code
+use std::{
+    borrow::Cow,
+    //cell::RefCell,
+    //collections::{BTreeSet, BTreeMap},
+    //collections::{HashSet, HashMap},
+    //io::{BufRead, Cursor},
+    //iter::zip,
+    hash::{BuildHasher, Hash, Hasher},
+    //marker::PhantomData,
+    //path::{Path, PathBuf},
+    //sync::Arc,
+    //str::FromStr,
+    //sync::OnceLock,
+};
+
 //use anyhow::{anyhow, bail, ensure, Context, Result};
 //use either::Either;
+use hashbrown::HashMap;
 use indoc::indoc;
 //use rand::{distr::Uniform, Rng, RngCore};
 //use serde::{Deserialize, Serialize};
@@ -30,67 +48,134 @@ use indoc::indoc;
 //use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
+    Domain, DynFnRefSymbolToCowstr, Rule, RuleCost, RuleCostSum,
     error::{Error, Result},
-    imp::{
-        rule::Rule,
-        sym::Sym,
-        sym_set::SymSet,
-    },
+    imp::{BuildHasher_Sym, BuildHasher_Symbol, MAX_SYMREPR, SymRepr, SymSetRepr, reserve_addl},
 };
 
 //=================================================================================================|
 
-#[derive(Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
-pub struct Problem {
-    pub starting_set: SymSet,
-    pub finishing_set: SymSet,
-    pub rules: Vec<Rule>,
+#[derive(Clone)]
+pub struct Problem<'d, Symbol>
+where
+    Symbol: Eq + Hash + Ord,
+{
+    pub(crate) domain: &'d Domain<Symbol>,
+
+    pub(crate) starting_set: HashMap<Symbol, (), BuildHasher_Symbol>,
+    pub(crate) finishing_set: HashMap<Symbol, (), BuildHasher_Symbol>,
+
+    pub(crate) rules: Vec<Rule<'d, Symbol>>,
 }
 
-impl Problem {
-    /*
-    pub fn successors(&self, ss_from: SymSet) -> impl Iterator<Item = (SymSet, i64)> + use<> {
-        let ss_from2 = &ss_from;
-        let mut filter_map_rule = &mut move |rule: &Rule| {
-            let ss_from3 = ss_from2;
-            let ss_rule_requires_and_ss_from = rule.requires.clone() & ss_from3;
-            (&rule.requires == &ss_rule_requires_and_ss_from)
-                .then(|| (ss_from.clone() | &rule.produces, rule.cost))
-        };
-        self.rules.iter().filter_map(filter_map_rule)
+impl<'d, Symbol> Problem<'d, Symbol>
+where
+    Symbol: Eq + Hash + Clone + Ord,
+{
+    pub fn new<SS_II, SS_II_Symbol, FS_II, FS_II_Symbol>(
+        domain: &'d Domain<Symbol>,
+        starting_set_iter: SS_II,
+        finishing_set_iter: FS_II,
+    ) -> Self
+    where
+        SS_II: IntoIterator<Item = SS_II_Symbol>,
+        SS_II_Symbol: std::borrow::Borrow<Symbol>,
+        FS_II: IntoIterator<Item = FS_II_Symbol>,
+        FS_II_Symbol: std::borrow::Borrow<Symbol>,
+    {
+        let build_hasher_symbol = domain.build_hasher_symbol().clone();
+
+        let mut starting_set = HashMap::with_hasher(build_hasher_symbol.clone());
+        for s in starting_set_iter {
+            starting_set.insert(s.borrow().clone(), ());
+        }
+
+        let mut finishing_set = HashMap::with_hasher(build_hasher_symbol);
+        for s in finishing_set_iter {
+            finishing_set.insert(s.borrow().clone(), ());
+        }
+
+        Self {
+            domain,
+            starting_set,
+            finishing_set,
+            rules: Vec::new(),
+        }
     }
-    // */
 }
 
-impl std::fmt::Debug for Problem {
+impl<'d, Symbol> Problem<'d, Symbol>
+where
+    Symbol: Eq + Hash + Ord,
+{
+    /// Returns access to the [`Domain`].
+    pub(crate) fn domain(&self) -> &'d Domain<Symbol> {
+        self.domain
+    }
+
+    /// Adds a new rule to the Domain. Also adds all Symbols mentioned by the rule.
+    ///
+    /// Returns the index of the new rule.
+    pub fn add_rule(&mut self, mut rule: Rule<'d, Symbol>) -> Result<usize> {
+        let rule_ix = self.rules.len();
+
+        //? TODO If another rule which is at least as powerful with no less cost
+        // does not exist already, return the existing rule?
+
+        if rule_ix >= crate::RULES_CNT_MAX {
+            return Err(Error::RuleSetFull {
+                current_number: self.rules.len(),
+            });
+        }
+
+        rule.ix = rule_ix;
+        self.rules.push(rule);
+
+        Ok(rule_ix)
+    }
+}
+
+impl<'d, Symbol> std::fmt::Debug for Problem<'d, Symbol>
+where
+    Symbol: Eq + Hash + Ord + std::fmt::Debug,
+{
     /// Format the value suitable for debugging output.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             indoc! {"
             Problem {{
-                starting_set: {},
-                finishing_set: {},
+                starting_set: {:?},
+                finishing_set: {:?},
                 rules: [
         "},
             self.starting_set, self.finishing_set
         )?;
+
         for (ix, r) in self.rules.iter().enumerate() {
-            writeln!(f, "        {ix:4}: {r}")?;
+            writeln!(f, "        {ix:4}: {r:?}")?;
         }
-        write!(f, indoc! {"
+
+        write!(
+            f,
+            indoc! {"
                 ],
-            }}"})
+            }}"}
+        )
     }
 }
 
-impl std::fmt::Display for Problem {
+impl<'d, Symbol> std::fmt::Display for Problem<'d, Symbol>
+where
+    Symbol: Eq + Hash + Ord + std::fmt::Debug,
+{
     /// Format the value suitable for user-facing output.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self, f)
     }
 }
 
+/*
 impl arbitrary::Arbitrary<'_> for Problem {
     fn arbitrary(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Self> {
         let mut starting_set: SymSet = u.arbitrary()?;
@@ -150,6 +235,7 @@ impl proptest::arbitrary::Arbitrary for Problem {
         proptest_arbitrary_interop::arb()
     }
 }
+// */
 
 //=================================================================================================|
 
@@ -162,6 +248,7 @@ mod t {
 
     use super::*;
 
+    /*
     // [`Problem`] tests
     proptest! {
         #[test]
@@ -169,4 +256,5 @@ mod t {
             //prop_assert!();
         }
     }
+    // */
 }

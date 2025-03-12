@@ -4,13 +4,18 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, path::Path, sync::Arc};
 
-use anyhow::{bail, ensure, Context, Result};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use anyhow::{Context, Result, bail, ensure};
 
-use util::csprng::{Csprng, CsprngBuilder, get_osrng_data_for_seeding};
+use eg::eg::Eg;
+use util::{
+    csprng::{Csprng, CsprngBuilder},
+    osrng::get_osrng_data_for_seeding,
+};
+use zeroize::Zeroizing;
 
 use crate::{
     artifacts_dir::{ArtifactFile, ArtifactsDir},
@@ -28,6 +33,8 @@ pub(crate) struct SubcommandHelper {
     pub artifacts_dir: ArtifactsDir,
 
     opt_insecure_deterministic_seed_data: Option<Vec<u8>>,
+
+    opt_eg: Option<Arc<Eg>>,
 }
 
 impl SubcommandHelper {
@@ -36,70 +43,75 @@ impl SubcommandHelper {
             clargs,
             artifacts_dir,
             opt_insecure_deterministic_seed_data: None,
+            opt_eg: None,
         })
     }
 
-    /// Returns a [`builder`](util::csprng::CsprngBuilder) for a new
-    /// pre-loaded from the OS entropy source (or the insecure deterministic pseudorandom seed data file),
-    /// to be further customized or seeded.
-    ///
+    /// Gets the [`Eg`] instance.
     /// In insecure deterministic mode, if called multiple times with the same customization_data,
     /// the same initialized csprng will be returned.
-    // TODO: this was migrated to `eg::eg_config`. Unify.
-    pub fn build_csprng(&mut self) -> Result<CsprngBuilder> {
-        let insecure_deterministic_pseudorandom_seed_data_file_path = self
-            .artifacts_dir
-            .path(ArtifactFile::InsecureDeterministicPseudorandomSeedData);
-
-        let insecure_deterministic_pseudorandom_seed_data_file_exists =
-            insecure_deterministic_pseudorandom_seed_data_file_path
-                .try_exists()
-                .unwrap_or_default();
-
-        // Values are arbitrary, chosen by `dd if=/dev/urandom | xxd -p -l8`.
-        #[derive(Clone, Copy)]
-        #[repr(u32)]
-        enum SeedMethod {
-            InsecureDeterministic = 0x4813b968,
-            TrueRandom = 0x32964bac,
-        }
-
-        let csprng_builder = if self.clargs.insecure_deterministic {
-            let insecure_deterministic_pseudorandom_seed_data = self
-                .get_insecure_deterministic_pseudorandom_seed_data(
-                    &insecure_deterministic_pseudorandom_seed_data_file_path,
-                )?;
-
-            Csprng::build()
-                .write_u64(SeedMethod::InsecureDeterministic as u64)
-                .write_bytes(insecure_deterministic_pseudorandom_seed_data)
+    pub fn get_eg(&mut self, subcommand_str: &str) -> Result<Arc<Eg>> {
+        let arc_eg = if let Some(arc_eg) = self.opt_eg.as_ref() {
+            arc_eg.clone()
         } else {
-            if insecure_deterministic_pseudorandom_seed_data_file_exists {
-                eprintln!(
-                    "WARNING: The --insecure-deterministic command line argument was not specified, but the insecure deterministc pseudorandom seed datafile exists: {}",
-                    insecure_deterministic_pseudorandom_seed_data_file_path.display() );
-            }
+            let insecure_deterministic_pseudorandom_seed_data_file_path = self
+                .artifacts_dir
+                .path(ArtifactFile::InsecureDeterministicPseudorandomSeedData)?;
 
-            let mut true_random_seed_data = Zeroizing::new([0u8; Csprng::max_entropy_seed_bytes()]);
-            get_osrng_data_for_seeding(&mut true_random_seed_data);
-            ensure!(
-                eg::hash::HVALUE_BYTE_LEN <= true_random_seed_data.len(),
-                "Not enough OS-provided true random data."
-            );
+            let insecure_deterministic_pseudorandom_seed_data_file_exists =
+                insecure_deterministic_pseudorandom_seed_data_file_path
+                    .try_exists()
+                    .unwrap_or_default();
 
-            eprintln!(
-                "Seeding CSPRNG with {} bytes of OS-provided true random data.",
-                true_random_seed_data.len()
-            );
+            let eg = if self.clargs.insecure_deterministic {
+                if !cfg!(feature = "eg-allow-insecure-deterministic-csprng") {
+                    anyhow::bail!(
+                        "The --insecure-deterministic arg requires building with the {:?} feature.",
+                        "eg-allow-insecure-deterministic-csprng"
+                    );
+                } else {
+                    let subcommand_str_bytes = subcommand_str.as_bytes();
+                    let subcommand_str_bytes_len = subcommand_str_bytes.len() as u64;
 
-            Csprng::build()
-                .write_u64(SeedMethod::TrueRandom as u64)
-                .write_bytes(true_random_seed_data)
+                    let seed_data_from_file = self
+                        .get_insecure_deterministic_pseudorandom_seed_data(
+                            &insecure_deterministic_pseudorandom_seed_data_file_path,
+                        )?;
+                    let seed_data_from_file_len = seed_data_from_file.len() as u64;
+
+                    let capacity = 8
+                        + (seed_data_from_file_len as usize)
+                        + 8
+                        + (subcommand_str_bytes_len as usize);
+                    let seed_data_len_be_bytes = seed_data_from_file_len.to_be_bytes();
+                    let mut seed_data = Vec::with_capacity(capacity);
+                    seed_data.extend_from_slice(&seed_data_len_be_bytes);
+                    seed_data.extend_from_slice(seed_data_from_file);
+                    seed_data.extend_from_slice(&subcommand_str_bytes_len.to_be_bytes());
+                    seed_data.extend_from_slice(subcommand_str_bytes);
+                    debug_assert_eq!(seed_data.len(), capacity);
+
+                    Eg::new_with_insecure_deterministic_csprng_seed_data(&seed_data)
+                }
+            } else {
+                if insecure_deterministic_pseudorandom_seed_data_file_exists {
+                    eprintln!(
+                        "WARNING: The --insecure-deterministic command line argument was not specified, but the insecure deterministc pseudorandom seed datafile exists: {}",
+                        insecure_deterministic_pseudorandom_seed_data_file_path.display()
+                    );
+                }
+
+                Eg::new()
+            };
+
+            self.opt_eg = Some(eg.clone());
+            eg
         };
 
-        Ok(csprng_builder)
+        Ok(arc_eg)
     }
 
+    #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
     fn get_insecure_deterministic_pseudorandom_seed_data<P: AsRef<Path>>(
         &mut self,
         insecure_deterministic_pseudorandom_seed_data_file_path: P,
@@ -129,12 +141,14 @@ impl SubcommandHelper {
                     .read_to_end(&mut v)?;
 
                 if v.is_empty() {
-                    bail!("No insecure deterministic pseudorandom seed data could be read from: {path_str}");
+                    anyhow::bail!(
+                        "No insecure deterministic pseudorandom seed data could be read from: {path_str}"
+                    );
                 } else {
                     eprintln!(
-                    "Read {} bytes of insecure deterministic pseudorandom seed data from: {path_str}",
-                    v.len()
-                );
+                        "Read {} bytes of insecure deterministic pseudorandom seed data from: {path_str}",
+                        v.len()
+                    );
                 }
 
                 refmut_opt_insecure_deterministic_seed_data.insert(v)

@@ -15,7 +15,7 @@ use crate::{
     contest_data_fields_plaintexts::ContestDataFieldIndex,
     eg::Eg,
     election_manifest::ContestIndex,
-    hash::{eg_h, eg_h_q, HValue},
+    hash::{HValue, eg_h, eg_h_q},
     pre_voting_data::PreVotingData,
 };
 

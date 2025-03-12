@@ -7,14 +7,13 @@
 #![allow(clippy::assertions_on_constants)]
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
-use std::{any, rc::Rc};
+use std::{any, fmt::Debug, sync::Arc};
 
 use anyhow::{anyhow, bail};
 use either::Either;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    eg::Eg,
     election_manifest::{ElectionManifest, ElectionManifestInfo},
     election_parameters::{ElectionParameters, ElectionParametersInfo},
     errors::{EgError, EgResult},
@@ -22,6 +21,13 @@ use crate::{
     guardian::GuardianKeyPurpose,
     hashes::Hashes,
     joint_public_key::JointPublicKey,
+    resource::{
+        ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+    },
+    resource_id::ElectionDataObjectId as EdoId,
+    resource_producer::{ResourceProductionResult, ResourceSource, RpOp},
+    resource_producer_registry::RPFnRegistration,
+    resourceproducer_specific::GatherRPFnRegistrationsFnWrapper,
     serializable::SerializableCanonical,
     validatable::Validated,
 };
@@ -30,22 +36,51 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct PreVotingDataInfo {
     /// Baseline election and cryptographic parameters.
-    pub election_parameters: Either<Rc<ElectionParametersInfo>, Rc<ElectionParameters>>,
+    pub election_parameters: Either<Arc<ElectionParametersInfo>, Arc<ElectionParameters>>,
 
     /// The election manifest.
-    pub election_manifest: Either<Rc<ElectionManifestInfo>, Rc<ElectionManifest>>,
+    pub election_manifest: Either<Arc<ElectionManifestInfo>, Arc<ElectionManifest>>,
 
     /// Hashes H_P, H_M, H_B.
-    pub hashes: Rc<Hashes>,
+    pub hashes: Arc<Hashes>,
 
     /// "The joint vote encryption public key K"
-    pub jvepk_k: Rc<JointPublicKey>,
+    pub jvepk_k: Arc<JointPublicKey>,
 
     /// "The joint ballot data encryption public key ̂K" (K hat)
-    pub jbdepk_k_hat: Rc<JointPublicKey>,
+    pub jbdepk_k_hat: Arc<JointPublicKey>,
 
     /// Hash H_E.
     pub h_e: ExtendedBaseHash_H_E,
+}
+
+impl PreVotingDataInfo {
+    /// Computes the [`PreVotingDataInfo`] from gathered info.
+    pub async fn compute(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<PreVotingDataInfo> {
+        let election_parameters = produce_resource.election_parameters().await?;
+        let election_manifest = produce_resource.election_manifest().await?;
+        let hashes = produce_resource.hashes().await?;
+        let jvepk_k = produce_resource
+            .joint_vote_encryption_public_key_k()
+            .await?;
+        let jbdepk_k_hat = produce_resource
+            .joint_ballot_data_encryption_public_key_k_hat()
+            .await?;
+        let h_e = produce_resource.extended_base_hash().await?.h_e().clone();
+
+        let pre_voting_data_info = PreVotingDataInfo {
+            election_parameters: Either::Right(election_parameters),
+            election_manifest: Either::Right(election_manifest),
+            hashes,
+            jvepk_k,
+            jbdepk_k_hat,
+            h_e,
+        };
+
+        Ok(pre_voting_data_info)
+    }
 }
 
 impl<'de> Deserialize<'de> for PreVotingDataInfo {
@@ -53,9 +88,9 @@ impl<'de> Deserialize<'de> for PreVotingDataInfo {
     where
         D: serde::Deserializer<'de>,
     {
+        use Either::*;
         use serde::de::{Error, MapAccess, Visitor};
         use strum::{IntoStaticStr, VariantNames};
-        use Either::*;
 
         #[derive(Deserialize, IntoStaticStr, VariantNames)]
         #[serde(field_identifier)]
@@ -115,8 +150,8 @@ impl<'de> Deserialize<'de> for PreVotingDataInfo {
                 };
 
                 Ok(PreVotingDataInfo {
-                    election_parameters: Left(Rc::new(election_parameters_info)),
-                    election_manifest: Left(Rc::new(election_manifest_info)),
+                    election_parameters: Left(Arc::new(election_parameters_info)),
+                    election_manifest: Left(Arc::new(election_manifest_info)),
                     hashes,
                     jvepk_k,
                     jbdepk_k_hat,
@@ -136,7 +171,7 @@ crate::impl_knows_friendly_type_name! { PreVotingDataInfo }
 crate::impl_MayBeResource_for_non_Resource! { PreVotingDataInfo } //? TODO impl Resource
 
 crate::impl_validatable_validated! {
-    src: PreVotingDataInfo, eg => EgResult<PreVotingData> {
+    src: PreVotingDataInfo, produce_resource => EgResult<PreVotingData> {
         use Either::*;
 
         let PreVotingDataInfo {
@@ -152,8 +187,8 @@ crate::impl_validatable_validated! {
 
         let election_parameters = match election_parameters {
             Left(election_parameters_info) => {
-                let election_parameters = ElectionParameters::try_validate_from_rc(election_parameters_info, eg)?;
-                Rc::new(election_parameters)
+                let election_parameters = ElectionParameters::try_validate_from_arc(election_parameters_info, produce_resource)?;
+                Arc::new(election_parameters)
             }
             Right(election_parameters) => election_parameters,
         };
@@ -162,10 +197,10 @@ crate::impl_validatable_validated! {
 
         let election_manifest = match election_manifest {
             Left(election_manifest_info) => {
-                let election_manifest = ElectionManifest::try_validate_from_rc(election_manifest_info, eg)?;
-                Rc::new(election_manifest)
+                let election_manifest = ElectionManifest::try_validate_from_arc(election_manifest_info, produce_resource)?;
+                Arc::new(election_manifest)
             }
-            Right(rc_election_manifest) => rc_election_manifest,
+            Right(arc_election_manifest) => arc_election_manifest,
         };
 
         //----- Validate `hashes`.
@@ -221,16 +256,16 @@ impl From<PreVotingData> for PreVotingDataInfo {
 #[derive(Debug, Clone, Serialize)]
 pub struct PreVotingData {
     #[serde(rename = "election_parameters")]
-    election_parameters: Rc<ElectionParameters>,
+    election_parameters: Arc<ElectionParameters>,
 
     #[serde(rename = "election_manifest")]
-    election_manifest: Rc<ElectionManifest>,
+    election_manifest: Arc<ElectionManifest>,
 
-    hashes: Rc<Hashes>,
+    hashes: Arc<Hashes>,
 
-    jvepk_k: Rc<JointPublicKey>,
+    jvepk_k: Arc<JointPublicKey>,
 
-    jbdepk_k_hat: Rc<JointPublicKey>,
+    jbdepk_k_hat: Arc<JointPublicKey>,
 
     h_e: ExtendedBaseHash_H_E,
 }
@@ -265,26 +300,56 @@ impl PreVotingData {
     }
 
     /// Computes the [`PreVotingData`].
-    pub fn compute(eg: &Eg) -> EgResult<PreVotingData> {
-        let election_parameters = eg.election_parameters()?;
-        let election_manifest = eg.election_manifest()?;
-        let hashes = eg.hashes()?;
-        let jvepk_k = eg.joint_vote_encryption_public_key_k()?;
-        let jbdepk_k_hat = eg.joint_ballot_data_encryption_public_key_k_hat()?;
-        let h_e = eg.extended_base_hash()?.h_e().clone();
-
-        let pre_voting_data_info = PreVotingDataInfo {
-            election_parameters: Either::Right(election_parameters),
-            election_manifest: Either::Right(election_manifest),
-            hashes,
-            jvepk_k,
-            jbdepk_k_hat,
-            h_e,
-        };
+    pub async fn compute(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<PreVotingData> {
+        let pre_voting_data_info = PreVotingDataInfo::compute(produce_resource).await?;
 
         // This validation is expected to succeed, because PreVotingData is really just a collection.
-        PreVotingData::try_validate_from(pre_voting_data_info, eg)
+        PreVotingData::try_validate_from(pre_voting_data_info, produce_resource)
     }
 }
 
 impl SerializableCanonical for PreVotingData {}
+
+//=================================================================================================|
+
+#[allow(non_upper_case_globals)]
+const RID_PreVotingData: ResourceId = ResourceId::ElectionDataObject(EdoId::PreVotingData);
+
+#[allow(non_upper_case_globals)]
+const RIDFMT_PreVotingData_ValidatedEdo: ResourceIdFormat = ResourceIdFormat {
+    rid: RID_PreVotingData,
+    fmt: ResourceFormat::ValidElectionDataObject,
+};
+
+#[allow(non_snake_case)]
+fn maybe_produce_PreVotingData_ValidatedEdo(rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
+    Some(produce_PreVotingData_ValidatedEdo(rp_op))
+}
+
+#[allow(non_snake_case)]
+fn produce_PreVotingData_ValidatedEdo(rp_op: &Arc<RpOp>) -> ResourceProductionResult {
+    rp_op.check_ridfmt(&RIDFMT_PreVotingData_ValidatedEdo)?;
+
+    let pre_voting_data = async_global_executor::block_on(PreVotingData::compute(rp_op.as_ref()))?;
+
+    //? TODO 'depersisted' is not true
+    let rpsrc = ResourceSource::validly_extracted_from(ResourceSource::TodoItsComplicated);
+    Ok((Arc::new(pre_voting_data), rpsrc))
+}
+
+//=================================================================================================|
+
+fn gather_rpspecific_registrations(register_fn: &mut dyn FnMut(RPFnRegistration)) {
+    register_fn(RPFnRegistration::new_defaultproducer(
+        RIDFMT_PreVotingData_ValidatedEdo,
+        Box::new(maybe_produce_PreVotingData_ValidatedEdo),
+    ));
+}
+
+inventory::submit! {
+    GatherRPFnRegistrationsFnWrapper(gather_rpspecific_registrations)
+}
+
+//=================================================================================================|

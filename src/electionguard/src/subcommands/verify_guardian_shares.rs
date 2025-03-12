@@ -44,7 +44,7 @@ impl Subcommand for VerifyGuardianShares {
         // // use eg::guardian::Guardian;
 
         // if self.example_manifest && self.election_manifest().is_some() {
-        //     bail!("Specify either --example-manifest or --manifest, but not both.");
+        //     anyhow::bail!("Specify either --example-manifest or --manifest, but not both.");
         // }
 
         // let election_parameters: ElectionParameters;

@@ -4,15 +4,18 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use eg::{
-    election_parameters::ElectionParameters, guardian::GuardianIndex,
-    serializable::SerializablePretty, standard_parameters::STANDARD_PARAMETERS,
-    eg::Eg, varying_parameters::VaryingParameters,
+    eg::Eg,
+    election_parameters::ElectionParameters,
+    guardian::GuardianIndex,
+    serializable::SerializablePretty, // standard_parameters::STANDARD_PARAMETERS,
+    varying_parameters::VaryingParameters,
 };
 
 use crate::{
@@ -68,16 +71,11 @@ pub(crate) struct WriteParameters {
 
 impl Subcommand for WriteParameters {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut eg = {
-            let csprng = subcommand_helper
-                .build_csprng()?
-                .write_str("WriteParameters")
-                .finish();
-            Eg::from_csprng(csprng)
-        };
-        #[expect(unused_variables)]
-        let eg = &mut eg;
+        let eg = subcommand_helper.get_eg("WriteParameters")?;
+        let _eg = eg.as_ref();
+        anyhow::bail!("TODO: finish implementing WriteParameters");
 
+        /*
         // eprint!("Initializing standard parameters...");
         let fixed_parameters = STANDARD_PARAMETERS.clone();
         // eprintln!("Done.");
@@ -109,5 +107,6 @@ impl Subcommand for WriteParameters {
         eprintln!("Wrote election parameters to: {}", path.display());
 
         Ok(())
+        // */
     }
 }

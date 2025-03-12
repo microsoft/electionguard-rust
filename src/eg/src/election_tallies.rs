@@ -26,6 +26,7 @@ use crate::{
     election_manifest::{self, ElectionManifest},
     errors::EgResult,
     pre_voting_data,
+    resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
 };
 
@@ -105,9 +106,9 @@ crate::impl_Resource_for_simple_ElectionDataObjectId_info_type! { ElectionTallie
 impl SerializableCanonical for ElectionTalliesInfo {}
 
 crate::impl_validatable_validated! {
-    src: ElectionTalliesInfo, eg => EgResult<ElectionTallies> {
-        let election_parameters = eg.election_parameters()?.as_ref();
-        let pre_voting_data = eg.pre_voting_data()?;
+    src: ElectionTalliesInfo, produce_resource => EgResult<ElectionTallies> {
+        let election_parameters = produce_resource.election_parameters().await?.as_ref();
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
         let election_manifest = pre_voting_data.election_manifest();
 
         let ElectionTalliesInfo {
@@ -168,35 +169,34 @@ impl SerializableCanonical for ElectionTallies {}
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use anyhow::{anyhow, bail, ensure, Context};
+    use anyhow::{Context, anyhow, bail, ensure};
     use maybe_owned::MaybeOwned;
+
     use util::{csrng::Csrng, vec1::Vec1};
 
-    use super::{ElectionTallies, ElectionTalliesInfo};
-    //?use insta::assert_ron_snapshot;
     use crate::{
         contest_data_fields_ciphertexts,
         eg::Eg,
         election_manifest,
         errors::{EgResult, EgValidateError},
         guardian_secret_key::GuardianSecretKey,
-        pre_voting_data::PreVotingData,
+        resource::{ProduceResource, ProduceResourceExt},
         validatable::Validated,
     };
 
-    fn example_election_tallies_info(eg: &Eg) -> EgResult<ElectionTalliesInfo> {
-        //let MaybeOwned::Owned(pre_voting_data) = eg.pre_voting_data_take()? else {
-        //    return Err(anyhow!("Expecting owned").into());
-        //};
-        //let election_manifest = pre_voting_data.election_manifest();
+    use super::{ElectionTallies, ElectionTalliesInfo};
+
+    async fn example_election_tallies_info(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<ElectionTalliesInfo> {
         let mut election_tallies_info = {
-            let election_manifest = eg.election_manifest()?;
+            let election_manifest = produce_resource.election_manifest().await?;
             let election_manifest = election_manifest.as_ref();
             ElectionTalliesInfo::new_with_all_contests_zeroed(election_manifest)?
         };
 
         {
-            let csrng = eg.csrng();
+            let csrng = produce_resource.csrng();
 
             for contest_tallies in election_tallies_info.contests.iter_mut() {
                 for contest_data_field_tally in contest_tallies.iter_mut() {
@@ -210,24 +210,25 @@ mod t {
         Ok(election_tallies_info)
     }
 
-    fn example_election_tallies(eg: &Eg) -> EgResult<ElectionTallies> {
-        let election_tallies_info = example_election_tallies_info(eg)?;
+    async fn example_election_tallies(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<ElectionTallies> {
+        let election_tallies_info = example_election_tallies_info(produce_resource).await?;
 
-        ElectionTallies::try_validate_from(election_tallies_info, eg)
+        ElectionTallies::try_validate_from_async(produce_resource, election_tallies_info).await
     }
 
     #[test]
-    fn t0() {
-        //?assert!();
-        //?assert_eq!();
-        //?assert_ron_snapshot!(, @"");
+    fn t1() {
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::election_tallies::t::t1",
+            );
+            let eg = eg.as_ref();
 
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::election_tallies::t::t0",
-        );
+            let election_tallies = example_election_tallies(eg).await.unwrap();
 
-        let election_tallies = example_election_tallies(eg).unwrap();
-
-        assert!(false); //? TODO
+            assert!(false); //? TODO
+        });
     }
 }

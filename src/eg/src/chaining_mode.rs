@@ -6,35 +6,24 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
-#![allow(clippy::empty_line_after_doc_comments)] //? TODO: Remove temp development code
-#![allow(dead_code)] //? TODO: Remove temp development code
-#![allow(unused_assignments)] //? TODO: Remove temp development code
-#![allow(unused_braces)] //? TODO: Remove temp development code
-#![allow(unused_imports)] //? TODO: Remove temp development code
-#![allow(unused_mut)] //? TODO: Remove temp development code
-#![allow(unused_variables)] //? TODO: Remove temp development code
-#![allow(unreachable_code)] //? TODO: Remove temp development code
-#![allow(non_camel_case_types)] //? TODO: Remove temp development code
-#![allow(non_snake_case)] //? TODO: Remove temp development code
-#![allow(non_upper_case_globals)] //? TODO: Remove temp development code
-#![allow(noop_method_call)] //? TODO: Remove temp development code
+//#![allow(clippy::empty_line_after_doc_comments)] //? TODO: Remove temp development code
+//#![allow(dead_code)] //? TODO: Remove temp development code
+//#![allow(unused_assignments)] //? TODO: Remove temp development code
+//#![allow(unused_braces)] //? TODO: Remove temp development code
+//#![allow(unused_imports)] //? TODO: Remove temp development code
+//#![allow(unused_mut)] //? TODO: Remove temp development code
+//#![allow(unused_variables)] //? TODO: Remove temp development code
+//#![allow(unreachable_code)] //? TODO: Remove temp development code
+//#![allow(non_camel_case_types)] //? TODO: Remove temp development code
+//#![allow(non_snake_case)] //? TODO: Remove temp development code
+//#![allow(non_upper_case_globals)] //? TODO: Remove temp development code
+//#![allow(noop_method_call)] //? TODO: Remove temp development code
 
-//use anyhow::{anyhow, bail, ensure, Context, Result};
-//use either::Either;
-//use rand::{distr::Uniform, Rng, RngCore};
-//use serde::{Deserialize, Serialize};
-//use static_assertions::{assert_obj_safe, assert_impl_all, assert_cfg, const_assert};
-//use tracing::{debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span, warn};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{
-    ballot::HValue_H_I,
-    contest_data_fields_ciphertexts::ContestDataFieldsCiphertexts,
-    eg::Eg,
-    hash::{eg_h, HValue, HVALUE_BYTE_LEN},
-    pre_voting_data::PreVotingData,
-    voting_device::VotingDeviceInformationHash,
-};
+use util::hex_dump::HexDump;
+
+use crate::{hash::HVALUE_BYTE_LEN, voting_device::VotingDeviceInformationHash};
 
 //=================================================================================================|
 
@@ -49,7 +38,16 @@ pub const CHAINING_MODE_BYTE_LEN: usize = 4;
 pub type ChainingModeByteArray = [u8; CHAINING_MODE_BYTE_LEN];
 
 /// Byte sequence which identifies the chaining mode in use when computing the confirmation code.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    strum_macros::IntoStaticStr
+)]
 #[derive(serde::Deserialize, serde::Serialize)]
 #[repr(u32)]
 enum ChainingMode {
@@ -60,22 +58,29 @@ enum ChainingMode {
 
 impl ChainingMode {
     /// The number of bytes of a [`ChainingModeIdentifierByteArray`].
+    #[allow(dead_code)]
     pub const fn byte_len() -> usize {
         CHAINING_MODE_BYTE_LEN
     }
 }
 
-/*
-impl From<ChainingMode> for ChainingModeByteArray {
-    /// A [`ChainingModeByteArray`] can always be made from a [`ChainingMode`].
-    #[inline]
-    fn from(src: ChainingMode) -> Self {
-        (src as u32).to_be_bytes()
+impl std::fmt::Debug for ChainingMode {
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s: &'static str = self.into();
+        write!(f, "{s} = {:#010X}", *self as u32)
     }
 }
-// */
+
+impl std::fmt::Display for ChainingMode {
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
 
 impl From<ChainingMode> for [u8; CHAINING_MODE_BYTE_LEN] {
+    /// A [`ChainingModeByteArray`] can always be made from a [`ChainingMode`].
     #[inline]
     fn from(src: ChainingMode) -> Self {
         (src as u32).to_be_bytes()
@@ -155,56 +160,92 @@ impl serde::Serialize for ChainingField {
     }
 }
 
+impl std::fmt::Debug for ChainingField {
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl std::fmt::Display for ChainingField {
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let hd = HexDump::new()
+            .show_addr(false)
+            .show_ascii(false)
+            .group(2)
+            .line_prefix("    ")
+            .dump(self.as_array());
+        writeln!(f, "ChainingField(\n{hd} )")
+    }
+}
+
 //=================================================================================================|
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use anyhow::{anyhow, bail, ensure, Context, Result};
-    use insta::assert_ron_snapshot;
+    use insta::{assert_debug_snapshot, assert_ron_snapshot, assert_snapshot};
+
+    use util::hex_dump::HexDump;
 
     use super::*;
     use crate::{
         eg::Eg,
-        hash::HValue,
         voting_device::{VotingDeviceInformation, VotingDeviceInformationHash},
     };
 
     #[test]
-    fn t0() {
+    fn t1() {
         assert_ron_snapshot!(
             (CHAINING_MODE_BYTE_LEN, ChainingMode::byte_len()),
             @r#"(4, 4)"#);
 
         let cm = ChainingMode::NoChaining;
-        assert_ron_snapshot!(
-            (cm, cm as u32, ChainingModeByteArray::from(cm)),
-            @"(NoChaining, 0, (0, 0, 0, 0))");
+
+        assert_debug_snapshot!(cm, @r#"
+            NoChaining = 0x00000000
+        "#);
+
+        assert_snapshot!(cm, @r#"
+            NoChaining = 0x00000000
+        "#);
+
+        let cmba = ChainingModeByteArray::from(cm);
+        assert_snapshot!(
+            HexDump::new().show_addr(false).show_ascii(false).group(2).dump(&cmba),
+            @"0000 0000");
     }
 
     #[test]
-    fn t1() {
+    fn t2() {
         assert_ron_snapshot!(CHAINING_FIELD_BYTE_LEN, @r#"36"#);
         assert_ron_snapshot!(ChainingField::byte_len(), @r#"36"#);
     }
 
     #[test]
-    fn t2() {
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::chaining_mode::t::t1",
-        );
+    fn t3() {
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::chaining_mode::t::t1",
+            );
+            let eg = eg.as_ref();
 
-        let vdi = VotingDeviceInformation::new_empty();
+            let vdi = VotingDeviceInformation::new_empty();
 
-        let h_di =
-            VotingDeviceInformationHash::compute_from_voting_device_information(eg, &vdi).unwrap();
+            let h_di =
+                VotingDeviceInformationHash::compute_from_voting_device_information(eg, &vdi)
+                    .await
+                    .unwrap();
 
-        let cf = ChainingField::new_no_chaining_mode(&h_di).unwrap();
+            let cf = ChainingField::new_no_chaining_mode(&h_di).unwrap();
 
-        assert_ron_snapshot!(Vec::from(cf.as_array()), @r#"
-        "#);
-
-        assert_ron_snapshot!(cf, @r#"
-        "#);
+            assert_snapshot!(cf, @r#"
+                ChainingField(
+                    0000 0000 8ca6 7d84 9797 85f6 30dd 0746
+                    ab22 610d 5dd4 4f37 6893 5f93 b74c 4bed
+                    b770 6d0f )
+            "#);
+        });
     }
 }

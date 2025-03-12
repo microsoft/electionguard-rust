@@ -19,7 +19,7 @@
 
 use std::ops::DerefMut;
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 //use either::Either;
 //use tracing::{debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span, warn};
 //use proc_macro2::{Ident,Literal,TokenStream};
@@ -40,6 +40,7 @@ use crate::{
     //guardian_public_key::GuardianPublicKey,
     guardian_secret_key::GuardianSecretKey,
     //pre_voting_data::{self, PreVotingData},
+    resource::{ProduceResource, ProduceResourceExt},
     //varying_parameters::VaryingParameters,
 };
 
@@ -50,7 +51,7 @@ pub fn example_pre_voting_data(_eg: &mut Eg) -> Result<Vec1<GuardianSecretKey>> 
 }
 
 pub fn example_pre_voting_data2(
-    _eg: &Eg,
+    _produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     _varying_parameter_n: u32,
     _varying_parameter_k: u32,
 ) -> Result<Vec1<GuardianSecretKey>> {
@@ -59,13 +60,15 @@ pub fn example_pre_voting_data2(
 
 //=================================================================================================|
 
-pub fn example_validation_info(_eg: &Eg) -> Result<(Eg, Vec1<GuardianSecretKey>)> {
+pub fn example_validation_info(
+    _produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+) -> Result<(Eg, Vec1<GuardianSecretKey>)> {
     bail!("this function has been superceeded")
 }
 
 /// Creates an example [`PreVotingData`], specifying values for election varying parameters `n` and `k`.
 pub fn example_validation_info2(
-    _eg: &Eg,
+    _produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     _varying_parameter_n: u32,
     _varying_parameter_k: u32,
 ) -> Result<(Eg, Vec1<GuardianSecretKey>)> {

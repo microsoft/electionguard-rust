@@ -8,17 +8,17 @@
 //! This module provides the [`GuardianPublicKeyTrait`] trait
 //! which allows read access and validation of public key data.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use util::algebra::GroupElement;
 
 use crate::{
-    eg::Eg,
     errors::EgError,
     fixed_parameters::FixedParameters,
-    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyId, GuardianKeyPurpose},
+    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPartId, GuardianKeyPurpose},
     guardian_coeff_proof::CoefficientsProof,
     guardian_secret_key::{CoefficientCommitment, CoefficientCommitments},
+    resource::{ProduceResource, ProduceResourceExt},
 };
 
 /// Trait providing access to data common to both
@@ -26,10 +26,11 @@ use crate::{
 /// [`GuardianSecretKey`](crate::guardian_secret_key::GuardianSecretKey).
 ///
 /// It also allows to validate both types of keys (cf. Verification `2` in Section `3.2.2`).
+#[async_trait::async_trait(?Send)]
 pub trait GuardianKeyInfoTrait {
     /// Guardian key ID, describing the guardian number, the key purpose, and the
     /// asymmetric key part.
-    fn guardian_key_id(&self) -> &GuardianKeyId;
+    fn guardian_key_id(&self) -> &GuardianKeyPartId;
 
     /// Guardian index number, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
     fn guardian_index(&self) -> GuardianIndex {
@@ -65,7 +66,7 @@ pub trait GuardianKeyInfoTrait {
     /// commitment to a specific public communication key.
     ///
     /// EGDS 2.1.0 bottom of pg. 23.
-    fn opt_coefficients_proof(&self) -> &Option<Rc<CoefficientsProof>>;
+    fn opt_coefficients_proof(&self) -> &Option<Arc<CoefficientsProof>>;
 
     /// Returns the actual public key of the [`GuardianPublicKey`].
     ///
@@ -80,7 +81,7 @@ pub trait GuardianKeyInfoTrait {
         Ok(&coeff_commitment_0.0)
     }
 
-    /// This function returns the actual public key as a big-endian byte vector
+    /// Returns the actual public key as a big-endian byte vector
     /// of length [`Group::p_len_bytes`](util::algebra::Group::p_len_bytes).
     fn to_be_bytes_left_pad(
         &self,
@@ -96,14 +97,14 @@ pub trait GuardianKeyInfoTrait {
     ///
     /// The arguments are:
     ///
-    /// - `eg` - [`Eg`] context
+    /// - `produce_resource` - an implementation of [`ProduceResourceExt`](crate::resource::ProduceResourceExt)
     ///
     /// This corresponds to Verification `2` in Section `3.2.2`.
-    fn validate_public_key_info_to_election_parameters(
+    async fn validate_public_key_info_to_election_parameters(
         &self,
-        eg: &Eg,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     ) -> Result<(), PublicKeyValidationError> {
-        let election_parameters = eg.election_parameters()?;
+        let election_parameters = produce_resource.election_parameters().await?;
         let election_parameters = election_parameters.as_ref();
         let varying_parameters = &election_parameters.varying_parameters();
 
@@ -156,7 +157,7 @@ pub trait GuardianKeyInfoTrait {
 }
 
 /// Represents errors occurring during the validation of a public key.
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum PublicKeyValidationError {
     /// Occurs if the guardian's index is out of bounds.
     #[error("Guardian number i={i} is not in the range 1 <= i <= n={n}")]

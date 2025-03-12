@@ -136,7 +136,7 @@ impl TryFrom<ResourceCategory> for std::path::PathBuf {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use anyhow::{anyhow, bail, ensure, Context, Result};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use insta::assert_ron_snapshot;
     use strum::VariantNames;
 

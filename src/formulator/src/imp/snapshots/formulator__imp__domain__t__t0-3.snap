@@ -1,0 +1,9 @@
+---
+source: formulator/src/imp/domain.rs
+expression: "format!(\"domain: {domain},\\nsymbol: {symbol},\\nsymbol_hash_u64: {symbol_hash_u64:#018x}\")"
+---
+domain: Domain {
+    a
+},
+symbol: a,
+symbol_hash_u64: 0x02be3baf0fa40b0d

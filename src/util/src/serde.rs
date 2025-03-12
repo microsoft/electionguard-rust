@@ -17,6 +17,8 @@
 #![allow(non_snake_case)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 //=================================================================================================|
@@ -32,17 +34,74 @@ where
     stdioerror.to_string().serialize(serializer)
 }
 
-#[allow(clippy::borrowed_box)]
 #[inline]
-pub fn serialize_bxstdioerror<S>(
-    bx_stdioerror: &Box<std::io::Error>,
+pub fn serialize_asref_stdioerror<S, AsRefStdIoError>(
+    asref_stdioerror: AsRefStdIoError,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    AsRefStdIoError: AsRef<std::io::Error>,
+{
+    let stdioerror: &std::io::Error = asref_stdioerror.as_ref();
+    stdioerror.to_string().serialize(serializer)
+}
+
+#[inline]
+pub fn serialize_std_collections_tryreserveerror<S>(
+    std_collections_tryreserveerror: &std::collections::TryReserveError,
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let stdioerror: &std::io::Error = bx_stdioerror;
-    serialize_stdioerror(stdioerror, serializer)
+    std_collections_tryreserveerror
+        .to_string()
+        .serialize(serializer)
+}
+
+#[inline]
+pub fn serialize_std_convert_infallible<S>(
+    std_convert_infallible: &std::convert::Infallible,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    std_convert_infallible.to_string().serialize(serializer)
+}
+
+#[inline]
+pub fn serialize_std_num_parseinterror<S>(
+    std_num_parseinterror: &std::num::ParseIntError,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    std_num_parseinterror.to_string().serialize(serializer)
+}
+
+#[inline]
+pub fn serialize_std_num_tryfrominterror<S>(
+    std_num_tryfrominterror: &std::num::TryFromIntError,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    std_num_tryfrominterror.to_string().serialize(serializer)
+}
+
+#[inline]
+pub fn serialize_std_string_fromutf8error<S>(
+    std_num_parseinterror: &std::string::FromUtf8Error,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    std_num_parseinterror.to_string().serialize(serializer)
 }
 
 #[inline]
@@ -54,6 +113,17 @@ where
     S: Serializer,
 {
     anyhowerror.to_string().serialize(serializer)
+}
+
+#[inline]
+pub fn serialize_arc_anyhowerror<S>(
+    anyhowerror: &Arc<anyhow::Error>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    anyhowerror.as_ref().to_string().serialize(serializer)
 }
 
 /// Serializes an [`Option`] as a string "None" or "Some(...)".

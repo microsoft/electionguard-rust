@@ -5,17 +5,22 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
+#![allow(unused_variables)] //? TODO: Remove temp development code
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use eg::{
-    ballot::Ballot, loadable::LoadableFromStdIoReadValidated, eg::Eg,
+    ballot::Ballot, eg::Eg, loadable::LoadableFromStdIoReadValidated,
     voter_selections_plaintext::VoterSelectionsPlaintext,
 };
 
-use crate::{common_utils::load_pre_voting_data, subcommands::Subcommand};
+use crate::{
+    //common_utils::load_pre_voting_data,
+    subcommands::Subcommand,
+};
 
 #[derive(clap::Args, Debug, Default)]
 pub(crate) struct CreateBallotFromVoterSelections {
@@ -35,15 +40,11 @@ impl Subcommand for CreateBallotFromVoterSelections {
         &mut self,
         subcommand_helper: &mut crate::subcommand_helper::SubcommandHelper,
     ) -> Result<()> {
-        let mut eg = {
-            let csprng = subcommand_helper
-                .build_csprng()?
-                .write_str("CreateBallotFromVoterSelections")
-                .finish();
-            Eg::from_csprng(csprng)
-        };
-        let eg = &mut eg;
+        let eg = subcommand_helper.get_eg("CreateBallotFromVoterSelections")?;
+        let _eg = eg.as_ref();
+        anyhow::bail!("TODO: finish implementing CreateBallotFromVoterSelections");
 
+        /*
         load_pre_voting_data(eg, &subcommand_helper.artifacts_dir)?;
 
         let (mut stdioread, voter_selections_path) = subcommand_helper
@@ -72,7 +73,7 @@ impl Subcommand for CreateBallotFromVoterSelections {
             None, // opt_ballot_nonce_xi_B: Option<HValue>
             eg,
         )?;
-        bail!("TODO: finish implementing CreateBallotFromVoterSelections");
+        // */
 
         /* let (mut stdiowrite, path) = subcommand_helper
             .artifacts_dir

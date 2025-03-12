@@ -18,21 +18,13 @@ use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
 
 /// Returns the number of bits required to encode the given number.
 pub fn cnt_bits_repr_usize(n: usize) -> usize {
-    if n == 0 {
-        1
-    } else {
-        n.ilog2() as usize + 1
-    }
+    if n == 0 { 1 } else { n.ilog2() as usize + 1 }
 }
 
 /// Returns the number of bits required to encode the given number.
 pub fn cnt_bits_repr<T: Borrow<BigUint>>(n: &T) -> usize {
     let n: &BigUint = n.borrow();
-    if n.is_zero() {
-        1
-    } else {
-        n.bits() as usize
-    }
+    if n.is_zero() { 1 } else { n.bits() as usize }
 }
 
 /// Encodes [`BigUint`] in big-endian as a left-padded byte-string of length `len`.

@@ -1,0 +1,192 @@
+#!/usr/bin/sh
+
+#set -o xtrace
+set -o nounset
+
+umask 077
+
+sed_remove_toplevel_dir='s/[/]eg[/]wt[/]//'
+
+toplevel_dir=$(git rev-parse --show-toplevel)
+if [ "$?" != 0 ]; then
+    echo 'Error: Could not figure git toplevel dir'
+    exit 76
+fi
+
+toplevel_dir="${toplevel_dir:-}"
+printf 'toplevel_dir=%s\n' "$toplevel_dir"
+if ! [ -d "$toplevel_dir" ]; then
+    printf 'Error: not a directory: %s\n' "$toplevel_dir"
+    exit 77
+fi
+
+if ! cd "$toplevel_dir"; then
+    printf 'Error: Could not cd to: %s\n' "$toplevel_dir"
+    exit 78
+fi
+
+set -o errexit
+
+build_dir="$toplevel_dir/build"
+if ! [ -e "$build_dir" ]; then
+    printf '\nmkdir -p "%s"\n' "$build_dir"
+    mkdir -p "$build_dir"
+fi
+if ! [ -d "$build_dir" ]; then
+    printf 'Error: not a directory: %s\n' "$build_dir"
+    exit 79
+fi
+
+if ! cd "$toplevel_dir/src"; then
+    printf 'Error: Could not cd to: %s\n' "$toplevel_dir/src"
+    exit 80
+fi
+
+# profile='test'
+# target_subdir="./target/debug"
+# cargo_profile="--profile=$profile"
+profile='release'
+target_subdir="target/release"
+cargo_profile="--release"
+
+if [ -d "$target_subdir" ]; then
+    if [ "${1:-}" = '--rm-rf-target' ]; then
+        printf '\nrm -rf "%s"\n' "$target_subdir"
+        rm -rf "$target_subdir"
+    else
+        printf 'pwd: %s\n' $(pwd)
+        printf 'Directory exists: %s\n' "$target_subdir"
+        echo 'Run again with the --rm-rf-target flag, or delete it manually.'
+    fi
+fi
+
+if [ -d "$target_subdir" ]; then
+    exit 81
+fi
+
+build_info_txt="$build_dir/${profile}-build-info.txt"
+[ -f "$build_info_txt" ] && rm "$build_info_txt"
+
+printf '"%s"\n\n' "$build_info_txt" | tee -a "$build_info_txt"
+
+# man 1 time
+export TIME='\nexit status: %x\n\nelapsed real: %e s\nmax resident: %M KiB\npage faults:  %R'
+
+export CARGO_TERM_COLOR=never
+export RUST_LOG=off
+
+export -p | grep -P '^[^=]*\b(CARGO_TERM_COLOR|RUST_LOG|RUST_LOG_SPAN_EVENTS|TIME)=' | tee -a "$build_info_txt"
+
+printf '%s\n' 'unset -v RUST_LOG_SPAN_EVENTS' | tee -a "$build_info_txt"
+unset -v RUST_LOG_SPAN_EVENTS
+
+printf '\n======================== update-features-tree\n' $(pwd) | tee -a "$build_info_txt"
+echo >>"$build_info_txt"
+printf 'pwd=%s\n' $(pwd) | tee -a "$build_info_txt"
+printf 'target_subdir=%s\n' "$target_subdir" | tee -a "$build_info_txt"
+
+printf '\n======================== [ -f Cargo.lock ] && rm Cargo.lock\n' | tee -a "$build_info_txt"
+if [ -f Cargo.lock ]; then
+    echo >>"$build_info_txt"
+    printf 'rm Cargo.lock\n' >>"$build_info_txt"
+    rm Cargo.lock >>"$build_info_txt" 2>&1
+fi
+
+printf '\n======================== cargo version -vv\n' | tee -a "$build_info_txt"
+echo >>"$build_info_txt"
+cargo version -vv >>"$build_info_txt" 2>&1
+
+printf '\n======================== rustc --version -v\n' | tee -a "$build_info_txt"
+echo >>"$build_info_txt"
+rustc --version -v >>"$build_info_txt" 2>&1
+
+printf '\n======================== cargo update\n' | tee -a "$build_info_txt"
+echo >>"$build_info_txt"
+$(which time) cargo update >>"$build_info_txt" 2>&1
+
+printf '\n======================== cargo tree ...\n' | tee -a "$build_info_txt"
+
+cargo_tree_fmt="{p} {f}"
+
+f="$build_dir/${profile}-cargo-tree-normal.txt"
+printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+[ -f "$f" ] && rm "$f"
+printf 'cargo tree --offline -e normal -f "%s"\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+echo >>"$f"
+cargo tree --offline -e normal -f "$cargo_tree_fmt" >>"$f" 2>&1
+
+f="$build_dir/${profile}-cargo-tree-normal-dups.txt"
+printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+[ -f "$f" ] && rm "$f"
+printf 'cargo tree --offline -e normal -f "%s" --duplicates\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+echo >>"$f"
+cargo tree --offline -e normal -f "$cargo_tree_fmt" --duplicates >>"$f" 2>&1
+
+f="$build_dir/${profile}-cargo-tree-normal-list.txt"
+printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+[ -f "$f" ] && rm "$f"
+printf 'cargo tree --offline -e normal -f "%s" --prefix none --no-dedupe | sort --unique\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+echo >>"$f"
+( cargo tree --offline -e normal -f "$cargo_tree_fmt" --prefix none --no-dedupe | sort --unique ) >>"$f" 2>&1
+
+f="$build_dir/${profile}-cargo-tree-features.txt"
+printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+[ -f "$f" ] && rm "$f"
+printf 'cargo tree --offline -e features -f "%s"\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+echo >>"$f"
+cargo tree --offline -e features -f "$cargo_tree_fmt" >>"$f" 2>&1
+
+unset -v f cargo_tree_fmt
+
+#=============================================================== cargo build
+
+printf '\n======================== cargo build --offline %s --all-targets\n\n' "$cargo_profile" | tee -a "$build_info_txt"
+$(which time) cargo build --offline "$cargo_profile" --all-targets >>"$build_info_txt" 2>&1
+
+printf '\n======================== du -sh "%s"\n\n' "$target_subdir" | tee -a "$build_info_txt"
+du -sh "$target_subdir" 2>&1 | expand >>"$build_info_txt"
+
+printf '\n======================== ls -Aq1 -s --kibibytes "%s"\n\n' "$target_subdir" | tee -a "$build_info_txt"
+ls -Aq1 -s --kibibytes "$target_subdir" >>"$build_info_txt" 2>&1
+
+printf '\n======================== du -sh "%s"\n\n' "$target_subdir/*" | tee -a "$build_info_txt"
+du -sh "$target_subdir"/* 2>&1 | expand >>"$build_info_txt"
+
+printf '\n======================== du -sh "%s"\n\n' "$target_subdir/deps" | tee -a "$build_info_txt"
+du -sh "$target_subdir/deps" 2>&1 | expand >>"$build_info_txt"
+
+printf '\n======================== ls -SAq1 -s --kibibytes "%s" | head -n 20\n\n' "$target_subdir/deps" | tee -a "$build_info_txt"
+ls -SAq1 -s --kibibytes "$target_subdir/deps" | head -n 20 >>"$build_info_txt" 2>&1
+
+printf '\n[done]\n' | tee -a "$build_info_txt"
+
+#=============================================================== test
+
+f="$build_dir/${profile}-cargo-test.txt"
+printf '\n======================== %s\n\n' "$f" | tee -a "$build_info_txt"
+[ -f "$f" ] && rm "$f"
+
+set +o errexit
+
+printf 'cargo test %s -- --test-threads=1\n' "$cargo_profile" | tee -a "$build_info_txt" "$f"
+$(which time) cargo test "$cargo_profile" -- --test-threads=1 >>"$build_info_txt" 2>&1
+
+printf '\ncargo test exit code: %d\n' $? | tee -a "$build_info_txt" "$f"
+
+unset -v f
+
+set -o errexit
+
+#===============================================================
+
+printf '\n======================== fixing whitespace\n' | tee -a "$build_info_txt"
+if ! cd "$build_dir"; then
+    printf '\nError: Could not cd to: %s\n' "$build_dir"
+    exit 82
+fi
+printf '\n%s\n\n' 'find . type -f -execdir sed -i "s/\s*$//" \{\} \;' | tee -a "$build_info_txt"
+find . -type f -execdir sed -i 's/\s*$//' \{\} \;
+
+find . -type f -execdir sed -i "$sed_remove_toplevel_dir" \{\} \;
+
+printf '[done]\n' | tee -a "$build_info_txt"

@@ -24,7 +24,7 @@ use std::{
     //collections::{BTreeSet, BTreeMap},
     //collections::{HashSet, HashMap},
     //io::{BufRead, Cursor},
-    rc::Rc,
+    sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -40,28 +40,27 @@ use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
-use util::abbreviation::Abbreviation;
 
 use crate::{
     eg::Eg,
+    election_manifest::ElectionManifestInfo,
     errors::{EgError, EgResult},
-    fixed_parameters::FixedParameters,
-    guardian::try_into_guardian_index,
-    guardian_secret_key::GuardianIndex,
-    guardian_share::GuardianEncryptedShare,
-    resource::{Resource, ResourceFormat, ResourceId, ResourceIdFormat},
+    guardian::{AsymmetricKeyPart, GuardianKeyPartId},
+    guardian_secret_key::{GuardianIndex, GuardianSecretKey},
+    loadable::LoadableFromStdIoReadValidatable,
+    resource::{ProduceResource, ProduceResourceExt, Resource},
+    resource_id::{ElectionDataObjectId as EdoId, ResourceFormat, ResourceId, ResourceIdFormat},
     resource_producer::{
         ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionError,
         ResourceProductionResult, ResourceSource,
     },
     resource_producer_registry::{
         FnNewResourceProducer, GatherResourceProducerRegistrationsFnWrapper,
-        ResourceProducerCategory, ResourceProducerRegistration, ResourceProducerRegistry,
+        ResourceProducerCategory, ResourceProducerRegistration,
     },
     resource_production::RpOp,
-    resource_slicebytes::ResourceSliceBytes,
     validatable::Validated,
-    varying_parameters::{BallotChaining, VaryingParameters, VaryingParametersInfo},
+    varying_parameters::{BallotChaining, VaryingParametersInfo},
 };
 
 //=================================================================================================|
@@ -87,9 +86,9 @@ pub struct ResourceProducer_ExampleData {
 impl ResourceProducer_ExampleData {
     pub const NAME: &str = "ExampleData";
 
-    pub fn rc_new() -> Rc<dyn ResourceProducer_Any_Debug_Serialize> {
+    pub fn arc_new() -> Arc<dyn ResourceProducer_Any_Debug_Serialize + 'static> {
         let self_ = Self::new();
-        Rc::new(self_)
+        Arc::new(self_)
     }
 
     pub fn new() -> Self {
@@ -107,25 +106,6 @@ impl ResourceProducer_ExampleData {
     pub fn varying_parameter_k(&self) -> GuardianIndex {
         self.k
     }
-
-    fn make_fixed_parameters(eg: &Eg) -> FixedParameters {
-        // Unwrap() is justified here because this is test code
-        #[allow(clippy::unwrap_used)]
-        crate::standard_parameters::make_standard_parameters(eg).unwrap()
-    }
-
-    fn make_varying_parameters(&self, eg: &Eg) -> VaryingParameters {
-        let varying_parameters_info = VaryingParametersInfo {
-            n: self.n,
-            k: self.k,
-            date: "2023-05-02".to_string(),
-            info: "The United Realms of Imaginaria, General Election".to_string(),
-            ballot_chaining: BallotChaining::Prohibited,
-        };
-        // Unwrap() is justified here because this is test code
-        #[allow(clippy::unwrap_used)]
-        VaryingParameters::try_validate_from(varying_parameters_info, eg).unwrap()
-    }
 }
 
 impl Default for ResourceProducer_ExampleData {
@@ -134,63 +114,58 @@ impl Default for ResourceProducer_ExampleData {
     }
 }
 
+type Result_ArcDynResource_ProductionErr =
+    Result<Arc<(dyn Resource + 'static)>, ResourceProductionError>;
+type Opt_Result_ArcDynResource_ProductionErr = Option<Result_ArcDynResource_ProductionErr>;
+
 impl ResourceProducer for ResourceProducer_ExampleData {
     fn name(&self) -> Cow<'static, str> {
         Self::NAME.into()
     }
 
     fn fn_rc_new(&self) -> FnNewResourceProducer {
-        Self::rc_new
+        Self::arc_new
     }
 
+    fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
+        async_global_executor::block_on(self.maybe_produce_async(rp_op))
+    }
+}
+
+impl ResourceProducer_ExampleData {
     #[instrument(
-        name = "ResourceProducer_ResourceProducer_ExampleData::maybe_produce",
-        fields(rf = trace_display(&rp_op.target_ridfmt)),
-        skip(self, eg, rp_op),
-        ret
+        name = "RP_ExampleData",
+        fields(rf = trace_display(&rp_op.requested_ridfmt())),
+        skip(self, rp_op)
     )]
-    fn maybe_produce(&self, eg: &Eg, rp_op: &mut RpOp) -> Option<ResourceProductionResult> {
-        use ResourceFormat::{ConcreteType, SliceBytes, ValidatedElectionDataObject};
+    async fn maybe_produce_async(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
         use ResourceId as ResId;
 
-        use crate::resource::ElectionDataObjectId as EdoId;
+        let rp_op = rp_op.as_ref();
 
         let ResourceIdFormat {
             rid: requested_rid,
             fmt: requested_fmt,
-        } = rp_op.target_ridfmt().clone();
+        } = rp_op.requested_ridfmt().clone();
 
-        // Types that we can easily produce a validated EDO directly.
-
-        let opt_pr_rc_rsrc: Option<(Rc<dyn Resource>, ResourceSource)> =
+        #[allow(clippy::collapsible_match)]
+        let opt_result: Opt_Result_ArcDynResource_ProductionErr =
             match (requested_rid.clone(), requested_fmt) {
-                (ResId::ElectionDataObject(edoid), requested_fmt) => {
-                    match (edoid, requested_fmt) {
-                        (EdoId::FixedParameters, _requested_fmt) => {
-                            let edo = Self::make_fixed_parameters(eg);
-                            /*
-                            let rc = if requested_fmt == ConcreteType {
-                            let rsrc = edo.un_validate(eg)?;
-                            Rc::new(rsrc)
-                            } else {
-                            Rc::new(edo)
-                            };
-                            // */
-                            let rc = Rc::new(edo);
-                            Some((rc, ResourceSource::ExampleData(ValidatedElectionDataObject)))
-                        }
-                        (EdoId::VaryingParameters, _requested_fmt) => {
-                            let edo = self.make_varying_parameters(eg);
-                            /*
-                            let rc = if requested_fmt == ConcreteType {
-                            let rsrc = edo.un_validate(eg)?;
-                            Rc::new(rsrc)
-                            } else {
-                            Rc::new(edo)
-                            };
-                            // */
-                            let rc = Rc::new(edo);
-                            Some((rc, ResourceSource::ExampleData(ValidatedElectionDataObject)))
+                (ResId::ElectionDataObject(edo_id), ResourceFormat::ConcreteType) => match edo_id {
+                    EdoId::FixedParameters => Some(Self::make_fixed_parameters_info(rp_op)),
+                    EdoId::VaryingParameters => Some(self.make_varying_parameters_info()),
+                    EdoId::ElectionManifest => Some(Self::make_election_manifest_info()),
+                    _ => None,
+                },
+                (ResId::ElectionDataObject(edo_id), ResourceFormat::ValidElectionDataObject) => {
+                    match edo_id {
+                        EdoId::GuardianKeyPart(key_part_id) => {
+                            match key_part_id.asymmetric_key_part {
+                                AsymmetricKeyPart::Secret => Some(
+                                    Self::make_guardian_key_part_secret(rp_op, key_part_id).await,
+                                ),
+                                _ => None,
+                            }
                         }
                         _ => None,
                     }
@@ -198,66 +173,92 @@ impl ResourceProducer for ResourceProducer_ExampleData {
                 _ => None,
             };
 
-        if let Some((rc_resource, rsrc)) = opt_pr_rc_rsrc {
-            let current_ridfmt = rc_resource.ridfmt().clone();
+        opt_result.map(|result| {
+            result.map(|arc_resource| {
+                let &fmt = arc_resource.format();
+                let resource_source = ResourceSource::ExampleData(fmt);
+                (arc_resource, resource_source)
+            })
+        })
+    }
 
-            if &current_ridfmt == rp_op.target_ridfmt() {
-                info!("Successfully produced a {}", current_ridfmt.abbreviation());
-                return Some(Ok((rc_resource, rsrc)));
-            }
+    #[instrument(name = "make_fixed_parameters_info", skip(produce_resource))]
+    fn make_fixed_parameters_info(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> Result_ArcDynResource_ProductionErr {
+        // Unwrap() is justified here because this is test code
+        #[allow(clippy::unwrap_used)]
+        let fixed_parameters =
+            crate::standard_parameters::make_standard_parameters(produce_resource).unwrap();
+        let fixed_parameters_info = fixed_parameters.un_validate();
+        Ok(Arc::new(fixed_parameters_info))
+    }
 
-            let ResourceIdFormat {
-                rid: current_rid,
-                fmt: current_fmt,
-            } = current_ridfmt.clone();
+    #[instrument(name = "make_varying_parameters_info")]
+    fn make_varying_parameters_info(&self) -> Result_ArcDynResource_ProductionErr {
+        let varying_parameters_info = VaryingParametersInfo {
+            n: self.n,
+            k: self.k,
+            date: "2023-05-02".to_string(),
+            info: "The United Realms of Imaginaria, General Election".to_string(),
+            ballot_chaining: BallotChaining::Prohibited,
+        };
+        Ok(Arc::new(varying_parameters_info))
+    }
 
-            if current_rid != requested_rid {
-                let e = ResourceProductionError::UnexpectedRidFmt {
-                    requested: rp_op.target_ridfmt().clone(),
-                    obtained: current_ridfmt,
-                };
-                error!("{e}");
-                return Some(Err(e));
-            }
+    #[instrument(name = "make_election_manifest_info")]
+    fn make_election_manifest_info() -> Result_ArcDynResource_ProductionErr {
+        let election_manifest_info =
+            ElectionManifestInfo::from_json_str_validatable(ELECTION_MANIFEST_PRETTY)?;
+        Ok(Arc::new(election_manifest_info))
+    }
 
-            if requested_fmt == SliceBytes && current_fmt == ValidatedElectionDataObject {
-                let result = ResourceSliceBytes::new_from_SerializableCanonical_Resource(
-                    rc_resource.as_ref(),
-                    rsrc,
-                );
-
-                let opt_result = match result {
-                    Ok((rc_slicebytes, rsrc)) => {
-                        info!(
-                            "From {}, made a ResourceSliceBytes {} {}",
-                            current_ridfmt.abbreviation(),
-                            rc_slicebytes.ridfmt().abbreviation(),
-                            rsrc.abbreviation()
-                        );
-                        Some(Ok((rc_slicebytes, rsrc)))
-                    }
-                    Err(e) => {
-                        error!("{e}");
-                        Some(Err(e))
-                    }
-                };
-                return opt_result;
-            }
-        }
-
-        None
+    #[instrument(name = "make_guardian_key_part_secret", skip(rp_op))]
+    async fn make_guardian_key_part_secret(
+        rp_op: &RpOp,
+        key_part_id: GuardianKeyPartId,
+    ) -> Result_ArcDynResource_ProductionErr {
+        info!(
+            rf = rp_op.trace_field_rf(),
+            "vvvvvvvvvvvvvv make_guardian_key_part_secret vvvvvvvvvvvvvv"
+        );
+        info!(
+            rf = rp_op.trace_field_rf(),
+            "rid: {}",
+            rp_op.requested_rid()
+        );
+        info!(
+            rf = rp_op.trace_field_rf(),
+            "fmt: {}",
+            rp_op.requested_fmt()
+        );
+        info!(rf = rp_op.trace_field_rf(), "key_part_id: {key_part_id}");
+        let GuardianKeyPartId {
+            guardian_ix,
+            key_purpose,
+            asymmetric_key_part,
+        } = key_part_id;
+        let name = format!("Example Guardian {guardian_ix}");
+        info!(rf = rp_op.trace_field_rf(), "name: {name}");
+        let gsk = GuardianSecretKey::generate(rp_op, guardian_ix, name, key_purpose).await?;
+        info!(
+            rf = rp_op.trace_field_rf(),
+            "^^^^^^^^^^^^^^ make_guardian_key_part_secret ^^^^^^^^^^^^^^"
+        );
+        Ok(gsk)
     }
 }
 
 //=================================================================================================|
 
+#[allow(non_snake_case)]
 fn gather_resourceproducer_registrations_ExampleData(
-    f: &mut dyn FnMut(&[ResourceProducerRegistration]),
+    f: &mut dyn for<'a> FnMut(&'a [ResourceProducerRegistration]),
 ) {
     let registration = {
         let name = ResourceProducer_ExampleData::NAME.into();
         let category = ResourceProducerCategory::GeneratedTestData;
-        let fn_rc_new = ResourceProducer_ExampleData::rc_new;
+        let fn_rc_new = ResourceProducer_ExampleData::arc_new;
         ResourceProducerRegistration {
             name,
             category,
@@ -276,105 +277,124 @@ GatherResourceProducerRegistrationsFnWrapper(gather_resourceproducer_registratio
 static ELECTION_MANIFEST_PRETTY: &str = r#"{
 "label": "General Election - The United Realms of Imaginaria",
 "contests": [
-{ "label": "For President and Vice President of The United Realms of Imaginaria",
-"options": [
-{ "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)" },
-{ "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)" }
-]
-}, { "label": "Minister of Elemental Resources",
-"options": [
-{ "label": "Tïtus Stormforge\n(Ætherwïng)" },
-{ "label": "Fæ Willowgrove\n(Crystâlheärt)" },
-{ "label": "Tèrra Stonebinder\n(Independent)" }
-]
-}, { "label": "Minister of Arcane Sciences",
-"options": [
-{ "label": "Élyria Moonshadow\n(Crystâlheärt)", "selection_limit": "CONTEST_LIMIT" },
-{ "label": "Archímedes Darkstone\n(Ætherwïng)" },
-{ "label": "Seraphína Stormbinder\n(Independent)" },
-{ "label": "Gávrïel Runëbørne\n(Stärsky)" }
-]
-}, { "label": "Minister of Dance",
-"options": [
-{ "label": "Äeliana Sunsong\n(Crystâlheärt)" },
-{ "label": "Thâlia Shadowdance\n(Ætherwïng)" },
-{ "label": "Jasper Moonstep\n(Stärsky)" }
-]
-}, { "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
-"options": [
-{ "label": "Ìgnatius Gearsøul\n(Crystâlheärt)" },
-{ "label": "Èlena Wîndwhisper\n(Technocrat)", "selection_limit": 3 },
-{ "label": "Bërnard Månesworn\n(Ætherwïng)", "selection_limit": "CONTEST_LIMIT" },
-{ "label": "Séraphine Lùmenwing\n(Stärsky)", "selection_limit": 2 },
-{ "label": "Nikólai Thunderstrîde\n(Independent)" },
-{ "label": "Lïliana Fîrestone\n(Pęacemaker)", "selection_limit": "CONTEST_LIMIT" }
-]
-}, { "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
-"options": [
-{ "label": "For", "selection_limit": "CONTEST_LIMIT" },
-{ "label": "Against" }
-]
-}, { "label": "Privacy Protection in Techno-Magical Communications Act",
-"options": [
-{ "label": "Prō" },
-{ "label": "Ĉontrá" }
-]
-}, { "label": "Public Transport Modernization and Enchantment Proposal",
-"options": [
-{ "label": "Prō" },
-{ "label": "Ĉontrá" }
-]
-}, { "label": "Renewable Ætherwind Infrastructure Initiative",
-"options": [
-{ "label": "Prō" },
-{ "label": "Ĉontrá" }
-]
-}, { "label": "For Librarian-in-Chief of Smoothstone County", "selection_limit": 2147483647,
-"options": [
-{ "label": "Élise Planetes", "selection_limit": "CONTEST_LIMIT" },
-{ "label": "Théodoric Inkdrifter", "selection_limit": 2147483647 } ]
-}, { "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
-"options": [
-{ "label": "Retain", "selection_limit": 375},
-{ "label": "Remove", "selection_limit": "CONTEST_LIMIT" } ]
-}
+    {
+        "label": "For President and Vice President of The United Realms of Imaginaria",
+        "options": [
+            { "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)" },
+            { "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)" } ]
+    }, {
+        "label": "Minister of Elemental Resources",
+        "options": [
+            { "label": "Tïtus Stormforge\n(Ætherwïng)" },
+            { "label": "Fæ Willowgrove\n(Crystâlheärt)" },
+            { "label": "Tèrra Stonebinder\n(Independent)" } ]
+    }, {
+        "label": "Minister of Arcane Sciences",
+        "options": [
+            { "label": "Élyria Moonshadow\n(Crystâlheärt)", "selection_limit": "CONTEST_LIMIT" },
+            { "label": "Archímedes Darkstone\n(Ætherwïng)" },
+            { "label": "Seraphína Stormbinder\n(Independent)" },
+            { "label": "Gávrïel Runëbørne\n(Stärsky)" } ]
+    }, {
+        "label": "Minister of Dance",
+        "options": [
+            { "label": "Äeliana Sunsong\n(Crystâlheärt)" },
+            { "label": "Thâlia Shadowdance\n(Ætherwïng)" },
+            { "label": "Jasper Moonstep\n(Stärsky)" } ]
+    }, {
+        "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
+        "options": [
+            { "label": "Ìgnatius Gearsøul\n(Crystâlheärt)" },
+            { "label": "Èlena Wîndwhisper\n(Technocrat)", "selection_limit": 3 },
+            { "label": "Bërnard Månesworn\n(Ætherwïng)", "selection_limit": "CONTEST_LIMIT" },
+            { "label": "Séraphine Lùmenwing\n(Stärsky)", "selection_limit": 2 },
+            { "label": "Nikólai Thunderstrîde\n(Independent)" },
+            { "label": "Lïliana Fîrestone\n(Pęacemaker)", "selection_limit": "CONTEST_LIMIT" } ]
+    }, {
+        "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
+        "options": [
+            { "label": "For", "selection_limit": "CONTEST_LIMIT" },
+            { "label": "Against" } ]
+    }, {
+        "label": "Privacy Protection in Techno-Magical Communications Act",
+        "options": [
+            { "label": "Prō" },
+            { "label": "Ĉontrá" } ]
+    }, {
+        "label": "Public Transport Modernization and Enchantment Proposal",
+        "options": [
+            { "label": "Prō" },
+            { "label": "Ĉontrá" } ]
+    }, {
+        "label": "Renewable Ætherwind Infrastructure Initiative",
+        "options": [
+            { "label": "Prō" },
+            { "label": "Ĉontrá" } ]
+    }, {
+        "label": "For Librarian-in-Chief of Smoothstone County", "selection_limit": 2147483647,
+        "options": [
+            { "label": "Élise Planetes", "selection_limit": "CONTEST_LIMIT" },
+            { "label": "Théodoric Inkdrifter", "selection_limit": 2147483647 } ]
+    }, {
+        "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
+        "options": [
+            { "label": "Retain", "selection_limit": 375},
+            { "label": "Remove", "selection_limit": "CONTEST_LIMIT" } ]
+    }
 ],
 "ballot_styles": [
-{ "label": "Ballot style 1 has 1 contest: 1",
-"contests": [1]
-}, { "label": "Ballot style 2 has 1 contest: 2",
-"contests": [2]
-}, { "label": "Ballot style 3 has 1 contest: 3",
-"contests": [3]
-}, { "label": "Ballot style 4 has 1 contest: 4",
-"contests": [4]
-}, { "label": "Ballot style 5 has 1 contest: 5",
-"contests": [5]
-}, { "label": "Ballot style 6 has 1 contest: 6",
-"contests": [6]
-}, { "label": "Ballot style 7 has 1 contest: 7",
-"contests": [7]
-}, { "label": "Ballot style 8 has 1 contest: 8",
-"contests": [8]
-}, { "label": "Ballot style 9 has 1 contest: 9",
-"contests": [9]
-}, { "label": "Ballot style 10 has 1 contest: 10",
-"contests": [10]
-}, { "label": "Ballot style 11 has 1 contest: 11",
-"contests": [11]
-}, { "label": "Ballot style 12 has 2 contests: 1, 2",
-"contests": [1, 2]
-}, { "label": "Ballot style 13 (Smoothstone County Ballot) has 10 contests: 1 through 10",
-"contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-}, { "label": "Ballot style 14 (Silvërspîre County Ballot) has 10 contests: 1 through 11, skipping 10",
-"contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]
-}, { "label": "Ballot style 15 has 2 contests: 1 and 3",
-"contests": [1, 3]
-}, { "label": "Ballot style 16 has 2 contests: 2 and 3",
-"contests": [2, 3]
-}, { "label": "Ballot style 17 has 3 contests: 1, 2, and 3",
-"contests": [1, 2, 3]
-}
+    {
+        "label": "Ballot style 1 has 1 contest: 1",
+        "contests": [1]
+    }, {
+        "label": "Ballot style 2 has 1 contest: 2",
+        "contests": [2]
+    }, {
+        "label": "Ballot style 3 has 1 contest: 3",
+        "contests": [3]
+    }, {
+        "label": "Ballot style 4 has 1 contest: 4",
+        "contests": [4]
+    }, {
+        "label": "Ballot style 5 has 1 contest: 5",
+        "contests": [5]
+    }, {
+        "label": "Ballot style 6 has 1 contest: 6",
+        "contests": [6]
+    }, {
+        "label": "Ballot style 7 has 1 contest: 7",
+        "contests": [7]
+    }, {
+        "label": "Ballot style 8 has 1 contest: 8",
+        "contests": [8]
+    }, {
+        "label": "Ballot style 9 has 1 contest: 9",
+        "contests": [9]
+    }, {
+        "label": "Ballot style 10 has 1 contest: 10",
+        "contests": [10]
+    }, {
+        "label": "Ballot style 11 has 1 contest: 11",
+        "contests": [11]
+    }, {
+        "label": "Ballot style 12 has 2 contests: 1, 2",
+        "contests": [1, 2]
+    }, {
+        "label": "Ballot style 13 (Smoothstone County Ballot) has 10 contests: 1 through 10",
+        "contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    }, {
+        "label": "Ballot style 14 (Silvërspîre County Ballot) has 10 contests: 1 through 11, skipping 10",
+        "contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]
+    }, {
+        "label": "Ballot style 15 has 2 contests: 1 and 3",
+        "contests": [1, 3]
+    }, {
+        "label": "Ballot style 16 has 2 contests: 2 and 3",
+        "contests": [2, 3]
+    }, {
+        "label": "Ballot style 17 has 3 contests: 1, 2, and 3",
+        "contests": [1, 2, 3]
+    }
 ]
 }
 "#;
@@ -387,7 +407,7 @@ mod t {
     use insta::assert_ron_snapshot;
 
     use super::*;
-    use crate::{eg_config::EgConfig, resource::ElectionDataObjectId};
+    use crate::resource::ElectionDataObjectId as EdoId;
 
     #[test]
     fn t0() {
@@ -407,11 +427,16 @@ mod t {
 
     #[test]
     fn t1() {
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+        async_global_executor::block_on(t1_async());
+    }
+
+    async fn t1_async() {
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::resourceproducer_exampledata::t::t0",
         );
+        let eg = eg.as_ref();
 
-        use ElectionDataObjectId::*;
+        use EdoId::*;
         use ResourceId::ElectionDataObject;
 
         {
@@ -420,6 +445,7 @@ mod t {
                     rid: ElectionDataObject(ElectionParameters),
                     fmt: ResourceFormat::SliceBytes,
                 })
+                .await
                 .unwrap();
             assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionParameters)");
             assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
@@ -435,6 +461,7 @@ mod t {
                     rid: ElectionDataObject(ElectionManifest),
                     fmt: ResourceFormat::SliceBytes,
                 })
+                .await
                 .unwrap();
             assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
             assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);

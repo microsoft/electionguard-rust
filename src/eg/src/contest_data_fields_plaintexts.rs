@@ -25,6 +25,7 @@ use crate::{
     election_manifest::ContestIndex,
     errors::{EgError, EgResult},
     pre_voting_data::PreVotingData,
+    resource::{ProduceResource, ProduceResourceExt},
 };
 
 /// Value (plaintext) of a contest data fields, which could be a selectable option or additional data.
@@ -99,14 +100,18 @@ impl ContestDataFieldsPlaintexts {
     /// - `option_fields_plaintexts` should have the same length as the
     ///   number of options in the contest.
     pub fn try_from_option_fields(
-        _eg: &Eg,
+        _produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         _contest_ix: ContestIndex,
         option_fields_plaintexts: ContestOptionFieldsPlaintexts,
     ) -> EgResult<Self> {
         //? TODO: This is probably where we want to add additional data fields for under/overvote
         //? and enforce selection limit is satisfied
-        warn!("ContestDataFieldsPlaintexts::try_from_option_fields does not yet verify the count of option fields");
-        warn!("ContestDataFieldsPlaintexts::try_from_option_fields does not yet include additional data fields");
+        warn!(
+            "ContestDataFieldsPlaintexts::try_from_option_fields does not yet verify the count of option fields"
+        );
+        warn!(
+            "ContestDataFieldsPlaintexts::try_from_option_fields does not yet include additional data fields"
+        );
 
         let v1_option_fields_plaintexts = option_fields_plaintexts.into_inner();
 

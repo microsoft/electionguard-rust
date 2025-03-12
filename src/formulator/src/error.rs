@@ -29,7 +29,7 @@ use std::{
     //iter::zip,
     //marker::PhantomData,
     //path::{Path, PathBuf},
-    //rc::Rc,
+    //sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -47,7 +47,7 @@ use std::{
 //=================================================================================================|
 
 /// [`Result::Err`](std::result::Result) type of a data resource production operation.
-#[derive(thiserror::Error, Debug, serde::Serialize)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[allow(non_camel_case_types)]
 pub enum Error {
     #[error("Parsing Sym")]
@@ -62,28 +62,31 @@ pub enum Error {
     #[error("UsizeToSymRepr")]
     SymTryFrom,
 
-    #[error("New symbol{s} could not be added because the symbol set is full. \
-        It already contains {current_number} symbols. The problem domain has become too complex.",
+    #[error("New symbol{s} could not be added because the domain symbol set is full. \
+        It already contains {current_number} symbols.",
         s = opt_symbol_to_space_quoted_string(opt_symbol_str))]
     SymbolSetFull {
         opt_symbol_str: Option<Cow<'static, str>>,
         current_number: usize,
     },
 
-    /*
-    #[error("The supplied symbol `{symbol}` is not valid. \
-        Valid symbols must match the regular expression {valid_symbol_regex_str}. \
-        For example, a plain word without spaces.")]
-    SymbolNotValid {
-        symbol: String,
-        valid_symbol_regex_str: String,
-    },
-    // */
     #[error("Capacity exceeded")]
     CapacityOverflow,
 
+    #[error(
+        "New rule could not be added because the rule set is full. It already contains {current_number} rules."
+    )]
+    RuleSetFull { current_number: usize },
+
     #[error("Allocation failed")]
     AllocationFailed,
+    /*
+    #[error("The symbols collection is already in use.")]
+    SymbolsAlreadyInUse,
+
+    #[error("The symbols collection is already (mutably) in use.")]
+    SymbolsAlreadyMutablyInUse,
+    // */
 }
 
 /// [`Result`](std::result::Result) type with an [`ProblemError`].

@@ -18,23 +18,127 @@
 #![allow(non_snake_case)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-//use std::borrow::Cow;
-//use std::collections::HashSet;
-//use std::io::{BufRead, Cursor};
-//use std::path::{Path, PathBuf};
-//use std::str::FromStr;
-//use std::sync::OnceLock;
+//=================================================================================================|
+
+pub(crate) mod domain;
+pub(crate) mod hasher;
+pub(crate) mod problem;
+pub(crate) mod rule;
+pub(crate) mod solution;
+//pub(crate) mod sym;
+//pub(crate) mod sym_set;
+
+//=================================================================================================|
+
+#[rustfmt::skip] //? TODO: Remove temp development code
+use std::{
+    borrow::Cow,
+    //cell::RefCell,
+    //collections::{BTreeSet, BTreeMap},
+    //collections::{HashSet, HashMap},
+    hash::{BuildHasher, Hash, Hasher},
+    //io::{BufRead, Cursor},
+    //iter::zip,
+    //marker::PhantomData,
+    //path::{Path, PathBuf},
+    //sync::Arc,
+    //str::FromStr,
+    //sync::OnceLock,
+};
 
 //use anyhow::{anyhow, bail, ensure, Context, Result};
 //use either::Either;
 //use log::{debug, error, info, trace, warn};
 //use rand::{distr::Uniform, Rng, RngCore};
+use tinyset::setu32::SetU32;
+
+use util::const_minmax::const_min_u128;
 
 //=================================================================================================|
 
-//pub(crate) mod problem;
-//pub(crate) mod rule;
-pub(crate) mod hasher;
-//pub(crate) mod solution;
-//pub(crate) mod sym;
-//pub(crate) mod sym_set;
+// The internal representation type for a symbol as a zero-based ordinal.
+type SymRepr = u32;
+
+/// The max value of a SymRepr
+pub(crate) static MAX_SYMREPR: SymRepr =
+    const_min_u128(&[usize::MAX as u128 - 1, SymRepr::MAX as u128]) as SymRepr;
+
+// The internal representation type for set of symbols.
+type SymSetRepr = SetU32;
+
+//=================================================================================================|
+
+/// [`BuildHasher`] for [`Symbol`].
+pub(crate) type BuildHasher_Symbol = crate::DefaultBuildHasher;
+
+/// [`BuildHasher`] for [`Sym`].
+pub(crate) type BuildHasher_Sym = crate::DefaultBuildHasher;
+
+//=================================================================================================|
+
+/// Calls `f` with the recommended amount to call [`try_reserve`] with.
+pub(crate) fn reserve_addl<E, F>(cur: usize, f: F) -> crate::error::Result<()>
+where
+    E: Into<crate::error::Error>,
+    F: FnOnce(usize) -> std::result::Result<(), E>,
+{
+    const CAPACITY_MULTIPLE: usize = 64;
+    let wanted = (cur + 1).next_multiple_of(CAPACITY_MULTIPLE);
+    let addl = wanted - cur;
+    if 0 < addl {
+        f(addl).map_err(Into::into)
+    } else {
+        Ok(())
+    }
+}
+
+//=================================================================================================|
+
+pub(crate) fn gen_random_name_strings<R: rand_core::RngCore>(
+    cnt: usize,
+    rng: &mut R,
+) -> Vec<String> {
+    use hashbrown::HashMap;
+    use rand_distr::{Distribution, Exp, Uniform};
+
+    type Symbol = String;
+
+    fn symbol_to_cowstr(symbol: &Symbol) -> Cow<'static, str> {
+        Cow::Owned(symbol.clone())
+    }
+
+    let opt_bx_dyn_fn_symbol_to_cowstr: Option<&crate::DynFnRefSymbolToCowstr<Symbol>> =
+        Some(&symbol_to_cowstr);
+
+    let exp = Exp::new(0.5).unwrap();
+
+    // Unwrap() is justified here because this is a const input.
+    #[allow(clippy::unwrap_used)]
+    let distr_char = Uniform::try_from('a'..='z').unwrap();
+
+    let hash_builder = crate::DefaultBuildHasher::new(rng.next_u64());
+
+    let mut h: HashMap<String, (), _> = HashMap::with_capacity_and_hasher(cnt * 2, hash_builder);
+    let mut v = vec![];
+    let mut cnt_iter = 25_u32;
+    while v.len() < cnt && cnt_iter < (1u32 << 30) {
+        cnt_iter += 1;
+        debug_assert_ne!(cnt_iter, 1u32 << 30);
+
+        let exp_multiplier: f64 = (cnt_iter as f64).log(26.0);
+        let f: f64 = exp.sample(rng) * exp_multiplier;
+        let string_len = 1_usize + f.round() as usize;
+
+        let mut s = String::new();
+        while s.len() < string_len {
+            let ch = distr_char.sample(rng);
+            s.push(ch);
+        }
+
+        if h.insert(s.clone(), ()).is_none() {
+            v.push(s);
+        }
+    }
+
+    v
+}

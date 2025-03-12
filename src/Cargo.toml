@@ -5,10 +5,12 @@ members = [
   "demo-eg",
   "eg",
   "eg-resourceproducer-filesystem",
-  "formulator",
-  # "electionguard",
+  #"formulator",
+  "test-electionguard",
+  "electionguard",
   # "preencrypted",
   "util",
+  "test-electionguard",
 ]
 
 [workspace.dependencies]
@@ -22,65 +24,114 @@ util = { path = "./util" }
 
 #--- From crates.io
 
+allocator-api2 = { version = "0.2.21", default-features = false, features = ["alloc"] }
+anyhow = "1.0.97"
 arbitrary = { version = "1.4.1", features = ["derive"] }
 derive_arbitrary  = "1.4.1"
-
-anyhow = "1.0.95"
-bimap = "0.6.3"
-bitflags = { version = "2.8.0", features = ["std"] }
-clap = { version = "4.5.17", features = ["derive", "env"] }
+#bimap = "0.6.3"
+bitflags = { version = "2.9.0", features = ["std"] }
+#bumpalo = { version = "3.17.0", default-features = false, features = ["allocator-api2", "boxed", "collections"] }
+clap = { version = "4.5.31", features = ["derive", "env"] }
 cfg-if = "1.0.0"
 downcast-rs = "2.0.1"
-derive_more = { version = "1.0.0", default-features = false }
-either = { version = "1.13.0", features = ["serde"] }
-erased-serde = { version = "0.4.5" }
+derive_more = { version = "2.0.1", default-features = false }
+either = { version = "1.15.0", features = ["serde"] }
+equivalent  = "1.0.2"
 faster-hex = { version = "0.10.0" }
-getrandom = { version = "0.3.1", default-features = false }
-#generic-array = { version = "1.2.0", default-features = false, features = ["const-default", "faster-hex", "serde", "typenum", "zeroize"] }
 hashbrown = { version = "0.15.2", default-features = false, features = [
-    #"allocator-api2",
-    #"equivalent",
+    "allocator-api2",
+    "equivalent",
     "inline-more",
     #"rayon",
     "raw-entry",
     "serde"
-] } # 
+] }
+hex-literal = { version = "1.0.0", default-features = false, features = [] }
+indexmap = { version = "2.7.1", default-features = false, features = [] }
 indoc = "2.0.5"
-inventory = "0.3.17"
+inventory = "0.3.20"
 itertools = "0.14.0"
 lazy_static = "1.4"
 maybe-owned = "0.3.4"
 num-bigint = { version = "0.4.6", features = ["serde"] }
 num-integer = "0.1.46"
 num-traits = { version = "0.2.19", features = ["libm"] }
-nutype = { version = "0.6.0", default-features = false, features = ["new_unchecked", "serde", "std"] }
+nutype = { version = "0.6.1", default-features = false, features = ["new_unchecked", "serde", "std"] }
 
-pathfinding = "4.13.1"  # defines no features
+#generic-array = { version = "1.2.0", default-features = false, features = ["const-default", "faster-hex", "serde", "typenum", "zeroize"] }
+#typenum = { version = "1.18.0", default-features = false, features = [] }
+
+# pathfinding = "4.13.1"  # defines no features
 # num-traits = "0.2.19"              # pathfinding
 # indexmap = "2.5.0"                 # pathfinding
 # rustc-hash = "2.0.0"               # pathfinding
 # integer-sqrt = "0.1.5"             # pathfinding
 # deprecate-until = "0.1.1"          # pathfinding
 
-proptest = "1.6.0"
-proptest-arbitrary-interop = "0.1.0"
+# proptest = { version = "1.6.0", features = [] }
+# proptest-arbitrary-interop = "0.1.0"
+
+smallbitvec = "2.6.0"
+static_assertions = "1.1.0"
+strum = { version = "0.27.1", features = ["derive", "std"] }
+strum_macros = "0.27.1"
+thiserror = "2.0.12"
+
+tempfile = { version = "3.17.1", default-features = false, features = [] }
+
+#--- Futures
+
+futures-lite = { version = "2.6.0", features = [
+    # Feature "default" gets dragged in by async-executor and lots of stuff
+    "futures-io", # Needed for simple timers
+] }
+
+# futures-core <- futures-lite
+futures-core = { version = "0.3.31", default-features = false }
+
+# futures-io <- futures-lite
+futures-io = { version = "0.3.31", default-features = false }
+
+# pin-project-lite <- futures-lite
+pin-project-lite = "0.2.16"
+
+async-global-executor = { version = "3.1.0", default-features = false, features = [
+    "async-io",
+    # "tokio",
+] }
+
+# Needed for simple timers
+#  async-io/default <- async-global-executor/async-io
+async-io = "2.4.0"
+
+async-process = { version = "2.3.0", default-features = false, features = [] }
+
+#async-fs = { version = "2.1.2", default-features = false }
+
+# async-lock default feature from async-process
+async-lock = "3.4.0"
+
+async-trait = { version = "0.1.87", default-features = false, features = [] }
+
+#--- Rand
+
+getrandom = { version = "0.3.1", default-features = false }
 rand = { version = "0.9.0", default-features = false, features = [
     "alloc",
 ] }
-rand_core     = { version = "0.9.0", default-features = false, features = ["std"] }
-# rand_distr  = { version = "0.9.0", default-features = false, features = ["alloc", "std_math"] }
-rand_xorshift = "0.3.0"
+rand_core = { version = "0.9.3", default-features = false, features = ["std"] }
+rand_distr  = { version = "0.5.1", default-features = false, features = ["std_math"] } # https://github.com/rust-random/rand_distr/blob/master/Cargo.toml
+rand_xorshift = { version = "0.4.0", default-features = false }
 rustc-stable-hash = "0.1.1"
+# zerocopy = "0.8.21"  # from rand 0.9
+# zerocopy-derive = "0.8.21"  # from zerocopy 0.8.20
 
-#3 TODO ? rand_distr = { version = "0.6.4", default-features = false, features = ["alloc", "std_math"] }
-serde = { version = "1.0.217", features = ["derive", "rc", "std"] }
-serde_json = { version = "1.0.135", features = ["preserve_order", "std"] }
+#--- Serde
 
-smallbitvec = "2.5.3"
-static_assertions = "1.1.0"
-strum = { version = "0.26.3", features = ["derive", "std"] }
-strum_macros = "0.26.4"
-thiserror = "2.0.0"                # pathfinding
+erased-serde = { version = "0.4.6" }
+serde = { version = "1.0.218", features = ["derive", "rc", "std"] }
+serde_json = { version = "1.0.139", features = ["preserve_order", "std"] }
+serde_with = { version = "3.12.0", default-features = false, features = ["macros"] }
 
 #--- Tracing
 
@@ -113,6 +164,11 @@ tracing-subscriber = { version = "0.3.19", default-features = false, features = 
 #with default features: newly dragged in by tracing and/or -subscriber "winapi 0.3.9"
 #with default features: newly dragged in by tracing and/or -subscriber "winapi-i686-pc-windows-gnu 0.4.0"
 #with default features: newly dragged in by tracing and/or -subscriber "winapi-x86_64-pc-windows-gnu 0.4.0"
+
+test-log = { version = "0.2.17", default-features = false, features = [
+    #"color",
+    "trace",
+]}
 
 #--- RustCrypto
 

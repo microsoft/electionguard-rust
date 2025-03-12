@@ -6,8 +6,6 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 
-#[cfg(feature = "eg-allow-test-data-generation")]
-use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::index::{Index, IndexError};
@@ -39,7 +37,7 @@ impl<T: HasIndexType + ?Sized> HasIndexType for std::sync::Arc<T> {
 }
 
 /// The [`std::error::Error`] type returned by the `Vec1` type.
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum Vec1Error {
     #[error(
         "A collection containing `{0}` elements of some kind was provided, which is larger than the limit of `2^31 - 1`."
@@ -52,13 +50,21 @@ pub enum Vec1Error {
     CollectionCantGrow,
 
     #[error("Likely out of memory: {0}")]
-    TryReserveError(#[from] std::collections::TryReserveError),
+    TryReserveError(
+        #[from]
+        #[serde(serialize_with = "crate::serde::serialize_std_collections_tryreserveerror")]
+        std::collections::TryReserveError,
+    ),
 
     #[error(transparent)]
     IndexError(#[from] IndexError),
 
     #[error(transparent)]
-    StdConvertInfallible(#[from] std::convert::Infallible),
+    StdConvertInfallible(
+        #[from]
+        #[serde(serialize_with = "crate::serde::serialize_std_convert_infallible")]
+        std::convert::Infallible,
+    ),
 }
 
 pub type Vec1Result<T> = std::result::Result<T, Vec1Error>;
@@ -339,7 +345,10 @@ impl<T: HasIndexType> Vec1<T> {
 
     /// Returns the index of a randomly selected element, or `None` if the collection is empty.
     #[cfg(feature = "eg-allow-test-data-generation")]
-    pub fn random_index<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<Index<T::IndexTypeParam>> {
+    pub fn random_index<R: rand::Rng + ?Sized>(
+        &self,
+        rng: &mut R,
+    ) -> Option<Index<T::IndexTypeParam>> {
         match self.len() {
             0 => None,
             1 => Some(Index::<T::IndexTypeParam>::one()),
@@ -739,9 +748,10 @@ mod test_vec1 {
     fn test() {
         let mut vec1: Vec1<char> = Vec1::new();
         assert_eq!(vec1.len(), 0);
-
-        let mut iter = vec1.indices();
-        assert_eq!(iter.next(), None);
+        {
+            let mut iter = vec1.indices();
+            assert_eq!(iter.next(), None);
+        }
 
         vec1.try_push('a').unwrap();
         assert_eq!(vec1.len(), 1);
@@ -751,12 +761,15 @@ mod test_vec1 {
                 .unwrap(),
             'a'
         );
-        let mut iter = vec1.indices();
-        assert_eq!(
-            iter.next(),
-            Some(CharIndex::try_from_one_based_index_u32(1).unwrap())
-        );
-        assert_eq!(iter.next(), None);
+
+        {
+            let mut iter = vec1.indices();
+            assert_eq!(
+                iter.next(),
+                Some(CharIndex::try_from_one_based_index_u32(1).unwrap())
+            );
+            assert_eq!(iter.next(), None);
+        }
 
         vec1.try_push('b').unwrap();
         assert_eq!(vec1.len(), 2);
@@ -767,15 +780,17 @@ mod test_vec1 {
             'b'
         );
 
-        let mut iter = vec1.indices();
-        assert_eq!(
-            iter.next(),
-            Some(CharIndex::try_from_one_based_index_u32(1).unwrap())
-        );
-        assert_eq!(
-            iter.next(),
-            Some(CharIndex::try_from_one_based_index_u32(2).unwrap())
-        );
-        assert_eq!(iter.next(), None);
+        {
+            let mut iter = vec1.indices();
+            assert_eq!(
+                iter.next(),
+                Some(CharIndex::try_from_one_based_index_u32(1).unwrap())
+            );
+            assert_eq!(
+                iter.next(),
+                Some(CharIndex::try_from_one_based_index_u32(2).unwrap())
+            );
+            assert_eq!(iter.next(), None);
+        }
     }
 }

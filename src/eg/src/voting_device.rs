@@ -20,7 +20,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::Write,
-    rc,
 };
 
 use itertools::Itertools;
@@ -29,9 +28,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     eg::Eg,
     errors::{EgError, EgResult},
-    hash::{eg_h, HValue, HValueByteArray, SpecificHValue},
+    hash::{HValue, HValueByteArray, SpecificHValue, eg_h},
+    resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
 };
+
+//? TODO Validatable
 
 //=================================================================================================|
 
@@ -189,7 +191,7 @@ impl VotingDeviceInformationSpec {
     /// Validates a specific [`VotingDeviceInformation`] against the [`VotingDeviceInformationSpec`].
     pub fn validate_voting_device_information_against_spec(
         &self,
-        eg: &Eg,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         vdi: &VotingDeviceInformation,
     ) -> Result<(), VotingDeviceInformationValidationError> {
         todo!(); //? TODO
@@ -240,7 +242,7 @@ impl SerializableCanonical for VotingDeviceInformationSpec {}
 
 /// [`Result::Err`](std::result::Result) type resulting from validating a
 /// [`VotingDeviceInformation`] against a [`VotingDeviceInformationSpec`].
-#[derive(thiserror::Error, Clone, Debug, Serialize)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[allow(non_camel_case_types)]
 pub enum VotingDeviceInformationValidationError {
     #[error(
@@ -286,7 +288,7 @@ impl VotingDeviceInformation {
             .and_then(|vby| String::from_utf8(vby).map_err(Into::<EgError>::into))
     }
 
-    /// Encodes `S_device` as described in Sec 3.4.3, to the supplied byte vector.
+    /// Encodes `S_device` as described in EGDS 2.1.0 Sec 3.4.3, to the supplied byte vector.
     ///
     /// - 4-byte length in bytes (big-endian)
     /// - that many bytes of string data in UTF-8
@@ -416,11 +418,11 @@ impl VotingDeviceInformationHash {
     ///
     /// Eq. 72  H_DI = H(H_E; 0x2A, S_device)
     ///
-    pub fn compute_from_voting_device_information(
-        eg: &Eg,
+    pub async fn compute_from_voting_device_information(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         vdi: &VotingDeviceInformation,
     ) -> EgResult<Self> {
-        let extended_base_hash = eg.extended_base_hash()?;
+        let extended_base_hash = produce_resource.extended_base_hash().await?;
         let extended_base_hash = extended_base_hash.as_ref();
         let h_e = extended_base_hash.h_e();
 
@@ -800,12 +802,13 @@ mod t {
         use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
         use VdiSpecItem_Requiredness::*;
 
-        let eg = &Eg::new_insecure_deterministic_with_example_election_data(
+        let eg = Eg::new_insecure_deterministic_with_example_election_data(
             "eg::voting_device::test::t11",
         )?;
+        let eg = eg.as_ref();
 
-        let rc_extended_base_hash = eg.extended_base_hash().unwrap();
-        let h_e = rc_extended_base_hash.h_e();
+        let arc_extended_base_hash = eg.extended_base_hash().await.unwrap();
+        let h_e = arc_extended_base_hash.h_e();
 
         // Test an example VotingDeviceInformation.
         let vdi = make_vdi();

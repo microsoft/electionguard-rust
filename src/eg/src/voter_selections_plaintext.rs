@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ballot_style::BallotStyleIndex,
     contest_option_fields::ContestOptionFieldsPlaintexts,
-    eg::Eg,
     election_manifest::{ContestIndex, ContestOptionIndex},
     errors::{EgError, EgResult},
     extended_base_hash::ExtendedBaseHash_H_E,
+    resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
     validatable::Validated,
 };
@@ -113,10 +113,10 @@ crate::impl_knows_friendly_type_name! { VoterSelectionsPlaintextInfo }
 crate::impl_MayBeResource_for_non_Resource! { VoterSelectionsPlaintextInfo }
 
 crate::impl_validatable_validated! {
-    src: VoterSelectionsPlaintextInfo, eg => EgResult<VoterSelectionsPlaintext> {
-        let election_h_e = eg.extended_base_hash()?.h_e().clone();
+    src: VoterSelectionsPlaintextInfo, produce_resource => EgResult<VoterSelectionsPlaintext> {
+        let election_h_e = produce_resource.extended_base_hash().await?.h_e().clone();
 
-        let election_manifest = eg.election_manifest()?;
+        let election_manifest = produce_resource.election_manifest().await?;
         let election_manifest = election_manifest.as_ref();
 
         let VoterSelectionsPlaintextInfo {
@@ -233,13 +233,13 @@ impl VoterSelectionsPlaintext {
 
     /// Constructs a new [`VoterSelectionsPlaintext`] from random contest selections.
     #[cfg(feature = "eg-allow-test-data-generation")]
-    pub fn new_generate_random_selections(
-        eg: &Eg,
+    pub async fn new_generate_random_selections(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         ballot_style_ix: BallotStyleIndex,
     ) -> EgResult<Self> {
-        let h_e = eg.extended_base_hash()?.h_e().clone();
+        let h_e = produce_resource.extended_base_hash().await?.h_e().clone();
 
-        let election_manifest = eg.election_manifest()?;
+        let election_manifest = produce_resource.election_manifest().await?;
         let election_manifest = election_manifest.as_ref();
 
         let ballot_style = election_manifest.get_ballot_style_validate_ix(ballot_style_ix)?;
@@ -247,7 +247,8 @@ impl VoterSelectionsPlaintext {
         let mut contests_option_fields_plaintexts = BTreeMap::new();
         for &contest_ix in ballot_style.contests().iter() {
             let contest = ballot_style.get_contest(election_manifest, contest_ix)?;
-            let contest_selections_pts = Self::random_contest_selections(contest, eg.csrng())?;
+            let contest_selections_pts =
+                Self::random_contest_selections(contest, produce_resource.csrng())?;
 
             contests_option_fields_plaintexts.insert(contest_ix, contest_selections_pts);
         }
@@ -258,7 +259,7 @@ impl VoterSelectionsPlaintext {
             contests_option_fields_plaintexts,
         };
 
-        VoterSelectionsPlaintext::try_validate_from(voter_selections_plaintext, eg)
+        VoterSelectionsPlaintext::try_validate_from(voter_selections_plaintext, produce_resource)
     }
 
     #[cfg(feature = "eg-allow-test-data-generation")]

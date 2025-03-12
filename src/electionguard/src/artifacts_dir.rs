@@ -5,13 +5,20 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
+#![allow(dead_code)] //? TODO: Remove temp development code
 
 use std::borrow::Borrow;
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
-use eg::guardian::GuardianIndex;
+use anyhow::{Context, Result, anyhow, bail};
+use eg::{
+    guardian::GuardianIndex,
+    resource_category::ResourceCategory,
+    resource_id::{ResourceFormat, ResourceId, ResourceIdFormat},
+    resource_path::ResourceNamespacePath,
+};
 
 /// Specifies whether to use the canonical or pretty form of an artifact.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,118 +27,87 @@ pub(crate) enum CanonicalPretty {
     Pretty,
 }
 
-/// Provides access to files in the artifacts directory.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub(crate) enum ArtifactFile {
     InsecureDeterministicPseudorandomSeedData,
-    ElectionManifestPretty,
-    ElectionManifestCanonical,
-    ElectionParameters,
-    Hashes,
-    ExtendedBaseHash,
-    PreVotingData,
-    GuardianSecretKey(GuardianIndex),
-<<<<<<< HEAD
-    GuardianPublicKey(GuardianIndex, CanonicalPretty),
-    JointElectionPublicKey,
-=======
-    GuardianPublicKey(GuardianIndex),
-    JointPublicKey,
-
-    #[cfg(feature = "eg-allow-test-data-generation")]
-    GeneratedTestDataVoterSelections(String),
-    //Ballot
-
->>>>>>> egds-2.1-pre
-    // #preencrypted_ballot#
-    // PreEncryptedBallotMetadata(u128),
-    // PreEncryptedBallot(u128, HValue),
-    // PreEncryptedBallotNonce(u128, HValue),
-    // VoterConfirmationCode(HValue),
+    ResourceNamespacePath(ResourceNamespacePath),
 }
 
 impl std::fmt::Display for ArtifactFile {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        PathBuf::from(self).as_path().display().fmt(f)
-    }
-}
-
-fn election_public_dir() -> PathBuf {
-    "public".into()
-}
-
-fn guardian_secret_dir(i: GuardianIndex) -> PathBuf {
-    format!("SECRET_for_guardian_{i}").into()
-}
-
-impl From<&ArtifactFile> for PathBuf {
-    fn from(artifact_file: &ArtifactFile) -> PathBuf {
-        use ArtifactFile::*;
-        match artifact_file {
-            InsecureDeterministicPseudorandomSeedData => {
-                election_public_dir().join("insecure_deterministic_seed_data.bin")
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArtifactFile::InsecureDeterministicPseudorandomSeedData => {
+                write!(f, "InsecureDeterministicPseudorandomSeedData")
             }
-            ElectionParameters => election_public_dir().join("election_parameters.json"),
-            ElectionManifestPretty => election_public_dir().join("election_manifest.json"),
-            ElectionManifestCanonical => {
-                election_public_dir().join("election_manifest_canonical.bin")
+            ArtifactFile::ResourceNamespacePath(resource_namespace_path) => {
+                std::fmt::Display::fmt(resource_namespace_path, f)
             }
-            GuardianSecretKey(i) => {
-                guardian_secret_dir(*i).join(format!("guardian_{i}.SECRET_key.json"))
-            }
-            GuardianPublicKey(i, canonical_pretty) => {
-                let cp = match canonical_pretty {
-                    CanonicalPretty::Canonical => "_canonical.bin",
-                    CanonicalPretty::Pretty => ".json",
-                };
-                election_public_dir().join(format!("guardian_{i}.public_key{cp}.json"))
-            }
-            Hashes => election_public_dir().join("hashes.json"),
-            JointPublicKey => election_public_dir().join("joint_public_key.json"),
-            ExtendedBaseHash => election_public_dir().join("extended_base_hash.json"),
-            PreVotingData => election_public_dir().join("pre_voting_data.json"),
-
-            #[cfg(feature = "eg-allow-test-data-generation")]
-            GeneratedTestDataVoterSelections(i) => election_public_dir()
-                .join(format!("generated_test_data_({i}).voter_selections.json")),
-            
-            //Ballot(ts, hv) => election_public_dir().join("ballots").join(format!(
-            //    "ballot-encrypted-{ts}-{}.json",
-            //    hv.to_string_hex_no_prefix_suffix()
-            //)),
-
-            //PreEncryptedBallotMetadata(ts) => Path::new("pre_encrypted/ballots/")
-            //    .join(format!("{ts}"))
-            //    .join(format!("metadata.{ts}.dat")),
-            //PreEncryptedBallot(ts, i) => Path::new("pre_encrypted/ballots/")
-            //    .join(format!("{ts}"))
-            //    .join(format!(
-            //        "ballot.{}.json",
-            //        i.to_string_hex_no_prefix_suffix()
-            //    )),
-            //PreEncryptedBallotNonce(ts, i) => Path::new("pre_encrypted/nonces/")
-            //    .join(format!("{ts}"))
-            //    .join(format!(
-            //        "nonce.SECRET.{}.json",
-            //        i.to_string_hex_no_prefix_suffix()
-            //    )),
-            //VoterSelection(ts, i) => Path::new("pre_encrypted/selections/")
-            //    .join(format!("{ts}"))
-            //    .join(format!("selection.SECRET.{}.json", i)),
-            // VoterConfirmationCode(i) => Path::new("pre_encrypted").join(format!(
-            //     "confirmation_code.{}.svg",
-            //     i.to_string_hex_no_prefix_suffix()
-            // )),
         }
     }
 }
 
-impl From<ArtifactFile> for PathBuf {
-    fn from(artifact_file: ArtifactFile) -> PathBuf {
-        PathBuf::from(&artifact_file)
+impl std::fmt::Debug for ArtifactFile {
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
     }
 }
+
+impl From<ResourceNamespacePath> for ArtifactFile {
+    /// A [`ArtifactFile`] can always be made from a [`ResourceNamespacePath`].
+    #[inline]
+    fn from(resource_namespace_path: ResourceNamespacePath) -> Self {
+        ArtifactFile::ResourceNamespacePath(resource_namespace_path)
+    }
+}
+
+/*
+impl TryFrom<ResourceId> for ArtifactFile {
+    type Error = anyhow::Error;
+    /// Attempts to convert a [`ResourceId`] into a [`ArtifactFile`].
+    #[inline]
+    fn try_from(resource_id: ResourceId) -> std::result::Result<Self, Self::Error> {
+        let resource_namespace_path = ResourceNamespacePath::try_from_resource_id(resource_id.clone())
+            .ok_or_else(|| anyhow!("Can't figure resource namespace path from {resource_id}"))?;
+        let self_ = ArtifactFile {
+            resource_namespace_path,
+        };
+        Ok(self_)
+    }
+}
+// */
+
+impl TryFrom<&ArtifactFile> for PathBuf {
+    type Error = anyhow::Error;
+    /// Attempts to convert a [`&ArtifactFile`] into a [`PathBuf`].
+    #[inline]
+    fn try_from(artifact_file: &ArtifactFile) -> std::result::Result<Self, Self::Error> {
+        let mut opt_resource_namespace_path = None;
+        let resource_namespace_path = match artifact_file {
+            ArtifactFile::InsecureDeterministicPseudorandomSeedData => {
+                // We need to resolve this filename even without `cfg!(feature = "eg-allow-test-data-generation")`,
+                // so we can log a warning if the file exists.
+                let resource_namespace_path = ResourceNamespacePath {
+                    resource_category: ResourceCategory::GeneratedTestData,
+                    dir_path_components: vec![],
+                    filename_base: "insecure_deterministic_seed_data".into(),
+                    filename_qualifier: "".into(),
+                    filename_ext: "bin".into(),
+                };
+                opt_resource_namespace_path.get_or_insert(resource_namespace_path)
+            }
+            ArtifactFile::ResourceNamespacePath(resource_namespace_path) => resource_namespace_path,
+        };
+        PathBuf::try_from(resource_namespace_path).map_err(|s| anyhow!("{s}"))
+    }
+}
+
+/*
+fn guardian_secret_dir(i: GuardianIndex) -> PathBuf {
+    format!("SECRET_for_guardian_{i}").into()
+}
+// */
 
 pub(crate) struct ArtifactsDir {
     pub dir_path: PathBuf,
@@ -150,14 +126,18 @@ impl ArtifactsDir {
 
     /// Returns the path to the specified artifact file.
     /// Does not check whether the file exists.
-    pub fn path<AF: Borrow<ArtifactFile>>(&self, artifact_file: AF) -> PathBuf {
-        let file_pb: PathBuf = artifact_file.borrow().into();
-        self.dir_path.join(file_pb)
+    pub fn path<AF: Borrow<ArtifactFile>>(&self, artifact_file: AF) -> Result<PathBuf> {
+        let artifact_file: &ArtifactFile = artifact_file.borrow();
+        let file_pb: PathBuf = artifact_file.try_into()?;
+        let pb = self.dir_path.join(file_pb);
+        Ok(pb)
     }
 
     /// Returns true if the file exists in the artifacts directory.
-    pub fn exists<AF: Borrow<ArtifactFile>>(&self, artifact_file: AF) -> bool {
-        self.path(artifact_file).try_exists().unwrap_or_default()
+    pub fn exists<AF: Borrow<ArtifactFile>>(&self, artifact_file: AF) -> Result<bool> {
+        let pb = self.path(artifact_file)?;
+        pb.try_exists()
+            .with_context(|| format!("Couldn't check path: {}", pb.display()))
     }
 
     /// Opens the specified artifact file according to the provided options.
@@ -167,7 +147,7 @@ impl ArtifactsDir {
         artifact_file: AF,
         open_options: &OpenOptions,
     ) -> Result<(File, PathBuf)> {
-        let file_path = self.path(artifact_file);
+        let file_path = self.path(artifact_file)?;
         let file = open_options
             .open(&file_path)
             .with_context(|| format!("Couldn't open file: {}", file_path.display()))?;
@@ -211,7 +191,7 @@ impl ArtifactsDir {
             let stdioread: Box<dyn std::io::Read> = Box::new(file);
             (stdioread, path)
         } else {
-            bail!("Specify at least one of opt_path or opt_artifact_file");
+            anyhow::bail!("Specify at least one of opt_path or opt_artifact_file");
         };
 
         Ok(stdioread_and_path)
@@ -243,7 +223,7 @@ impl ArtifactsDir {
             let bx_write: Box<dyn std::io::Write> = Box::new(file);
             (bx_write, path)
         } else {
-            bail!("Specify at least one of opt_path or opt_artifact_file");
+            anyhow::bail!("Specify at least one of opt_path or opt_artifact_file");
         };
 
         Ok(stdiowrite_and_path)

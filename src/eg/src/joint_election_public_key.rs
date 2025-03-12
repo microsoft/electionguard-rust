@@ -10,7 +10,7 @@
 //! This module provides the implementation of the [`JointPublicKey`] and [`Ciphertext`] for ballot encryption.
 //! For more details see Sections `3.2.2` and `3.3` of the Electionguard specification `2.0.0`. [TODO fix ref]
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::{ensure, Context, Result};
 use num_bigint::BigUint;
@@ -64,8 +64,8 @@ impl JointPublicKey {
     }
 
     /// Computes the [`JointPublicKey`].
-    pub fn compute(eg: &Eg, key_purpose: GuardianKeyPurpose) -> EgResult<JointPublicKey> {
-        let election_parameters = eg.election_parameters()?;
+    pub fn compute(produce_resource: &(dyn ProduceResource + Send + Sync + 'static), key_purpose: GuardianKeyPurpose) -> EgResult<JointPublicKey> {
+        let election_parameters = produce_resource.election_parameters().await?;
         let election_parameters = election_parameters.as_ref();
         let fixed_parameters = election_parameters.fixed_parameters();
         let group = fixed_parameters.group();
@@ -73,8 +73,8 @@ impl JointPublicKey {
         let varying_parameters = election_parameters.varying_parameters();
         let n = varying_parameters.n().get_one_based_usize();
 
-        let gpks = eg.guardian_public_keys(key_purpose)?;
-        let gpks = gpks.map_into(Rc::as_ref);
+        let gpks = produce_resource.guardian_public_keys(key_purpose)?;
+        let gpks = gpks.map_into(Arc::as_ref);
 
         // Validate every guardian public key against the election parameters.
         for &gpk in gpks.iter() {
@@ -260,7 +260,7 @@ mod t {
 
         JointPublicKey::get_or_compute(eg).unwrap();
 
-        let election_parameters = eg.election_parameters()?.as_ref();
+        let election_parameters = produce_resource.election_parameters().await?.as_ref();
         let fixed_parameters = election_parameters.fixed_parameters();
         let field = election_parameters.fixed_parameters().field;
 

@@ -1,0 +1,21 @@
+---
+source: formulator/src/imp/domain.rs
+expression: domain
+---
+Domain {
+    symbols: {
+        'a',
+        'b',
+        'c',
+    },
+    symbol_to_sym: {
+        'a' -> 0,
+    },
+    sym_to_symbol: {
+        0 -> 'a',
+    },
+    rules: [
+           0: Rule { ix: 0, requires: ['a'], produces: ['b'], cost: 10 },
+           1: Rule { ix: 1, requires: ['b'], produces: ['c'], cost: 20 },
+    ],
+}

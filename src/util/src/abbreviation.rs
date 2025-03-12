@@ -12,6 +12,6 @@ use std::borrow::Cow;
 //=================================================================================================|
 
 pub trait Abbreviation {
-    /// Returns an excessively short string hinting at the value useful only for logging.
+    /// Returns an excessively short string hinting at the value. Useful only for logging.
     fn abbreviation(&self) -> Cow<'static, str>;
 }

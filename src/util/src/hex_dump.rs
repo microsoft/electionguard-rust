@@ -123,14 +123,18 @@ impl HexDump {
     /// Produces a `std::fmt::Display` object that formats the supplied bytes.
     /// The `.to_string()` method can also be used on the resulting object.
     #[must_use]
-    pub fn dump<'a>(&self, bytes: &'a [u8]) -> HexDumpDisplay<'a> {
+    pub fn dump<'a, AsRefSliceU8>(&self, bytes: &'a AsRefSliceU8) -> HexDumpDisplay<'a>
+    where
+        AsRefSliceU8: AsRef<[u8]>,
+    {
         HexDumpDisplay {
             hd: self.clone(),
-            bytes,
+            bytes: bytes.as_ref(),
         }
     }
 }
 
+#[derive(serde_with::SerializeDisplay)]
 pub struct HexDumpDisplay<'a> {
     hd: HexDump,
     bytes: &'a [u8],
@@ -185,8 +189,6 @@ impl<'b, 'f, 'g> HexDumpOperation<'b, 'f, 'g> {
 
         let bytes_iter = self.bytes.iter().clone().cloned();
 
-        //#[allow(clippy::manual_div_ceil)]
-        //let cnt_lines = (cnt_bytes_total + self.hd.bytes_per_line - 1) / self.hd.bytes_per_line;
         let cnt_lines = cnt_bytes_total.div_ceil(self.hd.bytes_per_line);
 
         let addr_last_line = self.hd.addr_start + cnt_lines * self.hd.bytes_per_line;

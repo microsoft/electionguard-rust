@@ -8,23 +8,29 @@
 #![allow(clippy::panic)] // This is `cfg(test)` code
 #![allow(clippy::unwrap_used)] // This is `cfg(test)` code
 
-use std::{collections::BTreeSet, rc::Rc};
+use std::{collections::BTreeSet, sync::Arc};
 
 use util::vec1::Vec1;
 
 use crate::{
     ballot_style::{BallotStyle, BallotStyleInfo},
-    eg::Eg,
     election_manifest::{
         Contest, ContestIndex, ContestOption, ElectionManifest, ElectionManifestInfo,
     },
     errors::EgResult,
+    resource::ProduceResource,
     selection_limits::{ContestSelectionLimit, OptionSelectionLimit},
     validatable::Validated,
     voting_device::VotingDeviceInformationSpec,
 };
 
-pub fn example_election_manifest(eg: &Eg) -> EgResult<ElectionManifest> {
+#[allow(clippy::useless_attribute)]
+#[allow(unused_imports)]
+use crate::resource::ProduceResourceExt;
+
+pub fn example_election_manifest(
+    produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+) -> EgResult<ElectionManifest> {
     let label = "General Election - The United Realms of Imaginaria".to_string();
 
     let referendum_options = Vec1::try_from(vec![
@@ -458,11 +464,11 @@ pub fn example_election_manifest(eg: &Eg) -> EgResult<ElectionManifest> {
 
     let mut ballot_styles: Vec1<BallotStyle> = Vec1::new();
     for bsi in ballot_style_infos {
-        let bs = BallotStyle::try_validate_from(bsi, eg)?;
+        let bs = BallotStyle::try_validate_from(bsi, produce_resource)?;
         ballot_styles.try_push(bs)?;
     }
 
-    let voting_device_information_spec = Rc::new(VotingDeviceInformationSpec::default());
+    let voting_device_information_spec = Arc::new(VotingDeviceInformationSpec::default());
 
     use either::Either::*;
 
@@ -473,5 +479,5 @@ pub fn example_election_manifest(eg: &Eg) -> EgResult<ElectionManifest> {
         voting_device_information_spec,
     };
 
-    ElectionManifest::try_validate_from(election_manifest_info, eg)
+    ElectionManifest::try_validate_from(election_manifest_info, produce_resource)
 }

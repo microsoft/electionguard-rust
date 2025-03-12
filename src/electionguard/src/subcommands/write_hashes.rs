@@ -4,16 +4,20 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
-use eg::{hashes::Hashes, serializable::SerializablePretty, eg::Eg};
+use eg::{eg::Eg, hashes::Hashes, serializable::SerializablePretty};
 
 use crate::{
     artifacts_dir::ArtifactFile,
-    common_utils::{load_election_parameters, ElectionManifestSource},
+    common_utils::{
+        //load_election_parameters,
+        ElectionManifestSource,
+    },
     subcommand_helper::SubcommandHelper,
     subcommands::Subcommand,
 };
@@ -33,15 +37,11 @@ pub(crate) struct WriteHashes {
 
 impl Subcommand for WriteHashes {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
-        let mut eg = {
-            let csprng = subcommand_helper
-                .build_csprng()?
-                .write_str("WriteHashes")
-                .finish();
-            Eg::from_csprng(csprng)
-        };
-        let eg = &mut eg;
+        let eg = subcommand_helper.get_eg("WriteHashes")?;
+        let _eg = eg.as_ref();
+        anyhow::bail!("TODO: finish implementing WriteHashes");
 
+        /*
         //? TODO: Do we need a command line arg to specify the election parameters source?
         let _election_parameters =
             load_election_parameters(eg, &subcommand_helper.artifacts_dir)?;
@@ -68,5 +68,6 @@ impl Subcommand for WriteHashes {
         eprintln!("Wrote hashes to: {}", path.display());
 
         Ok(())
+        // */
     }
 }

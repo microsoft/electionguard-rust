@@ -17,7 +17,11 @@
 #![allow(non_snake_case)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-use std::{borrow::Cow, rc::Rc};
+use std::{
+    any::{Any, TypeId},
+    borrow::Cow,
+    sync::Arc,
+};
 
 use serde::Serialize;
 use tracing::{
@@ -27,10 +31,13 @@ use tracing::{
 use util::abbreviation::Abbreviation;
 
 use crate::{
-    eg::{Eg, RsrcCacheMap},
+    eg::Eg,
+    errors::EgError,
+    guardian::{AsymmetricKeyPart, GuardianKeyPartId},
     loadable::KnowsFriendlyTypeName,
     resource::{
-        ElectionDataObjectId as EdoId, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+        ElectionDataObjectId as EdoId, MayBeResource, ProduceResource, ProduceResourceExt,
+        Resource, ResourceFormat, ResourceId, ResourceIdFormat,
     },
     resource_producer::{
         ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionError,
@@ -41,7 +48,7 @@ use crate::{
         ResourceProducerCategory, ResourceProducerRegistration, ResourceProducerRegistry,
     },
     resource_production::RpOp,
-    validatable::Validated,
+    validatable::{Validatable, Validated},
 };
 
 //=================================================================================================|
@@ -55,9 +62,9 @@ pub(crate) struct ResourceProducer_ValidateToEdo;
 impl ResourceProducer_ValidateToEdo {
     pub const NAME: &str = "ValidateToEdo";
 
-    fn rc_new() -> Rc<dyn ResourceProducer_Any_Debug_Serialize> {
+    fn arc_new() -> Arc<dyn ResourceProducer_Any_Debug_Serialize + 'static> {
         let self_ = Self;
-        Rc::new(self_)
+        Arc::new(self_)
     }
 }
 
@@ -67,144 +74,267 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
     }
 
     fn fn_rc_new(&self) -> FnNewResourceProducer {
-        Self::rc_new
+        Self::arc_new
     }
 
     #[instrument(
-        name = "ResourceProducer_ValidateToEdo::maybe_produce",
-        fields(rf = trace_display(&rp_op.target_ridfmt)),
-        skip(self, eg, rp_op),
+        name = "RP_ValidateToEdo",
+        fields(rf = trace_display(&rp_op.requested_ridfmt())),
+        skip(self, rp_op),
         ret
     )]
-    fn maybe_produce(&self, eg: &Eg, rp_op: &mut RpOp) -> Option<ResourceProductionResult> {
-        use EdoId::*;
-        use ResourceFormat::{ConcreteType, ValidatedElectionDataObject};
-        use ResourceId::ElectionDataObject;
+    fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
+        tracing::Span::current().record(
+            "rid",
+            tracing::field::display(rp_op.requested_rid().abbreviation()),
+        );
+        tracing::Span::current().record(
+            "fmt",
+            tracing::field::display(rp_op.requested_fmt().abbreviation()),
+        );
 
-        //tracing::Span::current().record("rid", tracing::field::display(ridfmt.rid.abbreviation()));
-        //tracing::Span::current().record("fmt", tracing::field::display(ridfmt.fmt.abbreviation()));
+        let produce_resource = rp_op.as_ref();
 
-        // We only handle the case of requesting a validated ElectionDataObject.
-        // (Also, this extracts `edoid`.)
-        let ResourceIdFormat {
-            rid: ElectionDataObject(edoid),
-            fmt: ValidatedElectionDataObject,
-        } = rp_op.target_ridfmt().clone()
-        else {
-            return None;
+        let edo_id = match rp_op.requested_ridfmt() {
+            ResourceIdFormat {
+                rid: ResourceId::ElectionDataObject(edo_id),
+                fmt: ResourceFormat::ValidElectionDataObject,
+            } => edo_id.clone(),
+            _ => {
+                // We only handle requests for a validated ElectionDataObject.
+                return None;
+            }
         };
+
+        debug!("edo_id={edo_id:?}");
+
+        //? TODO temp test code
+        if edo_id == EdoId::ElectionManifest {
+            warn!("rp_op={rp_op:?}");
+        }
 
         // Try to obtain the resource in its not-yet-validated `Info` format.
 
-        let ridfmt_info_concrete = ResourceIdFormat {
-            rid: rp_op.target_ridfmt().rid.clone(),
-            fmt: ConcreteType,
+        let ridfmt_validatable = ResourceIdFormat {
+            rid: rp_op.requested_rid().clone(),
+            fmt: ResourceFormat::ConcreteType,
         };
 
-        let dependency_production_result = eg.produce_resource(&ridfmt_info_concrete);
+        debug!("ridfmt_validatable={ridfmt_validatable:?}");
 
-        match dependency_production_result {
+        let resource_production_result =
+            async_global_executor::block_on(rp_op.produce_resource(&ridfmt_validatable));
+
+        match resource_production_result {
+            Ok((arc_validatable, resource_source_validatable)) => {
+                // We managed to produce the requested `Validatable` type.
+
+                debug_assert_eq!(arc_validatable.ridfmt(), &ridfmt_validatable);
+
+                if arc_validatable.ridfmt() == &ridfmt_validatable {
+                    // Continue on to the next function to try to validate it to the type we need.
+                    self.maybe_produce2_(
+                        produce_resource,
+                        rp_op,
+                        &edo_id,
+                        ridfmt_validatable,
+                        arc_validatable,
+                        resource_source_validatable,
+                    )
+                } else {
+                    let e = ResourceProductionError::UnexpectedResourceIdFormatProduced {
+                        requested: ridfmt_validatable.clone(),
+                        produced: arc_validatable.ridfmt().clone(),
+                    };
+                    let e = ResourceProductionError::DependencyProductionError {
+                        ridfmt_request: rp_op.requested_ridfmt().clone(),
+                        dep_err: Box::new(e),
+                    };
+                    error!("{e:?}");
+                    Some(Err(e))
+                }
+            }
             Err(ResourceProductionError::NoProducerFound { .. }) => None,
             Err(dep_err) => {
                 let e = ResourceProductionError::DependencyProductionError {
-                    ridfmt_request: rp_op.target_ridfmt().clone(),
+                    ridfmt_request: rp_op.requested_ridfmt().clone(),
                     dep_err: Box::new(dep_err),
                 };
                 error!("{e:?}");
                 Some(Err(e))
-            }
-            Ok((rc_dyn_resource, rsrc_concrete)) => {
-                // We managed to produce the resource.
-                // Continue on to the next function to try to validate it to the type we need.
-                debug_assert_eq!(rc_dyn_resource.ridfmt(), &ridfmt_info_concrete);
-                self.maybe_produce2_(eg, rp_op, &edoid, rc_dyn_resource, rsrc_concrete)
             }
         }
     }
 }
 
 impl ResourceProducer_ValidateToEdo {
+    #[cfg(all(test, not(test)))] //? TODO would prefer something which didn't require generics
     fn maybe_produce2_(
         &self,
-        eg: &Eg,
-        rp_op: &mut RpOp,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+        rp_op: &Arc<RpOp>,
         edoid: &EdoId,
-        rc_dyn_resource: Rc<dyn Resource>,
+        ridfmt_validatable: ResourceIdFormat,
+        arc_validatable: Arc<dyn Resource>,
         rsrc: ResourceSource,
     ) -> Option<ResourceProductionResult> {
-        use EdoId::*;
-        use ResourceFormat::{ConcreteType, ValidatedElectionDataObject};
-        use ResourceId::ElectionDataObject;
+        use crate::validatable::{MayBeValidatableUnsized, ValidatableUnsized};
+        use downcast_rs::DowncastSync;
 
-        debug_assert_eq!(
-            &ResourceId::ElectionDataObject(edoid.clone()),
-            rp_op.target_rid()
-        );
+        let arc_dyn_any_send_sync = arc_validatable.into_any_arc();
+        let ref_dyn_any_send_sync =
+            AsRef::<dyn MayBeValidatableUnsized + Send + Sync>::as_ref(arc_dyn_any_send_sync);
 
-        match edoid {
-            // FixedParameters,
-            // VaryingParameters,
-            ElectionParameters => {
-                use crate::election_parameters::{ElectionParameters, ElectionParametersInfo};
-                type Validatable = ElectionParametersInfo;
-                type Validated = ElectionParameters;
+        // TODO can only downcast to concrete type.
+        match arc_dyn_any_send_sync.downcast::<dyn MayBeValidatableUnsized>() {
+            Err(arc) => {
+                let e = ResourceProductionError::CouldntDowncastResource {
+                    src_ridfmt: ridfmt_validatable,
+                    src_type: format!("{:?}", arc.type_id()),
+                    target_type: format!("{:?}", TypeId::of::<dyn MayBeValidatableUnsized>()),
+                };
+                error!("{e:?}");
+                Some(Err(e))
+            }
+            Ok(arc_dyn_maybevalidatableunsized) => {
+                info!("Successfully downcasted {}", arc_validatable.ridfmt());
 
-                let src_ridfmt = rc_dyn_resource.ridfmt().clone();
+                None //? TODO
+            }
+        }
+    }
 
-                //let downcast_result = rc_dyn_resource.into_any_rc().downcast::<Validatable>();
-                let downcast_result = rc_dyn_resource.downcast_rc::<Validatable>();
+    #[cfg(any(test, not(test)))] //? TODO current working code
+    fn maybe_produce2_(
+        &self,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+        rp_op: &Arc<RpOp>,
+        edoid: &EdoId,
+        ridfmt_validatable: ResourceIdFormat,
+        arc_validatable: Arc<dyn Resource>,
+        resource_source: ResourceSource,
+    ) -> Option<ResourceProductionResult> {
+        let arc_dyn_any_send_sync: Arc<dyn Any + Send + Sync> = arc_validatable.into_any_arc();
 
-                match downcast_result {
-                    Err(rc_dyn_any) => {
-                        let e = ResourceProductionError::CouldntDowncastResource {
-                            src_ridfmt,
-                            src_type: format!("{:?}", rc_dyn_any.type_id()),
-                            target_type: format!("{:?}", std::any::TypeId::of::<Validatable>()),
-                        };
-                        error!("{e:?}");
-                        Some(Err(e))
-                    }
-                    Ok(rc_validatable) => {
-                        let validate_result = Validated::try_validate_from_rc(rc_validatable, eg);
+        #[rustfmt::skip]
+        let result = match edoid {
+            EdoId::FixedParameters => self.maybe_produce3_::<crate::fixed_parameters::FixedParameters>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            EdoId::VaryingParameters => self.maybe_produce3_::<crate::varying_parameters::VaryingParameters>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            EdoId::ElectionParameters => self.maybe_produce3_::<crate::election_parameters::ElectionParameters>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            //? TODO EdoId::BallotStyle  => self.maybe_produce3_::<crate::ballot_style::BallotStyle>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            //? TODO EdoId::VotingDeviceInformationSpec  => self.maybe_produce3_::<crate::voting_device::VotingDeviceInformationSpec>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            EdoId::ElectionManifest => self.maybe_produce3_::<crate::election_manifest::ElectionManifest>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            //? TODO EdoId::Hashes  => self.maybe_produce3_::<crate::hashes::Hashes>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            EdoId::GuardianKeyPart(GuardianKeyPartId { asymmetric_key_part: AsymmetricKeyPart::Public, .. })  => self.maybe_produce3_::<crate::guardian_public_key::GuardianPublicKey>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            EdoId::GuardianKeyPart(GuardianKeyPartId { asymmetric_key_part: AsymmetricKeyPart::Secret, .. })  => self.maybe_produce3_::<crate::guardian_secret_key::GuardianSecretKey>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            //? TODO EdoId::JointPublicKey  => self.maybe_produce3_::<crate::joint_public_key::JointPublicKey>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            //? TODO EdoId::ExtendedBaseHash  => self.maybe_produce3_::<crate::extended_base_hash::ExtendedBaseHash>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            //? TODO EdoId::PreVotingData  => self.maybe_produce3_::<crate::pre_voting_data::PreVotingData>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            #[cfg(feature = "eg-allow-test-data-generation")]
+            //? TODO EdoId::GeneratedTestDataVoterSelections(_) => self.maybe_produce3_::<crate::voter_selections_plaintext::VoterSelectionsPlaintext>(eg, src_ridfmt, arc_dyn_any_send_sync, rsrc),
+            EdoId::ElectionTallies  => self.maybe_produce3_::<crate::election_tallies::ElectionTallies>(produce_resource, ridfmt_validatable, arc_dyn_any_send_sync,  resource_source),
+            _ => {
+                return None;
+            } //? TODO eventually this goes away?
+        };
+        Some(result)
+    }
 
-                        let result = match validate_result {
-                            Err(e) => {
-                                let e: ResourceProductionError = e.into();
-                                error!("{e:?}");
-                                Err(e)
-                            }
-                            Ok(election_parameters) => {
-                                let rc: Rc<dyn Resource> = Rc::new(election_parameters);
-                                let rsrc = ResourceSource::validated_from(src_ridfmt.fmt, rsrc);
-                                Ok((rc, rsrc))
-                            }
-                        };
+    fn maybe_produce3_<ValidatedInto>(
+        &self,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+        src_ridfmt: ResourceIdFormat,
+        arc_dyn_any_send_sync: Arc<dyn Any + Send + Sync>,
+        resource_source: ResourceSource,
+    ) -> ResourceProductionResult
+    where
+        ValidatedInto: Validated + Resource + Sized + Send + Sync,
+        <ValidatedInto as Validated>::ValidatedFrom: Resource + Clone + Sized + Send + Sync,
+    {
+        let src_typename = std::any::type_name_of_val(arc_dyn_any_send_sync.as_ref());
+        let src_typeid = arc_dyn_any_send_sync.as_ref().type_id();
 
-                        Some(result)
-                    }
+        //let valiated_into_typename = std::any::type_name::<ValidatedInto>();
+
+        // Try to downcast to the ValidatedFrom type, then try validation. Keep the most code possible in non-generic functions.
+        match arc_dyn_any_send_sync.downcast::<<ValidatedInto as Validated>::ValidatedFrom>() {
+            Ok(arc_validated_from) => {
+                let validate_result =
+                    ValidatedInto::try_validate_from_arc(arc_validated_from, produce_resource);
+                match validate_result {
+                    Ok(validated_into) => self.maybe_produce4_validate_ok(
+                        src_ridfmt,
+                        resource_source,
+                        Arc::new(validated_into),
+                    ),
+                    Err(e) => self.maybe_produce4_ok_validate_err(e),
                 }
             }
-            // ElectionManifest,
-            // Hashes,
-            // GuardianKeyPart(GuardianKeyId),
-            // JointPublicKey,
-            // ExtendedBaseHash,
-            // PreVotingData,
-            // #[cfg(feature = "eg-allow-test-data-generation")] GeneratedTestDataVoterSelections(seed),
-            // Ballot ?
-            _ => None, //? TODO eventually this goes away?
+            Err(arc_dyn_any) => {
+                let valiated_from_typename =
+                    std::any::type_name::<<ValidatedInto as Validated>::ValidatedFrom>();
+                let valiated_from_typeid =
+                    std::any::TypeId::of::<<ValidatedInto as Validated>::ValidatedFrom>();
+                self.maybe_produce4_downcast_err(
+                    src_ridfmt,
+                    resource_source,
+                    src_typename,
+                    src_typeid,
+                    valiated_from_typename,
+                    valiated_from_typeid,
+                )
+            }
         }
+    }
+
+    fn maybe_produce4_downcast_err(
+        &self,
+        src_ridfmt: ResourceIdFormat,
+        src_resource_source: ResourceSource,
+        src_typename: &'static str,
+        src_typeid: TypeId,
+        valiated_from_typename: &'static str,
+        valiated_from_typeid: TypeId,
+    ) -> ResourceProductionResult {
+        let src_type = format!("{src_typename} {src_typeid:?}");
+        let target_type = format!("{valiated_from_typename} {valiated_from_typename:?}");
+        let opt_src_type_expected = Some(target_type.clone());
+        let e = ResourceProductionError::CouldntDowncastResource {
+            src_ridfmt,
+            src_resource_source,
+            src_type,
+            opt_src_type_expected,
+            target_type,
+        };
+        error!("resourceproducer_validatetoedo: {e:?}");
+        Err(e)
+    }
+
+    fn maybe_produce4_validate_ok(
+        &self,
+        src_ridfmt: ResourceIdFormat,
+        resource_source: ResourceSource,
+        arc_validated: Arc<dyn Resource>,
+    ) -> ResourceProductionResult {
+        let rsrc = ResourceSource::validated_from(src_ridfmt.fmt, resource_source);
+        Ok((arc_validated, rsrc))
+    }
+
+    fn maybe_produce4_ok_validate_err(&self, e: EgError) -> ResourceProductionResult {
+        let e: ResourceProductionError = e.into();
+        error!("{e:?}");
+        Err(e)
     }
 }
 
 //=================================================================================================|
 
 fn gather_resourceproducer_registrations_ValidateToEdo(
-    f: &mut dyn FnMut(&[ResourceProducerRegistration]),
+    f: &mut dyn for<'a> FnMut(&'a [ResourceProducerRegistration]),
 ) {
     f(&[ResourceProducerRegistration::new_defaultproducer(
         ResourceProducer_ValidateToEdo::NAME,
-        ResourceProducer_ValidateToEdo::rc_new,
+        ResourceProducer_ValidateToEdo::arc_new,
     )]);
 }
 
@@ -217,17 +347,22 @@ inventory::submit! {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use anyhow::{anyhow, bail, ensure, Context, Result};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use insta::assert_ron_snapshot;
 
     use super::*;
     use crate::{eg_config::EgConfig, resource::ElectionDataObjectId as EdoId};
 
     #[test]
-    fn t0() {
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+    fn t1() {
+        async_global_executor::block_on(t1_async());
+    }
+
+    async fn t1_async() {
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::resource_provider_validatetoedo::t::t0",
         );
+        let eg = eg.as_ref();
 
         {
             let (dr_rc, dr_src) = eg
@@ -235,6 +370,7 @@ mod t {
                     rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
                     fmt: ResourceFormat::SliceBytes,
                 })
+                .await
                 .unwrap();
             assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
             assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
@@ -245,10 +381,12 @@ mod t {
         }
 
         {
-            let result = eg.produce_resource(&ResourceIdFormat {
-                rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-                fmt: ResourceFormat::ConcreteType,
-            });
+            let result = eg
+                .produce_resource(&ResourceIdFormat {
+                    rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
+                    fmt: ResourceFormat::ConcreteType,
+                })
+                .await;
             assert_ron_snapshot!(result, @r#"
             Err(NoProducerConfigured(
               ridfmt: ResourceIdFormat(

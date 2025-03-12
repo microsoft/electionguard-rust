@@ -12,7 +12,6 @@ use std::{
     ops::DerefMut,
 };
 
-use serde::{Deserialize, Serialize};
 use util::algebra::FieldElement;
 
 use crate::{
@@ -24,8 +23,9 @@ use crate::{
     election_manifest::ContestIndex,
     errors::{EgError, EgResult},
     fixed_parameters::FixedParameters,
-    hash::{eg_h, HValue, SpecificHValue},
+    hash::{HValue, SpecificHValue, eg_h},
     pre_voting_data::PreVotingData,
+    resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
     validatable::Validated,
     voter_selections_plaintext::{VoterSelectionsPlaintext, VoterSelectionsPlaintextInfo},
@@ -33,7 +33,7 @@ use crate::{
 
 //=================================================================================================|
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum BallotState {
     /// Voter selections are completed and present in encrypted form.
     /// The ballot has not yet been cast, challenged, or spoiled.
@@ -63,7 +63,9 @@ pub enum BallotState {
     Challenged,
 
     /// A challenged ballot in which voter selections have been decrypted.
-    /// Voter selections are present in both encrypted and plaintext form.
+    /// Voter selections are completed and present in encrypted form. The selections and other
+    /// contest data fields have been decrypted and the plaintext present in some other Election
+    /// Data Object, but the `Ballot` struct itself retains only the encrypted form.
     /// Selections MUST NOT be interpreted as an expression of voter intent.
     /// Selections MUST NOT be included in the tally.
     /// The challenged and decrypted ballot SHOULD be published.
@@ -126,9 +128,10 @@ where
 
 //=================================================================================================|
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct BallotInfo {
-    /// The 1-based index of the [`BallotStyle`] within the [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+    /// The 1-based index of the [`BallotStyle`] within the
+    /// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
     pub ballot_style_ix: BallotStyleIndex,
 
     /// The state of ballot.
@@ -168,15 +171,15 @@ pub struct BallotInfo {
     pub encryption_datetime: String,
 }
 
-impl<'de> Deserialize<'de> for BallotInfo {
+impl<'de> serde::Deserialize<'de> for BallotInfo {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::{Error, MapAccess, Visitor};
+        use serde::de::{Deserialize, Error, MapAccess, Visitor};
         use strum::{IntoStaticStr, VariantNames};
 
-        #[derive(Deserialize, IntoStaticStr, VariantNames)]
+        #[derive(serde::Deserialize, IntoStaticStr, VariantNames)]
         #[serde(field_identifier)]
         #[allow(non_camel_case_types)]
         enum Field {
@@ -275,8 +278,8 @@ crate::impl_MayBeResource_for_non_Resource! { BallotInfo } //? TODO impl Resourc
 impl SerializableCanonical for BallotInfo {}
 
 crate::impl_validatable_validated! {
-    src: BallotInfo, eg => EgResult<Ballot> {
-        let election_manifest = eg.election_manifest()?;
+    src: BallotInfo, produce_resource => EgResult<Ballot> {
+        let election_manifest = produce_resource.election_manifest().await?;
         let election_manifest = election_manifest.as_ref();
 
         let BallotInfo {
@@ -324,11 +327,10 @@ crate::impl_validatable_validated! {
         }
 
         // Also, invoke the common verification function for the ciphertexts.
-        Ballot::validate_contests_data_fields_ciphertexts_to_ballot_style(
-            eg,
-            ballot_style,
+        ballot_style.validate_contests_data_fields_ciphertexts(
+            produce_resource,
             &contests_data_fields_ciphertexts,
-            Some(ballot_style_ix) )?;
+            Some(ballot_style_ix) ).await?;
 
         //? TODO what additionally can we validate about this field?
 
@@ -347,14 +349,6 @@ crate::impl_validatable_validated! {
         //----- Validate `encryption_datetime`.
 
         //? TODO what additionally can we validate about this field?
-
-        //? TODO validate `confirmation_code`
-
-        //? TODO validate `device_id`
-
-        //? TODO validate `ballot_id`
-
-        //? TODO validate `encryption_datetime`
 
         //----- Construct and return the object from the validated data.
 
@@ -401,7 +395,8 @@ impl From<Ballot> for BallotInfo {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, ::serde::Serialize)]
+#[serde(crate = "::serde")]
 pub struct Ballot {
     //? TODO should we include h_e here?
     ballot_style_ix: BallotStyleIndex,
@@ -484,13 +479,13 @@ impl Ballot {
     ///
     /// If a nonce is not provided, a random nonce will be generated.
     #[allow(non_snake_case)]
-    pub fn try_new(
-        eg: &Eg,
+    pub async fn try_new(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         voter_selections_plaintext: VoterSelectionsPlaintext,
         chaining_field_B_C: &ChainingField,
         opt_ballot_nonce_xi_B: Option<BallotNonce_xi_B>,
     ) -> EgResult<Ballot> {
-        let extended_base_hash = eg.extended_base_hash()?;
+        let extended_base_hash = produce_resource.extended_base_hash().await?;
         let extended_base_hash = extended_base_hash.as_ref();
         let election_h_e = extended_base_hash.h_e();
 
@@ -510,8 +505,8 @@ impl Ballot {
         let h_e = voterselections_h_e;
 
         // Generate a random ballot nonce `xi_B` if one is not provided.
-        let ballot_nonce_xi_B =
-            opt_ballot_nonce_xi_B.unwrap_or_else(|| BallotNonce_xi_B::generate_random(eg.csrng()));
+        let ballot_nonce_xi_B = opt_ballot_nonce_xi_B
+            .unwrap_or_else(|| BallotNonce_xi_B::generate_random(produce_resource.csrng()));
 
         // Convert the plaintext contest option fields to plaintext contest data fields.
         let mut contests_data_fields_plaintexts: BTreeMap<
@@ -521,7 +516,7 @@ impl Ballot {
         for (contest_ix, contest_option_fields_plaintexts) in contests_option_fields_plaintexts {
             let specific_contest_data_fields_plaintexts =
                 ContestDataFieldsPlaintexts::try_from_option_fields(
-                    eg,
+                    produce_resource,
                     contest_ix,
                     contest_option_fields_plaintexts,
                 )?;
@@ -531,7 +526,7 @@ impl Ballot {
 
         // Figure the selection encryption identifier `id_b` and selection identifier hash `h_i`
 
-        let id_b = HValue::generate_random(eg.csrng());
+        let id_b = HValue::generate_random(produce_resource.csrng());
 
         let h_i = {
             let mut v = vec![0x20];
@@ -552,12 +547,13 @@ impl Ballot {
         for (contest_ix, contest_data_fields_plaintexts) in contests_data_fields_plaintexts {
             let contest_data_fields_ciphertexts = {
                 ContestDataFieldsCiphertexts::from_contest_data_fields_plaintexts(
-                    eg,
+                    produce_resource,
                     &h_i,
                     &ballot_nonce_xi_B,
                     contest_ix,
                     contest_data_fields_plaintexts,
-                )?
+                )
+                .await?
             };
 
             contests_data_fields_ciphertexts.insert(contest_ix, contest_data_fields_ciphertexts);
@@ -588,90 +584,7 @@ impl Ballot {
             encryption_datetime,
         };
 
-        Ballot::try_validate_from(ballot_info, eg)
-    }
-
-    //? TODO consider moving to [`BallotStyle`]
-    //
-    /// Verify a set of [`ContestDataFieldsCiphertexts`]s.
-    ///
-    /// Typically these would be from one [`Ballot`], but really what they have in
-    /// common is their [`BallotStyle`].
-    ///
-    /// It verifies that:
-    ///
-    /// - [`ContestDataFieldsCiphertexts`] are supplied for every contest on the `BallotStyle`,
-    /// - every `ContestIndex` belongs to the `BallotStyle`, and that
-    /// - all of the `ContestDataFieldsCiphertexts` proofs are correct.
-    ///
-    /// Supplying the `opt_ballot_style_ix` allows additional checks.
-    ///
-    pub fn validate_contests_data_fields_ciphertexts_to_ballot_style(
-        eg: &Eg,
-        ballot_style: &BallotStyle,
-        contests_data_fields_ciphertexts: &BTreeMap<ContestIndex, ContestDataFieldsCiphertexts>,
-        opt_ballot_style_ix: Option<BallotStyleIndex>,
-    ) -> EgResult<()> {
-        let election_manifest = eg.election_manifest()?;
-        let election_manifest = election_manifest.as_ref();
-
-        // Validates that the `BallotStyle` knows its `BallotStyleIndex`.
-        // See `BallotStyle::get_validated_ballot_style_ix()` for details.
-        let ballot_style_ix = ballot_style
-            .get_validated_ballot_style_ix(opt_ballot_style_ix, Some(election_manifest))?;
-
-        // Verify that every contest in the BallotStyle
-        // - is present in this ballot's data fields ciphertexts.
-        for &contest_ix in ballot_style.contests() {
-            if !contests_data_fields_ciphertexts.contains_key(&contest_ix) {
-                return Err(EgError::BallotMissingDataFieldsForContestInBallotStyle {
-                    ballot_style_ix,
-                    contest_ix,
-                });
-            }
-        }
-
-        // Verify that every contest for which data fields ciphertexts are supplied
-        // is present in the ballot style.
-        for &contest_ix in contests_data_fields_ciphertexts.keys() {
-            if !ballot_style.contests().contains(&contest_ix) {
-                return Err(EgError::BallotClaimsContestNonExistentInBallotStyle {
-                    ballot_style_ix,
-                    contest_ix,
-                });
-            }
-        }
-
-        // Verify the proofs for all data fields for every contest for which
-        // data fields ciphertexts are supplied.
-        let mut verified_contests = BTreeSet::<ContestIndex>::new();
-        for (&contest_ix, contest_fields_ciphertexts) in contests_data_fields_ciphertexts.iter() {
-            contest_fields_ciphertexts.verify_proofs_for_all_data_fields_in_contest(eg)?;
-
-            verified_contests.insert(contest_ix);
-        }
-
-        // Verify that we verified all contests in the ballot style.
-        for &contest_ix in ballot_style.contests() {
-            if !verified_contests.contains(&contest_ix) {
-                return Err(EgError::BallotContestNotVerified {
-                    ballot_style_ix,
-                    contest_ix,
-                });
-            }
-        }
-
-        // Verify that all contests we verified are in the ballot style.
-        for &contest_ix in verified_contests.iter() {
-            if !ballot_style.contests().contains(&contest_ix) {
-                return Err(EgError::BallotContestVerifiedNotInBallotStyle {
-                    ballot_style_ix,
-                    contest_ix,
-                });
-            }
-        }
-
-        Ok(())
+        Ballot::try_validate_from(ballot_info, produce_resource)
     }
 
     //? TODO move to `BallotScaled`
@@ -697,3 +610,325 @@ crate::impl_knows_friendly_type_name! { Ballot }
 crate::impl_MayBeResource_for_non_Resource! { Ballot } //? TODO impl Resource
 
 impl SerializableCanonical for Ballot {}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod t {
+    use anyhow::{Context, Result, anyhow, bail, ensure};
+
+    use util::csrng::{self, Csrng};
+
+    use crate::{
+        contest_option_fields::ContestOptionFieldsPlaintexts,
+        voting_device::{VotingDeviceInformation, VotingDeviceInformationHash},
+        zk::ZkProofRangeError,
+    };
+
+    use super::*;
+
+    fn test_verify_ballot_common(
+        csprng_seed_str: &str,
+        ballot_style_ix: BallotStyleIndex,
+        contests_option_fields_plaintexts: BTreeMap<ContestIndex, ContestOptionFieldsPlaintexts>,
+    ) -> EgResult<()> {
+        async_global_executor::block_on(test_verify_ballot_common_async(
+            csprng_seed_str,
+            ballot_style_ix,
+            contests_option_fields_plaintexts,
+        ))
+    }
+
+    async fn test_verify_ballot_common_async(
+        csprng_seed_str: &str,
+        ballot_style_ix: BallotStyleIndex,
+        contests_option_fields_plaintexts: BTreeMap<ContestIndex, ContestOptionFieldsPlaintexts>,
+    ) -> EgResult<()> {
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+            csprng_seed_str,
+        );
+        let eg = eg.as_ref();
+
+        let election_manifest = eg.election_manifest().await.unwrap();
+        let election_manifest = election_manifest.as_ref();
+
+        let ballot_style = election_manifest.get_ballot_style_validate_ix(ballot_style_ix)?;
+
+        let h_e = eg.extended_base_hash().await.unwrap().h_e().clone();
+
+        let voter_selections_plaintext = VoterSelectionsPlaintext::try_validate_from(
+            VoterSelectionsPlaintextInfo {
+                h_e,
+                ballot_style_ix,
+                contests_option_fields_plaintexts,
+            },
+            eg,
+        )
+        .unwrap();
+
+        let vdi = VotingDeviceInformation::new_empty();
+
+        let h_di = VotingDeviceInformationHash::compute_from_voting_device_information(eg, &vdi)
+            .await
+            .unwrap();
+
+        #[allow(non_snake_case)]
+        let chaining_field_B_C = ChainingField::new_no_chaining_mode(&h_di).unwrap();
+
+        #[allow(non_snake_case)]
+        let ballot_nonce_xi_B = BallotNonce_xi_B::generate_random(eg.csrng());
+
+        // This validates the ballot proofs.
+        let ballot = Ballot::try_new(
+            eg,
+            voter_selections_plaintext,
+            &chaining_field_B_C,
+            Some(ballot_nonce_xi_B),
+        )
+        .await
+        .unwrap();
+
+        // Verify the ballot proofs again to exercise this possibly-different code path.
+        ballot_style
+            .validate_contests_data_fields_ciphertexts(
+                eg,
+                ballot.contests_data_fields_ciphertexts(),
+                Some(ballot_style_ix),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn ballotstyle1_contest1_votes_0_0() -> EgResult<()> {
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle1_contest1_votes_0_0",
+            1.try_into()?,
+            [(
+                1.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle1_contest1_votes_0_1() -> EgResult<()> {
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle1_contest1_votes_0_1",
+            1.try_into()?,
+            [(
+                1.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle1_contest1_votes_1_0() -> EgResult<()> {
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle1_contest1_votes_1_0",
+            1.try_into()?,
+            [(
+                1.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle1_contest1_votes_1_1() -> EgResult<()> {
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle1_contest1_votes_1_1",
+            1.try_into()?,
+            [(
+                1.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_0_0_0_0_0_0() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_0_0_0_0_0_0",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 0, 0, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_0_0_0_0_0_1() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_0_0_0_0_0_1",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 0, 0, 1])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_0_0_0_0_1_0() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_0_0_0_0_1_0",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 0, 1, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_0_0_0_1_0_0() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_0_0_0_1_0_0",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 1, 0, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_0_0_1_0_0_0() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_0_0_1_0_0_0",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 1, 0, 0, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_0_1_0_0_0_0() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_0_1_0_0_0_0",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1, 0, 0, 0, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_1_0_0_0_0_0() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_1_0_0_0_0_0",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0, 0, 0, 0, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle5_contest5_votes_1_0_0_0_0_1_range_proof_error() -> EgResult<()> {
+        let ballot_style_ix = 5.try_into()?;
+        let result = test_verify_ballot_common(
+            "ballot::t::ballotstyle5_contest5_votes_1_0_0_0_0_1_range_proof_error",
+            ballot_style_ix,
+            [(
+                5.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0, 0, 0, 0, 1])?,
+            )]
+            .into(),
+        );
+        assert!(matches!(
+            result,
+            Err(EgError::ProofError(ZkProofRangeError::RangeNotSatisfied {
+                small_l: 2,
+                big_l: 1
+            }))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn ballotstyle6_contest6_votes_0_0() -> EgResult<()> {
+        let ballot_style_ix = 6.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle6_contest6_votes_0_0",
+            ballot_style_ix,
+            [(
+                6.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle6_contest6_votes_0_1() -> EgResult<()> {
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle6_contest6_votes_0_1",
+            6.try_into()?,
+            [(
+                6.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle6_contest6_votes_1_0() -> EgResult<()> {
+        let ballot_style_ix = 6.try_into()?;
+        test_verify_ballot_common(
+            "ballot::t::ballotstyle6_contest6_votes_1_0",
+            ballot_style_ix,
+            [(
+                6.try_into()?,
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0])?,
+            )]
+            .into(),
+        )
+    }
+
+    #[test]
+    fn ballotstyle6_contest6_votes_1_1_range_proof_error() {
+        let result = test_verify_ballot_common(
+            "ballot::t::ballotstyle6_contest6_votes_1_1_range_proof_error",
+            6.try_into().unwrap(),
+            [(
+                6.try_into().unwrap(),
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 1]).unwrap(),
+            )]
+            .into(),
+        );
+        assert!(matches!(
+            result,
+            Err(EgError::ProofError(ZkProofRangeError::RangeNotSatisfied {
+                small_l: 2,
+                big_l: 1
+            }))
+        ));
+    }
+}

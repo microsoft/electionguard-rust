@@ -7,7 +7,7 @@
 //! This module provides the implementation of the coefficient proof of knowledge for [`CoefficientCommitment`]s.
 //! For more details see Section `3.2.2` of the Electionguard specification `2.1.0`. [TODO check ref]
 
-use std::{iter::OnceWith, rc::Rc};
+use std::{iter::OnceWith, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use util::{
@@ -21,18 +21,19 @@ use crate::{
     el_gamal::{ElGamalPublicKey, ElGamalSecretKey},
     election_parameters::ElectionParameters,
     errors::{EgError, EgResult},
-    guardian::{GuardianIndex, GuardianKeyId, GuardianKeyPurpose},
+    guardian::{GuardianIndex, GuardianKeyPartId, GuardianKeyPurpose},
     guardian_public_key_trait::GuardianKeyInfoTrait,
     guardian_secret_key::{
         CoefficientCommitment, CoefficientCommitments, GuardianSecretKey, SecretCoefficient,
         SecretCoefficients,
     },
-    hash::{eg_h, eg_h_q_as_field_element, HVALUE_BYTE_LEN},
+    hash::{HVALUE_BYTE_LEN, eg_h, eg_h_q_as_field_element},
     hashes::ParameterBaseHash,
+    resource::{ProduceResource, ProduceResourceExt},
 };
 
 /// Represents errors occurring during the validation of a coefficient proof.
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum ProofValidationError {
     /// Occurs if the commitment is not a valid group element.
     #[error("The commitment is not a valid element in Z_p^r.")]
@@ -59,7 +60,7 @@ pub enum ProofValidationError {
 /// (K_{i,0}, K_{i,1}, ..., K_{i,k-1}) and κ_i."
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct CoefficientsProof {
-    guardian_key_id: GuardianKeyId,
+    guardian_key_id: GuardianKeyPartId,
 
     /// EGDS 2.1.0 eq. 11 pg. 23
     c_i: FieldElement,
@@ -68,16 +69,16 @@ pub struct CoefficientsProof {
     vec_v_i_j: Vec<FieldElement>,
 
     /// EGDS 2.1.0 bottom of pg. 21 "K_{i,j}"
-    coefficient_commitments: Rc<CoefficientCommitments>,
+    coefficient_commitments: Arc<CoefficientCommitments>,
 
     /// EGDS 2.1.0 eq. 9 pg. 23
-    guardian_commms_public_key: Rc<ElGamalPublicKey>,
+    guardian_commms_public_key: Arc<ElGamalPublicKey>,
 }
 
 impl CoefficientsProof {
     /// The [`GuardianKeyId`] to which this proof applies.
     #[allow(dead_code)]
-    fn guardian_key_id(&self) -> &GuardianKeyId {
+    fn guardian_key_id(&self) -> &GuardianKeyPartId {
         &self.guardian_key_id
     }
 
@@ -87,14 +88,14 @@ impl CoefficientsProof {
     /// - `guardian_secret_key` - the [`GuardianSecretKey`] for which the NIZK proof is being generated.
     /// - `guardian_comms_secret_key` - the [`ElGamalSecretKey`] for this guardian.
     #[allow(dead_code)] //? TODO: Remove temp development code
-    pub(crate) fn generate(
-        eg: &Eg,
+    pub(crate) async fn generate(
+        produce_resource: &(dyn crate::resource::ProduceResource + Send + Sync + 'static),
         guardian_secret_key: &GuardianSecretKey,
         guardian_comms_secret_key: &ElGamalSecretKey,
     ) -> EgResult<CoefficientsProof> {
         let guardian_key_id = *guardian_secret_key.guardian_key_id();
 
-        let election_parameters = eg.election_parameters()?;
+        let election_parameters = produce_resource.election_parameters().await?;
 
         let fixed_parameters = election_parameters.fixed_parameters();
         let field = fixed_parameters.field();
@@ -103,12 +104,12 @@ impl CoefficientsProof {
         let varying_parameters = election_parameters.varying_parameters();
         let k = varying_parameters.k().as_quantity();
 
-        let csrng = eg.csrng();
+        let csrng = produce_resource.csrng();
         let q_len_bytes = field.q_len_bytes();
         let p_len_bytes = group.p_len_bytes();
 
         let secret_coefficients = guardian_secret_key.secret_coefficients();
-        debug_assert_eq!(guardian_secret_key.secret_coefficients.len(), k);
+        debug_assert_eq!(guardian_secret_key.secret_coefficients().len(), k);
 
         let aby_pk_label = match guardian_key_id.key_purpose {
             GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields => b"pk_vote",
@@ -164,7 +165,7 @@ impl CoefficientsProof {
         let expected_len = 12 + (k + 1) * 2 * 512; // EGDS 2.1.0 pg. 74 (11, 13)
         assert_eq!(vec_msg_bytes.len(), expected_len);
 
-        let hashes = eg.hashes()?;
+        let hashes = produce_resource.hashes().await?;
         let h_p = hashes.h_p();
         let c_i = eg_h_q_as_field_element(h_p, &vec_msg_bytes, field);
 
@@ -184,7 +185,7 @@ impl CoefficientsProof {
             .collect();
 
         let coefficient_commitments =
-            Rc::new(guardian_secret_key.coefficient_commitments().clone());
+            Arc::new(guardian_secret_key.coefficient_commitments().clone());
 
         let coefficients_proof = CoefficientsProof {
             guardian_key_id,
@@ -238,7 +239,7 @@ impl CoefficientProof {
         FieldElement::from_bytes_be(c_bytes.0.as_slice(), &fixed_parameters.field)
     }
 
-    /// This function computes a [`CoefficientProof`] from given [`SecretCoefficient`] and [`CoefficientCommitment`].
+    /// Computes a [`CoefficientProof`] from given [`SecretCoefficient`] and [`CoefficientCommitment`].
     ///
     /// The arguments are
     /// - `csrng` - secure randomness generator
@@ -277,7 +278,7 @@ impl CoefficientProof {
         }
     }
 
-    /// This function verifies a [`CoefficientProof`] with respect to a given [`CoefficientCommitment`] and context.
+    /// Verifies a [`CoefficientProof`] with respect to a given [`CoefficientCommitment`] and context.
     ///
     /// The arguments are
     /// - `self` - the `CoefficientProof`
@@ -348,9 +349,10 @@ mod t0 {
     }
     #[test]
     fn test_guardian_proof_generation() -> EgResult<()> {
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::guardian_coeff_proof::t0::test_guardian_proof_generation");
-        let pre_voting_data = eg.pre_voting_data()?;
+        let eg = eg.as_ref();
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
         let pre_voting_data = pre_voting_data.as_ref();
         let election_parameters = pre_voting_data.election_parameters();
         let fixed_parameters = election_parameters.fixed_parameters();
@@ -381,9 +383,11 @@ mod t0 {
 
     #[test]
     fn test_guardian_proof_generation_wrong_index() -> EgResult<()> {
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::guardian_coeff_proof::t0::test_guardian_proof_generation_wrong_index");
-        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
+        let eg = eg.as_ref();
+
         let pre_voting_data = pre_voting_data.as_ref();
         let election_parameters = pre_voting_data.election_parameters();
         let fixed_parameters = election_parameters.fixed_parameters();

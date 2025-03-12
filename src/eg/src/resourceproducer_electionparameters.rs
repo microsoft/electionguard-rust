@@ -5,7 +5,11 @@
 #![deny(clippy::manual_assert)]
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
+#![deny(elided_lifetimes_in_paths)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(clippy::empty_line_after_doc_comments)] //? TODO: Remove temp development code
+#![allow(clippy::let_and_return)] //? TODO: Remove temp development code
+#![allow(clippy::needless_lifetimes)] //? TODO: Remove temp development code
 #![allow(dead_code)] //? TODO: Remove temp development code
 #![allow(unused_assignments)] //? TODO: Remove temp development code
 #![allow(unused_braces)] //? TODO: Remove temp development code
@@ -15,187 +19,211 @@
 #![allow(unreachable_code)] //? TODO: Remove temp development code
 #![allow(non_camel_case_types)] //? TODO: Remove temp development code
 #![allow(non_snake_case)] //? TODO: Remove temp development code
+#![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-use std::{borrow::Cow, rc::Rc};
+#[rustfmt::skip] //? TODO: Remove temp development code
+use std::{
+    borrow::{
+        Cow,
+        //Borrow,
+    },
+    //cell::RefCell,
+    //collections::{BTreeSet, BTreeMap},
+    //collections::{HashSet, HashMap},
+    //hash::{BuildHasher, Hash, Hasher},
+    //io::{BufRead, Cursor},
+    //iter::zip,
+    //marker::PhantomData,
+    //path::{Path, PathBuf},
+    //process::ExitCode,
+    sync::Arc,
+    //str::FromStr,
+    //sync::{,
+        //Arc,
+        //OnceLock,
+    //},
+};
 
-use serde::Serialize;
+//use anyhow::{anyhow, bail, ensure, Context, Result};
+use either::Either;
+//use futures_lite::future::{self, FutureExt};
+//use hashbrown::HashMap;
+//use rand::{distr::Uniform, Rng, RngCore};
+//use serde::{Deserialize, Serialize};
+//use static_assertions::{assert_obj_safe, assert_impl_all, assert_cfg, const_assert};
 use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
+//use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use util::abbreviation::Abbreviation;
 
 use crate::{
-    eg::{Eg, RsrcCacheMap},
+    eg::Eg,
+    election_parameters::{ElectionParameters, ElectionParametersInfo},
+    errors::ResourceProductionError,
+    fixed_parameters::{FixedParameters, FixedParametersInfo},
     loadable::KnowsFriendlyTypeName,
     resource::{
-        ElectionDataObjectId as EdoId, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
+        ElectionDataObjectId as EdoId, HasStaticResourceIdFormat, ProduceResource,
+        ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
     },
     resource_producer::{
-        ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionResult,
-        ResourceSource,
+        ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionOk,
+        ResourceProductionResult, ResourceSource,
     },
     resource_producer_registry::{
-        FnNewResourceProducer, GatherResourceProducerRegistrationsFnWrapper,
+        FnNewResourceProducer, GatherResourceProducerRegistrationsFnWrapper, RPFnRegistration,
         ResourceProducerCategory, ResourceProducerRegistration, ResourceProducerRegistry,
     },
     resource_production::RpOp,
-    validatable::Validated,
+    resourceproducer_specific::GatherRPFnRegistrationsFnWrapper,
+    validatable::{Validatable, Validated},
+    varying_parameters::{VaryingParameters, VaryingParametersInfo},
 };
 
 //=================================================================================================|
 
-/// A [`ResourceProducer`] that attempts to assemble an [`ElectionParametersInfo`].
-#[allow(non_camel_case_types)]
-#[derive(Clone, Debug, Default, Serialize)]
-pub(crate) struct ResourceProducer_ElectionParametersInfo;
+#[allow(non_upper_case_globals)]
+const RID_ElectionParameters: ResourceId =
+    ResourceId::ElectionDataObject(EdoId::ElectionParameters);
 
-impl ResourceProducer_ElectionParametersInfo {
-    fn rc_new() -> Rc<dyn ResourceProducer_Any_Debug_Serialize> {
-        let self_ = Self;
-        Rc::new(self_)
-    }
+#[allow(non_upper_case_globals)]
+const RIDFMT_ElectionParameters_ConcreteType: ResourceIdFormat = ResourceIdFormat {
+    rid: RID_ElectionParameters,
+    fmt: ResourceFormat::ConcreteType,
+};
+
+#[allow(non_upper_case_globals)]
+const RIDFMT_ElectionParameters_ValidatedEdo: ResourceIdFormat = ResourceIdFormat {
+    rid: RID_ElectionParameters,
+    fmt: ResourceFormat::ValidElectionDataObject,
+};
+
+#[allow(non_snake_case)]
+fn maybe_produce_ElectionParameters_ConcreteType(
+    rp_op: &Arc<RpOp>,
+) -> Option<ResourceProductionResult> {
+    async_global_executor::block_on(maybe_produce_ElectionParameters_ConcreteType_async(rp_op))
 }
 
-impl ResourceProducer for ResourceProducer_ElectionParametersInfo {
-    fn name(&self) -> Cow<'static, str> {
-        "ElectionParametersInfo".into()
+#[allow(non_snake_case)]
+async fn maybe_produce_ElectionParameters_ConcreteType_async(
+    rp_op: &Arc<RpOp>,
+) -> Option<ResourceProductionResult> {
+    // Only handle ElectionParametersInfo in the ConcreteType format.
+    let mut ridfmt = RIDFMT_ElectionParameters_ConcreteType;
+
+    let ridfmt_requested = rp_op.requested_ridfmt();
+
+    if ridfmt_requested != &ridfmt {
+        return Some(Err(
+            ResourceProductionError::UnexpectedResourceIdFormatRequested {
+                ridfmt_expected: ridfmt,
+                ridfmt_requested: ridfmt_requested.clone(),
+            },
+        ));
     }
 
-    fn fn_rc_new(&self) -> FnNewResourceProducer {
-        Self::rc_new
+    // If we already have a Validated EDO in the cache, just unvalidate it.
+    let ridfmt = RIDFMT_ElectionParameters_ValidatedEdo;
+    if let Some(Ok((arc_election_parameters, produce_resource))) = rp_op
+        .resources()
+        .obtain_resource_production_result_from_cache_downcast::<ElectionParameters>(&ridfmt)
+        .await
+    {
+        // Un-validate the ElectionParameters back to an ElectionParametersInfo
+        let produce_resource = ResourceSource::un_validated_from(produce_resource);
+        let election_parameters_info =
+            <ElectionParameters as Validated>::un_validate_from_rc(arc_election_parameters);
+        let production_result_ok: ResourceProductionOk =
+            (Arc::new(election_parameters_info), produce_resource);
+        return Some(Ok(production_result_ok));
     }
 
-    #[instrument(
-        name = "ResourceProducer_ElectionParametersInfo::maybe_produce",
-        fields(rf = trace_display(&rp_op.target_ridfmt)),
-        skip(self, eg, rp_op),
-        ret
-    )]
-    fn maybe_produce(&self, eg: &Eg, rp_op: &mut RpOp) -> Option<ResourceProductionResult> {
-        use EdoId::*;
-        use ResourceFormat::{ConcreteType, ValidatedElectionDataObject};
-        //? use ResourceId::ElectionDataObject;
-        //? let ridfmt_orig_request = ridfmt.clone();//?
-        //? // We only handle the case of requesting a validated ElectionDataObject.
-        //? // (Also, this extracts `edoid`.)
-        //? let ResourceIdFormat {
-        //?     rid: ElectionDataObject(edoid),
-        //?     fmt: ValidatedElectionDataObject,
-        //? } = ridfmt
-        //? else {
-        //?     return None;
-        //? };//?
-        //? // Try to obtain the resource in its not-yet-validated `Info` format.//?
-        //? let ridfmt_info_concrete = ResourceIdFormat {
-        //?     rid: ridfmt.rid.clone(),
-        //?     fmt: ConcreteType,
-        //? };//?
-        //? let dependency_production_result = eg.produce_resource(&ridfmt_info_concrete);//?
-        //? match dependency_production_result {
-        //?     Err(ResourceProductionError::NoProducerConfigured { .. }) => {
-        //?         None
-        //?     }
-        //?     Err(dep_err) => {
-        //?         let e = ResourceProductionError::DependencyProductionError {
-        //?             ridfmt_request: ridfmt.clone(),
-        //?             dep_err: Box::new(dep_err),
-        //?         };
-        //?         error!("{e:?}");
-        //?         Some(Err(e))
-        //?     }
-        //?     Ok((rc_dyn_resource, rsrc_concrete)) => {
-        //?         // We managed to produce the resource.
-        //?         // Continue on to the next function to try to validate it to the type we need.
-        //?         debug_assert_eq!(rc_dyn_resource.ridfmt(), &ridfmt_info_concrete);
-        //?         self.maybe_produce2_(
-        //?             eg,
-        //?             edoid,
-        //?             &ridfmt_orig_request,
-        //?             rc_dyn_resource,
-        //?             rsrc_concrete )
-        //?     }
-        //? }
-        None
-    }
+    // Obtain a validated FixedParameters from the cache, or try to produce a ConcreteType FixedParamsInfo.
+    let fixed_parameters = {
+        let mut ridfmt = ResourceIdFormat {
+            rid: ResourceId::ElectionDataObject(EdoId::FixedParameters),
+            fmt: ResourceFormat::ValidElectionDataObject,
+        };
+        let opt_result = rp_op
+            .resources()
+            .obtain_resource_production_result_from_cache_downcast_no_src::<FixedParameters>(
+                &ridfmt,
+            )
+            .await;
+        if let Some(Ok(arc_fixed_parameters)) = opt_result {
+            debug!("Obtained {ridfmt} from cache");
+            Either::Right(arc_fixed_parameters)
+        } else {
+            ridfmt.fmt = ResourceFormat::ConcreteType;
+            match rp_op
+                .produce_resource_downcast_no_src::<FixedParametersInfo>(&ridfmt)
+                .await
+            {
+                Ok(arc_fixed_parameters_info) => Either::Left(arc_fixed_parameters_info),
+                Err(e) => return Some(Err(e)),
+            }
+        }
+    };
+
+    // Obtain a validated VaryingParameters from the cache, or try to produce a ConcreteType VaryingParamsInfo.
+    let varying_parameters = {
+        let mut ridfmt = ResourceIdFormat {
+            rid: ResourceId::ElectionDataObject(EdoId::VaryingParameters),
+            fmt: ResourceFormat::ValidElectionDataObject,
+        };
+        let opt_result = rp_op
+            .resources()
+            .obtain_resource_production_result_from_cache_downcast_no_src::<VaryingParameters>(
+                &ridfmt,
+            )
+            .await;
+        if let Some(Ok(arc_varying_parameters)) = opt_result {
+            debug!("Obtained {ridfmt} from cache");
+            Either::Right(arc_varying_parameters)
+        } else {
+            ridfmt.fmt = ResourceFormat::ConcreteType;
+            match rp_op
+                .produce_resource_downcast_no_src::<VaryingParametersInfo>(&ridfmt)
+                .await
+            {
+                Ok(arc_varying_parameters_info) => Either::Left(arc_varying_parameters_info),
+                Err(e) => return Some(Err(e)),
+            }
+        }
+    };
+
+    let election_parameters_info = ElectionParametersInfo {
+        fixed_parameters,
+        varying_parameters,
+    };
+
+    Some(Ok((
+        Arc::new(election_parameters_info),
+        ResourceSource::constructed_concretetype(),
+    )))
 }
 
 //=================================================================================================|
 
-fn gather_resourceproducer_registrations_ElectionParametersInfo(
-    f: &mut dyn FnMut(&[ResourceProducerRegistration]),
-) {
-    f(&[ResourceProducerRegistration::new_defaultproducer(
-        "ElectionParametersInfo",
-        ResourceProducer_ElectionParametersInfo::rc_new,
-    )]);
+fn gather_rpspecific_registrations(register_fn: &mut dyn FnMut(RPFnRegistration)) {
+    register_fn(RPFnRegistration::new_defaultproducer(
+        ResourceIdFormat {
+            rid: RID_ElectionParameters,
+            fmt: ResourceFormat::ConcreteType,
+        },
+        Box::new(maybe_produce_ElectionParameters_ConcreteType),
+    ));
 }
 
 inventory::submit! {
-    GatherResourceProducerRegistrationsFnWrapper(gather_resourceproducer_registrations_ElectionParametersInfo)
+    GatherRPFnRegistrationsFnWrapper(gather_rpspecific_registrations)
 }
 
 //=================================================================================================|
 
-//? #[cfg(test)]
-//? #[allow(clippy::unwrap_used)]
-//? mod t {
-//?     use super::*;
-//?     use anyhow::{anyhow, bail, ensure, Context, Result};
-//?     use insta::assert_ron_snapshot;
-//?
-//?     use crate::eg_config::EgConfig;
-//?     use crate::resource::ElectionDataObjectId as EdoId;
-//?
-//?     #[test]
-//?     fn t0() {
-//?         let eg = &Eg::new_insecure_deterministic_with_example_election_data(
-//?             "eg::resource_provider_validatetoedo::t::t0",
-//?         )
-//?         .unwrap();
-//?
-//?         {
-//?             let (dr_rc, dr_src) = eg
-//?                 .produce_resource(&ResourceIdFormat {
-//?                     rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-//?                     fmt: ResourceFormat::SliceBytes,
-//?                 })
-//?                 .unwrap();
-//?             assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
-//?             assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
-//?             assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
-//?             assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
-//?             assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
-//?             //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
-//?         }
-//?
-//?         {
-//?             let result = eg.produce_resource(&ResourceIdFormat {
-//?                 rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-//?                 fmt: ResourceFormat::ConcreteType,
-//?             });
-//?             assert_ron_snapshot!(result, @r#"
-//?             Err(NoProducerConfigured(
-//?               ridfmt: ResourceIdFormat(
-//?                 id: ElectionDataObject(ElectionManifest),
-//?                 fmt: ConcreteType,
-//?               ),
-//?             ))
-//?             "#);
-//?         }
-//?
-//?         /*
-//?         {
-//?             let (dr_rc, dr_src) = eg
-//?                 .produce_resource(&ResourceIdFormat {
-//?                     id: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-//?                     fmt: ResourceFormat::ValidatedElectionDataObject,
-//?                 })
-//?                 .unwrap();
-//?             assert_ron_snapshot!(dr_rc.rid(), @r#"PersistedElectionDataObject(ElectionManifest)"#);
-//?             assert_ron_snapshot!(dr_rc.format(), @"ValidatedElectionDataObject");
-//?             assert_ron_snapshot!(dr_src, @"ExampleData");
-//?         }
-//?         // */
-//?     }
-//? }
+//? TODO impl test

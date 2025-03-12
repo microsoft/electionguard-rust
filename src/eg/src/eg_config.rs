@@ -26,7 +26,6 @@ use std::{
     //collections::{HashSet, HashMap},
     //io::{BufRead, Cursor},
     //path::{Path, PathBuf},
-    rc::Rc,
     //str::FromStr,
     //sync::OnceLock,
     sync::Arc,
@@ -130,8 +129,8 @@ impl EgConfig {
     #[inline]
     pub fn enable_test_data_generation(&mut self) {
         let rp = ResourceProducer_ExampleData::default();
-        let rc_rp = Rc::new(rp);
-        self.rpregistry.register_resourceproducer(rc_rp);
+        let arc_rp = Arc::new(rp);
+        self.rpregistry.register_resourceproducer(arc_rp);
     }
 
     /// `TESTING ONLY:` Enable test data generation using explicit values for `n` and `k`.
@@ -149,8 +148,8 @@ impl EgConfig {
         let k: GuardianIndex = k.try_into().map_err(EgError::from)?;
 
         let rp = ResourceProducer_ExampleData::new_n_k(n, k);
-        let rc_rp = Rc::new(rp);
-        self.rpregistry.register_resourceproducer(rc_rp);
+        let arc_rp = Arc::new(rp);
+        self.rpregistry.register_resourceproducer(arc_rp);
 
         Ok(())
     }
@@ -210,7 +209,7 @@ impl EgConfig {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use anyhow::{anyhow, bail, ensure, Context, Result};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use insta::assert_ron_snapshot;
 
     use super::*;
@@ -225,34 +224,24 @@ mod t {
           rpregistry: ResourceProducerRegistry(
             map: {
               RPRegistryEntry_Key(
-                name: "ElectionParametersInfo",
-                category: DefaultProducer,
-              ): RPRegistryEntry_Value(
-                rc_key: RPRegistryEntry_Key(
-                  name: "ElectionParametersInfo",
-                  category: DefaultProducer,
-                ),
-                opt_rc_rp: None,
-              ),
-              RPRegistryEntry_Key(
                 name: "Specific",
                 category: DefaultProducer,
               ): RPRegistryEntry_Value(
-                rc_key: RPRegistryEntry_Key(
+                arc_key: RPRegistryEntry_Key(
                   name: "Specific",
                   category: DefaultProducer,
                 ),
-                opt_rc_rp: None,
+                opt_arc_rp: None,
               ),
               RPRegistryEntry_Key(
                 name: "ValidateToEdo",
                 category: DefaultProducer,
               ): RPRegistryEntry_Value(
-                rc_key: RPRegistryEntry_Key(
+                arc_key: RPRegistryEntry_Key(
                   name: "ValidateToEdo",
                   category: DefaultProducer,
                 ),
-                opt_rc_rp: None,
+                opt_arc_rp: None,
               ),
             },
           ),

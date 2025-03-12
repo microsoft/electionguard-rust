@@ -54,7 +54,8 @@ impl Subcommand for VerifyGuardianProof {
             election_parameters = example_election_parameters()?;
             election_manifest = example_election_manifest_small();
         } else {
-            return Err(anyhow::anyhow!("Not implemented yet"));
+            //? TODO
+            bail!("Not implemented yet");
         }
 
         let hashes = Hashes::new(&election_parameters, &election_manifest);

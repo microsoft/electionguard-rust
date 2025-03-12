@@ -22,8 +22,8 @@ use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    errors::EgError,
-    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyId},
+    errors::{EgError, EgResult},
+    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPartId},
     resource::{ElectionDataObjectId, ResourceId},
     resource_category::ResourceCategory,
 };
@@ -86,14 +86,19 @@ impl ResourceNamespacePath {
     }
 }
 
-//=================================================================================================|
+impl std::fmt::Display for ResourceNamespacePath {
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
 
-impl TryFrom<ResourceNamespacePath> for std::path::PathBuf {
+impl TryFrom<&ResourceNamespacePath> for std::path::PathBuf {
     type Error = &'static str;
 
     /// Attempts to convert a [`ResourceNamespacePath`] into a [`std::path::PathBuf`].
     #[inline]
-    fn try_from(drnp: ResourceNamespacePath) -> Result<Self, Self::Error> {
+    fn try_from(drnp: &ResourceNamespacePath) -> Result<Self, Self::Error> {
         use std::borrow::Cow;
         use std::ffi::{OsStr, OsString};
         use std::path::{Path, PathBuf};
@@ -127,7 +132,6 @@ impl ResourceNamespacePath {
 
         match rid {
             ResourceId::ElectionGuardDesignSpecificationVersion => None,
-            ResourceId::Csrng => None,
             ResourceId::ElectionDataObject(election_data_object_id) => {
                 use ElectionDataObjectId::*;
 
@@ -204,7 +208,7 @@ impl ResourceNamespacePath {
 
     /// Many [`ResourceId`] variants constructed from an [`ElectionDataObjectId`] can
     /// recommend a [`ResourceNamespacePath`].
-    pub fn try_from_edoid(edo_id: ElectionDataObjectId) -> Option<ResourceNamespacePath> {
+    pub fn try_from_edoid_opt(edo_id: ElectionDataObjectId) -> Option<ResourceNamespacePath> {
         let rid = ResourceId::ElectionDataObject(edo_id);
         ResourceNamespacePath::try_from_resource_id(rid)
     }
@@ -213,13 +217,25 @@ impl ResourceNamespacePath {
     ///
     /// This is used for snapshot testing.
     #[cfg(test)]
-    pub fn into_xplatform_string_lossy(self) -> Option<String> {
+    pub fn into_xplatform_string_lossy(&self) -> Option<String> {
         std::path::PathBuf::try_from(self).ok().map(|pb| {
             pb.iter()
                 .map(|c| c.to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("/")
         })
+    }
+}
+
+impl TryFrom<ElectionDataObjectId> for ResourceNamespacePath {
+    type Error = EgError;
+
+    /// Attempts to convert a [`ElectionDataObjectId`] into a [`ResourceNamespacePath`].
+    #[inline]
+    fn try_from(edo_id: ElectionDataObjectId) -> std::result::Result<Self, Self::Error> {
+        let rid = ResourceId::ElectionDataObject(edo_id.clone());
+        ResourceNamespacePath::try_from_resource_id(rid)
+            .ok_or_else(|| EgError::ResourcePathFromEdoId(edo_id))
     }
 }
 
@@ -230,7 +246,7 @@ impl ResourceNamespacePath {
 mod t {
     use std::path::{Path, PathBuf};
 
-    use anyhow::{anyhow, bail, ensure, Context, Result};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use insta::assert_ron_snapshot;
 
     use super::*;
@@ -248,17 +264,17 @@ mod t {
         }
         {
             let edoid = FixedParameters;
-            let opt_rnsp = ResourceNamespacePath::try_from_edoid(edoid);
+            let opt_rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid);
             assert_ron_snapshot!(opt_rnsp, @"None");
         }
         {
             let edoid = VaryingParameters;
-            let opt_rnsp = ResourceNamespacePath::try_from_edoid(edoid);
+            let opt_rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid);
             assert_ron_snapshot!(opt_rnsp, @"None");
         }
         {
             let edoid = ElectionParameters;
-            let mut rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let mut rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             rnsp.specify_canonical();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
@@ -273,7 +289,7 @@ mod t {
         }
         {
             let edoid = ElectionManifest;
-            let mut rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let mut rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             rnsp.specify_pretty();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
@@ -288,7 +304,7 @@ mod t {
         }
         {
             let edoid = Hashes;
-            let rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: BeforeVotingBegins_Published,
@@ -301,13 +317,13 @@ mod t {
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/hashes.json""#);
         }
         {
-            let edoid = GuardianKeyPart(GuardianKeyId {
+            let edoid = GuardianKeyPart(GuardianKeyPartId {
                 guardian_ix: GuardianIndex::one(),
                 key_purpose:
                     GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
                 asymmetric_key_part: AsymmetricKeyPart::Secret,
             });
-            let rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: SecretForGuardian(1),
@@ -323,7 +339,7 @@ mod t {
             let edoid = JointPublicKey(
                 GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
             );
-            let rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: BeforeVotingBegins_Published,
@@ -337,7 +353,7 @@ mod t {
         }
         {
             let edoid = ExtendedBaseHash;
-            let rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: BeforeVotingBegins_Published,
@@ -351,7 +367,7 @@ mod t {
         }
         {
             let edoid = PreVotingData;
-            let rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: BeforeVotingBegins_Published,
@@ -366,7 +382,7 @@ mod t {
         {
             let hv: crate::hash::HValue = std::array::from_fn(|ix| ix as u8 + 0x50).into();
             let edoid = GeneratedTestDataVoterSelections(hv);
-            let rnsp = ResourceNamespacePath::try_from_edoid(edoid).unwrap();
+            let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: GeneratedTestData,

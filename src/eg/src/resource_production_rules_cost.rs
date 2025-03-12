@@ -36,8 +36,11 @@
 #[repr(i32)]
 #[derive(Debug, Clone, Copy)]
 pub enum CostCategory {
-    /// Cost of retrieval from cache, e.g., cloning an [`Rc<T>`](std::rc::Rc).
+    /// Cost of retrieval from cache, e.g., cloning an [`Arc<T>`](std::sync::Arc).
     ExistsInCache = 0x0030_0000,
+
+    /// Cost of extracting a sub-field from a larger resource.
+    Extraction = 0x0032_0000,
 
     /// Derive without having to perform validation checks.
     ///

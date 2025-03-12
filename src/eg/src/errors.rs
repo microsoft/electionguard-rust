@@ -8,13 +8,18 @@
 #![allow(non_camel_case_types)] // We use underscores for clarity in some error message identifiers
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
+use std::{any, char::MAX, sync::Arc};
+
+use static_assertions::assert_impl_all;
+
 use crate::{
     ballot_style::BallotStyleIndex,
     ciphertext::CiphertextIndex,
+    egds_version::ElectionGuard_DesignSpecification_Version,
     election_manifest::{ContestIndex, ContestOptionIndex},
     guardian::{GuardianIndex, GuardianKeyPurpose},
     hash::HValue,
-    resource::ResourceIdFormat,
+    resource::{ElectionDataObjectId, ResourceId, ResourceIdFormat},
 };
 pub use crate::{
     el_gamal::ElGamalError,
@@ -29,7 +34,7 @@ pub use crate::{
 };
 
 /// The main [`std::error::Error`] type returned by functions of the `eg` crate.
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum EgError {
     #[error(
         "Need exactly `{expected}` bytes to make an `HValue` but received `{actual}` bytes instead."
@@ -254,12 +259,8 @@ PreVotingData h_e=`{election_h_e}`"
     #[error("Random number generation error: {0}")]
     RandError(String),
 
-    /*
-    #[error("Likely out of memory: {0}")]
-    TryReserveError(#[from] std::collections::TryReserveError),
-    // */
     #[error(transparent)]
-    OtherA(#[from] anyhow::Error),
+    OtherError(WrapAnnoyingError<anyhow::Error>),
 
     #[error("{0}")]
     Str(&'static str),
@@ -272,6 +273,35 @@ PreVotingData h_e=`{election_h_e}`"
 
     #[error(transparent)]
     CombineProofError(#[from] CombineProofError),
+
+    #[error(
+        "The fixed parameters claim to be for `{egds_version_from_fp_info}`, but they do not match the standard parameters `{egds_version_from_standard_params}`."
+    )]
+    FixedParametersDoNotMatchStatedElectionGuardDesignSpecificationVersion {
+        egds_version_from_fp_info: ElectionGuard_DesignSpecification_Version,
+        egds_version_from_standard_params: ElectionGuard_DesignSpecification_Version,
+    },
+
+    #[error(
+        "The fixed parameters neither declare an ElectionGuard Design Specification version, nor do they do not match the standard parameters `{egds_version_from_standard_params}`."
+    )]
+    FixedParametersDoNotDeclareAnElectionGuardDesignSpecificationVersionOrMatchStandardParams {
+        egds_version_from_standard_params: ElectionGuard_DesignSpecification_Version,
+    },
+
+    #[error(
+        "The fixed parameters version `{egds_version_from_fp_info}` cannot be accepted because the application does not support toy parameters."
+    )]
+    ToyParametersNotSupported {
+        egds_version_from_fp_info: ElectionGuard_DesignSpecification_Version,
+    },
+
+    #[error(
+        "The fixed parameters version `{egds_version_from_fp_info}` cannot be accepted because the application does not support a non-standard ElectionGuard Design Specification version."
+    )]
+    NonstandardEgdsVersionNotSupported {
+        egds_version_from_fp_info: ElectionGuard_DesignSpecification_Version,
+    },
 
     #[error(transparent)]
     GuardianSecretKeyShareGenerationError(
@@ -290,34 +320,56 @@ PreVotingData h_e=`{election_h_e}`"
     ElGamal(#[from] ElGamalError),
 
     #[error(transparent)]
-    LoadingError(#[from] EgLoadingError),
+    LoadingError(EgLoadingError),
+
+    #[error("During loading: {_0}.")]
+    DuringLoading(Box<EgError>),
 
     #[error(transparent)]
     ValidationError(#[from] EgValidateError),
 
-    #[error(transparent)]
-    TooLargeFor31Bits(#[from] util::uint31::Uint31Error),
+    #[error("During validation: {_0}.")]
+    DuringValidation(Box<EgError>),
 
     #[error(transparent)]
-    TooLargeFor53Bits(#[from] util::uint53::Uint53Error),
+    TooLargeFor31Bits(#[from] util::uint31::U31Error),
+
+    #[error(transparent)]
+    TooLargeFor53Bits(#[from] util::uint53::U53Error),
 
     #[error("Internal error.")]
-    StdConvertInfallible(#[from] std::convert::Infallible),
+    StdConvertInfallible(
+        #[from]
+        #[serde(serialize_with = "util::serde::serialize_std_convert_infallible")]
+        std::convert::Infallible,
+    ),
 
-    #[error("IO error.")]
-    StdIoError(#[from] std::io::Error),
+    #[error("IO error: {0}")]
+    StdIoError(WrapAnnoyingError<std::io::Error>),
 
     #[error("Value out of range: {0}")]
-    TryFromIntError(#[from] std::num::TryFromIntError),
+    TryFromIntError(
+        #[from]
+        #[serde(serialize_with = "util::serde::serialize_std_num_tryfrominterror")]
+        std::num::TryFromIntError,
+    ),
 
     #[error("Malformed UTF-8: {0}")]
-    MalformedUtf8Error(#[from] std::string::FromUtf8Error),
+    MalformedUtf8Error(
+        #[from]
+        #[serde(serialize_with = "util::serde::serialize_std_string_fromutf8error")]
+        std::string::FromUtf8Error,
+    ),
 
     #[error(transparent)]
     FieldError(#[from] util::algebra::FieldError),
 
     #[error(transparent)]
-    ParseIntError(#[from] std::num::ParseIntError),
+    ParseIntError(
+        #[from]
+        #[serde(serialize_with = "util::serde::serialize_std_num_parseinterror")]
+        std::num::ParseIntError,
+    ),
 
     #[error(
         "Overflow encrypting contest `{contest_ix}` option field `{option_field_ix}`, needed for selection limit proof."
@@ -382,8 +434,14 @@ PreVotingData h_e=`{election_h_e}`"
     #[error("During resource production: {_0}.")]
     DuringResourceProduction(Box<EgError>),
 
+    #[error("A path could not be constructed for election data object `{0}`.")]
+    ResourcePathFromEdoId(ElectionDataObjectId),
+
+    #[error("A path could not be constructed for resource `{0}`.")]
+    ResourcePathFromResourceId(ResourceId),
+
     #[error("The `{ridfmt}` is not correct for type `{ty}`.")]
-    UnexpectedResourceIdFormat {
+    UnexpectedResourceIdFormatForType {
         ridfmt: ResourceIdFormat,
         ty: &'static str,
     },
@@ -416,29 +474,15 @@ PreVotingData h_e=`{election_h_e}`"
     },
 }
 
+assert_impl_all!(EgError: Send, Sync);
+
 impl EgError {
     pub fn unless<F, E>(cond: bool, f: F) -> EgResult<()>
     where
         F: Fn() -> E,
         E: Into<EgError>,
     {
-        if cond {
-            Ok(())
-        } else {
-            Err(f().into())
-        }
-    }
-}
-
-// We can't use the `Serialize` derive macro, even with the #[serde(into = "String")] attribute,
-// because the `anyhow` EgError variant doesn't support `Clone`.
-impl serde::ser::Serialize for EgError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        let s = self.to_string();
-        serializer.serialize_str(s.as_str())
+        if cond { Ok(()) } else { Err(f().into()) }
     }
 }
 
@@ -465,6 +509,16 @@ impl From<rand::distr::weighted::Error> for EgError {
     }
 }
 
+impl From<EgLoadingError> for EgError {
+    /// An [`EgError`] can always be made from a [`EgLoadingError`].
+    fn from(src: EgLoadingError) -> Self {
+        match src {
+            EgLoadingError::EgError(bx_egerror) => Self::DuringLoading(bx_egerror),
+            _ => Self::LoadingError(src),
+        }
+    }
+}
+
 impl From<ResourceProductionError> for EgError {
     /// An [`EgError`] can always be made from a [`ResourceProductionError`].
     fn from(src: ResourceProductionError) -> Self {
@@ -477,6 +531,39 @@ impl From<ResourceProductionError> for EgError {
     }
 }
 
+impl From<anyhow::Error> for EgError {
+    /// A [`EgError`] can always be made from a [`anyhow::Error`].
+    #[inline]
+    fn from(anyhow_error: anyhow::Error) -> Self {
+        EgError::OtherError(WrapAnnoyingError::from_anyhow_Error(anyhow_error))
+    }
+}
+impl From<std::io::Error> for EgError {
+    /// A [`EgError`] can always be made from a [`std::io::Error`].
+    #[inline]
+    fn from(src: std::io::Error) -> Self {
+        EgError::StdIoError(WrapAnnoyingError::from(src))
+    }
+}
+
+//? TODO this can go away when we move away from that inflexible macro generating the util::uint31::Uint31 type.
+impl From<util::uint31::Uint31Error> for EgError {
+    /// A [`EgError`] can always be made from a [`util::uint31::Uint31Error`].
+    #[inline]
+    fn from(src: util::uint31::Uint31Error) -> Self {
+        EgError::TooLargeFor31Bits(src.into())
+    }
+}
+
+//? TODO this can go away when we move away from that inflexible macro generating the util::uint53::Uint53 type.
+impl From<util::uint53::Uint53Error> for EgError {
+    /// A [`EgError`] can always be made from a [`util::uint53::Uint53Error`].
+    #[inline]
+    fn from(src: util::uint53::Uint53Error) -> Self {
+        EgError::TooLargeFor53Bits(src.into())
+    }
+}
+
 impl From<EgError> for String {
     /// Makes an [`String`](std::string::String) from an [`EgError`].
     fn from(e: EgError) -> Self {
@@ -486,3 +573,110 @@ impl From<EgError> for String {
 
 /// [`Result`](std::result::Result) type with `Err` type `E` of [`EgError`].
 pub type EgResult<T> = std::result::Result<T, EgError>;
+
+/// A wrapper for:
+///
+/// - anyhow::Error, because it does not implement [`std::error::Error`].
+/// - std::io::Error, because it does not implement [`std::ops::Clone`].
+#[derive(serde::Serialize)]
+pub struct WrapAnnoyingError<T>(Vec<String>, #[serde(skip)] Arc<T>)
+where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync;
+
+impl<T> Clone for WrapAnnoyingError<T>
+where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync,
+{
+    /// Returns a copy of the [`WrapAnnoyingError<T>`].
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1.clone())
+    }
+}
+impl<T> WrapAnnoyingError<T>
+where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync,
+{
+    pub fn ref_inner_arc(&self) -> &Arc<T> {
+        &self.1
+    }
+
+    fn append_error_strings(v: &mut Vec<String>, e: &dyn std::error::Error) {
+        const MAX_DEPTH: usize = 100;
+        const MAX_V: usize = 1000;
+
+        fn recur(v: &mut Vec<String>, depth: usize, e: &dyn std::error::Error) {
+            if v.len() < MAX_V {
+                v.push(format!("{depth}: {e:?}"));
+                if depth < MAX_DEPTH {
+                    let mut opt_e: Option<&dyn std::error::Error> = e.source();
+                    while let Some(e) = opt_e {
+                        recur(v, depth + 1, e);
+                        opt_e = e.source();
+                    }
+                }
+            }
+        }
+
+        recur(v, 1, e);
+    }
+}
+impl WrapAnnoyingError<anyhow::Error> {
+    /// A [`WrapAnyhowError`] can always be made from a [`anayhow::Error`].
+    #[allow(non_snake_case)]
+    #[inline]
+    pub fn from_anyhow_Error(anyhow_error: anyhow::Error) -> Self {
+        let mut v: Vec<String> = vec!["anyhow::Error".to_string()];
+        for e in anyhow_error.chain() {
+            Self::append_error_strings(&mut v, e);
+        }
+        Self(v, Arc::new(anyhow_error))
+    }
+}
+
+impl<T> From<T> for WrapAnnoyingError<T>
+where
+    T: std::error::Error + std::fmt::Debug + std::fmt::Display + Send + Sync,
+{
+    /// A [`WrapAnyhowError`] can always be made from a [`anayhow::Error`].
+    #[inline]
+    fn from(e: T) -> Self {
+        let mut v: Vec<String> = vec!["anyhow::Error".to_string()];
+        Self::append_error_strings(&mut v, &e);
+        Self(v, Arc::new(e))
+    }
+}
+
+impl<T> std::fmt::Debug for WrapAnnoyingError<T>
+where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync,
+{
+    /// Format the value suitable for debugging output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.1.as_ref(), f)
+    }
+}
+impl<T> std::fmt::Display for WrapAnnoyingError<T>
+where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync,
+{
+    /// Format the value suitable for user-facing output.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.1.as_ref(), f)
+    }
+}
+impl<T> std::error::Error for WrapAnnoyingError<T> where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync
+{
+}
+impl<T> PartialEq for WrapAnnoyingError<T>
+where
+    T: std::fmt::Debug + std::fmt::Display + Send + Sync,
+{
+    /// Compare based only on the string representation.
+    #[inline]
+    fn eq(&self, rhs: &Self) -> bool {
+        self.0.eq(&rhs.0)
+    }
+}
+impl<T> Eq for WrapAnnoyingError<T> where T: std::fmt::Debug + std::fmt::Display + Send + Sync {}

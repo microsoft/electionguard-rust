@@ -30,7 +30,7 @@ use std::{
     //io::{BufRead, Cursor},
     iter::zip,
     //path::{Path, PathBuf},
-    //rc::Rc,
+    //sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -57,8 +57,9 @@ use crate::{
     guardian_public_key::GuardianPublicKey,
     guardian_public_key_trait::GuardianKeyInfoTrait,
     guardian_secret_key::GuardianSecretKey,
-    hash::{eg_h, eg_hmac, HValue},
+    hash::{HValue, eg_h, eg_hmac},
     hashes::ParameterBaseHash,
+    resource::{ProduceResource, ProduceResourceExt},
     validatable::Validated,
 };
 
@@ -92,7 +93,7 @@ pub struct ShareEncryptionResult {
 }
 
 /// Represents errors occurring while decrypting a [`GuardianEncryptedShare`].
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum DecryptionError {
     /// Occurs if the given public key does not match the sender.
     #[error("The sender of the ciphertext is {i}, but the public key has index {j}.")]
@@ -132,7 +133,7 @@ pub struct GuardianEncryptedShare {
 
 impl GuardianEncryptedShare {
     /* Err("TODO rework for EGDS 2.1.0")?
-    /// This function computes the share encryption secret key as defined in Equation `16`. [TODO fix ref]
+    /// Computes the share encryption secret key as defined in Equation `16`. [TODO fix ref]
     ///
     /// The arguments are
     /// - `election_parameters` - the election parameters
@@ -164,7 +165,7 @@ impl GuardianEncryptedShare {
 
     /* Err("TODO rework for EGDS 2.1.0")?
 
-    /// This function computes the MAC key (eq `16`) and the encryption keys (eq `17` and `18`). [TODO fix ref]
+    /// Computes the MAC key (eq `16`) and the encryption keys (eq `17` and `18`). [TODO fix ref]
     ///
     /// The arguments are
     /// - `i` - the sender index
@@ -199,7 +200,7 @@ impl GuardianEncryptedShare {
         (k1, k2)
     }
 
-    /// This function computes the MAC as in Equation `19`. [TODO fix ref]
+    /// Computes the MAC as in Equation `19`. [TODO fix ref]
     ///
     /// The arguments are
     ///
@@ -211,30 +212,34 @@ impl GuardianEncryptedShare {
         v.extend_from_slice(c1.0.as_slice());
         eg_hmac(&k0, &v)
     }
+    // */
 
-    /// This function computes a [`GuardianEncryptedShare`] of a share for a given recipient and nonce.
+    /*
+    /// Computes a [`GuardianEncryptedShare`] of a share for a given recipient and nonce.
     ///
     /// The arguments are
     ///
     /// - `election_parameters` - the election parameters
-    /// - 'dealer_ix' - the sender index
+    /// - 'sender_ix' - the sender index
     /// - `nonce` - the encryption nonce
     /// - `share` - the secret key share
-    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
+    /// - `receiver_public_key` - the receiver's [`GuardianPublicKey`]
     ///
     /// This function is deterministic.
     fn new(
         election_parameters: &ElectionParameters,
-        dealer_ix: GuardianIndex,
+        sender_ix: GuardianIndex,
         nonce: &FieldElement,
         share: &FieldElement,
-        recipient_public_key: &GuardianPublicKey,
+        receiver_public_key: &GuardianPublicKey,
     ) -> EgResult<Self> {
+        Err("TODO rework for EGDS 2.1.0")?;
+
         let group = election_parameters.fixed_parameters().group();
 
-        let i = dealer_ix.get_one_based_u32();
-        let l = recipient_public_key.i().get_one_based_u32();
-        let capital_k = recipient_public_key.public_key_k_i_0()?;
+        let i = sender_ix.get_one_based_u32();
+        let l = receiver_public_key.i().get_one_based_u32();
+        let capital_k = receiver_public_key.public_key_k_i_0()?;
 
         // Generate alpha and beta (Equation 14) [TODO fix ref]
         let alpha = group.g_exp(nonce);
@@ -250,8 +255,8 @@ impl GuardianEncryptedShare {
         let c2: HValue = Self::share_mac(k0, alpha.to_be_bytes_left_pad(group).as_slice(), &c1);
 
         Ok(GuardianEncryptedShare {
-            sender: dealer_ix,
-            recipient: recipient_public_key.i(),
+            sender: sender_ix,
+            recipient: receiver_public_key.i(),
             c0: alpha,
             c1,
             c2,
@@ -259,31 +264,31 @@ impl GuardianEncryptedShare {
     }
     // */
 
-    /// This function creates a new [`ShareEncryptionResult`] given the sender's secret key for a given recipient.
+    /// Creates a new [`ShareEncryptionResult`] given the sender's secret key for a given recipient.
     ///
     /// The arguments are
     /// - `csrng` - secure randomness generator
     /// - `election_parameters` - the election parameters
-    /// - `sender_private_key` - the sender's [`GuardianSecretKey`]
-    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
+    /// - `sender_secret_key` - the sender's [`GuardianSecretKey`]
+    /// - `receiver_public_key` - the receiver's [`GuardianPublicKey`]
     pub fn encrypt(
         csrng: &dyn Csrng,
         election_parameters: &ElectionParameters,
-        sender_private_key: &GuardianSecretKey,
-        recipient_public_key: &GuardianPublicKey,
+        sender_secret_key: &GuardianSecretKey,
+        receiver_public_key: &GuardianPublicKey,
     ) -> EgResult<ShareEncryptionResult> {
-        Err("TODO rework for EGDS 2.1.0")?
-        /*
-
         let fixed_parameters = election_parameters.fixed_parameters();
         let field = fixed_parameters.field();
 
-        let l = recipient_public_key.i().get_one_based_u32();
+        Err("TODO rework for EGDS 2.1.0")?
+        /*
+
+        let l = receiver_public_key.i().get_one_based_u32();
 
         // Generate key share as P(l) (cf. Equations 9 and 18) using Horner's method [TODO fix ref]
         let x = FieldElement::from(l, field);
         let mut p_l = ScalarField::zero();
-        for coeff in sender_private_key.secret_coefficients.0.iter().rev() {
+        for coeff in sender_secret_key.secret_coefficients().0.iter().rev() {
             p_l = p_l.mul(&x, field).add(&coeff.0, field);
         }
 
@@ -291,17 +296,17 @@ impl GuardianEncryptedShare {
         let nonce = field.random_field_elem(csrng);
 
         // Encrypt the share
-        let ciphertext = Self::new(
+        let ciphertext: GuardianEncryptedShare = Self::new(
             election_parameters,
-            sender_private_key.i(),
+            sender_secret_key.i(),
             &nonce,
             &p_l,
-            recipient_public_key,
+            receiver_public_key,
         )?;
 
         let secret = GuardianEncryptionSecret {
-            sender: sender_private_key.i(),
-            recipient: recipient_public_key.i(),
+            sender: sender_secret_key.i(),
+            recipient: receiver_public_key.i(),
             share: p_l,
             nonce,
         };
@@ -312,19 +317,19 @@ impl GuardianEncryptedShare {
 
     /// EGDS 2.1.0 eq. 23 pg. 26.
     ///
-    /// This function decrypts and validates a [`GuardianEncryptedShare`].
+    /// Decrypts and validates a [`GuardianEncryptedShare`].
     ///
     /// The arguments are
     ///
     /// - `self` - the encrypted share
     /// - `election_parameters` - the election parameters
     /// - `sender_public_key` - the sender's [`ElGamalPublicKey`]
-    /// - `recipient_secret_key` - the recipient's [`ElGamalSecretKey`]
+    /// - `receiver_secret_key` - the receiver's [`ElGamalSecretKey`]
     pub fn decrypt_and_validate(
         &self,
         election_parameters: &ElectionParameters,
         sender_public_key: &GuardianPublicKey,
-        recipient_secret_key: &GuardianSecretKey,
+        receiver_secret_key: &GuardianSecretKey,
     ) -> EgResult<FieldElement> {
         Err("TODO rework for EGDS 2.1.0")?
         /*
@@ -334,7 +339,7 @@ impl GuardianEncryptedShare {
                 j: sender_public_key.i(),
             });
         }
-        if self.recipient != recipient_secret_key.i() {
+        if self.recipient != receiver_secret_key.i() {
             return Err(DecryptionError::RecipientIndicesMismatch {
                 i: self.sender,
                 j: sender_public_key.i(),
@@ -348,9 +353,9 @@ impl GuardianEncryptedShare {
         let i = self.sender.get_one_based_u32();
         let l = self.recipient.get_one_based_u32();
 
-        let capital_k = &recipient_secret_key.coefficient_commitments().as_slice()[0].0;
+        let capital_k = &receiver_secret_key.coefficient_commitments().as_slice()[0].0;
         let alpha = &self.c0;
-        let beta = alpha.exp(recipient_secret_key.secret_s(), group);
+        let beta = alpha.exp(receiver_secret_key.secret_s(), group);
         let k_i_l = Self::secret_key(election_parameters, i, l, capital_k, alpha, &beta);
 
         let (k0, k1) = Self::mac_and_encryption_key(i, l, &k_i_l);
@@ -386,7 +391,7 @@ impl GuardianEncryptedShare {
 }
 
 /// Errors that may occur with the public validation of a [`GuardianEncryptedShare`].
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum GuardianEncryptedSharePublicValidationError {
     #[error(
         "DealerPublicKeyMismatch: This guardian encrypted share is from sender `{expected_dealer}`, but the public key for guardian `{supplied_dealer}` was supplied."
@@ -434,45 +439,45 @@ pub enum GuardianEncryptedSharePublicValidationError {
 }
 
 impl GuardianEncryptedShare {
-    /// This function validates a [`GuardianEncryptedShare`] with respect to given [`GuardianEncryptionSecret`] and [`GuardianPublicKey`] of sender and recipient in case of a dispute.
+    /// Validates a [`GuardianEncryptedShare`] with respect to given [`GuardianEncryptionSecret`] and [`GuardianPublicKey`] of sender and recipient in case of a dispute.
     ///
     /// The arguments are
     ///
     /// - `self` - the encrypted share
     /// - `election_parameters` - the election parameters
-    /// - `dealer_public_key` - the sender's [`GuardianPublicKey`]
-    /// - `recipient_public_key` - the recipient's [`GuardianPublicKey`]
+    /// - `sender_public_key` - the sender's [`GuardianPublicKey`]
+    /// - `receiver_public_key` - the receiver's [`GuardianPublicKey`]
     /// - `secret` - the published [`GuardianEncryptionSecret`]
     ///
-    /// This function returns false if the sender's published secrets do not match the published
+    /// Returns false if the sender's published secrets do not match the published
     /// ciphertext, or Equation `21`. [TODO fix ref]
     ///
-    /// If they match, the function returns `Ok(())`, meaning the recipient's claim about the
+    /// If they match, the function returns `Ok(())`, meaning the receiver's claim about the
     /// wrongdoing by the sender is dismissed.
     pub fn public_validation(
         &self,
         election_parameters: &ElectionParameters,
-        dealer_public_key: &GuardianPublicKey,
-        recipient_public_key: &GuardianPublicKey,
+        sender_public_key: &GuardianPublicKey,
+        receiver_public_key: &GuardianPublicKey,
         secret: &GuardianEncryptionSecret,
     ) -> EgResult<()> {
         Err("TODO rework for EGDS 2.1.0")?
         /*
 
-        if self.sender != dealer_public_key.i() {
+        if self.sender != sender_public_key.i() {
             Err(
                 GuardianEncryptedSharePublicValidationError::DealerPublicKeyMismatch {
                     expected_dealer: self.sender,
-                    supplied_dealer: dealer_public_key.i(),
+                    supplied_dealer: sender_public_key.i(),
                 },
             )?;
         }
 
-        if self.recipient != recipient_public_key.i() {
+        if self.recipient != receiver_public_key.i() {
             Err(
                 GuardianEncryptedSharePublicValidationError::RecipientPublicKeyMismatch {
                     expected_recipient: self.recipient,
-                    supplied_recipient: recipient_public_key.i(),
+                    supplied_recipient: receiver_public_key.i(),
                 },
             )?;
         }
@@ -509,7 +514,7 @@ impl GuardianEncryptedShare {
             self.sender,
             &secret.nonce,
             &secret.share,
-            recipient_public_key,
+            receiver_public_key,
         )?;
 
         if *self != expected_ciphertext {
@@ -523,7 +528,7 @@ impl GuardianEncryptedShare {
 
         // RHS of Equation `21` [TODO fix ref]
         let l = &FieldElement::from(l, field);
-        let vec_k_i_j: &Vec<_> = dealer_public_key.coefficient_commitments();
+        let vec_k_i_j: &Vec<_> = sender_public_key.coefficient_commitments();
         let rhs = (0u32..)
             .zip(vec_k_i_j)
             .fold(Group::one(), |prod, (j, k_i_j)| {
@@ -553,7 +558,7 @@ pub struct GuardianSecretKeyShare {
 }
 
 /// Errors that may occur when combining shares to generate a [`GuardianSecretKeyShare`].
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum GuardianSecretKeyShareGenerationError {
     /// One or more guardian public keys are missing.
     #[error("Public keys are missing for guardian(s): {0}")]
@@ -612,19 +617,20 @@ impl GuardianSecretKeyShare {
     /// Computes the [`GuardianSecretKeyShare`] from the [`GuardianEncryptedShare`]s.
     ///
     /// The arguments are
-    /// - `eg` - [`Eg`] context
-    /// - `guardian_public_keys` - a list of [`GuardianPublicKey`]s
-    /// - `encrypted_shares` - a list of [`GuardianEncryptedShare`]
-    /// - `recipient_secret_key` - the recipient's [`GuardianSecretKey`]
     ///
-    /// This function assumes that i-th encrypted_share and the i-th guardian_public_key are from the same guardian.
-    pub fn generate(
-        eg: &Eg,
+    /// - `produce_resource` - common resource data provider
+    /// - `guardian_public_keys` - a sequence of [`GuardianPublicKey`]s
+    /// - `encrypted_shares` - a sequence of [`GuardianEncryptedShare`]
+    /// - `receiver_secret_key` - the receiver's [`GuardianSecretKey`]
+    ///
+    /// Verifies that the i-th `GuardianPublicKey` and the i-th `GuardianEncryptedShare` correspond to the same Guardian.
+    pub async fn generate(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         guardian_public_keys: &[&GuardianPublicKey],
         encrypted_shares: &[GuardianEncryptedShare],
-        recipient_secret_key: &GuardianSecretKey,
+        receiver_secret_key: &GuardianSecretKey,
     ) -> Result<Self, GuardianSecretKeyShareGenerationError> {
-        let pre_voting_data = eg.pre_voting_data()?;
+        let pre_voting_data = produce_resource.pre_voting_data().await?;
         let pre_voting_data = pre_voting_data.as_ref();
         let election_parameters = pre_voting_data.election_parameters();
         let fixed_parameters = election_parameters.fixed_parameters();
@@ -646,7 +652,7 @@ impl GuardianSecretKeyShare {
         }
 
         // Verify that the encrypted shares are from every guardian.
-        for (guardian_ix0, guardian_public_key) in guardian_public_keys.iter().enumerate() {
+        for (guardian_ix0, &guardian_public_key) in guardian_public_keys.iter().enumerate() {
             let guardian_listed_in_public_key = guardian_public_key.i();
             let encrypted_share: &GuardianEncryptedShare =
                 encrypted_shares.get(guardian_ix0).ok_or(
@@ -696,7 +702,7 @@ impl GuardianSecretKeyShare {
         for &guardian_public_key in guardian_public_keys {
             guardian_public_key
                 .clone()
-                .re_validate(eg)
+                .re_validate(produce_resource)
                 .map_err(|error| {
                     GuardianSecretKeyShareGenerationError::GuardianPublicKeyInvalid {
                         guardian: guardian_public_key.i(),
@@ -708,14 +714,14 @@ impl GuardianSecretKeyShare {
         // Decrypt and validate shares
         let mut shares = vec![];
         let mut issues = vec![];
-        for (&dealer_public_key, share) in zip(guardian_public_keys, encrypted_shares) {
+        for (&sender_public_key, share) in zip(guardian_public_keys, encrypted_shares) {
             let res = share.decrypt_and_validate(
-                pre_voting_data.election_parameters(),
-                dealer_public_key,
-                recipient_secret_key,
+                election_parameters,
+                sender_public_key,
+                receiver_secret_key,
             );
             match res {
-                Err(e) => issues.push((dealer_public_key.i(), e)),
+                Err(e) => issues.push((sender_public_key.i(), e)),
                 Ok(share) => shares.push(share),
             }
         }
@@ -739,7 +745,7 @@ impl GuardianSecretKeyShare {
             });
 
         Ok(Self {
-            guardian_ix: recipient_secret_key.i(),
+            guardian_ix: receiver_secret_key.i(),
             z_i: key,
         })
     }
@@ -750,7 +756,7 @@ impl GuardianSecretKeyShare {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod test {
-    use std::{iter::zip, rc::Rc};
+    use std::{iter::zip, sync::Arc};
 
     use util::{
         algebra::{FieldElement, ScalarField},
@@ -763,6 +769,7 @@ mod test {
         errors::EgResult,
         guardian::GuardianKeyPurpose,
         guardian_public_key_trait::GuardianKeyInfoTrait,
+        resource::{ProduceResource, ProduceResourceExt},
     };
 
     #[test]
@@ -776,26 +783,31 @@ mod test {
     const K: u32 = N;
 
     #[test]
-    fn test_encryption_decryption() -> EgResult<()> {
-        let eg = &{
+    fn test_encryption_decryption() {
+        async_global_executor::block_on(test_encryption_decryption_async());
+    }
+
+    async fn test_encryption_decryption_async() {
+        let eg = {
             let mut config = EgConfig::new();
             config.use_insecure_deterministic_csprng_seed_str(
                 "eg::guardian_share::test::test_encryption_decryption",
             );
-            config.enable_test_data_generation_n_k(N, K)?;
-            Eg::from(config)
+            config.enable_test_data_generation_n_k(N, K).unwrap();
+            Eg::from_config(config)
         };
+        let eg = eg.as_ref();
 
-        let election_parameters = eg.election_parameters()?;
+        let election_parameters = eg.election_parameters().await.unwrap();
         let election_parameters = election_parameters.as_ref();
 
         let key_purpose = GuardianKeyPurpose::Encrypt_InterGuardianCommunication;
 
-        let gpks = eg.guardian_public_keys(key_purpose)?;
-        let gpks = gpks.map_into(Rc::as_ref);
+        let gpks = eg.guardian_public_keys(key_purpose).await.unwrap();
+        let gpks = gpks.map_into(Arc::as_ref);
 
-        let gsks = eg.guardians_secret_keys(key_purpose)?;
-        let gsks = gsks.map_into(Rc::as_ref);
+        let gsks = eg.guardians_secret_keys(key_purpose).await.unwrap();
+        let gsks = gsks.map_into(Arc::as_ref);
 
         let [&pk_sender, &pk_recipient] = gpks.arr_refs::<{ N as usize }>().unwrap();
         let [&sk_sender, &sk_recipient] = gsks.arr_refs::<{ N as usize }>().unwrap();
@@ -805,7 +817,8 @@ mod test {
             election_parameters,
             sk_sender,
             pk_recipient,
-        )?;
+        )
+        .unwrap();
 
         let result = encrypted_result.ciphertext.decrypt_and_validate(
             election_parameters,
@@ -814,21 +827,25 @@ mod test {
         );
 
         assert!(result.is_ok(), "The decrypted share should be valid");
-        Ok(())
     }
 
     #[test]
-    fn test_key_sharing() -> EgResult<()> {
-        let eg = &{
+    fn test_key_sharing() {
+        async_global_executor::block_on(test_key_sharing_async());
+    }
+
+    async fn test_key_sharing_async() {
+        let eg = {
             let mut config = EgConfig::new();
             config.use_insecure_deterministic_csprng_seed_str(
                 "eg::guardian_share::test::test_key_sharing",
             );
-            config.enable_test_data_generation_n_k(N, K)?;
-            Eg::from(config)
+            config.enable_test_data_generation_n_k(N, K).unwrap();
+            Eg::from_config(config)
         };
+        let eg = eg.as_ref();
 
-        let election_parameters = eg.election_parameters()?;
+        let election_parameters = eg.election_parameters().await.unwrap();
         let election_parameters = election_parameters.as_ref();
         let fixed_parameters = election_parameters.fixed_parameters();
         let field = fixed_parameters.field();
@@ -836,72 +853,99 @@ mod test {
 
         let key_purpose = GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields;
 
-        let gpks = eg.guardian_public_keys(key_purpose)?;
-        let gpks = gpks.map_into(Rc::as_ref);
+        let gpks_rc = eg.guardian_public_keys(key_purpose).await.unwrap();
 
-        let gsks = eg.guardians_secret_keys(key_purpose)?;
-        let gsks = gsks.map_into(Rc::as_ref);
+        let gsks = eg.guardians_secret_keys(key_purpose).await.unwrap();
 
         // Compute secret key shares
-        let share_vecs = gpks
+        let share_vecs = gpks_rc
             .iter()
-            .map(|&pk| {
+            .map(|receiver_public_key| {
                 gsks.iter()
-                    .map(|&dealer_sk| {
-                        GuardianEncryptedShare::encrypt(csrng, election_parameters, dealer_sk, pk)
-                            .unwrap()
-                            .ciphertext
+                    .map(|sender_sk| {
+                        GuardianEncryptedShare::encrypt(
+                            csrng,
+                            election_parameters,
+                            sender_sk,
+                            receiver_public_key,
+                        )
+                        .unwrap()
+                        .ciphertext
                     })
                     .collect::<Vec<GuardianEncryptedShare>>()
             })
             .collect::<Vec<Vec<GuardianEncryptedShare>>>();
 
-        let key_shares = zip(gsks.iter(), share_vecs.iter())
-            .map(|(&sk, shares)| {
-                GuardianSecretKeyShare::generate(eg, gpks.as_slice(), shares.as_slice(), sk)
-                    .unwrap()
-            })
-            .collect::<Vec<GuardianSecretKeyShare>>();
+        let secret_key_shares: Vec<GuardianSecretKeyShare> = {
+            let gpks = gpks_rc.map_into(Arc::as_ref);
+            let mut secret_key_shares: Vec<GuardianSecretKeyShare> = Vec::with_capacity(gsks.len());
+            for (sender_sk, shares) in zip(gsks.iter(), share_vecs.iter()) {
+                let gsk_share = GuardianSecretKeyShare::generate(
+                    eg,
+                    gpks.as_slice(),
+                    shares.as_slice(),
+                    sender_sk.as_ref(),
+                )
+                .await
+                .unwrap();
+                secret_key_shares.push(gsk_share);
+            }
+            secret_key_shares
+        };
 
         // Compute joint secret key from secret keys
-        let joint_key_1 = gsks.iter().fold(ScalarField::zero(), |acc, &share| {
-            acc.add(share.secret_s(), field)
-        });
+        let joint_secret_key_from_secret_keys =
+            gsks.iter().fold(ScalarField::zero(), |acc, share| {
+                acc.add(share.secret_s(), field)
+            });
 
         // Compute joint secret key from shares
-        let xs: Vec<FieldElement> = gpks
-            .iter()
-            .map(|&pk| FieldElement::from(pk.i().get_one_based_u32(), field))
-            .collect();
-        let ys: Vec<FieldElement> = key_shares.iter().map(|s| s.z_i.clone()).collect();
-        let joint_key_2 = field_lagrange_at_zero(&xs, &ys, field);
+        let joint_secret_key_from_secret_key_shares = {
+            let xs = gpks_rc
+                .iter()
+                .map(|guardian_public_key| {
+                    FieldElement::from(guardian_public_key.i().get_one_based_u32(), field)
+                })
+                .collect::<Vec<FieldElement>>();
+            let ys = secret_key_shares
+                .iter()
+                .map(|s| s.z_i.clone())
+                .collect::<Vec<FieldElement>>();
+            field_lagrange_at_zero(&xs, &ys, field).unwrap()
+        };
 
-        assert_eq!(Some(joint_key_1), joint_key_2, "Joint keys should match.");
-
-        Ok(())
+        assert_eq!(
+            joint_secret_key_from_secret_keys,
+            joint_secret_key_from_secret_key_shares
+        );
     }
 
     #[test]
-    fn test_public_validation() -> EgResult<()> {
-        let eg = &{
+    fn test_public_validation() {
+        async_global_executor::block_on(test_public_validation_async());
+    }
+
+    async fn test_public_validation_async() {
+        let eg = {
             let mut config = EgConfig::new();
             config.use_insecure_deterministic_csprng_seed_str(
                 "eg::guardian_share::test::test_public_validation",
             );
-            config.enable_test_data_generation_n_k(N, K)?;
-            Eg::from(config)
+            config.enable_test_data_generation_n_k(N, K).unwrap();
+            Eg::from_config(config)
         };
+        let eg = eg.as_ref();
 
-        let election_parameters = eg.election_parameters()?;
+        let election_parameters = eg.election_parameters().await.unwrap();
         let election_parameters = election_parameters.as_ref();
 
         let key_purpose = GuardianKeyPurpose::Encrypt_InterGuardianCommunication;
 
-        let gpks = eg.guardian_public_keys(key_purpose)?;
-        let gpks = gpks.map_into(Rc::as_ref);
+        let gpks = eg.guardian_public_keys(key_purpose).await.unwrap();
+        let gpks = gpks.map_into(Arc::as_ref);
 
-        let gsks = eg.guardians_secret_keys(key_purpose)?;
-        let gsks = gsks.map_into(Rc::as_ref);
+        let gsks = eg.guardians_secret_keys(key_purpose).await.unwrap();
+        let gsks = gsks.map_into(Arc::as_ref);
 
         let [&pk_one, &pk_two] = gpks.arr_refs::<{ N as usize }>().unwrap();
         let [&sk_one, &sk_two] = gsks.arr_refs::<{ N as usize }>().unwrap();
@@ -909,13 +953,13 @@ mod test {
         let csrng = eg.csrng();
 
         let enc_res_1 =
-            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_two)?;
+            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_two).unwrap();
 
         let enc_res_2 =
-            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_one)?;
+            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_one).unwrap();
 
         let enc_res_3 =
-            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_two, pk_one)?;
+            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_two, pk_one).unwrap();
 
         assert!(
             enc_res_1
@@ -938,7 +982,5 @@ mod test {
                 .is_err(),
             "The ciphertext should not be valid"
         );
-
-        Ok(())
     }
 }

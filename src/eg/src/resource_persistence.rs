@@ -54,7 +54,7 @@ assert_obj_safe!(ResourcePersistence);
 //-------------------------------------------------------------------------------------------------|
 //? /// The [`Error`](std::error::Error) type returned by [`ElectionDataObjectStorage`] functions.
 //? #[allow(non_camel_case_types)]
-//? #[derive(thiserror::Error, Clone, Debug)]
+//? #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 //? pub enum EdoPersistentStorageError {
 //?     #[error("The object `{0}` does not currently exist in persisted storage.")]
 //?     ReadExisting_DoesNotCurrentlyExist(ElectionDataObjectId),

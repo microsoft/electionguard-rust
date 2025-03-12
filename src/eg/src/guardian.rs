@@ -117,7 +117,9 @@ pub enum AsymmetricKeyPart {
     Secret,
 }
 
-/// Identifies a Guardian key.
+/// Identifies a part of a Guardian key. E.g. Guardian [`1`](GuardianIndex)'s
+/// [`Vote Encryption`](GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields)
+/// [`Secret`](AsymmetricKeyPart::Secret) Key.
 #[derive(
     Clone,
     Copy,
@@ -132,13 +134,14 @@ pub enum AsymmetricKeyPart {
     serde::Serialize
 )]
 #[display("Guardian {guardian_ix}, {key_purpose}, {asymmetric_key_part}")]
-pub struct GuardianKeyId {
-    /// Guardian index, 1 <= i <= [`n`](crate::varying_parameters::VaryingParameters::n).
+pub struct GuardianKeyPartId {
+    /// Guardian index, `1` <= `guardian_ix` <= [`n`](crate::varying_parameters::VaryingParameters::n).
     pub guardian_ix: GuardianIndex,
 
-    /// Key purpose
+    /// Key purpose.
     pub key_purpose: GuardianKeyPurpose,
 
-    /// Asymmetric part, 'Public' or 'Secret'.
+    /// Which part of the asymmetric key, [`Public`](AsymmetricKeyPart::Public) or
+    /// [`Secret`](AsymmetricKeyPart::Secret).
     pub asymmetric_key_part: AsymmetricKeyPart,
 }

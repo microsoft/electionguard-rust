@@ -4,10 +4,11 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::io::Write;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 use eg::hash::HValue;
 
@@ -23,6 +24,11 @@ pub(crate) struct WriteInsecureDeterministicSeedData {
 
 impl Subcommand for WriteInsecureDeterministicSeedData {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let eg = subcommand_helper.get_eg("WriteInsecureDeterministicSeedData")?;
+        let _eg = eg.as_ref();
+        bail!("TODO: finish implementing WriteInsecureDeterministicSeedData");
+
+        /*
         let mut open_options = std::fs::OpenOptions::new();
         open_options.write(true);
         if self.overwrite {
@@ -32,7 +38,7 @@ impl Subcommand for WriteInsecureDeterministicSeedData {
                 .artifacts_dir
                 .exists(ArtifactFile::InsecureDeterministicPseudorandomSeedData)
             {
-                anyhow::bail!(
+                bail!(
                     "Insecure deterministic seed data file already exists. Use --overwrite to overwrite it."
                 );
             }
@@ -70,5 +76,6 @@ impl Subcommand for WriteInsecureDeterministicSeedData {
         );
 
         Ok(())
+        // */
     }
 }

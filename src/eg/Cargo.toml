@@ -1,26 +1,34 @@
 [package]
 name = "eg"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 publish = false
 
 [features]
 default = [
     "eg-allow-unsafe-code",
+    
     "eg-allow-insecure-deterministic-csprng",
+    # "eg-forbid-insecure-deterministic-csprng",
+
     "eg-allow-test-data-generation",
+    # "eg-forbid-test-data-generation",
+
     "eg-allow-toy-parameters",
-    #"eg-forbid-insecure-deterministic-csprng",
-    #"eg-forbid-test-data-generation",
-    #"eg-forbid-toy-parameters",
+    # "eg-forbid-toy-parameters",
+
+    # "eg-allow-nonstandard-egds-version",
+    "eg-forbid-nonstandard-egds-version",
 ]
-eg-allow-unsafe-code           = ["util/eg-allow-unsafe-code" ]
-eg-allow-insecure-deterministic-csprng  = ["util/eg-allow-insecure-deterministic-csprng" ]
-eg-forbid-insecure-deterministic-csprng = ["util/eg-forbid-insecure-deterministic-csprng" ]
-eg-allow-test-data-generation  = ["util/eg-allow-test-data-generation" ]
-eg-forbid-test-data-generation = ["util/eg-forbid-test-data-generation" ]
-eg-allow-toy-parameters = ["util/eg-allow-toy-parameters" ]
-eg-forbid-toy-parameters = ["util/eg-forbid-toy-parameters" ]
+eg-allow-unsafe-code           = ["util/eg-allow-unsafe-code"]
+eg-allow-insecure-deterministic-csprng  = ["util/eg-allow-insecure-deterministic-csprng"]
+eg-forbid-insecure-deterministic-csprng = ["util/eg-forbid-insecure-deterministic-csprng"]
+eg-allow-test-data-generation  = ["util/eg-allow-test-data-generation"]
+eg-forbid-test-data-generation = ["util/eg-forbid-test-data-generation"]
+eg-allow-toy-parameters = ["util/eg-allow-toy-parameters"]
+eg-forbid-toy-parameters = ["util/eg-forbid-toy-parameters"]
+eg-allow-nonstandard-egds-version = [ ]
+eg-forbid-nonstandard-egds-version = [ ]
 
 [dependencies]
 
@@ -35,7 +43,8 @@ derive_more = { workspace = true, features = ["debug", "deref", "deref_mut", "di
 downcast-rs.workspace = true
 either.workspace = true
 erased-serde.workspace = true
-hex-literal = "0.4"
+hashbrown.workspace = true
+hex-literal.workspace = true
 inventory.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
@@ -50,6 +59,15 @@ static_assertions.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
+
+#--- Futures
+
+async-global-executor.workspace = true
+async-lock.workspace = true
+async-trait.workspace = true
+futures-core.workspace = true
+futures-lite.workspace = true
+#trait-variant.workspace = true
 
 #--- Tracing
 tracing.workspace = true
@@ -66,3 +84,4 @@ zeroize.workspace = true
 [dev-dependencies]
 derive_more = { workspace = true, features = ["add_assign"] }
 insta = { version = "1.42.1", features = ["ron"] }
+test-log.workspace = true

@@ -1,0 +1,50 @@
+[package]
+name = "test-electionguard"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = [
+    "eg-allow-unsafe-code",
+    "eg-allow-insecure-deterministic-csprng",
+    #"eg-forbid-test-data-generation",
+    #"eg-forbid-toy-parameters",
+]
+eg-allow-unsafe-code           = ["eg/eg-allow-unsafe-code" ]
+eg-allow-insecure-deterministic-csprng  = ["eg/eg-allow-insecure-deterministic-csprng" ]
+eg-forbid-insecure-deterministic-csprng = ["eg/eg-forbid-insecure-deterministic-csprng" ]
+eg-allow-test-data-generation  = ["eg/eg-allow-test-data-generation" ]
+eg-forbid-test-data-generation = ["eg/eg-forbid-test-data-generation" ]
+eg-allow-toy-parameters = ["eg/eg-allow-toy-parameters" ]
+eg-forbid-toy-parameters = ["eg/eg-forbid-toy-parameters" ]
+
+[dependencies]
+
+#--- Defined in this workspace
+#electionguard.workspace = true
+eg.workspace = true
+#util.workspace = true
+
+#--- From crates.io
+anyhow.workspace = true
+clap.workspace = true
+itertools.workspace = true
+static_assertions.workspace = true
+
+#--- Rand
+rand_core.workspace = true
+rand_distr.workspace = true
+
+#--- Futures
+
+futures-lite.workspace = true
+futures-core.workspace = true
+futures-io.workspace = true
+pin-project-lite.workspace = true
+async-process.workspace = true
+async-global-executor.workspace = true
+async-io.workspace = true
+
+#--- Tracing
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = [] } # "ansi"

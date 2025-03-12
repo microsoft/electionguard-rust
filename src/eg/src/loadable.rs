@@ -25,6 +25,7 @@ use anyhow::Context;
 use crate::{
     eg::Eg,
     errors::{EgError, EgResult, EgValidateError},
+    resource::{ProduceResource, ProduceResourceExt},
     validatable::{Validatable, Validated},
 };
 
@@ -37,7 +38,7 @@ pub trait KnowsFriendlyTypeName {
     fn friendly_type_name() -> std::borrow::Cow<'static, str>;
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[allow(non_camel_case_types)]
 pub enum EgLoadingError {
     #[error(transparent)]
@@ -52,10 +53,7 @@ pub enum EgLoadingError {
     },
 
     #[error(transparent)]
-    EgError(#[from] Box<EgError>),
-
-    #[error(transparent)]
-    AError(#[from] anyhow::Error),
+    EgError(Box<EgError>),
 }
 
 impl EgLoadingError {
@@ -66,6 +64,25 @@ impl EgLoadingError {
             type_name: type_name.into_owned(),
             s: format!("{:?} error: {:?}", sj_err.classify(), sj_err),
         }
+    }
+}
+
+impl From<EgError> for EgLoadingError {
+    /// A [`EgLoadingError`] can always be made from a [`EgError`].
+    fn from(src: EgError) -> Self {
+        match src {
+            EgError::LoadingError(self_) => self_,
+            EgError::DuringLoading(bx_egerror) => EgLoadingError::EgError(bx_egerror),
+            _ => EgLoadingError::EgError(Box::new(src)),
+        }
+    }
+}
+
+impl From<anyhow::Error> for EgLoadingError {
+    /// A [`EgLoadingError`] can always be made from a [`anyhow::Error`].
+    #[inline]
+    fn from(src: anyhow::Error) -> Self {
+        EgError::from(src).into()
     }
 }
 
@@ -131,12 +148,15 @@ where
     /// Does not verify that it is *the* canonical byte sequence, or validate the resulting object.
     ///
     /// It can be either the canonical or pretty JSON representation.
-    fn from_json_str_validated(s: &str, eg: &Eg) -> EgResult<Self>
+    fn from_json_str_validated(
+        s: &str,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<Self>
     where
         for<'de> <Self as Validated>::ValidatedFrom: serde::de::Deserialize<'de>,
     {
         let mut cursor = Cursor::new(s);
-        Self::from_stdioread_validated(&mut cursor, eg)
+        Self::from_stdioread_validated(&mut cursor, produce_resource)
     }
 
     /// Reads `Self: Validated` from a byte sequence.
@@ -144,12 +164,15 @@ where
     /// Does not verify that it is *the* canonical byte sequence, or validate the resulting object.
     ///
     /// It can be either the canonical or pretty JSON representation.
-    fn from_bytes_validated(bytes: &[u8], eg: &Eg) -> EgResult<Self>
+    fn from_bytes_validated(
+        bytes: &[u8],
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<Self>
     where
         for<'de> <Self as Validated>::ValidatedFrom: serde::de::Deserialize<'de>,
     {
         let mut cursor = Cursor::new(bytes);
-        Self::from_stdioread_validated(&mut cursor, eg)
+        Self::from_stdioread_validated(&mut cursor, produce_resource)
     }
 
     /// Reads `Self: Validated` from a [`std::io::Read`].
@@ -157,12 +180,15 @@ where
     /// Does not verify that it is *the* canonical byte sequence, or validate the resulting object.
     ///
     /// It can be either the canonical or pretty JSON representation.
-    fn from_stdioread_validated(stdioread: &mut dyn std::io::Read, eg: &Eg) -> EgResult<Self>
+    fn from_stdioread_validated(
+        stdioread: &mut dyn std::io::Read,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
+    ) -> EgResult<Self>
     where
         for<'de> <Self as Validated>::ValidatedFrom: serde::de::Deserialize<'de>,
     {
         <<Self as Validated>::ValidatedFrom as LoadableFromStdIoReadValidatable>::from_stdioread_validatable(stdioread)
-            .and_then(|self_| <Self as Validated>::try_validate_from(self_, eg))
+            .and_then(|self_| <Self as Validated>::try_validate_from(self_, produce_resource))
             .with_context(|| format!("Reading {} from stdio", Self::friendly_type_name()))
             .map_err(Into::<EgError>::into)
     }

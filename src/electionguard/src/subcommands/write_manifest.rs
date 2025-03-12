@@ -4,13 +4,14 @@
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
 #![deny(clippy::manual_assert)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use eg::{
-    serializable::{SerializableCanonical, SerializablePretty},
     eg::Eg,
+    serializable::{SerializableCanonical, SerializablePretty},
 };
 
 use crate::{
@@ -58,23 +59,21 @@ pub(crate) struct WriteManifest {
 
 impl Subcommand for WriteManifest {
     fn do_it(&mut self, subcommand_helper: &mut SubcommandHelper) -> Result<()> {
+        let eg = subcommand_helper.get_eg("WriteManifest")?;
+
+        #[expect(unused_variables)]
+        let eg = eg.as_ref();
+
+        anyhow::bail!("TODO: finish implementing WriteManifest");
+
+        /*
         let cnt_in_specified = self.in_pretty as usize
             + self.in_canonical as usize
             + self.in_file.is_some() as usize
             + self.in_example as usize;
         if cnt_in_specified > 1 {
-            bail!("Specify at most one of `--in-pretty`, `--in-canonical`, `--in-file`, or `--in-example`");
+            anyhow::bail!("Specify at most one of `--in-pretty`, `--in-canonical`, `--in-file`, or `--in-example`");
         }
-
-        let mut eg = {
-            let csprng = subcommand_helper
-                .build_csprng()?
-                .write_str("WriteManifest")
-                .finish();
-            Eg::from_csprng(csprng)
-        };
-        #[expect(unused_variables)]
-        let eg = &mut eg;
 
         // Resolve the options to a ElectionManifestSource.
         let election_manifest_source = if self.in_pretty {
@@ -118,5 +117,6 @@ impl Subcommand for WriteManifest {
         );
 
         Ok(())
+        // */
     }
 }

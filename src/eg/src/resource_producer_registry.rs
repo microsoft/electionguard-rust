@@ -25,7 +25,7 @@ use std::{
     //collections::{HashSet, HashMap},
     //io::{BufRead, Cursor},
     //path::{Path, PathBuf},
-    rc::Rc,
+    sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -34,7 +34,7 @@ use std::{
 //use either::Either;
 //use rand::{distr::Uniform, Rng, RngCore};
 //use serde::{Deserialize, Serialize};
-//use static_assertions::{assert_obj_safe, assert_impl_all, assert_cfg, const_assert};
+use static_assertions::{assert_cfg, assert_impl_all, assert_obj_safe, const_assert};
 use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
@@ -74,10 +74,12 @@ pub enum ResourceProducerCategory {
     GeneratedTestData,
 }
 
+assert_impl_all!(ResourceProducerCategory: Send, Sync, Unpin);
+
 //=================================================================================================|
 
 /// The plain fn type for creating a new [`ResourceProducer`].
-pub type FnNewResourceProducer = fn() -> Rc<dyn ResourceProducer_Any_Debug_Serialize>;
+pub type FnNewResourceProducer = fn() -> Arc<dyn ResourceProducer_Any_Debug_Serialize + 'static>;
 
 /// Implementations of [`ResourceProducer`]s register to express
 /// (via [inventory::submit!] `{` [RegisterResourceProducerFactoryFnWrapper] `}`)
@@ -115,18 +117,20 @@ impl ResourceProducerRegistration {
 /// (via [inventory::submit!] `{` [RegisterResourceProducerFactoryFnWrapper] `}`)
 /// their ability to create a new [`ResourceProducer`].
 pub type GatherResourceProducerRegistrationsFn =
-    fn(&mut dyn FnMut(&[ResourceProducerRegistration]));
+    fn(&mut dyn for<'a> FnMut(&'a [ResourceProducerRegistration]));
 
 /// Wrapper type to identify the collection of [`RegisterResourceProducerFactoryFn`]s for
 /// [`inventory`].
 pub struct GatherResourceProducerRegistrationsFnWrapper(pub GatherResourceProducerRegistrationsFn);
+
+assert_impl_all!(GatherResourceProducerRegistrationsFnWrapper: Send, Sync, Unpin);
 
 inventory::collect!(GatherResourceProducerRegistrationsFnWrapper);
 
 //=================================================================================================|
 
 /// Dyn fn type for [`ResourceProducer::maybe_produce`].
-pub type DynFnMaybeProduce = dyn Fn(&Eg, &mut RpOp) -> Option<ResourceProductionResult>;
+pub type DynFnMaybeProduce = dyn Fn(&Arc<RpOp>) -> Option<ResourceProductionResult> + Send + Sync;
 
 /// Boxed dyn fn type for [`ResourceProducer::maybe_produce`].
 pub type BxDynFnMaybeProduce = Box<DynFnMaybeProduce>;
@@ -184,6 +188,8 @@ impl std::fmt::Debug for RPFnRegistration {
     }
 }
 
+assert_impl_all!(RPFnRegistration: Send, Sync, Unpin);
+
 //=================================================================================================|
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
@@ -195,81 +201,89 @@ pub struct RPRegistryEntry_Key {
     pub category: ResourceProducerCategory,
 }
 
+assert_impl_all!(RPRegistryEntry_Key: Send, Sync, Unpin);
+
 //=================================================================================================|
 
 #[derive(Debug, serde::Serialize)]
 pub struct RPRegistryEntry_Value {
     /// Reference to the key.
-    pub rc_key: Rc<RPRegistryEntry_Key>,
+    pub arc_key: Arc<RPRegistryEntry_Key>,
 
     /// Function to produce a [`ResourceProducer`].
     #[serde(skip)]
     pub fn_rc_new: FnNewResourceProducer,
 
     /// An optional constructed [`ResourceProducer`].
-    pub opt_rc_rp: Option<Rc<dyn ResourceProducer_Any_Debug_Serialize>>,
+    pub opt_arc_rp: Option<Arc<dyn ResourceProducer_Any_Debug_Serialize>>,
 }
 
 impl RPRegistryEntry_Value {
     /// Creates a new [`RPRegistryEntry_Value`] from a [`ResourceProducerRegistration`].
-    pub fn from_rp_registration(rp_reg: &ResourceProducerRegistration) -> Rc<Self> {
+    pub fn from_rp_registration(rp_reg: &ResourceProducerRegistration) -> Arc<Self> {
         let key = RPRegistryEntry_Key {
             name: rp_reg.name.clone(),
             category: rp_reg.category,
         };
 
         let value = Self {
-            rc_key: Rc::new(key),
+            arc_key: Arc::new(key),
             fn_rc_new: rp_reg.fn_rc_new,
-            opt_rc_rp: None,
+            opt_arc_rp: None,
         };
 
-        Rc::new(value)
+        Arc::new(value)
     }
 
     /// Creates a new [`RPRegistryEntry_Value`] from a [`ResourceProducer`] constructed [`ResourceProducer`].
     pub fn from_rc_resourceproducer(
-        rc_rp: Rc<dyn ResourceProducer_Any_Debug_Serialize>,
-    ) -> Rc<Self> {
+        arc_rp: Arc<dyn ResourceProducer_Any_Debug_Serialize + 'static>,
+    ) -> Arc<Self> {
         let key = RPRegistryEntry_Key {
-            name: rc_rp.name(),
-            category: rc_rp.category(),
+            name: arc_rp.name(),
+            category: arc_rp.category(),
         };
 
         let value = Self {
-            rc_key: Rc::new(key),
-            fn_rc_new: rc_rp.fn_rc_new(),
-            opt_rc_rp: Some(rc_rp),
+            arc_key: Arc::new(key),
+            fn_rc_new: arc_rp.fn_rc_new(),
+            opt_arc_rp: Some(arc_rp),
         };
 
-        Rc::new(value)
+        Arc::new(value)
     }
 
-    pub fn get_or_create_resourceproducer(&self) -> Rc<dyn ResourceProducer_Any_Debug_Serialize> {
-        match &self.opt_rc_rp {
-            Some(rc_rp) => {
-                debug!(
+    pub fn get_or_create_resourceproducer(
+        &self,
+    ) -> Arc<dyn ResourceProducer_Any_Debug_Serialize + 'static> {
+        match &self.opt_arc_rp {
+            Some(arc_rp) => {
+                trace!(
                     "RPRegistryEntry {} retrieving existing ResourceProducer instance",
-                    self.rc_key.name
+                    self.arc_key.name
                 );
-                rc_rp.clone()
+                arc_rp.clone()
             }
             None => {
-                debug!(
+                trace!(
                     "RPRegistryEntry {} creating new ResourceProducer",
-                    self.rc_key.name
+                    self.arc_key.name
                 );
                 (self.fn_rc_new)()
             }
         }
     }
 }
+
+assert_impl_all!(RPRegistryEntry_Value: Send, Sync, Unpin);
+assert_impl_all!(RPRegistryEntry_Value: Unpin);
+
 //=================================================================================================|
 
 #[derive(Clone, Debug, Default, serde::Serialize)]
 pub struct ResourceProducerRegistry {
     /// The `ResourceProducerRegistration`s. These are collected statically.
-    map: BTreeMap<Rc<RPRegistryEntry_Key>, Rc<RPRegistryEntry_Value>>,
+    map: BTreeMap<Arc<RPRegistryEntry_Key>, Arc<RPRegistryEntry_Value>>,
 }
 
 impl ResourceProducerRegistry {
@@ -317,48 +331,49 @@ impl ResourceProducerRegistry {
     pub fn add_rp_registration(
         &mut self,
         rp_reg: &ResourceProducerRegistration,
-    ) -> Option<Rc<RPRegistryEntry_Value>> {
-        let rc_rpre_value: Rc<RPRegistryEntry_Value> =
+    ) -> Option<Arc<RPRegistryEntry_Value>> {
+        let arc_rpregistry_entry_value: Arc<RPRegistryEntry_Value> =
             RPRegistryEntry_Value::from_rp_registration(rp_reg);
-        self.add_rc_rpre_value(rc_rpre_value)
+        self.add_rpregistry_entry_value(arc_rpregistry_entry_value)
     }
 
     /// Registers a [`ResourceProducer`], obtaining registration information from the
     /// `ResourceProducer` itself.
     pub fn register_resourceproducer(
         &mut self,
-        rc_rp: Rc<dyn ResourceProducer_Any_Debug_Serialize>,
-    ) -> Option<Rc<RPRegistryEntry_Value>> {
-        let rc_rpre_value = RPRegistryEntry_Value::from_rc_resourceproducer(rc_rp);
-        self.add_rc_rpre_value(rc_rpre_value)
+        arc_rp: Arc<dyn ResourceProducer_Any_Debug_Serialize + 'static>,
+    ) -> Option<Arc<RPRegistryEntry_Value>> {
+        let arc_rpregistry_entry_value = RPRegistryEntry_Value::from_rc_resourceproducer(arc_rp);
+        self.add_rpregistry_entry_value(arc_rpregistry_entry_value)
     }
 
-    fn add_rc_rpre_value(
+    fn add_rpregistry_entry_value(
         &mut self,
-        rc_value: Rc<RPRegistryEntry_Value>,
-    ) -> Option<Rc<RPRegistryEntry_Value>> {
+        arc_value: Arc<RPRegistryEntry_Value>,
+    ) -> Option<Arc<RPRegistryEntry_Value>> {
         use std::collections::btree_map::Entry::*;
 
-        match self.map.entry(rc_value.rc_key.clone()) {
+        match self.map.entry(arc_value.arc_key.clone()) {
             Vacant(v) => {
-                v.insert(rc_value);
+                v.insert(arc_value);
                 None
             }
             Occupied(o) => {
-                // We coud replace the existing value here, but the `rc_rpre_value.rc_key` would not
-                // be the same object as the key used in the map.
-                let (_, rc_previous_value) = o.remove_entry();
+                // We could replace the existing value here, but the
+                // `arc_rpregistry_entry_value.arc_key` would not  be the same object as the key
+                // used in the map.
+                let (_, arc_previous_value) = o.remove_entry();
 
-                self.map.insert(rc_value.rc_key.clone(), rc_value);
+                self.map.insert(arc_value.arc_key.clone(), arc_value);
 
-                Some(rc_previous_value)
+                Some(arc_previous_value)
             }
         }
     }
 
     /// Iterates over the [`RPRegistryEntry_Value`]s.
     pub fn registrations(&self) -> impl std::iter::Iterator<Item = &RPRegistryEntry_Value> {
-        self.map.values().map(|rc_val| rc_val.as_ref())
+        self.map.values().map(|arc_val| arc_val.as_ref())
     }
 
     /// Retains only the [`RPRegistryEntry_Value`]s specified by the predicate.
@@ -367,8 +382,10 @@ impl ResourceProducerRegistry {
         F: FnMut(&RPRegistryEntry_Key, &RPRegistryEntry_Value) -> bool,
     {
         let mut f = f;
-        self.map.retain(|rc_key, rc_value| f(rc_key, rc_value))
+        self.map.retain(|arc_key, arc_value| f(arc_key, arc_value))
     }
 }
+
+assert_impl_all!(ResourceProducerRegistry: Send, Sync, Unpin);
 
 //=================================================================================================|

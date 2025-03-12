@@ -5,18 +5,20 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 use eg::{
-    serializable::SerializablePretty, eg::Eg,
-    voter_selections_plaintext::VoterSelectionsPlaintext,
+    eg::Eg, serializable::SerializablePretty, voter_selections_plaintext::VoterSelectionsPlaintext,
 };
 
 use crate::{
-    artifacts_dir::ArtifactFile, common_utils::load_pre_voting_data, subcommands::Subcommand,
+    artifacts_dir::ArtifactFile,
+    //? common_utils::load_pre_voting_data,
+    subcommands::Subcommand,
 };
 
 #[derive(clap::Args, Debug, Default)]
@@ -37,15 +39,13 @@ impl Subcommand for GenerateRandomVoterSelections {
         &mut self,
         subcommand_helper: &mut crate::subcommand_helper::SubcommandHelper,
     ) -> Result<()> {
+        let eg = subcommand_helper.get_eg("GenerateRandomVoterSelections")?;
+        let _eg = eg.as_ref();
+
+        anyhow::bail!("TODO: finish implementing GenerateRandomVoterSelections");
+
+        /*
         let seed_str = self.seed.clone().unwrap_or_default();
-        let mut eg = {
-            let csprng = subcommand_helper
-                .build_csprng()?
-                .write_str("GenerateRandomVoterSelections")
-                .finish();
-            Eg::from_csprng(csprng)
-        };
-        let eg = &mut eg;
 
         let _pre_voting_data =
             load_pre_voting_data(eg, &subcommand_helper.artifacts_dir)?;
@@ -79,5 +79,6 @@ impl Subcommand for GenerateRandomVoterSelections {
         eprintln!("Wrote random voter selections to: {}", path.display());
 
         Ok(())
+        // */
     }
 }

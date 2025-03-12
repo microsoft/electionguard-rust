@@ -18,7 +18,7 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use either::*;
@@ -29,6 +29,7 @@ use crate::{
     errors::EgResult,
     fixed_parameters::{self, FixedParameters, FixedParametersInfo},
     resource::{ElectionDataObjectId, HasStaticResourceIdFormat, Resource, ResourceIdFormat},
+    resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
     validatable::{Validatable, Validated},
     varying_parameters::{VaryingParameters, VaryingParametersInfo},
@@ -37,10 +38,10 @@ use crate::{
 #[derive(Debug, Clone, Serialize)]
 pub struct ElectionParametersInfo {
     /// The fixed ElectionGuard election_parameters that apply to all elections.
-    pub fixed_parameters: Either<Rc<FixedParametersInfo>, Rc<FixedParameters>>,
+    pub fixed_parameters: Either<Arc<FixedParametersInfo>, Arc<FixedParameters>>,
 
     /// The election_parameters for a specific election.
-    pub varying_parameters: Either<Rc<VaryingParametersInfo>, Rc<VaryingParameters>>,
+    pub varying_parameters: Either<Arc<VaryingParametersInfo>, Arc<VaryingParameters>>,
 }
 
 crate::impl_knows_friendly_type_name! { ElectionParametersInfo }
@@ -108,7 +109,7 @@ impl<'de> Deserialize<'de> for ElectionParametersInfo {
 }
 
 crate::impl_validatable_validated! {
-    src: ElectionParametersInfo, eg => EgResult<ElectionParameters> {
+    src: ElectionParametersInfo, produce_resource => EgResult<ElectionParameters> {
         let ElectionParametersInfo {
             fixed_parameters,
             varying_parameters,
@@ -117,9 +118,9 @@ crate::impl_validatable_validated! {
         // Validate `FixedParameters`.
         let fixed_parameters = match fixed_parameters {
             Left(fixed_parameters_info) => {
-                let fixed_parameters_info = Rc::unwrap_or_clone(fixed_parameters_info);
-                let fixed_parameters = FixedParameters::try_validate_from(fixed_parameters_info, eg)?;
-                Rc::new(fixed_parameters)
+                let fixed_parameters_info = Arc::unwrap_or_clone(fixed_parameters_info);
+                let fixed_parameters = FixedParameters::try_validate_from(fixed_parameters_info, produce_resource)?;
+                Arc::new(fixed_parameters)
             }
             Right(fixed_parameters) => fixed_parameters,
         };
@@ -127,8 +128,8 @@ crate::impl_validatable_validated! {
         // Validate `VaryingParameters`.
         let varying_parameters = match varying_parameters {
             Left(varying_parameters_info) => {
-                let varying_parameters = VaryingParameters::try_validate_from_rc(varying_parameters_info, eg)?;
-                Rc::new(varying_parameters)
+                let varying_parameters = VaryingParameters::try_validate_from_arc(varying_parameters_info, produce_resource)?;
+                Arc::new(varying_parameters)
             }
             Right(varying_parameters) => varying_parameters,
         };
@@ -161,8 +162,8 @@ impl From<ElectionParameters> for ElectionParametersInfo {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ElectionParameters {
-    fixed_parameters: Rc<FixedParameters>,
-    varying_parameters: Rc<VaryingParameters>,
+    fixed_parameters: Arc<FixedParameters>,
+    varying_parameters: Arc<VaryingParameters>,
 }
 
 impl ElectionParameters {

@@ -6,7 +6,7 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use util::abbreviation::Abbreviation;
 
@@ -46,11 +46,13 @@ impl ResourceSliceBytes {
         let drsb = ResourceSliceBytes::new(resource.rid(), vby);
         let rsrc =
             ResourceSource::serialized_from(ResourceFormat::SliceBytes, rpsrc_serialized_from);
-        Ok((Rc::new(drsb), rsrc))
+        Ok((Arc::new(drsb), rsrc))
     }
 }
 
 impl SerializableCanonical for ResourceSliceBytes {}
+
+crate::impl_MayBeValidatableUnsized_for_non_ValidatableUnsized! { ResourceSliceBytes }
 
 impl Resource for ResourceSliceBytes {
     fn ridfmt(&self) -> &ResourceIdFormat {
@@ -93,3 +95,5 @@ impl std::fmt::Display for ResourceSliceBytes {
 }
 
 //=================================================================================================|
+
+//? TODO impl test

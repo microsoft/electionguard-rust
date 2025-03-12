@@ -26,7 +26,7 @@ use std::{
     //collections::{HashSet, HashMap},
     //io::{BufRead, Cursor},
     //path::{Path, PathBuf},
-    rc::Rc,
+    sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
@@ -47,7 +47,7 @@ use util::{
 //=================================================================================================|
 
 /// [`Result::Err`](std::result::Result) type of a data resource production operation.
-#[derive(thiserror::Error, Debug, serde::Serialize)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[allow(non_camel_case_types)]
 pub enum ElGamalError {
     #[error(
@@ -95,7 +95,7 @@ pub struct ElGamalSecretKey {
     zeta: FieldElement,
 
     /// The public key for this secret key, if we happen to know it.
-    pubkey_cache: RefCell<Option<Rc<ElGamalPublicKey>>>,
+    pubkey_cache: RefCell<Option<Arc<ElGamalPublicKey>>>,
 }
 
 impl ElGamalSecretKey {
@@ -113,7 +113,7 @@ impl ElGamalSecretKey {
     }
 
     /// Gets or computes the [`ElGamalPublicKey`] for this [`ElGamalSecretKey`].
-    pub fn public_key(&self, group: &Group) -> ElGamalResult<Rc<ElGamalPublicKey>> {
+    pub fn public_key(&self, group: &Group) -> ElGamalResult<Arc<ElGamalPublicKey>> {
         {
             let pubkey_cache = self.pubkey_cache_try_borrow()?;
             if let Some(pubkey) = &*pubkey_cache {
@@ -125,7 +125,7 @@ impl ElGamalSecretKey {
 
         let pubkey = mut_pubkey_cache.get_or_insert_with(|| {
             let kappa = group.g_exp(&self.zeta);
-            Rc::new(ElGamalPublicKey::from_kappa(kappa))
+            Arc::new(ElGamalPublicKey::from_kappa(kappa))
         });
 
         Ok(pubkey.clone())
@@ -133,7 +133,7 @@ impl ElGamalSecretKey {
 
     pub(crate) fn pubkey_cache_try_borrow(
         &self,
-    ) -> ElGamalResult<std::cell::Ref<'_, Option<Rc<ElGamalPublicKey>>>> {
+    ) -> ElGamalResult<std::cell::Ref<'_, Option<Arc<ElGamalPublicKey>>>> {
         self.pubkey_cache
             .try_borrow()
             .map_err(|e| ElGamalError::TryBorrowSharedPubkeyCacheAlreadyMutablyInUse(e.to_string()))
@@ -141,7 +141,7 @@ impl ElGamalSecretKey {
 
     pub(crate) fn pubkey_cache_try_borrow_mut(
         &self,
-    ) -> ElGamalResult<std::cell::RefMut<'_, Option<Rc<ElGamalPublicKey>>>> {
+    ) -> ElGamalResult<std::cell::RefMut<'_, Option<Arc<ElGamalPublicKey>>>> {
         self.pubkey_cache.try_borrow_mut().map_err(|e| {
             ElGamalError::TryBorrowExclusivePubkeyCacheAlreadyMutablyInUse(e.to_string())
         })

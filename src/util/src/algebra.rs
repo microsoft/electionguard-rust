@@ -213,7 +213,7 @@ impl Drop for FieldElement {
 
 impl ZeroizeOnDrop for FieldElement {}
 
-#[derive(thiserror::Error, Clone, Debug)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum FieldError {
     #[error("Could not convert field element to `{0}`: {1}")]
     FieldElementConvertTo(&'static str, String),
@@ -251,7 +251,7 @@ pub struct ScalarField {
 impl ScalarField {
     /// Constructs a new scalar field from a given order.
     ///
-    /// This function returns `None` if the given order is not prime.
+    /// Returns `None` if the given order is not prime.
     /// Checking the validity of inputs is expensive.
     /// A field should therefore be constructed once and then reused as much as possible.
     ///
@@ -457,9 +457,10 @@ impl Group {
     /// - `order`- the order `q`
     /// - `generator` - a generator `g`
     ///
-    /// This function checks that the group is valid according to [`Group::is_valid`].
-    /// Checking the validity of inputs is expensive.
-    /// A group should therefore be constructed once and then reused as much as possible.
+    /// Verifies that the [`Group`] is valid according to [`Group::is_valid`].
+    ///
+    /// Checking the validity of inputs is expensive, so a `Group` should be constructed once and
+    /// then reused as much as possible.
     ///
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`Group::new_unchecked`].
     pub fn new(
@@ -479,7 +480,7 @@ impl Group {
         None
     }
 
-    /// Constructs a new group without checking the validity according to [`Group::is_valid`].
+    /// Constructs a new [`Group`] without checking the validity according to [`Group::is_valid`].
     pub fn new_unchecked(modulus: BigUint, order: BigUint, generator: BigUint) -> Self {
         Group {
             p: modulus,
@@ -488,9 +489,12 @@ impl Group {
         }
     }
 
-    /// This function checks that the given group is valid. The call is expensive.
+    /// Checks that the given [`Group`] is valid.
+    ///
+    /// `NOTE`: This call is expensive.
     ///
     /// A group is considered valid if:
+    ///
     /// - the `modulus` is prime,
     /// - the `order` is prime, divides `modulus-1`, but not `(modulus-1)/order`,
     /// - the `generator` has order `order`,
@@ -573,7 +577,7 @@ impl Group {
         (cnt_bits_repr(&self.q) + 7) / 8
     }
 
-    /// This function checks if the group and the given field have the same order.
+    /// Checks if the group and the given field have the same order.
     pub fn matches_field(self: &Group, field: &ScalarField) -> bool {
         self.q == field.q
     }

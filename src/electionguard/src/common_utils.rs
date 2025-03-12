@@ -5,26 +5,31 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(unused_imports)] //? TODO: Remove temp development code
+#![allow(dead_code)] //? TODO: Remove temp development code
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 
 use eg::{
-    election_manifest::ElectionManifest, election_parameters::ElectionParameters,
-    example_election_manifest::example_election_manifest,
-    example_election_parameters::example_election_parameters, guardian::GuardianIndex,
-    guardian_public_key::GuardianPublicKey, guardian_public_key_trait::GuardianKeyInfoTrait,
-    guardian_secret_key::GuardianSecretKey, hashes::Hashes, extended_base_hash::ExtendedBaseHash,
-    joint_public_key::JointPublicKey, loadable::LoadableFromStdIoReadValidated,
-    pre_voting_data::PreVotingData, eg::Eg,
+    eg::Eg,
+    election_manifest::ElectionManifest,
+    election_parameters::ElectionParameters,
+    guardian_public_key::GuardianPublicKey,
+    guardian_public_key_trait::GuardianKeyInfoTrait,
+    guardian_secret_key::GuardianSecretKey,
+    loadable::LoadableFromStdIoReadValidated,
+    resource::{ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceIdFormat},
+    resource_id::{self, ElectionDataObjectId, ResourceId},
+    resource_path::ResourceNamespacePath,
 };
-
-use util::{csprng::Csprng, vec1::Vec1};
+use util::vec1::Vec1;
 
 use crate::artifacts_dir::{ArtifactFile, ArtifactsDir};
 
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub(crate) enum ElectionManifestSource {
     ArtifactFileElectionManifestPretty,
     ArtifactFileElectionManifestCanonical,
@@ -33,25 +38,39 @@ pub(crate) enum ElectionManifestSource {
 }
 
 impl ElectionManifestSource {
-    pub(crate) fn load_election_manifest(
+    pub(crate) async fn load_election_manifest(
         &self,
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         artifacts_dir: &ArtifactsDir,
-    ) -> Result<ElectionManifest> {
+    ) -> Result<Arc<ElectionManifest>> {
+        let edo_id = ElectionDataObjectId::ElectionManifest;
+
+        use ElectionManifestSource::*;
         let (opt_path, opt_artifact_file): (Option<PathBuf>, Option<ArtifactFile>) = match self {
-            ElectionManifestSource::ArtifactFileElectionManifestPretty => {
-                (None, Some(ArtifactFile::ElectionManifestPretty))
+            ArtifactFileElectionManifestPretty => {
+                let mut resource_namespace_path = ResourceNamespacePath::try_from(edo_id)?;
+                resource_namespace_path.specify_pretty();
+                (None, Some(ArtifactFile::from(resource_namespace_path)))
             }
-            ElectionManifestSource::ArtifactFileElectionManifestCanonical => {
-                (None, Some(ArtifactFile::ElectionManifestCanonical))
+            ArtifactFileElectionManifestCanonical => {
+                let mut resource_namespace_path = ResourceNamespacePath::try_from(edo_id)?;
+                resource_namespace_path.specify_canonical();
+                (None, Some(ArtifactFile::from(resource_namespace_path)))
             }
-            ElectionManifestSource::SpecificFile(path) => (Some(path.clone()), None),
-            ElectionManifestSource::Example => {
-                //let csprng = &mut Csprng::...;
-                let eg = Eg {
-                    opt_election_parameters: Some(example_election_parameters()),
-                    ..Eg::default()
+            SpecificFile(path) => (Some(path.clone()), None),
+            Example => {
+                let ridfmt = ResourceIdFormat {
+                    rid: ResourceId::from(edo_id),
+                    fmt: ResourceFormat::ValidElectionDataObject,
                 };
-                return Ok(example_election_manifest(&eg)?); //------- inner return
+                let (election_manifest, resource_source) = produce_resource
+                    .produce_resource_downcast::<ElectionManifest>(&ridfmt)
+                    .await?;
+                ensure!(
+                    resource_source.derives_from_test_data(),
+                    "An example election manifest was requested but it was loaded from {resource_source} instead."
+                );
+                return Ok(election_manifest);
             }
         };
 
@@ -59,7 +78,7 @@ impl ElectionManifestSource {
             artifacts_dir.in_file_stdioread(opt_path.as_ref(), opt_artifact_file.as_ref())?;
 
         let election_manifest =
-            ElectionManifest::from_stdioread_validated(&mut stdioread, &Eg::default())
+            ElectionManifest::from_stdioread_validated(&mut stdioread, produce_resource)
                 .with_context(|| {
                     format!("Loading election manifest from: {}", actual_path.display())
                 })?;
@@ -69,12 +88,13 @@ impl ElectionManifestSource {
             actual_path.display()
         );
 
-        Ok(election_manifest)
+        Ok(Arc::new(election_manifest))
     }
 }
 
+/*
 pub(crate) fn load_election_parameters(
-    eg: &Eg,
+    produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     artifacts_dir: &ArtifactsDir,
 ) -> Result<ElectionParameters> {
     let (mut stdioread, path) =
@@ -92,9 +112,11 @@ pub(crate) fn load_election_parameters(
 
     Ok(election_parameters)
 }
+// */
 
+/*
 pub(crate) fn load_guardian_secret_key(
-    eg: &Eg,
+    produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     opt_i: Option<GuardianIndex>,
     opt_secret_key_path: Option<&PathBuf>,
     artifacts_dir: &ArtifactsDir,
@@ -140,9 +162,11 @@ pub(crate) fn load_guardian_secret_key(
 
     Ok(guardian_secret_key)
 }
+// */
 
+/*
 pub(crate) fn load_guardian_public_key(
-    eg: &Eg,
+    produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     opt_i: Option<GuardianIndex>,
     opt_public_key_path: Option<&PathBuf>,
     artifacts_dir: &ArtifactsDir,
@@ -192,7 +216,9 @@ pub(crate) fn load_guardian_public_key(
 
     Ok(guardian_public_key)
 }
+// */
 
+/*
 pub(crate) fn load_joint_public_key<'vi>(
     eg: &'vi mut Eg,
     artifacts_dir: &ArtifactsDir,
@@ -202,7 +228,7 @@ pub(crate) fn load_joint_public_key<'vi>(
 
     let joint_public_key = JointPublicKey::from_stdioread_validated(
         &mut stdioread,
-        eg.election_parameters()?,
+        produce_resource.election_parameters().await?,
     )?;
     eg.opt_joint_public_key = Some(joint_public_key);
 
@@ -212,7 +238,9 @@ pub(crate) fn load_joint_public_key<'vi>(
         .joint_vote_encryption_public_key_k()
         .map_err(Into::into)
 }
+// */
 
+/*
 pub(crate) fn load_hashes<'vi>(
     eg: &'vi mut Eg,
     artifacts_dir: &ArtifactsDir,
@@ -227,7 +255,9 @@ pub(crate) fn load_hashes<'vi>(
 
     eg.hashes().map_err(Into::into)
 }
+// */
 
+/*
 pub(crate) fn load_extended_base_hash<'vi>(
     eg: &'vi mut Eg,
     artifacts_dir: &ArtifactsDir,
@@ -240,13 +270,15 @@ pub(crate) fn load_extended_base_hash<'vi>(
 
     eprintln!("ExtendedBaseHash loaded from: {}", path.display());
 
-    eg.extended_base_hash().map_err(Into::into)
+    eg.extended_base_hash().await.map_err(Into::into)
 }
+// */
 
+/*
 pub(crate) fn load_pre_voting_data<'a>(
     eg: &'a mut Eg,
     artifacts_dir: &ArtifactsDir,
-) -> Result<&'a PreVotingData> {
+) -> Result<Arc<PreVotingData>> {
     let (mut stdioread, path) =
         artifacts_dir.in_file_stdioread(None, Some(&ArtifactFile::PreVotingData))?;
 
@@ -256,9 +288,11 @@ pub(crate) fn load_pre_voting_data<'a>(
 
     eprintln!("PreVotingData loaded from: {}", path.display());
 
-    eg.pre_voting_data().map_err(Into::into)
+    produce_resource.pre_voting_data().map_err(Into::into)
 }
+// */
 
+/*
 pub(crate) fn load_all_guardian_public_keys<'vi>(
     eg: &'vi mut Eg,
     artifacts_dir: &ArtifactsDir,
@@ -274,5 +308,6 @@ pub(crate) fn load_all_guardian_public_keys<'vi>(
     }
     eg.refcell_opt_guardian_public_keys = Some(guardian_public_keys).into();
 
-    eg.guardian_public_keys().map_err(Into::into)
+    produce_resource.guardian_public_keys().map_err(Into::into)
 }
+// */

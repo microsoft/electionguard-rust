@@ -31,13 +31,14 @@ use std::{
     ffi::OsStr,
     //io::{BufRead, Cursor},
     path::{Path, PathBuf},
-    rc::Rc,
+    sync::Arc,
     //str::FromStr,
     //sync::OnceLock,
 };
 
 use eg::{
     errors::{EgError, EgResult},
+    resource::{ProduceResource, ProduceResourceExt},
     resource_category::ResourceCategory,
     resource_persistence::ResourcePersistence,
 };
@@ -136,9 +137,9 @@ impl ResourcePersistence for ResourceProducer_Filesystem {}
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
-    use anyhow::{anyhow, bail, ensure, Context, Result};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use eg::{eg::Eg, eg_config::EgConfig};
     use insta::assert_ron_snapshot;
 
@@ -148,9 +149,10 @@ mod t {
     fn t0() -> Result<()> {
         use ResourceCategory::*;
 
-        let eg = &Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::dataresourceproducer_filesystem::t::t0",
         );
+        let eg = eg.as_ref();
 
         /*
         // Trivial success cases.

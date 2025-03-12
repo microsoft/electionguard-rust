@@ -6,6 +6,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
+#![allow(clippy::empty_line_after_doc_comments)] //? TODO: Remove temp development code
+#![allow(clippy::needless_lifetimes)] //? TODO: Remove temp development code
 #![allow(dead_code)] //? TODO: Remove temp development code
 #![allow(unused_assignments)] //? TODO: Remove temp development code
 #![allow(unused_braces)] //? TODO: Remove temp development code
@@ -15,32 +17,54 @@
 #![allow(unreachable_code)] //? TODO: Remove temp development code
 #![allow(non_camel_case_types)] //? TODO: Remove temp development code
 #![allow(non_snake_case)] //? TODO: Remove temp development code
+#![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-//use std::borrow::Cow;
-//use std::collections::HashSet;
-//use std::io::{BufRead, Cursor};
-//use std::path::{Path, PathBuf};
-use std::{process::ExitCode, rc::Rc};
+#[rustfmt::skip] //? TODO: Remove temp development code
+use std::{
+    //borrow::Cow,
+    //cell::RefCell,
+    //collections::{BTreeSet, BTreeMap},
+    //collections::{HashSet, HashMap},
+    //hash::{BuildHasher, Hash, Hasher},
+    io::{
+        //BufRead, Cursor,
+        Write,
+    },
+    //iter::zip,
+    //marker::PhantomData,
+    //path::{Path, PathBuf},
+    process::ExitCode,
+    sync::Arc,
+    //str::FromStr,
+    //sync::OnceLock,
+};
 
-//use std::str::FromStr;
-//use std::sync::OnceLock;
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, ensure};
+//use either::Either;
+//use hashbrown::HashMap;
+//use rand::{distr::Uniform, Rng, RngCore};
+//use serde::{Deserialize, Serialize};
+//use static_assertions::{assert_obj_safe, assert_impl_all, assert_cfg, const_assert};
+use tracing::{
+    debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
+    warn,
+};
+//use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use util::abbreviation::Abbreviation;
+
 use eg::{
     eg::{Eg, EgConfig},
     election_parameters::ElectionParameters,
     fixed_parameters::FixedParameters,
-    resource::{ElectionDataObjectId as EdoId, ResourceFormat, ResourceId, ResourceIdFormat},
+    resource::{
+        ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, Resource,
+        ResourceFormat, ResourceId, ResourceIdFormat,
+    },
+    serializable::SerializablePretty,
     varying_parameters::VaryingParameters,
 };
-//use either::Either;
-//use tracing::{debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span, warn};
-//use proc_macro2::{Ident,Literal,TokenStream};
-//use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-//use rand::{distr::Uniform, Rng, RngCore};
-//use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, info_span, instrument, trace, warn};
-use util::abbreviation::Abbreviation;
 
 //=================================================================================================|
 
@@ -64,7 +88,9 @@ fn main() -> ExitCode {
 
     // Call `main2`
     tracing::subscriber::with_default(subscriber_fmt, || -> ExitCode {
-        let ec = match main2() {
+        let result = async_global_executor::block_on(main2());
+
+        let ec = match result {
             Ok(_) => {
                 info!("Success!");
                 ExitCode::SUCCESS
@@ -79,7 +105,7 @@ fn main() -> ExitCode {
     })
 }
 
-fn main2() -> Result<()> {
+async fn main2() -> Result<()> {
     info!(name: "started", "Started");
 
     let csprng_seed_str = "demo-eg";
@@ -95,7 +121,7 @@ fn main2() -> Result<()> {
     let cnt_ballots = 10_usize;
     info!(cnt_ballots, "Number of ballots:");
 
-    let eg = &{
+    let eg = {
         let mut config = EgConfig::new();
         config.use_insecure_deterministic_csprng_seed_str(csprng_seed_str);
         config.enable_test_data_generation_n_k(n, k)?;
@@ -107,81 +133,70 @@ fn main2() -> Result<()> {
             },
         );
 
-        Eg::from(config)
+        Eg::from_config(config)
     };
+    let eg = eg.as_ref();
 
     format!("{eg:#?}")
         .lines()
         .for_each(|line| debug!("`Eg`: {line}"));
 
     let (egds_version, egds_version_rsrc): (
-        Rc<eg::fixed_parameters::ElectionGuardDesignSpecificationVersion>,
+        Arc<eg::egds_version::ElectionGuard_DesignSpecification_Version>,
         _,
-    ) = eg.produce_resource_downcast(&ResourceIdFormat {
-        rid: ResourceId::ElectionGuardDesignSpecificationVersion,
-        fmt: ResourceFormat::ConcreteType,
-    })?;
+    ) = eg
+        .produce_resource_downcast(&ResourceIdFormat {
+            rid: ResourceId::ElectionGuardDesignSpecificationVersion,
+            fmt: ResourceFormat::ConcreteType,
+        })
+        .await?;
     info!("{egds_version:#?}");
     info!("source: {egds_version_rsrc}");
 
-    let (egds_version_slicebytes, egds_version_slicebytes_rsrc) =
-        eg.produce_resource(&ResourceIdFormat {
+    pretty_print_to_stderr(
+        egds_version.as_ref(),
+        "ElectionGuardDesignSpecificationVersion",
+    );
+
+    let (egds_version_slicebytes, egds_version_slicebytes_rsrc) = eg
+        .produce_resource(&ResourceIdFormat {
             rid: ResourceId::ElectionGuardDesignSpecificationVersion,
             fmt: ResourceFormat::SliceBytes,
-        })?;
+        })
+        .await?;
     info!("{egds_version_slicebytes:#?} {egds_version_slicebytes_rsrc}");
     info!("{egds_version_slicebytes:?} {egds_version_slicebytes_rsrc}");
 
-    /*
-    let (fixed_parameters, rsrc): (Rc<FixedParameters>, _) =
-        eg.produce_resource_downcast(&EdoId::FixedParameters.validated_type_ridfmt())?;
+    let (fixed_parameters, rsrc): (Arc<FixedParameters>, _) = eg
+        .produce_resource_downcast(&EdoId::FixedParameters.validated_type_ridfmt())
+        .await?;
     info!("{fixed_parameters:#?}");
     info!("source: {rsrc}");
 
-    let (fixed_parameters_info, rsrc): (Rc<FixedParameters>, _) =
-        eg.produce_resource_downcast(&EdoId::FixedParameters.info_type_ridfmt())?;
-    info!("{fixed_parameters_info:#?}");
-    info!("source: {rsrc}");
-    // */
+    pretty_print_resource_to_stderr(fixed_parameters);
+
+    let (fixed_parameters_info, rsrc): (Arc<FixedParameters>, _) = eg
+        .produce_resource_downcast(&EdoId::FixedParameters.info_type_ridfmt())
+        .await?;
+
+    pretty_print_resource_to_stderr(fixed_parameters_info);
 
     /*
+    info!("{fixed_parameters_info:#?}");
+    info!("source: {rsrc}");
 
-    let _fixed_parameters: Rc<FixedParameters> = {
-        let ridfmt = EdoId::FixedParameters.validated_type_ridfmt();
-        info_range_begin("FixedParameters");
-        info_span!("Make",
-            rf = %&*ridfmt.abbreviation()
-        ).in_scope(|| -> Result<_> {
-            let (fixed_parameters, rsrc) = eg.produce_resource_downcast(&ridfmt)?;
-
-            //format!("{fixed_parameters:#?}").lines().for_each(|line| debug!("`FixedParameters`: {line}"));
-
-            info!("source: {rsrc}");
-            Ok(fixed_parameters)
-        })?
-    };
-    info_range_end("FixedParameters");
-
-    let (varying_parameters, rsrc): (Rc<VaryingParameters>, _) =
+    let (varying_parameters, rsrc): (Arc<VaryingParameters>, _) =
         eg.produce_resource_downcast(&EdoId::VaryingParameters.validated_type_ridfmt())?;
     info!("{varying_parameters:#?}");
     info!("source: {rsrc}");
 
-    let (election_parameters, rsrc): (Rc<ElectionParameters>, _) =
+    let (election_parameters, rsrc): (Arc<ElectionParameters>, _) =
         eg.produce_resource_downcast(&EdoId::ElectionParameters.validated_type_ridfmt())?;
     info!("{election_parameters:#?}");
     info!("source: {rsrc}");
     // */
 
     Ok(())
-}
-
-fn info_range_begin(s: &str) {
-    info!("vvvvvvvvvvvvvvvv {s} vvvvvvvvvvvvvvvv");
-}
-
-fn info_range_end(s: &str) {
-    info!("^^^^^^^^^^^^^^^^ {s} ^^^^^^^^^^^^^^^^");
 }
 
 //?     #  Write election parameters
@@ -376,3 +391,26 @@ fn info_range_end(s: &str) {
 //?         ]
 //?     }
 //? }
+
+fn pretty_print_to_stderr(sp: &dyn SerializablePretty, title: &str) {
+    let _ = (|| -> anyhow::Result<()> {
+        static REP_CHAR_BEGIN: &str = "--vvvvv--";
+        static REP_CHAR_END: &str = "--^^^^^--";
+        let mut stderr = std::io::stderr();
+        let stderr = &mut stderr;
+        writeln!(stderr, "-{0}{0}{0}- {title} -{0}{0}{0}-", REP_CHAR_BEGIN)?;
+        sp.to_stdiowrite_pretty(stderr)?;
+        writeln!(stderr, "-{0}{0}{0}- {title} -{0}{0}{0}-", REP_CHAR_END)?;
+        Ok(())
+    })();
+}
+
+fn pretty_print_resource_to_stderr<T, U>(sp: T)
+where
+    T: AsRef<U>,
+    U: Resource + SerializablePretty,
+{
+    let u: &U = sp.as_ref();
+    let title = format!("{} as {}", u.rid(), u.format());
+    pretty_print_to_stderr(u, &title);
+}

@@ -9,7 +9,7 @@
 //! This module provides implementation of guardian secret keys. For more details see Section `3.2`
 //! of the Electionguard specification `2.1.0`. [TODO check ref]
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -26,11 +26,12 @@ use crate::{
     election_parameters::{self, ElectionParameters},
     errors::EgResult,
     fixed_parameters::FixedParameters,
-    guardian::{AsymmetricKeyPart, GuardianKeyId, GuardianKeyPurpose},
+    guardian::{AsymmetricKeyPart, GuardianKeyPartId, GuardianKeyPurpose},
     guardian_coeff_proof::CoefficientsProof,
     guardian_public_key::GuardianPublicKey,
     guardian_public_key_trait::GuardianKeyInfoTrait,
     resource::{ElectionDataObjectId, Resource, ResourceFormat, ResourceIdFormat},
+    resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
     validatable::{Validatable, Validated},
 };
@@ -72,7 +73,7 @@ impl From<FieldElement> for SecretCoefficient {
 pub struct SecretCoefficients(pub Vec<SecretCoefficient>);
 
 impl SecretCoefficients {
-    /// This function generates a fresh [`SecretCoefficients`].
+    /// Generates a fresh [`SecretCoefficients`].
     ///
     /// The arguments are
     /// - `csrng` - secure randomness generator
@@ -154,7 +155,7 @@ impl From<Vec<CoefficientCommitment>> for CoefficientCommitments {
 pub struct GuardianSecretKeyInfo {
     /// Identifies the guardian index number, the key purpose, and the
     /// asymmetric key part (i.e., [`Secret`](crate::guardian::AsymmetricKeyPart::Secret).
-    pub key_id: GuardianKeyId,
+    pub key_id: GuardianKeyPartId,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
     ///
@@ -171,7 +172,7 @@ pub struct GuardianSecretKeyInfo {
     ///
     /// May not have been generated yet.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub opt_coefficients_proof: Option<Rc<CoefficientsProof>>,
+    pub opt_coefficients_proof: Option<Arc<CoefficientsProof>>,
 
     /// Secret polynomial coefficients.
     pub secret_coefficients: SecretCoefficients,
@@ -181,7 +182,7 @@ pub struct GuardianSecretKeyInfo {
 }
 
 impl GuardianKeyInfoTrait for GuardianSecretKeyInfo {
-    fn guardian_key_id(&self) -> &GuardianKeyId {
+    fn guardian_key_id(&self) -> &GuardianKeyPartId {
         &self.key_id
     }
 
@@ -193,7 +194,7 @@ impl GuardianKeyInfoTrait for GuardianSecretKeyInfo {
         &self.coefficient_commitments
     }
 
-    fn opt_coefficients_proof(&self) -> &Option<Rc<CoefficientsProof>> {
+    fn opt_coefficients_proof(&self) -> &Option<Arc<CoefficientsProof>> {
         &self.opt_coefficients_proof
     }
 }
@@ -254,10 +255,10 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
                     return Err(MapAcc::Error::missing_field("coefficient_commitments"));
                 };
 
-                let (opt_coefficients_proof, next_entry): (Option<Rc<CoefficientsProof>>, _) =
+                let (opt_coefficients_proof, next_entry): (Option<Arc<CoefficientsProof>>, _) =
                     match map.next_key()? {
                         Some(Field::coefficients_proof) => {
-                            (Some(Rc::new(map.next_value()?)), map.next_entry()?)
+                            (Some(Arc::new(map.next_value()?)), map.next_entry()?)
                         }
                         Some(key) => (None, Some((key, map.next_value()?))),
                         None => (None, None),
@@ -267,7 +268,7 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
                     return Err(MapAcc::Error::missing_field("secret_coefficients"));
                 };
 
-                let key_id = GuardianKeyId {
+                let key_id = GuardianKeyPartId {
                     guardian_ix: i,
                     key_purpose: purpose,
                     asymmetric_key_part: AsymmetricKeyPart::Secret,
@@ -301,7 +302,7 @@ impl Resource for GuardianSecretKeyInfo {
     fn ridfmt(&self) -> &ResourceIdFormat {
         #[cfg(debug_assertions)]
         {
-            let key_id_expected = GuardianKeyId {
+            let key_id_expected = GuardianKeyPartId {
                 asymmetric_key_part: AsymmetricKeyPart::Secret,
                 ..self.key_id
             };
@@ -314,9 +315,9 @@ impl Resource for GuardianSecretKeyInfo {
 }
 
 crate::impl_validatable_validated! {
-    src: GuardianSecretKeyInfo, eg => EgResult<GuardianSecretKey> {
+    src: GuardianSecretKeyInfo, produce_resource => EgResult<GuardianSecretKey> {
         // Validate the info common to public and secret keys.
-        src.validate_public_key_info_to_election_parameters(eg)?;
+        src.validate_public_key_info_to_election_parameters(produce_resource).await?;
 
         let GuardianSecretKeyInfo {
             key_id,
@@ -329,7 +330,12 @@ crate::impl_validatable_validated! {
 
         //? TODO leverage some common code for GuardianSecretKey and GuardianPublicKey? See GuardianPublicKeyTrait::validate_public_key_info_to_election_parameters
 
-        //? TODO validate the key_id
+        // Validate the key_id
+        let key_id_expected = GuardianKeyPartId {
+                guardian_ix: key_id.guardian_ix,
+                key_purpose: key_id.key_purpose,
+                asymmetric_key_part: AsymmetricKeyPart::Secret,
+            };
 
         //? TODO validate the name
 
@@ -339,11 +345,6 @@ crate::impl_validatable_validated! {
 
         //? TODO validate the secret_coefficients
 
-        let key_id_expected = GuardianKeyId {
-                guardian_ix: key_id.guardian_ix,
-                key_purpose: key_id.key_purpose,
-                asymmetric_key_part: AsymmetricKeyPart::Secret,
-            };
         let edoid_expected = ElectionDataObjectId::GuardianKeyPart(key_id_expected);
         let ridfmt_expected = edoid_expected.info_type_ridfmt();
 
@@ -396,17 +397,17 @@ impl From<GuardianSecretKey> for GuardianSecretKeyInfo {
 pub struct GuardianSecretKey {
     /// Identifies the guardian index number, the key purpose, and the
     /// asymmetric key part (i.e., [`Secret`](crate::guardian::AsymmetricKeyPart::Secret).
-    pub key_id: GuardianKeyId,
+    key_id: GuardianKeyPartId,
 
     /// Short name with which to refer to the guardian. Should not have any line breaks.
     ///
     /// Optional, may be blank.
-    pub name: String,
+    name: String,
 
     /// "Published" polynomial coefficient commitments.
     ///
     /// EGDS 2.1.0 bottom of pg. 21 "K_{i,j}".
-    pub coefficient_commitments: CoefficientCommitments,
+    coefficient_commitments: CoefficientCommitments,
 
     /// Proof of knowledge of a specific [`GuardianSecretKey`], and
     /// commitment to a specific public communication key.
@@ -415,12 +416,12 @@ pub struct GuardianSecretKey {
     ///
     /// May not have been generated yet.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub opt_coefficients_proof: Option<Rc<CoefficientsProof>>,
+    opt_coefficients_proof: Option<Arc<CoefficientsProof>>,
 
     /// Secret polynomial coefficients.
     ///
     /// EGDS 2.1.0 bottom of pg. 21 "a_{i, j} such 0 < j < k".
-    pub secret_coefficients: SecretCoefficients,
+    secret_coefficients: SecretCoefficients,
 
     /// Refers to this object as a [`Resource`].
     #[serde(skip_serializing)]
@@ -432,7 +433,7 @@ impl HasIndexType for GuardianSecretKey {
 }
 
 impl GuardianKeyInfoTrait for GuardianSecretKey {
-    fn guardian_key_id(&self) -> &GuardianKeyId {
+    fn guardian_key_id(&self) -> &GuardianKeyPartId {
         &self.key_id
     }
 
@@ -444,35 +445,35 @@ impl GuardianKeyInfoTrait for GuardianSecretKey {
         &self.coefficient_commitments
     }
 
-    fn opt_coefficients_proof(&self) -> &Option<Rc<CoefficientsProof>> {
+    fn opt_coefficients_proof(&self) -> &Option<Arc<CoefficientsProof>> {
         &self.opt_coefficients_proof
     }
 }
 
 impl GuardianSecretKey {
-    /// This function generates a [`GuardianSecretKey`] for guardian `i`.
+    /// Generates a [`GuardianSecretKey`] for guardian `i`.
     ///
     /// It does not include the [`CoefficientsProof`], as that cannot be generated until
     /// after the [`public communication key`](ElGamalPublicKey) is known.
     ///
     /// The arguments are
-    /// - `eg` - [`Eg`] context
+    /// - `produce_resource` - common resource data provider
     /// - `guardian_ix` - the guardian's 1-based index
     /// - `name` - Short name with which to refer to the guardian. Should not have any line breaks. Optional, may be blank.
     /// - `key_purpose` - purpose of the key.
-    pub fn generate(
-        eg: &Eg,
+    pub async fn generate(
+        produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         guardian_ix: GuardianIndex,
         name: String,
         key_purpose: GuardianKeyPurpose,
-    ) -> EgResult<Self> {
-        let election_parameters = eg.election_parameters()?;
+    ) -> EgResult<Arc<Self>> {
+        let election_parameters = produce_resource.election_parameters().await?;
         let election_parameters = election_parameters.as_ref();
         let fixed_parameters = election_parameters.fixed_parameters();
         let group = fixed_parameters.group();
-        let csrng = eg.csrng();
+        let csrng = produce_resource.csrng();
 
-        let key_id = GuardianKeyId {
+        let key_id = GuardianKeyPartId {
             guardian_ix,
             key_purpose,
             asymmetric_key_part: AsymmetricKeyPart::Secret,
@@ -499,22 +500,24 @@ impl GuardianSecretKey {
             ridfmt: ElectionDataObjectId::GuardianKeyPart(key_id).info_type_ridfmt(),
         };
 
-        GuardianSecretKey::try_validate_from(gsk_info, eg)
+        let gsk = GuardianSecretKey::try_validate_from(gsk_info, produce_resource)?;
+
+        Ok(Arc::new(gsk))
     }
 
-    /// This function returns the [`SecretCoefficients`] of the [`GuardianSecretKey`].
+    /// Returns the [`SecretCoefficients`] of the [`GuardianSecretKey`].
     pub fn secret_coefficients(&self) -> &SecretCoefficients {
         &self.secret_coefficients
     }
 
-    /// This function returns the actual secret key of the [`GuardianSecretKey`].
+    /// Returns the actual secret key of the [`GuardianSecretKey`].
     ///
     /// The returned value corresponds to `a_{i,0}` as defined in Section `3.2.2`.
     pub fn secret_s(&self) -> &FieldElement {
         &self.secret_coefficients.0[0].0
     }
 
-    /// This function computes the [`GuardianPublicKey`] corresponding to the [`GuardianSecretKey`].
+    /// Computes the [`GuardianPublicKey`] corresponding to the [`GuardianSecretKey`].
     pub fn make_public_key(&self) -> GuardianPublicKey {
         let Self {
             key_id,
@@ -525,12 +528,25 @@ impl GuardianSecretKey {
             ridfmt: _,
         } = self.clone();
 
+        let GuardianKeyPartId {
+            guardian_ix,
+            key_purpose,
+            asymmetric_key_part,
+        } = key_id;
+        debug_assert_eq!(asymmetric_key_part, AsymmetricKeyPart::Secret);
+
+        let key_id = GuardianKeyPartId {
+            guardian_ix,
+            key_purpose,
+            asymmetric_key_part: AsymmetricKeyPart::Public,
+        };
+
         GuardianPublicKey {
             key_id,
             name,
             coefficient_commitments,
             opt_coefficients_proof,
-            ridfmt: ElectionDataObjectId::GuardianKeyPart(key_id).info_type_ridfmt(),
+            ridfmt: ElectionDataObjectId::GuardianKeyPart(key_id).validated_type_ridfmt(),
         }
     }
 }
@@ -543,7 +559,7 @@ impl Resource for GuardianSecretKey {
     fn ridfmt(&self) -> &ResourceIdFormat {
         #[cfg(debug_assertions)]
         {
-            let key_id_expected = GuardianKeyId {
+            let key_id_expected = GuardianKeyPartId {
                 asymmetric_key_part: AsymmetricKeyPart::Secret,
                 ..self.key_id
             };

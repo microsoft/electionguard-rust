@@ -6,11 +6,15 @@
 #![deny(clippy::manual_assert)]
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    eg::Eg, errors::EgError, guardian::GuardianIndex, serializable::SerializableCanonical,
+    eg::Eg,
+    errors::EgError,
+    guardian::GuardianIndex,
+    resource::{ProduceResource, ProduceResourceExt},
+    serializable::SerializableCanonical,
 };
 
 /// Ballot chaining.
@@ -99,11 +103,12 @@ impl<'de> Deserialize<'de> for VaryingParametersInfo {
                     return Err(MapAcc::Error::missing_field(Field::ballot_chaining.into()));
                 };
 
-                let (opt_date, next_entry): (Option<String>, _) = match map.next_key()? {
-                    Some(Field::date) => (map.next_value()?, map.next_entry()?),
-                    Some(key) => (None, Some((key, map.next_value()?))),
-                    None => (None, None),
-                };
+                let (opt_date, next_entry): (Option<String>, Option<(Field, ())>) =
+                    match map.next_key()? {
+                        Some(Field::date) => (map.next_value()?, map.next_entry()?),
+                        Some(key) => (None, Some((key, ()))), //Some(key) => (None, Some((key, map.next_value()?))),
+                        None => (None, None),
+                    };
 
                 if let Some((field, _)) = next_entry {
                     return Err(MapAcc::Error::unknown_field(field.into(), &[]));
@@ -126,7 +131,7 @@ impl<'de> Deserialize<'de> for VaryingParametersInfo {
 }
 
 crate::impl_validatable_validated! {
-    src: VaryingParametersInfo, eg => EgResult<VaryingParameters> {
+    src: VaryingParametersInfo, produce_resource => EgResult<VaryingParameters> {
         let VaryingParametersInfo {
             n,
             k,
@@ -247,3 +252,6 @@ crate::impl_knows_friendly_type_name! { VaryingParameters }
 crate::impl_Resource_for_simple_ElectionDataObjectId_validated_type! { VaryingParameters, VaryingParameters }
 
 impl SerializableCanonical for VaryingParameters {}
+
+static_assertions::assert_impl_all!(VaryingParametersInfo: crate::validatable::Validatable);
+static_assertions::assert_impl_all!(VaryingParameters: crate::validatable::Validated);

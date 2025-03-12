@@ -44,15 +44,12 @@ impl Ciphertext {
     /// Verify the proof that the cipher text is an encryption of 0 or 1.
     pub fn verify_ballot_correctness(
         &self,
-        eg: &Eg,
+        pre_voting_data: &PreVotingData,
         proof: &ProofRange,
         effective_option_selection_limit: EffectiveOptionSelectionLimit,
         contest_ix_for_errs: ContestIndex,
         ciphertext_ix_for_errs: CiphertextIndex,
     ) -> EgResult<()> {
-        let pre_voting_data = eg.pre_voting_data()?;
-        let pre_voting_data = pre_voting_data.as_ref();
-
         if proof.verify(
             pre_voting_data,
             self,

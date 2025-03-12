@@ -1,7 +1,7 @@
 [package]
 name = "demo-eg"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [features]
 default = [
@@ -35,6 +35,14 @@ num-traits.workspace = true
 serde.workspace = true
 # serde_json.workspace = true
 # static_assertions.workspace = true
+
+#--- Futures
+
+async-global-executor.workspace = true
+#async-trait.workspace = true
+futures-core.workspace = true
+futures-lite.workspace = true
+#trait-variant.workspace = true
 
 #--- Tracing
 tracing.workspace = true

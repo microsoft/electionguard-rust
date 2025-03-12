@@ -13,7 +13,7 @@
 /// FIXME(const-hack): Someday Rust `std` will provide this.
 /// https://github.com/rust-lang/rust/issues/57563
 pub const fn const_min_usize(mut slice: &[usize]) -> usize {
-    if let [mut acc, rest @ ..] = slice {
+    if let &[mut acc, ref rest @ ..] = slice {
         slice = rest;
         while let [fst, rest @ ..] = slice {
             if *fst < acc {
@@ -32,7 +32,7 @@ pub const fn const_min_usize(mut slice: &[usize]) -> usize {
 /// FIXME(const-hack): Someday Rust `std` will provide this.
 /// https://github.com/rust-lang/rust/issues/57563
 pub const fn const_max_usize(mut slice: &[usize]) -> usize {
-    if let [mut acc, rest @ ..] = slice {
+    if let &[mut acc, ref rest @ ..] = slice {
         slice = rest;
         while let [fst, rest @ ..] = slice {
             if acc < *fst {
@@ -53,7 +53,7 @@ pub const fn const_max_usize(mut slice: &[usize]) -> usize {
 /// FIXME(const-hack): Someday Rust `std` will provide this.
 /// https://github.com/rust-lang/rust/issues/57563
 pub const fn const_min_u128(mut slice: &[u128]) -> u128 {
-    if let [mut acc, rest @ ..] = slice {
+    if let &[mut acc, ref rest @ ..] = slice {
         slice = rest;
         while let [fst, rest @ ..] = slice {
             if *fst < acc {
@@ -72,7 +72,7 @@ pub const fn const_min_u128(mut slice: &[u128]) -> u128 {
 /// FIXME(const-hack): Someday Rust `std` will provide this.
 /// https://github.com/rust-lang/rust/issues/57563
 pub const fn const_max_u128(mut slice: &[u128]) -> u128 {
-    if let [mut acc, rest @ ..] = slice {
+    if let &[mut acc, ref rest @ ..] = slice {
         slice = rest;
         while let [fst, rest @ ..] = slice {
             if acc < *fst {
