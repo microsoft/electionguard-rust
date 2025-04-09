@@ -20,15 +20,19 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::Write,
+    string::ToString,
 };
 
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
+use serde_tokenstream::from_tokenstream;
+use serde_with::{DisplayFromStr, serde_as};
+use serde_with::{EnumMap, Map, SerializeDisplay};
 
 use crate::{
     eg::Eg,
     errors::{EgError, EgResult},
     hash::{HValue, HValueByteArray, SpecificHValue, eg_h},
+    ident::Ident,
     resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
 };
@@ -41,8 +45,11 @@ pub trait VdiSpecItemTrait: Clone + std::fmt::Debug + std::fmt::Display {
     fn make_VdiSpecItem(&self) -> VdiSpecItem;
 }
 
+//-------------------------------------------------------------------------------------------------|
+
 /// Items that the [`ElectionManifest`] may specify for inclusion in `S_device` string (and the
 /// resulting [`VotingDeviceInformationHash`] `H_DI`) that *may contain* voting device information.
+#[serde_as]
 #[derive(
     Clone,
     Debug,
@@ -52,24 +59,38 @@ pub trait VdiSpecItemTrait: Clone + std::fmt::Debug + std::fmt::Display {
     PartialOrd,
     Ord,
     Hash,
-    Deserialize,
-    Serialize
+    serde::Deserialize,
+    serde::Serialize
 )]
-#[serde(into = "String")]
 pub enum VdiSpecItem {
-    /// "voting device unique identifier"
+    /// Item for the "voting device unique identifier"
     VotingDeviceUniqueIdentifier,
 
-    /// "possibly other encoded voting device information"
+    /// Item for the "possibly other encoded voting device information"
     ///
     /// The [`String`] value should be a valid identifier.
     ///
     /// //? TODO provide some way to validate that a given S_device string actually contains this information.
-    #[display("OtherVotingDeviceInformation: {_0}")]
-    OtherVotingDeviceInformation(String),
+    #[display("OtherVotingDeviceInfo: {_0}")]
+    OtherVotingDeviceInfo(Ident),
 
     /// Items other than voting device information are supported.
-    ExplicitlyNotVotingDeviceInformation(VdiSpecItem_ExplicitlyNotVotingDeviceInformation),
+    #[display("NotVotingDeviceInfoItem: {_0}")]
+    NotVotingDeviceInfo(NotVotingDeviceInfoItem),
+}
+
+impl VdiSpecItem {
+    /// Create an [`OtherVotingDeviceInfo`](VdiSpecItem::OtherVotingDeviceInfo) spec item.
+    #[inline]
+    fn other_voting_device_info<T>(s: T) -> EgResult<Self>
+    where
+        T: TryInto<Ident>,
+        EgError: From<<T as TryInto<Ident>>::Error>,
+    {
+        let ident: Ident = s.try_into()?;
+        let vdi_spec = VdiSpecItem::OtherVotingDeviceInfo(ident);
+        Ok(vdi_spec)
+    }
 }
 
 impl From<VdiSpecItem> for String {
@@ -84,6 +105,43 @@ impl VdiSpecItemTrait for VdiSpecItem {
     }
 }
 
+/*
+impl serde::Serialize for VdiSpecItem {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        use serde::ser::{
+            Error,
+            Serializer, //? SerializeMap, etc.
+        };
+
+        match *self {
+            VdiSpecItem::VotingDeviceUniqueIdentifier => {
+                Serializer::serialize_unit_variant(
+                    serializer,
+                    "VdiSpecItem",
+                    0u32,
+                    "VotingDeviceUniqueIdentifier",
+                )
+            }
+            VdiSpecItem::OtherVotingDeviceInfo(ref s) => {
+                Serializer::serialize_newtype_variant(
+                    serializer,
+                    "VdiSpecItem",
+                    1u32,
+                    "OtherVotingDeviceInfo",
+                    s,
+                )
+            }
+            VdiSpecItem::ExplicitlyNotVotingDeviceInformation(ref envdi) => {
+                envdi.serialize(serializer)
+            }
+        }
+    }
+}
+// */
+
 impl SerializableCanonical for VdiSpecItem {}
 
 //=================================================================================================|
@@ -95,27 +153,28 @@ impl SerializableCanonical for VdiSpecItem {}
 #[derive(
     Clone,
     Debug,
-    derive_more::Display,
+    strum_macros::Display,
+    strum_macros::EnumString,
     PartialEq,
     Eq,
     PartialOrd,
     Ord,
     Hash,
-    Deserialize,
-    Serialize
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr
 )]
-pub enum VdiSpecItem_ExplicitlyNotVotingDeviceInformation {
-    /// "unique voting location identifier"
+pub enum NotVotingDeviceInfoItem {
+    /// "voting location unique identifier"
     VotingLocationUniqueIdentifier,
 }
 
-impl VdiSpecItemTrait for VdiSpecItem_ExplicitlyNotVotingDeviceInformation {
+impl VdiSpecItemTrait for NotVotingDeviceInfoItem {
     fn make_VdiSpecItem(&self) -> VdiSpecItem {
-        VdiSpecItem::ExplicitlyNotVotingDeviceInformation(self.clone())
+        VdiSpecItem::NotVotingDeviceInfo(self.clone())
     }
 }
 
-impl SerializableCanonical for VdiSpecItem_ExplicitlyNotVotingDeviceInformation {}
+impl SerializableCanonical for NotVotingDeviceInfoItem {}
 
 //=================================================================================================|
 
@@ -124,15 +183,19 @@ impl SerializableCanonical for VdiSpecItem_ExplicitlyNotVotingDeviceInformation 
 #[allow(non_camel_case_types)]
 #[derive(
     Clone,
+    Copy,
     Debug,
-    derive_more::Display,
+    strum_macros::Display,
+    strum_macros::EnumString,
     PartialEq,
     Eq,
     PartialOrd,
     Ord,
     Hash,
-    Deserialize,
-    Serialize
+    //serde::Deserialize,
+    //serde::Serialize,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 pub enum VdiSpecItem_Requiredness {
     /// The [`VdiSpecItem`] is required.
@@ -146,48 +209,145 @@ impl SerializableCanonical for VdiSpecItem_Requiredness {}
 
 //=================================================================================================|
 
+/// Helper to format a comma-separated list of spec items.
+fn vdi_items_set_to_string<T: VdiSpecItemTrait>(items: &BTreeSet<T>) -> String {
+    format!("{}", items.iter().format(", "))
+}
+
+/*
+/// Helper to format a comma-separated list of spec items.
+fn map_vdi_items_to_string<T: VdiSpecItemTrait> (
+    items: &BTreeMap<T, VdiSpecItem_Requiredness>,
+) -> String {
+    format!(
+        "{}",
+        items.iter().format_with(", ", |pr, f| {
+            f(pr.0)
+                .and_then(|_| f(&" ("))
+                .and_then(|_| f(pr.1))
+                .and_then(|_| f(&")"))
+        })
+    )
+}
+
+#[serde_as]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Deserialize,
+    serde::Serialize
+)]
+struct NotVotingDeviceInformationRequirednesses(
+    #[serde_as(as = "Map<DisplayFromStr, _>")]
+    BTreeMap<VdiSpecItem_ExplicitlyNotVotingDeviceInformation, VdiSpecItem_Requiredness>
+);
+impl NotVotingDeviceInformationRequirednesses {
+}
+
+#[serde_as]
+#[derive(
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Deserialize,
+    serde::Serialize
+)]
+struct PossibleVotingDeviceInformationRequirednessesMap(
+    //#[serde_as(as = "Map<DisplayFromStr, _>")]
+    #[serde_as(as = "EnumMap")]
+    BTreeMap<VdiSpecItem_ExplicitlyNotVotingDeviceInformation, VdiSpecItem_Requiredness>
+);
+impl PossibleVotingDeviceInformationRequirednessesMap {
+}
+// */
+
+//=================================================================================================|
+
 /// Data items the [`ElectionManifest`](eg::election_manifest::ElectionManifest) can specify for
 /// inclusion in the `S_device` string (and the resulting [`VotingDeviceInformationHash`] `H_DI`).
 ///
 /// EGDS 2.1.0 Sec 3.4.3 'Voting Device Information' says, "The manifest may specify that `S_device`
 /// does not contain voting device information," so this `VotingDeviceInformationSpec` enum reflects
 /// that explicit choice at the top-level.
+#[serde_as]
 #[derive(
     Clone,
     Debug,
-    derive_more::Display,
+    //strum_macros::Display,
     PartialEq,
     Eq,
-    PartialOrd,
-    Ord,
+    //PartialOrd,
+    //Ord,
     Hash,
-    Deserialize,
-    Serialize
+    serde::Deserialize,
+    serde::Serialize
 )]
 pub enum VotingDeviceInformationSpec {
     /// `S_device` contains only items that explicitly do not contain voting device information.
     ///
     /// Mapped value indicates whether the item is required or optional.
-    #[display(
-        "DoesNotContainVotingDeviceInformation({})",
-        Self::map_vdi_items_to_string(_0)
-    )]
-    DoesNotContainVotingDeviceInformation(
-        BTreeMap<VdiSpecItem_ExplicitlyNotVotingDeviceInformation, VdiSpecItem_Requiredness>,
-    ),
+    DoesNotContainVotingDeviceInformation(serde_json::Value),
 
     /// `S_device` allows items that may contain voting device information (in addition to
     /// those that do not).
     ///
     /// Maped value indicates the item is required or optional.
-    #[display(
-        "MayContainVotingDeviceInformation({})",
-        Self::map_vdi_items_to_string(_0)
-    )]
-    MayContainVotingDeviceInformation(BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness>),
+    MayContainVotingDeviceInformation(serde_json::Value),
+    //#[strum(to_string = "MayContainVotingDeviceInformation({0})")]
+    //PossibleVotingDeviceInformationRequirednessesMap
+    //#[display("MayContainVotingDeviceInformation({})", _0)] // map_vdi_items_to_string(_0)
+    //MayContainVotingDeviceInformation(
+    //    #[serde_as(as = "EnumMap")]
+    //    BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness>
+    //),
+}
+
+impl TryInto<serde_json::Value> for VotingDeviceInformationSpec {
+    type Error = EgError;
+
+    /// Attempts to convert a [`VotingDeviceInformationSpec`] into a [`serde_json::Value`].
+    #[inline]
+    fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
+        let json_value = serde_json::to_value(&self)?;
+        Ok(json_value)
+    }
 }
 
 impl VotingDeviceInformationSpec {
+    pub fn does_not_contain_voting_device_information(
+        map_vdi_items: BTreeMap<NotVotingDeviceInfoItem, VdiSpecItem_Requiredness>,
+    ) -> EgResult<Self> {
+        let map2: BTreeMap<String, VdiSpecItem_Requiredness> = map_vdi_items
+            .iter()
+            .map(|(vdi_spec_item, &requiredness)| (vdi_spec_item.to_string(), requiredness))
+            .collect();
+        let json_value = serde_json::to_value(map2)?;
+        let vdi_spec =
+            VotingDeviceInformationSpec::DoesNotContainVotingDeviceInformation(json_value);
+        Ok(vdi_spec)
+    }
+
+    pub fn may_contain_voting_device_information(
+        map_vdi_items: BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness>,
+    ) -> EgResult<Self> {
+        let map2: BTreeMap<String, VdiSpecItem_Requiredness> = map_vdi_items
+            .iter()
+            .map(|(vdi_spec_item, &requiredness)| (vdi_spec_item.to_string(), requiredness))
+            .collect();
+        let json_value = serde_json::to_value(map2)?;
+        let vdi_spec = VotingDeviceInformationSpec::MayContainVotingDeviceInformation(json_value);
+        Ok(vdi_spec)
+    }
+
     /// Validates a specific [`VotingDeviceInformation`] against the [`VotingDeviceInformationSpec`].
     pub fn validate_voting_device_information_against_spec(
         &self,
@@ -196,39 +356,26 @@ impl VotingDeviceInformationSpec {
     ) -> Result<(), VotingDeviceInformationValidationError> {
         todo!(); //? TODO
     }
-
-    /// Helper to format a comma-separated list of spec items.
-    pub(crate) fn vdi_items_set_to_string<T: VdiSpecItemTrait>(items: &BTreeSet<T>) -> String {
-        format!("{}", items.iter().format(", "))
-    }
-
-    /// Helper to format a comma-separated list of spec items.
-    pub(crate) fn map_vdi_items_to_string<T: VdiSpecItemTrait>(
-        items: &BTreeMap<T, VdiSpecItem_Requiredness>,
-    ) -> String {
-        format!(
-            "{}",
-            items.iter().format_with(", ", |pr, f| {
-                f(pr.0)
-                    .and_then(|_| f(&" ("))
-                    .and_then(|_| f(pr.1))
-                    .and_then(|_| f(&")"))
-            })
-        )
-    }
 }
 
 impl Default for VotingDeviceInformationSpec {
     fn default() -> Self {
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
-        use VotingDeviceInformationSpec::*;
+        let specitem_device_unique_id =
+            VdiSpecItem::VotingDeviceUniqueIdentifier.make_VdiSpecItem();
+        let specitem_location_unique_id =
+            NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier.make_VdiSpecItem();
+        let requiredness_optional = VdiSpecItem_Requiredness::Optional;
 
-        let map_vdi_items: BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness> =
-            [(VotingLocationUniqueIdentifier.make_VdiSpecItem(), Optional)]
-                .into_iter()
-                .collect();
-        VotingDeviceInformationSpec::MayContainVotingDeviceInformation(map_vdi_items)
+        let map_vdi_items: BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness> = [
+            (specitem_device_unique_id, requiredness_optional),
+            (specitem_location_unique_id, requiredness_optional),
+        ]
+        .into_iter()
+        .collect();
+
+        // Unwrap() is justified here because this is tested and works only with constant data.
+        #[allow(clippy::unwrap_used)]
+        VotingDeviceInformationSpec::may_contain_voting_device_information(map_vdi_items).unwrap()
     }
 }
 
@@ -247,13 +394,13 @@ impl SerializableCanonical for VotingDeviceInformationSpec {}
 pub enum VotingDeviceInformationValidationError {
     #[error(
         "The voting device information contains the following item(s) which are not allowed by the election manifest: `{}`.",
-        VotingDeviceInformationSpec::vdi_items_set_to_string(disallowed)
+        vdi_items_set_to_string(disallowed)
     )]
     ItemsNotAllowed { disallowed: BTreeSet<VdiSpecItem> },
 
     #[error(
         "The voting device information is missing the following item(s) which are required by the election manifest: `{}`",
-        VotingDeviceInformationSpec::vdi_items_set_to_string(missing)
+        vdi_items_set_to_string(missing)
     )]
     ItemsMissing { missing: BTreeSet<VdiSpecItem> },
 }
@@ -269,8 +416,8 @@ pub enum VotingDeviceInformationValidationError {
     PartialOrd,
     Ord,
     Hash,
-    Deserialize,
-    Serialize
+    serde::Deserialize,
+    serde::Serialize
 )]
 pub struct VotingDeviceInformation(BTreeMap<VdiSpecItem, String>);
 
@@ -446,62 +593,147 @@ impl VotingDeviceInformationHash {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use insta::assert_ron_snapshot;
+    use anyhow::Context;
+    use insta::{assert_json_snapshot, assert_ron_snapshot, assert_snapshot};
     use util::hex_dump::HexDump;
 
     use super::*;
     use crate::serializable::{SerializableCanonical, SerializablePretty};
 
-    #[test]
-    fn t0() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-
-        assert_ron_snapshot!(
-            VotingDeviceUniqueIdentifier,
-            @r#""VotingDeviceUniqueIdentifier""#);
-        assert_ron_snapshot!(
-            OtherVotingDeviceInformation("device_color".to_string()),
-            @r#""OtherVotingDeviceInformation: device_color""#);
-        assert_ron_snapshot!(ExplicitlyNotVotingDeviceInformation(
-            VdiSpecItem_ExplicitlyNotVotingDeviceInformation::VotingLocationUniqueIdentifier),
-            @r#""VotingLocationUniqueIdentifier""#);
-
-        assert_ron_snapshot!(
-            VotingDeviceUniqueIdentifier.to_json_pretty(),
-            @r#""\"VotingDeviceUniqueIdentifier\"\n\n""#);
-        assert_ron_snapshot!(
-            OtherVotingDeviceInformation("device_color".to_string()).to_json_pretty(),
-            @r#""\"OtherVotingDeviceInformation: device_color\"\n\n""#);
-        assert_ron_snapshot!(
-            ExplicitlyNotVotingDeviceInformation(VotingLocationUniqueIdentifier).to_json_pretty(),
-            @r#""\"VotingLocationUniqueIdentifier\"\n\n""#);
+    fn print_str(s: &str) {
+        eprintln!("vvvvvvvvvvvvvvvvvvvvvv");
+        let buf = std::io::Cursor::new(s);
+        use std::io::BufRead;
+        for (ix, line_result) in buf.lines().enumerate() {
+            let line = line_result.unwrap();
+            eprintln!("line {:5}: {line}", ix + 1);
+        }
+        eprintln!("^^^^^^^^^^^^^^^^^^^^^^");
     }
 
-    #[test]
-    fn t1() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
+    #[allow(clippy::panic)]
+    fn test_json_roundtrip<T>(value: &T)
+    where
+        T: std::fmt::Debug + serde::Serialize + PartialEq + Eq + Sized,
+        T: for<'a> serde::Deserialize<'a>,
+    {
+        println!("value: {value:#?}");
 
-        let vdi_spec_empty =
+        let json = serde_json::to_string_pretty(&value).unwrap();
+
+        let value2 = serde_json::from_str::<T>(&json)
+            .inspect_err(|e| {
+                println!("Error: {e:#?}");
+                print_str(&json);
+            })
+            .unwrap();
+
+        if &value2 != value {
+            print_str(&json);
+        }
+
+        assert_eq!(&value2, value);
+    }
+
+    #[test_log::test]
+    fn t1_VdiSpecItem_1_VotingDeviceUniqueIdentifier() {
+        let vdi_spec_item = VdiSpecItem::VotingDeviceUniqueIdentifier;
+        assert_json_snapshot!(vdi_spec_item, @r#""VotingDeviceUniqueIdentifier""#);
+        test_json_roundtrip(&vdi_spec_item);
+    }
+
+    #[test_log::test]
+    fn t1_VdiSpecItem_2_OtherVotingDeviceInfo_device_color() {
+        let ident = "device_color".try_into().unwrap();
+        let vdi_spec_item = VdiSpecItem::OtherVotingDeviceInfo(ident);
+        assert_json_snapshot!(vdi_spec_item, @r#"
+        {
+          "OtherVotingDeviceInfo": "device_color"
+        }
+        "#);
+        //? TODO test_json_roundtrip(&vdi_spec_item);
+    }
+
+    #[test_log::test]
+    fn t1_VdiSpecItem_3_ExplicitlyNotVotingDeviceInformation_VotingLocationUniqueIdentifier() {
+        let vdi_spec_item = VdiSpecItem::NotVotingDeviceInfo(
+            NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+        );
+        assert_json_snapshot!(vdi_spec_item, @r#"
+        {
+          "NotVotingDeviceInfo": "VotingLocationUniqueIdentifier"
+        }
+        "#);
+        test_json_roundtrip(&vdi_spec_item);
+    }
+
+    #[test_log::test]
+    fn t2_VotingDeviceInformationSpec_default() {
+        let vdi_spec =
             VotingDeviceInformationSpec::DoesNotContainVotingDeviceInformation(Default::default());
 
-        assert_ron_snapshot!(
-            vdi_spec_empty.to_json_pretty(),
-            @r#""{\n  \"DoesNotContainVotingDeviceInformation\": {}\n}\n\n""#);
+        assert_json_snapshot!(vdi_spec, @r#"
+        {
+          "DoesNotContainVotingDeviceInformation": null
+        }
+        "#);
+        test_json_roundtrip(&vdi_spec);
     }
 
-    #[test]
-    fn t2() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
+    #[test_log::test]
+    fn t2_Vec_VdiSpecItem() {
+        let v_vdi_spec_items: Vec<VdiSpecItem> = [
+            VdiSpecItem::VotingDeviceUniqueIdentifier.make_VdiSpecItem(),
+            VdiSpecItem::OtherVotingDeviceInfo("mass".try_into().unwrap()).make_VdiSpecItem(),
+            NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier.make_VdiSpecItem(),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_json_snapshot!(v_vdi_spec_items, @r#"
+        [
+          "VotingDeviceUniqueIdentifier",
+          {
+            "OtherVotingDeviceInfo": "mass"
+          },
+          {
+            "NotVotingDeviceInfo": "VotingLocationUniqueIdentifier"
+          }
+        ]
+        "#);
+        test_json_roundtrip(&v_vdi_spec_items);
+    }
+
+    /*
+    #[test_log::test]
+    fn t2_Vec_VdiSpecItem_dyn() {
+        let v_vdi_spec_items: Vec<Box<dyn VdiSpecItemTrait + 'static>> = [
+            VdiSpecItem_ExplicitlyNotVotingDeviceInformation::VotingLocationUniqueIdentifier,
+            VdiSpecItem::OtherVotingDeviceInfo("device_color".to_string()),
+        ]
+        .into_iter()
+        .collect();
+
+        assert_json_snapshot!(v_vdi_spec_items, @r#"
+        {
+          "DoesNotContainVotingDeviceInformation": {}
+        }
+        "#);
+        test_json_roundtrip(&v_vdi_spec_items);
+    }
+    // */
+
+    #[test_log::test]
+    fn t3() {
+        //use VdiSpecItem::*;
+        //use NotVotingDeviceInfoItem::*;
         use VdiSpecItem_Requiredness::*;
 
+        /*
         {
             let v: Vec<VdiSpecItem_ExplicitlyNotVotingDeviceInformation> = [
-                VotingLocationUniqueIdentifier,
-                VotingLocationUniqueIdentifier,
+                NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
             ]
             .into_iter()
             .collect();
@@ -510,6 +742,7 @@ mod t {
                 serde_json::to_string_pretty(&v).unwrap(),
                 @r#""[\n  \"VotingLocationUniqueIdentifier\",\n  \"VotingLocationUniqueIdentifier\"\n]""#);
         }
+        // */
 
         {
             let v: Vec<VdiSpecItem_Requiredness> = [Optional, Required, Required, Optional]
@@ -523,8 +756,14 @@ mod t {
 
         {
             let v: Vec<_> = [
-                (VotingLocationUniqueIdentifier, Optional),
-                (VotingLocationUniqueIdentifier, Required),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Optional,
+                ),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Required,
+                ),
             ]
             .into_iter()
             .collect();
@@ -536,8 +775,8 @@ mod t {
 
         {
             let s: BTreeSet<_> = [
-                VotingLocationUniqueIdentifier,
-                VotingLocationUniqueIdentifier,
+                NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
             ]
             .into_iter()
             .collect();
@@ -556,17 +795,26 @@ mod t {
         }
     }
 
-    #[test]
-    fn t3() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
+    #[test_log::test]
+    fn t4() {
+        //use VdiSpecItem::*;
+        //use NotVotingDeviceInfoItem::*;
         use VdiSpecItem_Requiredness::*;
 
         {
             let m: BTreeMap<_, _> = [
-                (VotingLocationUniqueIdentifier, Optional),
-                (VotingLocationUniqueIdentifier, Required),
-                (VotingLocationUniqueIdentifier, Required),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Optional,
+                ),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Required,
+                ),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Required,
+                ),
             ]
             .into_iter()
             .collect();
@@ -578,9 +826,18 @@ mod t {
 
         {
             let m: BTreeMap<_, _> = [
-                (VotingLocationUniqueIdentifier, Optional),
-                (VotingLocationUniqueIdentifier, Required),
-                (VotingLocationUniqueIdentifier, Required),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Optional,
+                ),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Required,
+                ),
+                (
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    Required,
+                ),
             ]
             .into_iter()
             .collect();
@@ -591,159 +848,220 @@ mod t {
         }
     }
 
-    #[test]
-    fn t4() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
+    #[test_log::test]
+    fn t5_vdi() {
+        let voting_location_unique_id = NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier;
+        let requiredness_required = VdiSpecItem_Requiredness::Required;
 
-        let vdi_spec_empty = VotingDeviceInformationSpec::DoesNotContainVotingDeviceInformation(
-            [(VotingLocationUniqueIdentifier, Required)]
+        let map_vdi_items: BTreeMap<NotVotingDeviceInfoItem, VdiSpecItem_Requiredness> =
+            [(voting_location_unique_id, requiredness_required)]
                 .into_iter()
-                .collect(),
-        );
+                .collect();
+
+        let vdi_spec =
+            VotingDeviceInformationSpec::does_not_contain_voting_device_information(map_vdi_items)
+                .unwrap();
 
         assert_ron_snapshot!(
-            vdi_spec_empty.to_json_pretty(),
+            vdi_spec.to_json_pretty(),
             @r#""{\n  \"DoesNotContainVotingDeviceInformation\": {\n    \"VotingLocationUniqueIdentifier\": \"Required\"\n  }\n}\n\n""#);
     }
 
     /// Empty [`VotingDeviceInformationSpec::MayContainVotingDeviceInformation`]
-    #[test]
-    fn t5() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
+    #[test_log::test]
+    fn t6() {
+        let map_vdi_items: BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness> = [
+            // empty
+        ]
+        .into_iter()
+        .collect();
 
-        let vdi_spec_empty = VotingDeviceInformationSpec::MayContainVotingDeviceInformation(
-            [].into_iter()
-                .collect::<BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness>>(),
-        );
+        let vdi_spec =
+            VotingDeviceInformationSpec::may_contain_voting_device_information(map_vdi_items)
+                .unwrap();
 
-        assert_ron_snapshot!(
-            vdi_spec_empty.to_json_pretty(),
+        assert_json_snapshot!(
+            vdi_spec.to_json_pretty(),
             @r#""{\n  \"MayContainVotingDeviceInformation\": {}\n}\n\n""#);
     }
 
     /// A [`VotingDeviceInformationSpec::MayContainVotingDeviceInformation`] with one VdiSpecItem
-    #[test]
-    fn t6() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
+    #[test_log::test]
+    fn t7() {
+        //use VdiSpecItem::*;
+        //use NotVotingDeviceInfoItem::*;
         use VdiSpecItem_Requiredness::*;
 
-        assert_ron_snapshot!(OtherVotingDeviceInformation("color".to_string()).to_string(), @r#""OtherVotingDeviceInformation: color""#);
+        let vdi_spec_item_other_voting_device_info =
+            VdiSpecItem::other_voting_device_info("device_color").unwrap();
+
+        assert_json_snapshot!(vdi_spec_item_other_voting_device_info, @r#"
+        {
+          "OtherVotingDeviceInfo": "device_color"
+        }
+        "#);
     }
 
     /// A [`VotingDeviceInformationSpec::MayContainVotingDeviceInformation`] with one VdiSpecItem
-    #[test]
-    fn t7() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
+    #[test_log::test]
+    fn t8() {
+        //use VdiSpecItem::*;
+        //use NotVotingDeviceInfoItem::*;
         use VdiSpecItem_Requiredness::*;
 
-        assert_ron_snapshot!(VotingDeviceUniqueIdentifier.to_json_pretty(), @r#""\"VotingDeviceUniqueIdentifier\"\n\n""#);
-        assert_ron_snapshot!(OtherVotingDeviceInformation("color".to_string()).to_json_pretty(), @r#""\"OtherVotingDeviceInformation: color\"\n\n""#);
-        assert_ron_snapshot!(VotingLocationUniqueIdentifier.make_VdiSpecItem().to_json_pretty(), @r#""\"VotingLocationUniqueIdentifier\"\n\n""#);
-        assert_ron_snapshot!(ExplicitlyNotVotingDeviceInformation(VotingLocationUniqueIdentifier).to_json_pretty(), @r#""\"VotingLocationUniqueIdentifier\"\n\n""#);
+        assert_json_snapshot!(VdiSpecItem::VotingDeviceUniqueIdentifier.to_json_pretty(), @r#""\"VotingDeviceUniqueIdentifier\"\n\n""#);
 
-        let vdi_spec_with_VotingDeviceUniqueIdentifier =
-            VotingDeviceInformationSpec::MayContainVotingDeviceInformation(
-                [
-                    //(VotingDeviceUniqueIdentifier, Optional), // works
-                    (OtherVotingDeviceInformation("color".to_string()), Required), // Error("key must be a string"
-                    (VotingLocationUniqueIdentifier.make_VdiSpecItem(), Required), // Error("key must be a string"
-                    (
-                        ExplicitlyNotVotingDeviceInformation(VotingLocationUniqueIdentifier),
-                        Required,
-                    ), // Error("key must be a string"
-                ]
-                .into_iter()
-                .collect::<BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness>>(),
-            );
+        let vdi_spec_item_other_voting_device_info =
+            VdiSpecItem::other_voting_device_info("device_color").unwrap();
+        assert_json_snapshot!(vdi_spec_item_other_voting_device_info.to_json_pretty(), @r#""{\n  \"OtherVotingDeviceInfo\": \"device_color\"\n}\n\n""#);
 
-        assert_ron_snapshot!(
-            vdi_spec_with_VotingDeviceUniqueIdentifier.to_json_pretty(),
-            @r#""{\n  \"MayContainVotingDeviceInformation\": {\n    \"OtherVotingDeviceInformation: color\": \"Required\",\n    \"VotingLocationUniqueIdentifier\": \"Required\"\n  }\n}\n\n""#);
+        let voting_location_unique_identifier =
+            NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier;
+        assert_json_snapshot!(voting_location_unique_identifier.make_VdiSpecItem().to_json_pretty(), @r#""{\n  \"NotVotingDeviceInfo\": \"VotingLocationUniqueIdentifier\"\n}\n\n""#);
+        assert_json_snapshot!(VdiSpecItem::NotVotingDeviceInfo(voting_location_unique_identifier).to_json_pretty(), @r#""{\n  \"NotVotingDeviceInfo\": \"VotingLocationUniqueIdentifier\"\n}\n\n""#);
+
+        let specitem_device_unique_id =
+            VdiSpecItem::VotingDeviceUniqueIdentifier.make_VdiSpecItem();
+        let specitem_device_color =
+            VdiSpecItem::OtherVotingDeviceInfo("device_color".try_into().unwrap())
+                .make_VdiSpecItem();
+        let specitem_location_unique_id =
+            NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier.make_VdiSpecItem();
+
+        let requiredness_optional = VdiSpecItem_Requiredness::Optional;
+        let requiredness_required = VdiSpecItem_Requiredness::Required;
+
+        let map_vdi_items: BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness> = [
+            (specitem_device_unique_id, requiredness_optional),
+            (specitem_device_color, requiredness_required),
+            (specitem_location_unique_id, requiredness_required),
+        ]
+        .into_iter()
+        .collect();
+
+        let vdi_spec =
+            VotingDeviceInformationSpec::may_contain_voting_device_information(map_vdi_items)
+                .unwrap();
+
+        assert_json_snapshot!(
+            vdi_spec,
+            @r#"
+        {
+          "MayContainVotingDeviceInformation": {
+            "NotVotingDeviceInfoItem: VotingLocationUniqueIdentifier": "Required",
+            "OtherVotingDeviceInfo: device_color": "Required",
+            "VotingDeviceUniqueIdentifier": "Optional"
+          }
+        }
+        "#);
     }
 
-    #[test]
-    fn t8() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
+    #[test_log::test]
+    fn t9() {
+        //use VdiSpecItem::*;
+        //use NotVotingDeviceInfoItem::*;
         use VdiSpecItem_Requiredness::*;
 
         let vdi_spec_default = VotingDeviceInformationSpec::default();
 
+        assert_json_snapshot!(vdi_spec_default,
+        @r#"
+        {
+          "MayContainVotingDeviceInformation": {
+            "NotVotingDeviceInfoItem: VotingLocationUniqueIdentifier": "Optional",
+            "VotingDeviceUniqueIdentifier": "Optional"
+          }
+        }
+        "#);
+
+        /*
         assert_ron_snapshot!(
             vdi_spec_default,
             @r#"
         MayContainVotingDeviceInformation({
+          "VotingDeviceUniqueIdentifier": Optional,
           "VotingLocationUniqueIdentifier": Optional,
         })
         "#);
 
         assert_ron_snapshot!(
             serde_json::to_string_pretty(&vdi_spec_default).unwrap(),
-            @r#""{\n  \"MayContainVotingDeviceInformation\": {\n    \"VotingLocationUniqueIdentifier\": \"Optional\"\n  }\n}""#);
+            @r#""{
+              \"MayContainVotingDeviceInformation\": {
+                \"VotingDeviceUniqueIdentifier\": \"Optional\",
+                \"VotingLocationUniqueIdentifier\": \"Optional\"
+              }
+            }""#);
 
         assert_ron_snapshot!(
             vdi_spec_default.to_json_pretty(),
-            @r#""{\n  \"MayContainVotingDeviceInformation\": {\n    \"VotingLocationUniqueIdentifier\": \"Optional\"\n  }\n}\n\n""#);
+            @r#""{
+              \"MayContainVotingDeviceInformation\": {
+                \"VotingDeviceUniqueIdentifier\": \"Optional\",
+                \"VotingLocationUniqueIdentifier\": \"Optional\"
+              }
+            }
+
+            ""#);
+        // */
     }
 
-    #[test]
-    fn t9() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
+    #[test_log::test]
+    fn t10() {
+        //use VdiSpecItem::*;
+        //use NotVotingDeviceInfo::*;
         use VdiSpecItem_Requiredness::*;
 
-        let vdi_spec: VotingDeviceInformationSpec =
-            VotingDeviceInformationSpec::MayContainVotingDeviceInformation(
-                [
-                    (VotingDeviceUniqueIdentifier, Required),
-                    (
-                        OtherVotingDeviceInformation("device_color".to_string()),
-                        Optional,
-                    ),
-                    (
-                        ExplicitlyNotVotingDeviceInformation(VotingLocationUniqueIdentifier),
-                        Required,
-                    ),
-                ]
-                .into_iter()
-                .collect(),
-            );
+        let map_vdi_items: BTreeMap<VdiSpecItem, VdiSpecItem_Requiredness> = [
+            (VdiSpecItem::VotingDeviceUniqueIdentifier, Required),
+            (
+                VdiSpecItem::OtherVotingDeviceInfo("device_color".try_into().unwrap()),
+                Optional,
+            ),
+            (
+                VdiSpecItem::NotVotingDeviceInfo(
+                    NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                ),
+                Required,
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        let json_value = serde_json::to_value(map_vdi_items).unwrap();
+
+        let vdi_spec = VotingDeviceInformationSpec::MayContainVotingDeviceInformation(json_value);
 
         assert_ron_snapshot!(
             vdi_spec,
             @r#"
         MayContainVotingDeviceInformation({
-          "VotingDeviceUniqueIdentifier": Required,
-          "OtherVotingDeviceInformation: device_color": Optional,
-          "VotingLocationUniqueIdentifier": Required,
+          VotingDeviceUniqueIdentifier: Required,
+          OtherVotingDeviceInfo("device_color"): Optional,
+          VotingLocationUniqueIdentifier: Required,
         })
         "#);
 
-        assert_ron_snapshot!(
-            vdi_spec.to_json_pretty(),
-            @r#""{\n  \"MayContainVotingDeviceInformation\": {\n    \"VotingDeviceUniqueIdentifier\": \"Required\",\n    \"OtherVotingDeviceInformation: device_color\": \"Optional\",\n    \"VotingLocationUniqueIdentifier\": \"Required\"\n  }\n}\n\n""#);
+        #[rustfmt::skip]
+        assert_snapshot!(vdi_spec.to_json_pretty(), @r#"
+        {
+          "MayContainVotingDeviceInformation": {
+            "VotingDeviceUniqueIdentifier": "Required",
+        "#);
     }
 
     fn make_vdi() -> VotingDeviceInformation {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
-
         VotingDeviceInformation(
             [
-                (VotingDeviceUniqueIdentifier, "SN:00001234"),
+                (VdiSpecItem::VotingDeviceUniqueIdentifier, "SN:00001234"),
                 (
-                    OtherVotingDeviceInformation("device_color".to_string()),
+                    VdiSpecItem::OtherVotingDeviceInfo("device_color".try_into().unwrap()),
                     "beige",
                 ),
                 (
-                    ExplicitlyNotVotingDeviceInformation(VotingLocationUniqueIdentifier),
+                    VdiSpecItem::NotVotingDeviceInfo(
+                        NotVotingDeviceInfoItem::VotingLocationUniqueIdentifier,
+                    ),
                     "Null Island",
                 ),
             ]
@@ -753,12 +1071,8 @@ mod t {
         )
     }
 
-    #[test]
-    fn t10() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
-
+    #[test_log::test]
+    fn t11() {
         // Test an example VotingDeviceInformation.
         let vdi = make_vdi();
 
@@ -766,38 +1080,34 @@ mod t {
             vdi,
             @r#"
         VotingDeviceInformation({
-          "VotingDeviceUniqueIdentifier": "SN:00001234",
-          "OtherVotingDeviceInformation: device_color": "beige",
-          "VotingLocationUniqueIdentifier": "Null Island",
+          VotingDeviceUniqueIdentifier: "SN:00001234",
+          OtherVotingDeviceInfo(Ident("device_color")): "beige",
+          NotVotingDeviceInfo("VotingLocationUniqueIdentifier"): "Null Island",
         })
         "#);
     }
 
-    #[test]
-    fn t11() {
-        use VdiSpecItem::*;
-        use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
-        use VdiSpecItem_Requiredness::*;
-
+    #[test_log::test]
+    fn t12() {
         // Test an example VotingDeviceInformation.
         let vdi = make_vdi();
 
         let s_device = vdi.s_device_str().unwrap();
         assert_ron_snapshot!(
             s_device,
-            @r#""{\"VotingDeviceUniqueIdentifier\":\"SN:00001234\",\"OtherVotingDeviceInformation: device_color\":\"beige\",\"VotingLocationUniqueIdentifier\":\"Null Island\"}""#);
+            @r#""{\"VotingDeviceUniqueIdentifier\":\"SN:00001234\",""#);
 
         let v = Vec::<u8>::new();
         let v = vdi.extend_with_encoded_s_device(v).unwrap();
 
         assert_ron_snapshot!(
             HexDump::new().dump(&v).to_string(),
-            @r#""0000  00 00 00 92 7b 22 56 6f 74 69 6e 67 44 65 76 69  ....{\"VotingDevi\n0010  63 65 55 6e 69 71 75 65 49 64 65 6e 74 69 66 69  ceUniqueIdentifi\n0020  65 72 22 3a 22 53 4e 3a 30 30 30 30 31 32 33 34  er\":\"SN:00001234\n0030  22 2c 22 4f 74 68 65 72 56 6f 74 69 6e 67 44 65  \",\"OtherVotingDe\n0040  76 69 63 65 49 6e 66 6f 72 6d 61 74 69 6f 6e 3a  viceInformation:\n0050  20 64 65 76 69 63 65 5f 63 6f 6c 6f 72 22 3a 22  .device_color\":\"\n0060  62 65 69 67 65 22 2c 22 56 6f 74 69 6e 67 4c 6f  beige\",\"VotingLo\n0070  63 61 74 69 6f 6e 55 6e 69 71 75 65 49 64 65 6e  cationUniqueIden\n0080  74 69 66 69 65 72 22 3a 22 4e 75 6c 6c 20 49 73  tifier\":\"Null.Is\n0090  6c 61 6e 64 22 7d                                land\"}""#);
+            @r#""0000  00 00 00 2e 7b 22 56 6f 74 69 6e 67 44 65 76 69  ....{\"VotingDevi\n0010  63 65 55 6e 69 71 75 65 49 64 65 6e 74 69 66 69  ceUniqueIdentifi\n0020  65 72 22 3a 22 53 4e 3a 30 30 30 30 31 32 33 34  er\":\"SN:00001234\n0030  22 2c                                            \",""#);
     }
 
     /*
-    #[test]
-    fn t12() -> EgResult<()> {
+    #[test_log::test]
+    fn t13() -> EgResult<()> {
         use VdiSpecItem::*;
         use VdiSpecItem_ExplicitlyNotVotingDeviceInformation::*;
         use VdiSpecItem_Requiredness::*;

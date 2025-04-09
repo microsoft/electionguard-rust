@@ -78,7 +78,7 @@ impl Subcommand for WriteParameters {
         /*
         // eprint!("Initializing standard parameters...");
         let fixed_parameters = STANDARD_PARAMETERS.clone();
-        // eprintln!("Done.");
+        // println!("Done.");
 
         let varying_parameters = VaryingParameters {
             n: self.n,
@@ -104,7 +104,7 @@ impl Subcommand for WriteParameters {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote election parameters to: {}", path.display());
+        println!("Wrote election parameters to: {}", path.display());
 
         Ok(())
         // */

@@ -190,7 +190,16 @@ pub enum EgError {
     },
 
     #[error(
-        "While trying to produce a `Ballot`, the provided `VoterSelectionsPlaintext` contains a value for the extended base hash `H_E` that does not match the `H_E` for this election. \
+        "While producing a `ContestDataFieldsPlaintexts` for contest `{contest_ix}`, `{qty_expected}` values were expected for that contest, but `{qty_supplied}` values were supplied."
+    )]
+    IncorrectQtyOfContestOptionFieldsPlaintexts {
+        contest_ix: ContestIndex,
+        qty_expected: usize,
+        qty_supplied: usize,
+    },
+
+    #[error(
+        "While producing a `Ballot`, the provided `VoterSelectionsPlaintext` contains a value for the extended base hash `H_E` that does not match the `H_E` for this election. \
 Possibly this `VoterSelectionsPlaintext` was created for a different election or election configuration. \
 VoterSelectionsPlaintext h_e=`{voterselections_h_e}`, \
 PreVotingData h_e=`{election_h_e}`"
@@ -198,6 +207,12 @@ PreVotingData h_e=`{election_h_e}`"
     VoterSelectionsPlaintextDoesNotMatchExpected {
         voterselections_h_e: crate::extended_base_hash::ExtendedBaseHash_H_E,
         election_h_e: crate::extended_base_hash::ExtendedBaseHash_H_E,
+    },
+
+    #[error("While producing a Ballot of style `{ballot_style_ix}`: {bx_err}")]
+    WhileProducingBallot {
+        ballot_style_ix: BallotStyleIndex,
+        bx_err: Box<EgError>,
     },
 
     #[error("Ballot of style `{ballot_style_ix}` is missing contest `{contest_ix}`.")]
@@ -259,7 +274,7 @@ PreVotingData h_e=`{election_h_e}`"
     #[error("Random number generation error: {0}")]
     RandError(String),
 
-    #[error(transparent)]
+    #[error("{0}")]
     OtherError(WrapAnnoyingError<anyhow::Error>),
 
     #[error("{0}")]
@@ -472,6 +487,9 @@ PreVotingData h_e=`{election_h_e}`"
         expected: std::ops::RangeInclusive<u32>,
         actual: u32,
     },
+
+    #[error("JSON error: {0}")]
+    JsonError(WrapAnnoyingError<serde_json::Error>),
 }
 
 assert_impl_all!(EgError: Send, Sync);
@@ -564,13 +582,6 @@ impl From<util::uint53::Uint53Error> for EgError {
     }
 }
 
-impl From<EgError> for String {
-    /// Makes an [`String`](std::string::String) from an [`EgError`].
-    fn from(e: EgError) -> Self {
-        e.to_string()
-    }
-}
-
 /// [`Result`](std::result::Result) type with `Err` type `E` of [`EgError`].
 pub type EgResult<T> = std::result::Result<T, EgError>;
 
@@ -621,8 +632,9 @@ where
         recur(v, 1, e);
     }
 }
+
 impl WrapAnnoyingError<anyhow::Error> {
-    /// A [`WrapAnyhowError`] can always be made from a [`anayhow::Error`].
+    /// A [`WrapAnyhowError`] can always be made from a [`anyhow::Error`].
     #[allow(non_snake_case)]
     #[inline]
     pub fn from_anyhow_Error(anyhow_error: anyhow::Error) -> Self {
@@ -634,14 +646,23 @@ impl WrapAnnoyingError<anyhow::Error> {
     }
 }
 
+impl From<serde_json::Error> for EgError {
+    /// A [`EgError`] can always be made from a [`serde_json::Error`].
+    #[inline]
+    fn from(src: serde_json::Error) -> Self {
+        EgError::JsonError(src.into())
+    }
+}
+
 impl<T> From<T> for WrapAnnoyingError<T>
 where
     T: std::error::Error + std::fmt::Debug + std::fmt::Display + Send + Sync,
 {
-    /// A [`WrapAnyhowError`] can always be made from a [`anayhow::Error`].
+    /// A [`WrapAnnoyingError<T>`] can always be made from a `T:` [`std::error::Error`]
+    /// `+` [`std::fmt::Debug`] `+` [`std::fmt::Display`] `+` [`Send`] `+` [`Sync`].
     #[inline]
     fn from(e: T) -> Self {
-        let mut v: Vec<String> = vec!["anyhow::Error".to_string()];
+        let mut v: Vec<String> = vec!["T::Error".to_string()];
         Self::append_error_strings(&mut v, &e);
         Self(v, Arc::new(e))
     }
@@ -664,10 +685,6 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(self.1.as_ref(), f)
     }
-}
-impl<T> std::error::Error for WrapAnnoyingError<T> where
-    T: std::fmt::Debug + std::fmt::Display + Send + Sync
-{
 }
 impl<T> PartialEq for WrapAnnoyingError<T>
 where

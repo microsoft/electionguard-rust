@@ -119,6 +119,7 @@ impl<'de> Deserialize<'de> for ElectionManifestInfo {
             label,
             contests,
             ballot_styles,
+            voting_device_information_spec,
         }
 
         struct ElectionManifestInfoVisitor;
@@ -146,18 +147,27 @@ impl<'de> Deserialize<'de> for ElectionManifestInfo {
                     return Err(V::Error::missing_field(Field::ballot_styles.into()));
                 };
 
+                let voting_device_information_spec = {
+                    let Some((
+                        Field::voting_device_information_spec,
+                        voting_device_information_spec,
+                    )) = map.next_entry()?
+                    else {
+                        return Err(V::Error::missing_field(
+                            Field::voting_device_information_spec.into(),
+                        ));
+                    };
+                    Arc::new(voting_device_information_spec)
+                };
+
                 let v1_bsi: Vec1<BallotStyleInfo> =
                     Vec1::try_from_vec(v_bsi).map_err(|e| V::Error::custom(e.to_string()))?;
-
-                //? TODO
-                let voting_device_information_spec = VotingDeviceInformationSpec::default();
-                let arc_voting_device_information_spec = Arc::new(voting_device_information_spec);
 
                 Ok(ElectionManifestInfo {
                     label,
                     contests,
                     ballot_styles: Left(v1_bsi),
-                    voting_device_information_spec: arc_voting_device_information_spec,
+                    voting_device_information_spec,
                 })
             }
         }
@@ -182,11 +192,14 @@ crate::impl_validatable_validated! {
 
         //----- Validate `label`.
 
+        //? TODO S3.1.3.b EGRI rejects labels that contain line break characters, tabs, or similar special characters
+        //? TODO S3.1.3.b EGRI rejects labels that have leading or trailing whitespace
         //? TODO let label = label.validate(eg)?;
 
         //----- Validate `contests`.
 
         //? TODO let contests = contests.validate(eg)?;
+        //? TODO S3.1.3.aEGRI rejects any Election Manifest containing duplicate labels for contests
 
         //for contest in contests {
             // Validate the contest.
@@ -213,6 +226,8 @@ crate::impl_validatable_validated! {
             }
             Right(v1_bs) => v1_bs,
         };
+
+        //? TODO S3.1.3.f Every Ballot Style defines a label unique across all Ballot Styles in the manifest
 
         //----- Validate `voting_device_information_spec`.
 
@@ -430,13 +445,20 @@ impl Contest {
             .ok_or(EgError::ContestOptionIndexNotInContest(ix))
     }
 
-    /// The number of data fields for the selectable options of this [`Contest`].
-    pub fn num_selectable_option_data_fields(&self) -> usize {
+    /// The number of Contest Option Data Fields for this [`Contest`], not including any non-selectable or
+    /// system-assigned additional data fields.
+    ///
+    /// This value is the required length of the
+    /// [`ContestOptionFieldsPlaintexts`](crate::contest_data_fields_plaintexts::ContestDataFieldsPlaintexts)
+    /// that should be supplied in the
+    /// [`VoterSelectionsPlaintext`](crate::voter_selections_plaintext::VoterSelectionsPlaintext)
+    /// for this contest .
+    pub fn qty_contest_option_data_fields(&self) -> usize {
         self.contest_options.len()
     }
 
     /// The number of (non-selectable) additional data fields used for this [`Contest`].
-    pub fn num_additional_non_selectable_option_data_fields(&self) -> usize {
+    pub fn qty_additional_non_selectable_option_data_fields(&self) -> usize {
         //? TODO determine this once policy of recording (over|under)vote[ds], is fully defined.
         0
     }
@@ -447,9 +469,9 @@ impl Contest {
     ///
     /// This is simply the sum of `num_selectable_option_data_fields()` and
     /// `num_additional_non_selectable_option_data_fields()`.
-    pub fn num_data_fields(&self) -> usize {
-        self.num_selectable_option_data_fields()
-            + self.num_additional_non_selectable_option_data_fields()
+    pub fn qty_data_fields(&self) -> usize {
+        self.qty_contest_option_data_fields()
+            + self.qty_additional_non_selectable_option_data_fields()
     }
 
     /// The effective selection limit for this [`Contest`].
@@ -525,6 +547,11 @@ impl Contest {
                 }
             }
         }
+
+        //? TODO S3.1.3.a EGRI rejects any Election Manifest containing duplicate labels for Selectable Options in any contest
+        //? TODO S3.1.3.b EGRI rejects labels that contain line break characters, tabs, or similar special characters
+        //? TODO S3.1.3.b EGRI rejects labels that have leading or trailing whitespace
+
         Ok(())
     }
 }
@@ -550,6 +577,8 @@ pub struct ContestOption {
     #[serde(skip)]
     pub opt_contest_option_ix: Option<ContestOptionIndex>,
 
+    //? TODO S3.1.3.b EGRI rejects labels that contain line break characters, tabs, or similar special characters
+    //? TODO S3.1.3.b EGRI rejects labels that have leading or trailing whitespace
     /// The label for this [`ContestOption`].
     pub label: String,
 
@@ -610,86 +639,99 @@ pub type ContestOptionIndex = CiphertextIndex;
 pub mod t {
     use std::io::Cursor;
 
+    use anyhow::Context;
+    //?use insta::assert_snapshot;
+
     use super::*;
     use crate::{
         eg::Eg,
         loadable::LoadableFromStdIoReadValidated,
-        resource_id::ElectionDataObjectId,
         serializable::{SerializableCanonical, SerializablePretty},
     };
 
-    #[test]
+    #[test_log::test]
     fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
-
-    async fn t1_async() {
-        let election_manifest_ridfmt =
-            ElectionDataObjectId::ElectionManifest.validated_type_ridfmt();
-
-        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::election_manifest::t::t1_async",
-        );
-        let eg = eg.as_ref();
-
-        // Pretty
-        {
-            let json_pretty = {
-                let mut buf = Cursor::new(vec![0u8; 0]);
-                let result = eg
-                    .produce_resource_downcast_no_src::<ElectionManifest>(&election_manifest_ridfmt)
-                    .await;
-                if let Err(e) = &result {
-                    eprintln!("Err(e): {e:#?}");
-                    eprintln!("eg: {eg:#?}");
-                }
-                result.unwrap().to_stdiowrite_pretty(&mut buf).unwrap();
-                buf.into_inner()
-            };
-            assert!(json_pretty.len() > 6);
-            assert_eq!(*json_pretty.last().unwrap(), b'\n');
-
-            let election_manifest_from_json_pretty = ElectionManifest::from_stdioread_validated(
-                &mut Cursor::new(json_pretty.clone()),
-                eg,
-            )
-            .unwrap();
-
-            let json_pretty_2 = {
-                let mut buf = Cursor::new(vec![0u8; 0]);
-                election_manifest_from_json_pretty
-                    .to_stdiowrite_pretty(&mut buf)
-                    .unwrap();
-                buf.into_inner()
-            };
-
-            assert_eq!(json_pretty, json_pretty_2);
-            assert_eq!(
-                *eg.election_manifest().await.unwrap(),
-                election_manifest_from_json_pretty
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::election_manifest::t::t1_async",
             );
-        }
+            let eg = eg.as_ref();
 
-        // Canonical
-        {
-            let canonical_bytes = eg
+            let election_manifest = eg
                 .election_manifest()
                 .await
-                .unwrap()
-                .to_canonical_bytes()
+                .context("producing ElectionManifest")
+                .inspect_err(|e| println!("Error: {e:#?}"))
                 .unwrap();
-            assert!(canonical_bytes.len() > 5);
-            assert_ne!(canonical_bytes[canonical_bytes.len() - 1], b'\n');
-            assert_ne!(canonical_bytes[canonical_bytes.len() - 1], 0x00);
 
-            let election_manifest_from_canonical_bytes =
-                ElectionManifest::from_stdioread_validated(&mut Cursor::new(canonical_bytes), eg)
+            // Pretty
+            {
+                let json_pretty = {
+                    let mut buf = Cursor::new(vec![0u8; 0]);
+                    election_manifest.to_stdiowrite_pretty(&mut buf).unwrap();
+                    buf.into_inner()
+                };
+                assert!(json_pretty.len() > 6);
+                assert_eq!(*json_pretty.last().unwrap(), b'\n');
+                //let json_pretty_str: &str = std::str::from_utf8(json_pretty.as_slice()).unwrap();
+                //assert_snapshot!(json_pretty_str, @r#"
+                //"#);
+
+                let election_manifest_from_json_pretty =
+                    ElectionManifest::from_stdioread_validated(
+                        &mut Cursor::new(json_pretty.clone()),
+                        eg,
+                    )
+                    .inspect_err(|e| {
+                        println!("Error: {e:#?}");
+                        let buf = Cursor::new(json_pretty.clone());
+                        use std::io::BufRead;
+                        for (ix, line_result) in buf.lines().enumerate() {
+                            let line = line_result.unwrap_or_else(|e| format!("Error: {e:#?}"));
+                            println!("line {:5}: {line}", ix + 1);
+                        }
+                    })
                     .unwrap();
 
-            assert_eq!(
-                *eg.election_manifest().await.unwrap(),
-                election_manifest_from_canonical_bytes
-            );
-        }
+                let json_pretty_2 = {
+                    let mut buf = Cursor::new(vec![0u8; 0]);
+                    election_manifest_from_json_pretty
+                        .to_stdiowrite_pretty(&mut buf)
+                        .unwrap();
+                    buf.into_inner()
+                };
+
+                assert_eq!(json_pretty, json_pretty_2);
+                assert_eq!(
+                    *eg.election_manifest().await.unwrap(),
+                    election_manifest_from_json_pretty
+                );
+            }
+
+            // Canonical
+            {
+                let canonical_bytes = eg
+                    .election_manifest()
+                    .await
+                    .unwrap()
+                    .to_canonical_bytes()
+                    .unwrap();
+                assert!(canonical_bytes.len() > 5);
+                assert_ne!(canonical_bytes[canonical_bytes.len() - 1], b'\n');
+                assert_ne!(canonical_bytes[canonical_bytes.len() - 1], 0x00);
+
+                let election_manifest_from_canonical_bytes =
+                    ElectionManifest::from_stdioread_validated(
+                        &mut Cursor::new(canonical_bytes),
+                        eg,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    *eg.election_manifest().await.unwrap(),
+                    election_manifest_from_canonical_bytes
+                );
+            }
+        });
     }
 }

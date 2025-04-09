@@ -86,7 +86,7 @@ impl Subcommand for GuardianSecretKeyGenerate {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote {description}");
+        println!("Wrote {description}");
 
         Ok(())
         // */

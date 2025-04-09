@@ -214,8 +214,8 @@ mod t {
 
     use super::*;
 
-    #[test]
-    fn t0() {
+    #[test_log::test]
+    fn t1() {
         let config = EgConfig::new();
 
         assert_ron_snapshot!(config,
@@ -223,6 +223,16 @@ mod t {
         EgConfig(
           rpregistry: ResourceProducerRegistry(
             map: {
+              RPRegistryEntry_Key(
+                name: "PublicFromSecretKey",
+                category: DefaultProducer,
+              ): RPRegistryEntry_Value(
+                arc_key: RPRegistryEntry_Key(
+                  name: "PublicFromSecretKey",
+                  category: DefaultProducer,
+                ),
+                opt_arc_rp: None,
+              ),
               RPRegistryEntry_Key(
                 name: "Specific",
                 category: DefaultProducer,

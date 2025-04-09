@@ -347,7 +347,7 @@ mod t0 {
         let commitment = CoefficientCommitment(fixed_parameters.group.g_exp(&coefficient.0));
         (coefficient, commitment)
     }
-    #[test]
+    #[test_log::test]
     fn test_guardian_proof_generation() -> EgResult<()> {
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::guardian_coeff_proof::t0::test_guardian_proof_generation");
@@ -381,7 +381,7 @@ mod t0 {
         Ok(())
     }
 
-    #[test]
+    #[test_log::test]
     fn test_guardian_proof_generation_wrong_index() -> EgResult<()> {
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::guardian_coeff_proof::t0::test_guardian_proof_generation_wrong_index");

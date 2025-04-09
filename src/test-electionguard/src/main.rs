@@ -43,7 +43,7 @@ fn main() -> ExitCode {
     match main2() {
         Ok(exit_code) => exit_code,
         Err(e) => {
-            eprintln!("{e}");
+            println!("{e}");
             ExitCode::FAILURE
         }
     }

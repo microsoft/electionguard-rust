@@ -140,7 +140,7 @@ impl Subcommand for PreEncryptedBallotRecord {
                     .with_context(|| format!("Writing encrypted ballot to: {}", path.display()))?;
                 drop(bx_write);
             } else {
-                eprintln!(
+                println!(
                     "Regenerated ballot with nonce {} does not match ballot {}",
                     nonce, b_idx
                 );

@@ -44,7 +44,7 @@ impl ElectionTalliesInfo {
         let mut contests =
             Vec1::<ContestTallies>::with_capacity(election_manifest.contests().len());
         for contest in election_manifest.contests().iter() {
-            let zero_tallies = ContestTallies::new_zeroed_of_len(contest.num_data_fields())?;
+            let zero_tallies = ContestTallies::new_zeroed_of_len(contest.qty_data_fields())?;
             contests.try_push(zero_tallies)?;
         }
 
@@ -170,7 +170,6 @@ impl SerializableCanonical for ElectionTallies {}
 #[allow(clippy::unwrap_used)]
 mod t {
     use anyhow::{Context, anyhow, bail, ensure};
-    use maybe_owned::MaybeOwned;
 
     use util::{csrng::Csrng, vec1::Vec1};
 
@@ -218,7 +217,7 @@ mod t {
         ElectionTallies::try_validate_from_async(produce_resource, election_tallies_info).await
     }
 
-    #[test]
+    #[test_log::test]
     fn t1() {
         async_global_executor::block_on(async {
             let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(

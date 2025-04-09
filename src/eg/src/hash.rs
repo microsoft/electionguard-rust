@@ -545,7 +545,7 @@ mod test_eg_h {
 
     use super::*;
 
-    #[test]
+    #[test_log::test]
     fn test_hvalue_std_fmt() {
         assert_eq!(HValue::byte_len(), 32);
         assert_eq!(HValue::byte_len() * 8, HValue::bit_len());
@@ -558,7 +558,7 @@ mod test_eg_h {
         assert_eq!(format!("{h:?}"), expected);
     }
 
-    #[test]
+    #[test_log::test]
     fn test_hvalue_serde_json() {
         let h: HValue = std::array::from_fn(|ix| ix as u8).into();
 
@@ -571,7 +571,7 @@ mod test_eg_h {
         assert_eq!(h2, h);
     }
 
-    #[test]
+    #[test_log::test]
     fn test_evaluate_h() {
         let key: HValue = HValue::default();
 

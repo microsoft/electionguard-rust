@@ -17,6 +17,7 @@ pub mod csprng;
 pub mod csrng;
 pub mod file;
 pub mod hex_dump;
+pub mod ident;
 pub mod index;
 pub mod logging;
 pub mod osrng;

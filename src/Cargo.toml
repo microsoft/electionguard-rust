@@ -5,7 +5,6 @@ members = [
   "demo-eg",
   "eg",
   "eg-resourceproducer-filesystem",
-  #"formulator",
   "test-electionguard",
   "electionguard",
   # "preencrypted",
@@ -16,11 +15,12 @@ members = [
 [workspace.dependencies]
 
 #--- Defined in this workspace
-eg = { path = "./eg" }
-eg-resourceproducer-filesystem = { path = "./eg-resourceproducer-filesystem" }
-# electionguard = { path = "./electionguard" }
-# preencrypted = { path = "./preencrypted" }
-util = { path = "./util" }
+
+eg = { path = "./eg", default-features = false }
+eg-resourceproducer-filesystem = { path = "./eg-resourceproducer-filesystem", default-features = false }
+# electionguard = { path = "./electionguard", default-features = false }
+# preencrypted = { path = "./preencrypted", default-features = false }
+util = { path = "./util", default-features = false }
 
 #--- From crates.io
 
@@ -31,7 +31,7 @@ derive_arbitrary  = "1.4.1"
 #bimap = "0.6.3"
 bitflags = { version = "2.9.0", features = ["std"] }
 #bumpalo = { version = "3.17.0", default-features = false, features = ["allocator-api2", "boxed", "collections"] }
-clap = { version = "4.5.31", features = ["derive", "env"] }
+clap = { version = "4.5.35", features = ["derive", "env"] }
 cfg-if = "1.0.0"
 downcast-rs = "2.0.1"
 derive_more = { version = "2.0.1", default-features = false }
@@ -47,12 +47,11 @@ hashbrown = { version = "0.15.2", default-features = false, features = [
     "serde"
 ] }
 hex-literal = { version = "1.0.0", default-features = false, features = [] }
-indexmap = { version = "2.7.1", default-features = false, features = [] }
+indexmap = { version = "2.8.0", default-features = false, features = [] }
 indoc = "2.0.5"
 inventory = "0.3.20"
 itertools = "0.14.0"
 lazy_static = "1.4"
-maybe-owned = "0.3.4"
 num-bigint = { version = "0.4.6", features = ["serde"] }
 num-integer = "0.1.46"
 num-traits = { version = "0.2.19", features = ["libm"] }
@@ -60,13 +59,6 @@ nutype = { version = "0.6.1", default-features = false, features = ["new_uncheck
 
 #generic-array = { version = "1.2.0", default-features = false, features = ["const-default", "faster-hex", "serde", "typenum", "zeroize"] }
 #typenum = { version = "1.18.0", default-features = false, features = [] }
-
-# pathfinding = "4.13.1"  # defines no features
-# num-traits = "0.2.19"              # pathfinding
-# indexmap = "2.5.0"                 # pathfinding
-# rustc-hash = "2.0.0"               # pathfinding
-# integer-sqrt = "0.1.5"             # pathfinding
-# deprecate-until = "0.1.1"          # pathfinding
 
 # proptest = { version = "1.6.0", features = [] }
 # proptest-arbitrary-interop = "0.1.0"
@@ -106,16 +98,23 @@ async-io = "2.4.0"
 
 async-process = { version = "2.3.0", default-features = false, features = [] }
 
-#async-fs = { version = "2.1.2", default-features = false }
+async-fs = { version = "2.1.2", default-features = false }
 
 # async-lock default feature from async-process
 async-lock = "3.4.0"
 
-async-trait = { version = "0.1.87", default-features = false, features = [] }
+async-trait = { version = "0.1.88", default-features = false, features = [] }
+
+#--- proc_macro2, quote, syn, unicode-ident
+
+# proc-macro2 = "1.0.94"
+# quote = "1.0.40"
+# syn = { version = "2.0.100", features = ["parsing"] }
+unicode-ident = "1.0.18"
 
 #--- Rand
 
-getrandom = { version = "0.3.1", default-features = false }
+getrandom = { version = "0.3.2", default-features = false }
 rand = { version = "0.9.0", default-features = false, features = [
     "alloc",
 ] }
@@ -129,41 +128,30 @@ rustc-stable-hash = "0.1.1"
 #--- Serde
 
 erased-serde = { version = "0.4.6" }
-serde = { version = "1.0.218", features = ["derive", "rc", "std"] }
-serde_json = { version = "1.0.139", features = ["preserve_order", "std"] }
-serde_with = { version = "3.12.0", default-features = false, features = ["macros"] }
+serde = { version = "1.0.219", features = ["derive", "rc", "std"] }
+serde_json = { version = "1.0.140", features = ["preserve_order", "std"] }
+serde_tokenstream = "0.2.2"
+serde_with = { version = "3.12.0", features = ["alloc", "macros"] } #default-features = false,
 
 #--- Tracing
 
-tracing = { version = "0.1.41", default-features = false, features = ["std", "attributes"] }
-# tracing: "pin-project-lite 0.2.15"
-# tracing: "tracing-core 0.1.33"
-# tracing-core: "once_cell 1.20.2"
+tracing = { version = "0.1.41", default-features = false, features = [
+    "std",
+    "attributes",
+] }
 
-tracing-subscriber = { version = "0.3.19", default-features = false, features = ["fmt", "smallvec", "std"] }
-# tracing-subscriber: "tracing-core 0.1.33"
-# tracing-subscriber "fmt": "sharded-slab 0.1.7"
-# tracing-subscriber "fmt": "thread_local 1.1.8"
-# tracing-subscriber "smallvec": "smallvec 1.13.2"
+tracing-subscriber = { version = "0.3.19", default-features = false, features = [
+    "fmt",
+    "smallvec",
+    "std",
+] }
 
-#valuable = { version = "0.1.0", features = ["derive", "std"] }
-# tracing-core "valuable": "valuable" version = "0.1.0"
+# valuable = { version = "0.1.0", features = ["derive", "std"] }
 
-# tracing-subscriber "parking_lot": "parking_lot 0.12.3"
-# tracing-subscriber "parking_lot": "parking_lot_core 0.9.10"
-# tracing-subscriber "parking_lot": "smallvec 1.13.2"
-# tracing-subscriber "parking_lot": "redox_syscall 0.5.7"
-# tracing-subscriber "parking_lot": "scopeguard 1.2.0"
-# tracing-subscriber "parking_lot": "lock_api 0.4.12"
-
-#with default features: newly dragged in by tracing and/or -subscriber "tracing-attributes 0.1.28"
-#with default features: newly dragged in by tracing and/or -subscriber "tracing-log 0.2.0"
-#with default features: newly dragged in by tracing and/or -subscriber "overload 0.1.1"
-#with default features: newly dragged in by tracing and/or -subscriber "nu-ansi-term 0.46.0"
-#with default features: newly dragged in by tracing and/or -subscriber "log 0.4.22"
-#with default features: newly dragged in by tracing and/or -subscriber "winapi 0.3.9"
-#with default features: newly dragged in by tracing and/or -subscriber "winapi-i686-pc-windows-gnu 0.4.0"
-#with default features: newly dragged in by tracing and/or -subscriber "winapi-x86_64-pc-windows-gnu 0.4.0"
+test-log = { version = "0.2.17", default-features = false, features = [
+    "color",
+    "trace",
+]}
 
 test-log = { version = "0.2.17", default-features = false, features = [
     #"color",

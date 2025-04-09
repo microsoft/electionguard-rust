@@ -130,7 +130,8 @@ crate::impl_validatable_validated! {
 
         //----- Validate `label`.
 
-        //? TODO can we impose any hard requirements on the label?
+        //? TODO S3.1.3.b EGRI rejects labels that contain line break characters, tabs, or similar special characters
+        //? TODO S3.1.3.b EGRI rejects labels that have leading or trailing whitespace
 
         if let Some((qty_contests, qty_ballot_styles)) = contest_and_ballot_style_quantities(produce_resource).await? {
 
@@ -145,6 +146,8 @@ crate::impl_validatable_validated! {
             }
 
             //----- Validate `contests`.
+
+            //? TODO S3.1.3.f EGRI rejects any Election Manifest listing the same Contest Index more than once within the same Ballot Style.
 
             // Verify that every contest is present in the election_manifest.
             for &contest_ix in &contests {

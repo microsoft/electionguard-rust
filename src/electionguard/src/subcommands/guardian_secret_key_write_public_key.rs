@@ -85,7 +85,7 @@ impl Subcommand for GuardianSecretKeyWritePublicKey {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote public key for guardian {i} to: {}", path.display());
+        println!("Wrote public key for guardian {i} to: {}", path.display());
 
         Ok(())
         // */

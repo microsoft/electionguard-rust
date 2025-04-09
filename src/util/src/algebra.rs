@@ -303,7 +303,7 @@ impl ScalarField {
     ///
     /// For the standard parameter field this is `32`.
     pub fn q_len_bytes(&self) -> usize {
-        (cnt_bits_repr(&self.q) + 7) / 8
+        cnt_bits_repr(&self.q).div_ceil(8)
     }
 }
 
@@ -567,14 +567,14 @@ impl Group {
     ///
     /// For the standard parameter group this is `512`.
     pub fn p_len_bytes(&self) -> usize {
-        (cnt_bits_repr(&self.p) + 7) / 8
+        cnt_bits_repr(&self.p).div_ceil(8)
     }
 
     /// Returns the length of the byte-array representation of field order `q`.
     ///
     /// For the standard parameter field this is `32`.
     pub fn q_len_bytes(&self) -> usize {
-        (cnt_bits_repr(&self.q) + 7) / 8
+        cnt_bits_repr(&self.q).div_ceil(8)
     }
 
     /// Checks if the group and the given field have the same order.

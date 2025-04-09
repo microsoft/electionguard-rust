@@ -15,7 +15,7 @@ use num_bigint::BigUint;
 /// to hold the specified number of bits. If the input number is too large, then an error is returned.
 pub fn to_string_uppercase_hex_bits(u: &BigUint, fixed_len_bits: u32) -> Result<String> {
     let fixed_len_bits = (fixed_len_bits as u64).max(1);
-    let fixed_len_bytes = (fixed_len_bits + 7) / 8;
+    let fixed_len_bytes = fixed_len_bits.div_ceil(8);
     let fixed_len_digits = fixed_len_bytes * 2;
     let fixed_len_bits = fixed_len_digits * 4;
 
@@ -25,7 +25,7 @@ pub fn to_string_uppercase_hex_bits(u: &BigUint, fixed_len_bits: u32) -> Result<
         "Value of {value_bits} bits is too large for specified fixed length of {fixed_len_bits} bit result."
     );
 
-    let value_digits = (value_bits + 3) / 4;
+    let value_digits = value_bits.div_ceil(4);
 
     let s = if value_digits < fixed_len_digits {
         let prepend_leading = fixed_len_digits - value_digits;
@@ -125,7 +125,7 @@ mod to_string {
 
 /// Read a `BigUint` number from a string, requiring uppercase hex digits only.
 pub fn biguint_from_str_uppercase_hex_bits(s: &str, fixed_len_bits: u32) -> Result<BigUint> {
-    let needed_bytes = (fixed_len_bits + 7) / 8;
+    let needed_bytes = fixed_len_bits.div_ceil(8);
     let needed_digits = needed_bytes * 2;
 
     let s_len = s.len();

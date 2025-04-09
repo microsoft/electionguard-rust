@@ -95,7 +95,7 @@ impl SubcommandHelper {
                 }
             } else {
                 if insecure_deterministic_pseudorandom_seed_data_file_exists {
-                    eprintln!(
+                    println!(
                         "WARNING: The --insecure-deterministic command line argument was not specified, but the insecure deterministc pseudorandom seed datafile exists: {}",
                         insecure_deterministic_pseudorandom_seed_data_file_path.display()
                     );
@@ -128,7 +128,7 @@ impl SubcommandHelper {
             if let Some(v) = refmut_opt_insecure_deterministic_seed_data {
                 v
             } else {
-                eprintln!("!!! WARNING: Using INSECURE deterministic mode. !!!");
+                println!("!!! WARNING: Using INSECURE deterministic mode. !!!");
 
                 let path_str = insecure_deterministic_pseudorandom_seed_data_file_path
                     .as_ref()
@@ -145,7 +145,7 @@ impl SubcommandHelper {
                         "No insecure deterministic pseudorandom seed data could be read from: {path_str}"
                     );
                 } else {
-                    eprintln!(
+                    println!(
                         "Read {} bytes of insecure deterministic pseudorandom seed data from: {path_str}",
                         v.len()
                     );

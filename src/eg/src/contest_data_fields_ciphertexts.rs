@@ -359,7 +359,7 @@ impl ContestDataFieldsCiphertexts {
         let contest =
             election_manifest.get_contest_without_checking_ballot_style(self.contest_ix)?;
 
-        let cnt_data_fields_in_contest = contest.num_data_fields();
+        let cnt_data_fields_in_contest = contest.qty_data_fields();
 
         let mut cnt_ciphertexts_verified = 0;
         for (ciphertext_ix, ciphertext) in self.ciphertexts.enumerate() {

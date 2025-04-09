@@ -36,7 +36,7 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     if v.len() < len {
         let left_pad = len - v.len();
         v.reserve(left_pad);
-        v.extend(std::iter::repeat(0).take(left_pad));
+        v.extend(std::iter::repeat_n(0, left_pad));
         v.rotate_right(left_pad);
     }
 

@@ -61,7 +61,7 @@ impl Subcommand for WriteInsecureDeterministicSeedData {
             &open_options,
         )?;
 
-        eprintln!(
+        println!(
             "Seed data for future insecure deterministic pseudorandom operation:\n    {}",
             &seed_data_hv
         );
@@ -69,7 +69,7 @@ impl Subcommand for WriteInsecureDeterministicSeedData {
         file.write_all(&seed_data_hv.0)?;
         drop(file);
 
-        eprintln!(
+        println!(
             "{} bytes written to: {}",
             seed_data_hv.0.len(),
             path.display()

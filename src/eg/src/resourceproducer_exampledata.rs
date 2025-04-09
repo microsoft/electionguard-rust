@@ -218,30 +218,30 @@ impl ResourceProducer_ExampleData {
         rp_op: &RpOp,
         key_part_id: GuardianKeyPartId,
     ) -> Result_ArcDynResource_ProductionErr {
-        info!(
+        debug!(
             rf = rp_op.trace_field_rf(),
             "vvvvvvvvvvvvvv make_guardian_key_part_secret vvvvvvvvvvvvvv"
         );
-        info!(
+        debug!(
             rf = rp_op.trace_field_rf(),
             "rid: {}",
             rp_op.requested_rid()
         );
-        info!(
+        debug!(
             rf = rp_op.trace_field_rf(),
             "fmt: {}",
             rp_op.requested_fmt()
         );
-        info!(rf = rp_op.trace_field_rf(), "key_part_id: {key_part_id}");
+        debug!(rf = rp_op.trace_field_rf(), "key_part_id: {key_part_id}");
         let GuardianKeyPartId {
             guardian_ix,
             key_purpose,
             asymmetric_key_part,
         } = key_part_id;
         let name = format!("Example Guardian {guardian_ix}");
-        info!(rf = rp_op.trace_field_rf(), "name: {name}");
+        debug!(rf = rp_op.trace_field_rf(), "name: {name}");
         let gsk = GuardianSecretKey::generate(rp_op, guardian_ix, name, key_purpose).await?;
-        info!(
+        debug!(
             rf = rp_op.trace_field_rf(),
             "^^^^^^^^^^^^^^ make_guardian_key_part_secret ^^^^^^^^^^^^^^"
         );
@@ -275,127 +275,134 @@ GatherResourceProducerRegistrationsFnWrapper(gather_resourceproducer_registratio
 //=================================================================================================|
 
 static ELECTION_MANIFEST_PRETTY: &str = r#"{
-"label": "General Election - The United Realms of Imaginaria",
-"contests": [
+  "label": "General Election - The United Realms of Imaginaria",
+  "contests": [
     {
-        "label": "For President and Vice President of The United Realms of Imaginaria",
-        "options": [
-            { "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)" },
-            { "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)" } ]
+      "label": "For President and Vice President of The United Realms of Imaginaria",
+      "options": [
+          { "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)" },
+          { "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)" } ]
     }, {
-        "label": "Minister of Elemental Resources",
-        "options": [
-            { "label": "Tïtus Stormforge\n(Ætherwïng)" },
-            { "label": "Fæ Willowgrove\n(Crystâlheärt)" },
-            { "label": "Tèrra Stonebinder\n(Independent)" } ]
+      "label": "Minister of Elemental Resources",
+      "options": [
+          { "label": "Tïtus Stormforge\n(Ætherwïng)" },
+          { "label": "Fæ Willowgrove\n(Crystâlheärt)" },
+          { "label": "Tèrra Stonebinder\n(Independent)" } ]
     }, {
-        "label": "Minister of Arcane Sciences",
-        "options": [
-            { "label": "Élyria Moonshadow\n(Crystâlheärt)", "selection_limit": "CONTEST_LIMIT" },
-            { "label": "Archímedes Darkstone\n(Ætherwïng)" },
-            { "label": "Seraphína Stormbinder\n(Independent)" },
-            { "label": "Gávrïel Runëbørne\n(Stärsky)" } ]
+      "label": "Minister of Arcane Sciences",
+      "options": [
+          { "label": "Élyria Moonshadow\n(Crystâlheärt)", "selection_limit": "CONTEST_LIMIT" },
+          { "label": "Archímedes Darkstone\n(Ætherwïng)" },
+          { "label": "Seraphína Stormbinder\n(Independent)" },
+          { "label": "Gávrïel Runëbørne\n(Stärsky)" } ]
     }, {
-        "label": "Minister of Dance",
-        "options": [
-            { "label": "Äeliana Sunsong\n(Crystâlheärt)" },
-            { "label": "Thâlia Shadowdance\n(Ætherwïng)" },
-            { "label": "Jasper Moonstep\n(Stärsky)" } ]
+      "label": "Minister of Dance",
+      "options": [
+          { "label": "Äeliana Sunsong\n(Crystâlheärt)" },
+          { "label": "Thâlia Shadowdance\n(Ætherwïng)" },
+          { "label": "Jasper Moonstep\n(Stärsky)" } ]
     }, {
-        "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
-        "options": [
-            { "label": "Ìgnatius Gearsøul\n(Crystâlheärt)" },
-            { "label": "Èlena Wîndwhisper\n(Technocrat)", "selection_limit": 3 },
-            { "label": "Bërnard Månesworn\n(Ætherwïng)", "selection_limit": "CONTEST_LIMIT" },
-            { "label": "Séraphine Lùmenwing\n(Stärsky)", "selection_limit": 2 },
-            { "label": "Nikólai Thunderstrîde\n(Independent)" },
-            { "label": "Lïliana Fîrestone\n(Pęacemaker)", "selection_limit": "CONTEST_LIMIT" } ]
+      "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
+      "options": [
+          { "label": "Ìgnatius Gearsøul\n(Crystâlheärt)" },
+          { "label": "Èlena Wîndwhisper\n(Technocrat)", "selection_limit": 3 },
+          { "label": "Bërnard Månesworn\n(Ætherwïng)", "selection_limit": "CONTEST_LIMIT" },
+          { "label": "Séraphine Lùmenwing\n(Stärsky)", "selection_limit": 2 },
+          { "label": "Nikólai Thunderstrîde\n(Independent)" },
+          { "label": "Lïliana Fîrestone\n(Pęacemaker)", "selection_limit": "CONTEST_LIMIT" } ]
     }, {
-        "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
-        "options": [
-            { "label": "For", "selection_limit": "CONTEST_LIMIT" },
-            { "label": "Against" } ]
+      "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
+      "options": [
+          { "label": "For", "selection_limit": "CONTEST_LIMIT" },
+          { "label": "Against" } ]
     }, {
-        "label": "Privacy Protection in Techno-Magical Communications Act",
-        "options": [
-            { "label": "Prō" },
-            { "label": "Ĉontrá" } ]
+      "label": "Privacy Protection in Techno-Magical Communications Act",
+      "options": [
+          { "label": "Prō" },
+          { "label": "Ĉontrá" } ]
     }, {
-        "label": "Public Transport Modernization and Enchantment Proposal",
-        "options": [
-            { "label": "Prō" },
-            { "label": "Ĉontrá" } ]
+      "label": "Public Transport Modernization and Enchantment Proposal",
+      "options": [
+          { "label": "Prō" },
+          { "label": "Ĉontrá" } ]
     }, {
-        "label": "Renewable Ætherwind Infrastructure Initiative",
-        "options": [
-            { "label": "Prō" },
-            { "label": "Ĉontrá" } ]
+      "label": "Renewable Ætherwind Infrastructure Initiative",
+      "options": [
+          { "label": "Prō" },
+          { "label": "Ĉontrá" } ]
     }, {
-        "label": "For Librarian-in-Chief of Smoothstone County", "selection_limit": 2147483647,
-        "options": [
-            { "label": "Élise Planetes", "selection_limit": "CONTEST_LIMIT" },
-            { "label": "Théodoric Inkdrifter", "selection_limit": 2147483647 } ]
+      "label": "For Librarian-in-Chief of Smoothstone County",
+      "selection_limit": 2147483647,
+      "options": [
+          { "label": "Élise Planetes", "selection_limit": "CONTEST_LIMIT" },
+          { "label": "Théodoric Inkdrifter", "selection_limit": 2147483647 } ]
     }, {
-        "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
-        "options": [
-            { "label": "Retain", "selection_limit": 375},
-            { "label": "Remove", "selection_limit": "CONTEST_LIMIT" } ]
+      "label": "Silvërspîre County Register of Deeds Sébastian Moonglôw to be retained",
+      "options": [
+          { "label": "Retain", "selection_limit": 375},
+          { "label": "Remove", "selection_limit": "CONTEST_LIMIT" } ]
     }
-],
-"ballot_styles": [
+  ],
+  "ballot_styles": [
     {
-        "label": "Ballot style 1 has 1 contest: 1",
-        "contests": [1]
+      "label": "Ballot style 1 has 1 contest: 1",
+      "contests": [1]
     }, {
-        "label": "Ballot style 2 has 1 contest: 2",
-        "contests": [2]
+      "label": "Ballot style 2 has 1 contest: 2",
+      "contests": [2]
     }, {
-        "label": "Ballot style 3 has 1 contest: 3",
-        "contests": [3]
+      "label": "Ballot style 3 has 1 contest: 3",
+      "contests": [3]
     }, {
-        "label": "Ballot style 4 has 1 contest: 4",
-        "contests": [4]
+      "label": "Ballot style 4 has 1 contest: 4",
+      "contests": [4]
     }, {
-        "label": "Ballot style 5 has 1 contest: 5",
-        "contests": [5]
+      "label": "Ballot style 5 has 1 contest: 5",
+      "contests": [5]
     }, {
-        "label": "Ballot style 6 has 1 contest: 6",
-        "contests": [6]
+      "label": "Ballot style 6 has 1 contest: 6",
+      "contests": [6]
     }, {
-        "label": "Ballot style 7 has 1 contest: 7",
-        "contests": [7]
+      "label": "Ballot style 7 has 1 contest: 7",
+      "contests": [7]
     }, {
-        "label": "Ballot style 8 has 1 contest: 8",
-        "contests": [8]
+      "label": "Ballot style 8 has 1 contest: 8",
+      "contests": [8]
     }, {
-        "label": "Ballot style 9 has 1 contest: 9",
-        "contests": [9]
+      "label": "Ballot style 9 has 1 contest: 9",
+      "contests": [9]
     }, {
-        "label": "Ballot style 10 has 1 contest: 10",
-        "contests": [10]
+      "label": "Ballot style 10 has 1 contest: 10",
+      "contests": [10]
     }, {
-        "label": "Ballot style 11 has 1 contest: 11",
-        "contests": [11]
+      "label": "Ballot style 11 has 1 contest: 11",
+      "contests": [11]
     }, {
-        "label": "Ballot style 12 has 2 contests: 1, 2",
-        "contests": [1, 2]
+      "label": "Ballot style 12 has 2 contests: 1, 2",
+      "contests": [1, 2]
     }, {
-        "label": "Ballot style 13 (Smoothstone County Ballot) has 10 contests: 1 through 10",
-        "contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      "label": "Ballot style 13 (Smoothstone County Ballot) has 10 contests: 1 through 10",
+      "contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     }, {
-        "label": "Ballot style 14 (Silvërspîre County Ballot) has 10 contests: 1 through 11, skipping 10",
-        "contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]
+      "label": "Ballot style 14 (Silvërspîre County Ballot) has 10 contests: 1 through 11, skipping 10",
+      "contests": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]
     }, {
-        "label": "Ballot style 15 has 2 contests: 1 and 3",
-        "contests": [1, 3]
+      "label": "Ballot style 15 has 2 contests: 1 and 3",
+      "contests": [1, 3]
     }, {
-        "label": "Ballot style 16 has 2 contests: 2 and 3",
-        "contests": [2, 3]
+      "label": "Ballot style 16 has 2 contests: 2 and 3",
+      "contests": [2, 3]
     }, {
-        "label": "Ballot style 17 has 3 contests: 1, 2, and 3",
-        "contests": [1, 2, 3]
+      "label": "Ballot style 17 has 3 contests: 1, 2, and 3",
+      "contests": [1, 2, 3]
     }
-]
+  ],
+  "voting_device_information_spec": {
+    "MayContainVotingDeviceInformation": {
+      "VotingDeviceUniqueIdentifier": "Optional",
+      "VotingLocationUniqueIdentifier": "Optional"
+    }
+  }
 }
 "#;
 
@@ -409,8 +416,8 @@ mod t {
     use super::*;
     use crate::resource::ElectionDataObjectId as EdoId;
 
-    #[test]
-    fn t0() {
+    #[test_log::test]
+    fn t1() {
         assert_ron_snapshot!(ResourceProducer_ExampleData::new(), @r#"
         ResourceProducer_ExampleData(
           n: 5,
@@ -425,50 +432,48 @@ mod t {
         "#);
     }
 
-    #[test]
-    fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
+    #[test_log::test]
+    fn t2() {
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::resourceproducer_exampledata::t::t2",
+            );
+            let eg = eg.as_ref();
 
-    async fn t1_async() {
-        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::resourceproducer_exampledata::t::t0",
-        );
-        let eg = eg.as_ref();
+            use EdoId::*;
+            use ResourceId::ElectionDataObject;
 
-        use EdoId::*;
-        use ResourceId::ElectionDataObject;
+            {
+                let (dr_rc, dr_src) = eg
+                    .produce_resource(&ResourceIdFormat {
+                        rid: ElectionDataObject(ElectionParameters),
+                        fmt: ResourceFormat::SliceBytes,
+                    })
+                    .await
+                    .unwrap();
+                assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionParameters)");
+                assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
+                assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
+                assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
+                assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
+                //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
+            }
 
-        {
-            let (dr_rc, dr_src) = eg
-                .produce_resource(&ResourceIdFormat {
-                    rid: ElectionDataObject(ElectionParameters),
-                    fmt: ResourceFormat::SliceBytes,
-                })
-                .await
-                .unwrap();
-            assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionParameters)");
-            assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
-            assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
-            assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
-            assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
-            //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
-        }
-
-        {
-            let (dr_rc, dr_src) = eg
-                .produce_resource(&ResourceIdFormat {
-                    rid: ElectionDataObject(ElectionManifest),
-                    fmt: ResourceFormat::SliceBytes,
-                })
-                .await
-                .unwrap();
-            assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
-            assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
-            assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
-            assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
-            assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
-            //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
-        }
+            {
+                let (dr_rc, dr_src) = eg
+                    .produce_resource(&ResourceIdFormat {
+                        rid: ElectionDataObject(ElectionManifest),
+                        fmt: ResourceFormat::SliceBytes,
+                    })
+                    .await
+                    .unwrap();
+                assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
+                assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
+                assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
+                assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
+                assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
+                //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
+            }
+        });
     }
 }

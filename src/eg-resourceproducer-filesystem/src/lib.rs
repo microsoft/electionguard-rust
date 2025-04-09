@@ -1,10 +1,5 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 
-//! The ElectionGuard 2.1 Reference Implementation in Rust -- Optional filesystem support library
-//!
-//! This crate is useful when you wish to provide access to data persisted in files to
-//! the code in the `eg` crate, and other code that may use it.
-
 //#![cfg_attr(rustfmt, rustfmt_skip)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::manual_assert)]
@@ -24,6 +19,11 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
+//! The ElectionGuard 2.1 Reference Implementation in Rust -- Optional filesystem support library
+//!
+//! This crate is useful when you wish to provide access to data persisted in files to
+//! the code in the `eg` crate, and other code that may use it.
+
 use std::{
     borrow::Cow,
     //collections::{BTreeSet, BTreeMap},
@@ -36,22 +36,37 @@ use std::{
     //sync::OnceLock,
 };
 
-use eg::{
-    errors::{EgError, EgResult},
-    resource::{ProduceResource, ProduceResourceExt},
-    resource_category::ResourceCategory,
-    resource_persistence::ResourcePersistence,
-};
-//use tracing::{debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span, warn};
-#[cfg(test)]
-use serde::Serialize;
 //use anyhow::{anyhow, bail, ensure, Context, Result};
 //use either::Either;
-//use proc_macro2::{Ident,Literal,TokenStream};
 //use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 //use rand::{distr::Uniform, Rng, RngCore};
-//use serde::{Deserialize, Serialize};
-use static_assertions::assert_obj_safe;
+#[cfg(test)]
+use serde::Serialize;
+//use static_assertions::assert_obj_safe;
+use tracing::{
+    debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
+    warn,
+};
+
+use eg::{
+    eg::Eg,
+    errors::{EgError, EgResult},
+    loadable::LoadableFromStdIoReadValidatable,
+    resource::{ProduceResource, ProduceResourceExt, Resource},
+    resource_category::ResourceCategory,
+    resource_id::{ElectionDataObjectId as EdoId, ResourceFormat, ResourceId, ResourceIdFormat},
+    resource_persistence::ResourcePersistence,
+    resource_producer::{
+        ResourceProducer, ResourceProducer_Any_Debug_Serialize, ResourceProductionError,
+        ResourceProductionResult, ResourceSource,
+    },
+    resource_producer_registry::{
+        FnNewResourceProducer, GatherResourceProducerRegistrationsFnWrapper,
+        ResourceProducerCategory, ResourceProducerRegistration,
+    },
+    resource_production::RpOp,
+    validatable::Validated,
+};
 
 //=================================================================================================|
 
@@ -63,6 +78,9 @@ use static_assertions::assert_obj_safe;
 pub(crate) struct ResourceProducer_Filesystem;
 
 impl ResourceProducer_Filesystem {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self)
+    }
     /*
     /// Opens the specified file for reading, or if "-" then read from stdin.
     /// Next it tries any specified artifact file.
@@ -139,18 +157,18 @@ impl ResourcePersistence for ResourceProducer_Filesystem {}
 mod t {
     use std::sync::Arc;
 
-    use anyhow::{Context, Result, anyhow, bail, ensure};
-    use eg::{eg::Eg, eg_config::EgConfig};
+    //use anyhow::{Context, Result, anyhow, bail, ensure};
+    //use eg::{eg::Eg, eg_config::EgConfig};
     use insta::assert_ron_snapshot;
 
     use super::*;
 
-    #[test]
-    fn t0() -> Result<()> {
+    #[test_log::test]
+    fn t1() {
         use ResourceCategory::*;
 
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::dataresourceproducer_filesystem::t::t0",
+            "eg::resourceproducer_filesystem::t::t1",
         );
         let eg = eg.as_ref();
 
@@ -181,6 +199,5 @@ mod t {
         assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
             @r#"None"#);
         // */
-        Ok(())
     }
 }

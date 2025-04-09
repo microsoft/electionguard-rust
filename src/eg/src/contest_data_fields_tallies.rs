@@ -273,7 +273,7 @@ impl ContestTallies {
         let mut contest_tallies =
             Vec1::<ContestTallies>::with_capacity(election_manifest.contests().len());
         for contest in election_manifest.contests().iter() {
-            let zero_tallies = ContestTallies::new_zeroed_of_len(contest.num_data_fields())?;
+            let zero_tallies = ContestTallies::new_zeroed_of_len(contest.qty_data_fields())?;
             contest_tallies.try_push(zero_tallies)?;
         }
         Ok(contest_tallies)
@@ -296,7 +296,7 @@ mod t {
     use super::*;
     //?use insta::assert_ron_snapshot;
 
-    #[test]
+    #[test_log::test]
     fn t10() -> Result<()> {
         let _u53 = Uint53::from(0_u8);
 

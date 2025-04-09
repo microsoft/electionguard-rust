@@ -26,7 +26,6 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 //use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 //use rand::{distr::Uniform, Rng, RngCore};
 //use serde::{Deserialize, Serialize};
-use maybe_owned::{MaybeOwned, MaybeOwnedMut};
 use util::{
     csrng::Csrng,
     vec1::{HasIndexType, Vec1},

@@ -93,7 +93,7 @@ impl Subcommand for PreEncryptedBallotGenerate {
                 .to_stdiowrite_pretty(bx_write.as_mut())
                 .with_context(|| format!("Writing pre-encrypted ballot to: {}", path.display()))?;
 
-            eprintln!("Wrote pre-encrypted ballot to: {}", path.display());
+            println!("Wrote pre-encrypted ballot to: {}", path.display());
 
             drop(bx_write);
 

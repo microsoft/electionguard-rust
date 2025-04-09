@@ -65,7 +65,7 @@ impl Subcommand for WriteHashes {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote hashes to: {}", path.display());
+        println!("Wrote hashes to: {}", path.display());
 
         Ok(())
         // */

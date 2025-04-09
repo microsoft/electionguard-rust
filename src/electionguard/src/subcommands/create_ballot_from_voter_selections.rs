@@ -63,7 +63,7 @@ impl Subcommand for CreateBallotFromVoterSelections {
                 )
             })?;
 
-        eprintln!(
+        println!(
             "VoterSelectionsPlaintext loaded from: {}",
             voter_selections_path.display()
         );
@@ -85,7 +85,7 @@ impl Subcommand for CreateBallotFromVoterSelections {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote ballot to: {}", path.display());
+        println!("Wrote ballot to: {}", path.display());
         */
 
         #[allow(unreachable_code)]

@@ -202,49 +202,36 @@ inventory::submit! {
 #[allow(clippy::unwrap_used)]
 mod t {
     use anyhow::{Context, Result};
-    use hex_literal::hex;
+    use insta::assert_snapshot;
 
     use super::*;
     use crate::eg::Eg;
 
-    #[test]
+    #[test_log::test]
     fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
+        async_global_executor::block_on(async {
+            let eg = {
+                let mut config = crate::eg::EgConfig::new();
+                config.use_insecure_deterministic_csprng_seed_str("eg::hashes::t::t1");
+                config.enable_test_data_generation_n_k(5, 3).unwrap();
+                Eg::from_config(config)
+            };
+            let eg = eg.as_ref();
 
-    async fn t1_async() {
-        let eg = {
-            let mut config = crate::eg::EgConfig::new();
-            config.use_insecure_deterministic_csprng_seed_str("eg::hashes::t::t1");
-            config.enable_test_data_generation_n_k(5, 3).unwrap();
-            Eg::from_config(config)
-        };
-        let eg = eg.as_ref();
+            let hashes = eg
+                .hashes()
+                .await
+                .with_context(|| "Hashes::compute() failed")
+                .unwrap();
 
-        let hashes = eg
-            .hashes()
-            .await
-            .with_context(|| "Hashes::compute() failed")
-            .unwrap();
+            // These hashes are to get notified if the hash computation is changed. They have
+            // not been computed externally.
 
-        // These hashes are to get notified if the hash computation is changed. They have
-        // not been computed externally.
+            assert_snapshot!(hashes.h_b,
+                @"75664571043EF9E2515E599F7FEC798D15350EA18529FFDA624854D4E59C2CD6");
 
-        let expected_h_p = HValue::from(hex!(
-            "944286970EAFDB6F347F4EB93B30D48FA3EDCC89BFBAEA6F5AE8F29AFB05DDCE"
-        ));
-
-        let expected_h_b = HValue::from(hex!(
-            "53675B5383394C92BDECF826A7FEBD64DB1E8E1BE69AE517FFA46054C8F6E4BB"
-        ));
-
-        assert_eq!(
-            hashes.h_p, expected_h_p,
-            "hashes.h_p (left) != (right) expected_h_p"
-        );
-        assert_eq!(
-            hashes.h_b, expected_h_b,
-            "hashes.h_b (left) != (right) expected_h_b"
-        );
+            assert_snapshot!(hashes.h_p,
+                @"944286970EAFDB6F347F4EB93B30D48FA3EDCC89BFBAEA6F5AE8F29AFB05DDCE");
+        });
     }
 }

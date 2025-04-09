@@ -419,7 +419,7 @@ mod test {
         resource::{ProduceResourceExt, Resource},
     };
 
-    #[test]
+    #[test_log::test]
     fn test_key_generation() {
         async_global_executor::block_on(test_key_generation_async());
     }

@@ -64,7 +64,7 @@ impl Subcommand for WriteJointPublicKey {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote joint election public key to: {}", path.display());
+        println!("Wrote joint election public key to: {}", path.display());
 
         Ok(())
     }

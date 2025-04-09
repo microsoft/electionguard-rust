@@ -104,61 +104,45 @@ inventory::submit! {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod t {
-    use insta::assert_ron_snapshot;
+    use insta::{assert_json_snapshot, assert_ron_snapshot};
 
     use super::*;
+    use crate::egds_version::ElectionGuard_DesignSpecification_Version;
 
-    #[test]
+    #[test_log::test]
     fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_insecure_deterministic_csprng_seed(
+                "eg::resourceproducer_egdsversion::t::t1",
+            );
+            let eg = eg.as_ref();
 
-    async fn t1_async() {
-        let eg = Eg::new_with_insecure_deterministic_csprng_seed(
-            "eg::resourceproducer_egdsversion::t::t0",
-        );
-        let eg = eg.as_ref();
+            let (arc_egdsv, resource_source) = eg
+                .produce_resource_downcast::<ElectionGuard_DesignSpecification_Version>(
+                    &ResourceIdFormat {
+                        rid: ResourceId::ElectionGuardDesignSpecificationVersion,
+                        fmt: ResourceFormat::ConcreteType,
+                    },
+                )
+                .await
+                .unwrap();
 
-        // Trivial success cases.
-
-        let (dr_rc, dr_src) = eg
-            .produce_resource(&ResourceIdFormat {
-                rid: ResourceId::ElectionGuardDesignSpecificationVersion,
-                fmt: ResourceFormat::SliceBytes,
-            })
-            .await
-            .unwrap();
-
-        assert_ron_snapshot!(dr_rc.rid(), @r#"ElectionGuardDesignSpecificationVersion"#);
-        assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
-        assert_ron_snapshot!(dr_src, @"SerializedFrom(SliceBytes, Constructed(ConcreteType))");
-        assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
-            @r#"Some("{\"version_number\":[2,1],\"qualifier\":\"Released_Specification_Version\",\"fixed_parameters_kind\":\"Standard_Parameters\"}")"#);
-    }
-
-    #[test]
-    fn t2() {
-        async_global_executor::block_on(t2_async());
-    }
-
-    async fn t2_async() {
-        let eg = Eg::new_with_insecure_deterministic_csprng_seed(
-            "eg::resourceproducer_egdsversion::t::t1",
-        );
-        let eg = eg.as_ref();
-
-        let (dr_rc, dr_src) = eg
-            .produce_resource(&ResourceIdFormat {
-                rid: ResourceId::ElectionGuardDesignSpecificationVersion,
-                fmt: ResourceFormat::ConcreteType,
-            })
-            .await
-            .unwrap();
-
-        assert_ron_snapshot!(dr_rc.rid(), @r#"ElectionGuardDesignSpecificationVersion"#);
-        assert_ron_snapshot!(dr_rc.format(), @"ConcreteType");
-        assert_ron_snapshot!(dr_src, @"Constructed(ConcreteType)");
-        assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
+            assert_ron_snapshot!(arc_egdsv.rid(), @r#"ElectionGuardDesignSpecificationVersion"#);
+            assert_ron_snapshot!(arc_egdsv.format(), @"ConcreteType");
+            assert_ron_snapshot!(resource_source, @"Constructed(ConcreteType)");
+            assert_ron_snapshot!(arc_egdsv.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
             @r#"None"#);
+
+            assert_json_snapshot!(arc_egdsv, @r#"
+            {
+              "version_number": [
+                2,
+                1
+              ],
+              "qualifier": "Released_Specification_Version",
+              "fixed_parameters_kind": "Standard_Parameters"
+            }
+            "#);
+        });
     }
 }

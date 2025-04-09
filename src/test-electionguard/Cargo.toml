@@ -2,30 +2,39 @@
 name = "test-electionguard"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [features]
+
 default = [
-    "eg-allow-unsafe-code",
-    "eg-allow-insecure-deterministic-csprng",
-    #"eg-forbid-test-data-generation",
-    #"eg-forbid-toy-parameters",
+    "eg-forbid-unsafe-code",
+    "eg-forbid-insecure-deterministic-csprng",
+    "eg-forbid-test-data-generation",
+    "eg-forbid-toy-parameters",
+    "eg-forbid-nonstandard-egds-version",
 ]
-eg-allow-unsafe-code           = ["eg/eg-allow-unsafe-code" ]
-eg-allow-insecure-deterministic-csprng  = ["eg/eg-allow-insecure-deterministic-csprng" ]
-eg-forbid-insecure-deterministic-csprng = ["eg/eg-forbid-insecure-deterministic-csprng" ]
-eg-allow-test-data-generation  = ["eg/eg-allow-test-data-generation" ]
-eg-forbid-test-data-generation = ["eg/eg-forbid-test-data-generation" ]
-eg-allow-toy-parameters = ["eg/eg-allow-toy-parameters" ]
-eg-forbid-toy-parameters = ["eg/eg-forbid-toy-parameters" ]
+
+eg-allow-unsafe-code                    = [ "eg/eg-allow-unsafe-code",                      "util/eg-allow-unsafe-code" ]
+eg-allow-insecure-deterministic-csprng  = [ "eg/eg-allow-insecure-deterministic-csprng",    "util/eg-allow-insecure-deterministic-csprng" ]
+eg-allow-test-data-generation           = [ "eg/eg-allow-test-data-generation",             "util/eg-allow-test-data-generation" ]
+eg-allow-toy-parameters                 = [ "eg/eg-allow-toy-parameters",                   "util/eg-allow-toy-parameters" ]
+eg-allow-nonstandard-egds-version       = [ "eg/eg-allow-nonstandard-egds-version",         "util/eg-allow-nonstandard-egds-version" ]
+
+eg-forbid-unsafe-code                   = [ "eg/eg-forbid-unsafe-code",                     "util/eg-forbid-unsafe-code" ]
+eg-forbid-insecure-deterministic-csprng = [ "eg/eg-forbid-insecure-deterministic-csprng",   "util/eg-forbid-insecure-deterministic-csprng" ]
+eg-forbid-test-data-generation          = [ "eg/eg-forbid-test-data-generation",            "util/eg-forbid-test-data-generation" ]
+eg-forbid-toy-parameters                = [ "eg/eg-forbid-toy-parameters",                  "util/eg-forbid-toy-parameters" ]
+eg-forbid-nonstandard-egds-version      = [ "eg/eg-forbid-nonstandard-egds-version",        "util/eg-forbid-nonstandard-egds-version" ]
 
 [dependencies]
 
 #--- Defined in this workspace
-#electionguard.workspace = true
+
 eg.workspace = true
-#util.workspace = true
+util.workspace = true
 
 #--- From crates.io
+
 anyhow.workspace = true
 clap.workspace = true
 itertools.workspace = true

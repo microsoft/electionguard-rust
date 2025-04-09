@@ -111,7 +111,7 @@ impl Subcommand for WriteManifest {
             )
         })?;
 
-        eprintln!(
+        println!(
             "Wrote election manifest {description} to: {}",
             path.display()
         );

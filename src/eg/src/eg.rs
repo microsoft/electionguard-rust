@@ -248,10 +248,10 @@ mod t {
 
     use super::*;
 
-    #[test]
-    fn t0() {
+    #[test_log::test]
+    fn t1() {
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::eg::t::t0",
+            "eg::eg::t::t1",
         );
 
         assert_ron_snapshot!(eg, @r#"
@@ -271,6 +271,16 @@ mod t {
                     n: 5,
                     k: 3,
                   )),
+                ),
+                RPRegistryEntry_Key(
+                  name: "PublicFromSecretKey",
+                  category: DefaultProducer,
+                ): RPRegistryEntry_Value(
+                  arc_key: RPRegistryEntry_Key(
+                    name: "PublicFromSecretKey",
+                    category: DefaultProducer,
+                  ),
+                  opt_arc_rp: None,
                 ),
                 RPRegistryEntry_Key(
                   name: "Specific",
@@ -294,7 +304,7 @@ mod t {
                 ),
               },
             ),
-            opt_insecure_deterministic_seed_data: "65673A3A65673A3A743A3A7430",
+            opt_insecure_deterministic_seed_data: "65673A3A65673A3A743A3A7431",
           ),
           "csrng": "DeterministicCsrng",
           "resource_states": {

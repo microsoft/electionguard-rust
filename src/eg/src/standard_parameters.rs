@@ -211,7 +211,7 @@ mod t {
 
     /// Validate the standard parameters v2.1.
     //? TODO #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
-    #[test]
+    #[test_log::test]
     fn make_standard_parameters_egds_v2_1() -> EgResult<()> {
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::standard_parameters::t::make_standard_parameters_egds_v2_1",
@@ -234,7 +234,7 @@ mod t {
 
     /// Validate the result of [`make_standard_parameters()`].
     //? TODO #[cfg(not(debug_assertions))] // This test is too slow without optimizations.
-    #[test]
+    #[test_log::test]
     fn make_standard_parameters() -> EgResult<()> {
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::standard_parameters::t::make_standard_parameters",

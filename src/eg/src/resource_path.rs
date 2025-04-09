@@ -252,7 +252,7 @@ mod t {
     use super::*;
     use crate::guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPurpose};
 
-    #[test]
+    #[test_log::test]
     fn dr_ns_path() {
         use ElectionDataObjectId::*;
         use ResourceId::*;

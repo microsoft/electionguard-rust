@@ -143,8 +143,8 @@ mod t {
     use super::*;
     use crate::guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPurpose};
 
-    #[test]
-    fn t0() {
+    #[test_log::test]
+    fn t1() {
         use ResourceCategory::*;
         assert_ron_snapshot!(ResourceCategory::VARIANTS, @r#"
         [
@@ -157,8 +157,8 @@ mod t {
         ]"#);
     }
 
-    #[test]
-    fn t1() {
+    #[test_log::test]
+    fn t2() {
         use std::path::PathBuf;
 
         use ResourceCategory::*;

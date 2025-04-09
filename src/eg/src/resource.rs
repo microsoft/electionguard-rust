@@ -581,7 +581,7 @@ mod t {
     use super::*;
     use crate::guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPurpose};
 
-    #[test]
+    #[test_log::test]
     fn edoid() {
         use ElectionDataObjectId::*;
         use GuardianKeyPurpose::*;
@@ -595,7 +595,7 @@ mod t {
             key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
             asymmetric_key_part: AsymmetricKeyPart::Secret,
         }), @r#"
-        GuardianKeyPart(GuardianKeyId(
+        GuardianKeyPart(GuardianKeyPartId(
           guardian_ix: 1,
           key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
           asymmetric_key_part: Secret,
@@ -611,7 +611,7 @@ mod t {
         ), @r#"GeneratedTestDataVoterSelections("707172737475767778797A7B7C7D7E7F808182838485868788898A8B8C8D8E8F")"#);
     }
 
-    #[test]
+    #[test_log::test]
     fn rid() {
         use ElectionDataObjectId::*;
         use ResourceId::*;

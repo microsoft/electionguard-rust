@@ -33,17 +33,17 @@ impl Subcommand for VerifyStandardParameters {
         /*
         eprint!("Initializing standard parameters...");
         let fixed_parameters = &*STANDARD_PARAMETERS;
-        eprintln!("Done.");
+        println!("Done.");
 
-        eprintln!("Verifying standard parameters...");
+        println!("Verifying standard parameters...");
         for pass in 0..self.passes {
-            eprintln!("    Starting pass {pass}/{}...", self.passes);
+            println!("    Starting pass {pass}/{}...", self.passes);
             fixed_parameters
                 .validate(eg.csrng())
                 .context("Parameter verification failed")?;
         }
 
-        eprintln!("Done.");
+        println!("Done.");
 
         Ok(())
         // */

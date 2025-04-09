@@ -61,7 +61,7 @@ impl Subcommand for WriteExtendedBaseHash {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote hashes ext to: {}", path.display());
+        println!("Wrote hashes ext to: {}", path.display());
 
         Ok(())
     }

@@ -55,6 +55,10 @@ pub enum CostCategory {
 
     /// Read/write data to/from disk.
     ToFromNetwork = 0x00B0_0000,
+
+    /// Generate example data.
+    #[cfg(any(feature = "eg-allow-test-data-generation", test))]
+    ExampleData = 0x00D0_0000,
 }
 
 /// Cost

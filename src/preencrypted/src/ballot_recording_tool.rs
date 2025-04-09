@@ -47,11 +47,11 @@ impl BallotRecordingTool {
             true,
         );
         if *ballot != regenerated_ballot {
-            eprintln!("Ballot mismatch: {:?} != {:?}.", ballot, regenerated_ballot);
+            println!("Ballot mismatch: {:?} != {:?}.", ballot, regenerated_ballot);
             return (None, false);
         }
 
-        // eprintln!("Ballot matched");
+        // println!("Ballot matched");
         (Some(regenerated_ballot), true)
     }
 

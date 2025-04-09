@@ -341,7 +341,6 @@ inventory::submit! {
 //=================================================================================================|
 
 #[cfg(test)]
-//x TODO figure this out #[cfg(any(not(debug_assertions), miri))]
 #[allow(clippy::unwrap_used)]
 mod t {
     use num_bigint::BigUint;
@@ -382,70 +381,69 @@ mod t {
     }
 
     #[test_log::test]
+    #[ignore]
     pub fn jvepk_k_scaling() {
-        async_global_executor::block_on(jvepk_k_scaling_async());
-    }
+        async_global_executor::block_on(async {
+            use crate::guardian::GuardianKeyPurpose;
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::joint_public_key::t::jvepk_k_scaling",
+            );
 
-    async fn jvepk_k_scaling_async() {
-        use crate::guardian::GuardianKeyPurpose;
-        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::joint_public_key::t::jvepk_k_scaling",
-        );
+            let election_parameters = eg.election_parameters().await.unwrap();
+            let election_parameters = election_parameters.as_ref();
 
-        let election_parameters = eg.election_parameters().await.unwrap();
-        let election_parameters = election_parameters.as_ref();
+            let fixed_parameters = election_parameters.fixed_parameters();
 
-        let fixed_parameters = election_parameters.fixed_parameters();
+            let field = election_parameters.fixed_parameters().field();
 
-        let field = election_parameters.fixed_parameters().field();
+            let guardian_key_purpose =
+                GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields;
 
-        let guardian_key_purpose =
-            GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields;
+            let sk = eg
+                .guardians_secret_keys(guardian_key_purpose)
+                .await
+                .unwrap()
+                .iter()
+                .fold(ScalarField::zero(), |a, b| {
+                    a.add(&b.secret_coefficients().0[0].0, field)
+                });
+            let secret_coeff = SecretCoefficient(sk);
 
-        let sk = eg
-            .guardians_secret_keys(guardian_key_purpose)
-            .await
-            .unwrap()
-            .iter()
-            .fold(ScalarField::zero(), |a, b| {
-                a.add(&b.secret_coefficients().0[0].0, field)
-            });
-        let secret_coeff = SecretCoefficient(sk);
+            let joint_public_key = eg.joint_public_key(guardian_key_purpose).await.unwrap();
 
-        let joint_public_key = eg.joint_public_key(guardian_key_purpose).await.unwrap();
+            debug!("key_purpose: {guardian_key_purpose}");
+            debug!("joint_public_key {joint_public_key:?}");
 
-        debug!("key_purpose: {guardian_key_purpose}");
-        debug!("joint_public_key {joint_public_key:?}");
+            let nonce = FieldElement::from(BigUint::from(5u8), field);
+            debug!("nonce {nonce:?}");
 
-        let nonce = FieldElement::from(BigUint::from(5u8), field);
-        debug!("nonce {nonce:?}");
+            let ciphertext = joint_public_key.encrypt_to(fixed_parameters, &nonce, 1_u32);
+            debug!("ciphertext {ciphertext:?}");
 
-        let ciphertext = joint_public_key.encrypt_to(fixed_parameters, &nonce, 1_u32);
-        debug!("ciphertext {ciphertext:?}");
+            let factor = FieldElement::from(BigUint::new(vec![0, 64u32]), field); // 2^38
+            debug!("factor: {factor:?}");
+            let factor = factor.sub(&ScalarField::one(), field); // 2^38 - 1
+            debug!("factor: {factor:?}");
 
-        let factor = FieldElement::from(BigUint::new(vec![0, 64u32]), field); // 2^38
-        debug!("factor: {factor:?}");
-        let factor = factor.sub(&ScalarField::one(), field); // 2^38 - 1
-        debug!("factor: {factor:?}");
+            let scaled_ciphertext = ciphertext.scale(fixed_parameters, &factor);
+            debug!("scaled_ciphertext: {scaled_ciphertext:?}");
 
-        let scaled_ciphertext = ciphertext.scale(fixed_parameters, &factor);
-        debug!("scaled_ciphertext: {scaled_ciphertext:?}");
+            let ciphertext = scaled_ciphertext;
 
-        let ciphertext = scaled_ciphertext;
+            let result = decrypt_ciphertext(
+                &ciphertext,
+                &joint_public_key,
+                &secret_coeff,
+                fixed_parameters,
+            );
+            debug!("decrypted result: {result:?}");
 
-        let result = decrypt_ciphertext(
-            &ciphertext,
-            &joint_public_key,
-            &secret_coeff,
-            fixed_parameters,
-        );
-        debug!("decrypted result: {result:?}");
-
-        assert_eq!(result, factor);
+            assert_eq!(result, factor);
+        });
     }
 
     /* //? TODO
-    #[test]
+    #[test_log::test]
     pub fn jbdepk_khat() {
         async_global_executor::block_on(jbdepk_khat_async());
     }

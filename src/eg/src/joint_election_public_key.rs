@@ -250,7 +250,7 @@ mod t {
         dlog.ff_find(&group_msg, &fixed_parameters.field).unwrap() // plaintext
     }
 
-    #[test]
+    #[test_log::test]
     pub fn test_scaling_ciphertext() -> EgResult<()> {
         let mut eg = Eg::new_insecure_deterministic_with_example_election_data(
             "electionguard-rust/src/eg::joint_public_key::test::test_scaling_ciphertext",

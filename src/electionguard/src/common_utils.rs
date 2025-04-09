@@ -83,7 +83,7 @@ impl ElectionManifestSource {
                     format!("Loading election manifest from: {}", actual_path.display())
                 })?;
 
-        eprintln!(
+        println!(
             "Election election_manifest loaded from: {}",
             actual_path.display()
         );
@@ -105,7 +105,7 @@ pub(crate) fn load_election_parameters(
         eg.csrng(),
     )?;
 
-    eprintln!(
+    println!(
         "Election election_parameters loaded from: {}",
         path.display()
     );
@@ -146,14 +146,14 @@ pub(crate) fn load_guardian_secret_key(
     }
 
     if !guardian_secret_key.name.is_empty() {
-        eprintln!(
+        println!(
             "Secret key for guardian number {} {:?} loaded from: {}",
             guardian_secret_key.i,
             guardian_secret_key.name,
             path.display()
         )
     } else {
-        eprintln!(
+        println!(
             "Secret key for guardian number {} loaded from: {}",
             guardian_secret_key.i,
             path.display()
@@ -200,14 +200,14 @@ pub(crate) fn load_guardian_public_key(
 
     let gpk_name = guardian_public_key.name();
     if !gpk_name.is_empty() {
-        eprintln!(
+        println!(
             "Public key for guardian number {} {:?} loaded from: {}",
             guardian_public_key.i(),
             gpk_name,
             path.display()
         )
     } else {
-        eprintln!(
+        println!(
             "Public key for guardian number {} loaded from: {}",
             guardian_public_key.i(),
             path.display()
@@ -232,7 +232,7 @@ pub(crate) fn load_joint_public_key<'vi>(
     )?;
     eg.opt_joint_public_key = Some(joint_public_key);
 
-    eprintln!("Joint election public key loaded from: {}", path.display());
+    println!("Joint election public key loaded from: {}", path.display());
 
     eg
         .joint_vote_encryption_public_key_k()
@@ -251,7 +251,7 @@ pub(crate) fn load_hashes<'vi>(
     let hashes = Hashes::from_stdioread_validated(&mut stdioread)?;
     eg.opt_hashes = Some(hashes);
 
-    eprintln!("Hashes loaded from: {}", path.display());
+    println!("Hashes loaded from: {}", path.display());
 
     eg.hashes().map_err(Into::into)
 }
@@ -268,7 +268,7 @@ pub(crate) fn load_extended_base_hash<'vi>(
     let extended_base_hash = ExtendedBaseHash::from_stdioread_validated(&mut stdioread)?;
     eg.opt_extended_base_hash = Some(extended_base_hash);
 
-    eprintln!("ExtendedBaseHash loaded from: {}", path.display());
+    println!("ExtendedBaseHash loaded from: {}", path.display());
 
     eg.extended_base_hash().await.map_err(Into::into)
 }
@@ -286,7 +286,7 @@ pub(crate) fn load_pre_voting_data<'a>(
 
     eg.opt_pre_voting_data = Some(pre_voting_data);
 
-    eprintln!("PreVotingData loaded from: {}", path.display());
+    println!("PreVotingData loaded from: {}", path.display());
 
     produce_resource.pre_voting_data().map_err(Into::into)
 }

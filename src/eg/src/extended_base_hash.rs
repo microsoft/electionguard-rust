@@ -167,11 +167,12 @@ inventory::submit! {
 #[allow(clippy::unwrap_used)]
 mod t {
     use hex_literal::hex;
+    use insta::assert_snapshot;
 
     use super::*;
     use crate::{eg::Eg, errors::EgResult};
 
-    #[test]
+    #[test_log::test]
     fn t1() {
         async_global_executor::block_on(t1_async());
     }
@@ -185,14 +186,7 @@ mod t {
         let extended_base_hash = ExtendedBaseHash::compute(eg).await.unwrap();
 
         // This has to be modified every time the example data election manifest is changed even a little bit.
-
-        let expected_h_e = ExtendedBaseHash_H_E::from(hex!(
-            "CF24EBAF651B6A2A25BD342C0479876D620B17F8867E6D6970A2B17FEE02826A"
-        ));
-
-        assert_eq!(
-            extended_base_hash.h_e, expected_h_e,
-            "hashes.h_e (left) != (right) expected_h_e"
-        );
+        assert_snapshot!(extended_base_hash.h_e,
+            @"2DFC9973241A9A6CA98268F4F167E98C65BBAA87DEF24C4835C63FE820990C8E");
     }
 }

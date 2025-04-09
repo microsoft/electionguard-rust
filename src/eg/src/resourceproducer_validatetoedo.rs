@@ -197,7 +197,7 @@ impl ResourceProducer_ValidateToEdo {
                 Some(Err(e))
             }
             Ok(arc_dyn_maybevalidatableunsized) => {
-                info!("Successfully downcasted {}", arc_validatable.ridfmt());
+                debug!("Successfully downcasted {}", arc_validatable.ridfmt());
 
                 None //? TODO
             }
@@ -353,41 +353,38 @@ mod t {
     use super::*;
     use crate::{eg_config::EgConfig, resource::ElectionDataObjectId as EdoId};
 
-    #[test]
+    #[test_log::test]
     fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::resource_provider_validatetoedo::t::t1",
+            );
+            let eg = eg.as_ref();
 
-    async fn t1_async() {
-        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::resource_provider_validatetoedo::t::t0",
-        );
-        let eg = eg.as_ref();
+            {
+                let (dr_rc, dr_src) = eg
+                    .produce_resource(&ResourceIdFormat {
+                        rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
+                        fmt: ResourceFormat::SliceBytes,
+                    })
+                    .await
+                    .unwrap();
+                assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
+                assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
+                assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
+                assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
+                assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
+                //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
+            }
 
-        {
-            let (dr_rc, dr_src) = eg
-                .produce_resource(&ResourceIdFormat {
-                    rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-                    fmt: ResourceFormat::SliceBytes,
-                })
-                .await
-                .unwrap();
-            assert_ron_snapshot!(dr_rc.rid(), @"ElectionDataObject(ElectionManifest)");
-            assert_ron_snapshot!(dr_rc.format(), @r#"SliceBytes"#);
-            assert_ron_snapshot!(dr_src, @"ExampleData(SliceBytes)");
-            assert_ron_snapshot!(dr_rc.as_slice_bytes().is_some(), @r#"true"#);
-            assert_ron_snapshot!(10 < dr_rc.as_slice_bytes().unwrap().len(), @r#"true"#);
-            //assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()), @r#"Some("{...}")"#);
-        }
-
-        {
-            let result = eg
-                .produce_resource(&ResourceIdFormat {
-                    rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-                    fmt: ResourceFormat::ConcreteType,
-                })
-                .await;
-            assert_ron_snapshot!(result, @r#"
+            {
+                let result = eg
+                    .produce_resource(&ResourceIdFormat {
+                        rid: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
+                        fmt: ResourceFormat::ConcreteType,
+                    })
+                    .await;
+                assert_ron_snapshot!(result, @r#"
             Err(NoProducerConfigured(
               ridfmt: ResourceIdFormat(
                 id: ElectionDataObject(ElectionManifest),
@@ -395,20 +392,21 @@ mod t {
               ),
             ))
             "#);
-        }
+            }
 
-        /*
-        {
-            let (dr_rc, dr_src) = eg
-                .produce_resource(&ResourceIdFormat {
-                    id: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
-                    fmt: ResourceFormat::ValidatedElectionDataObject,
-                })
-                .unwrap();
-            assert_ron_snapshot!(dr_rc.rid(), @r#"PersistedElectionDataObject(ElectionManifest)"#);
-            assert_ron_snapshot!(dr_rc.format(), @"ValidatedElectionDataObject");
-            assert_ron_snapshot!(dr_src, @"ExampleData");
-        }
-        // */
+            /*
+            {
+                let (dr_rc, dr_src) = eg
+                    .produce_resource(&ResourceIdFormat {
+                        id: ResourceId::ElectionDataObject(EdoId::ElectionManifest),
+                        fmt: ResourceFormat::ValidatedElectionDataObject,
+                    })
+                    .unwrap();
+                assert_ron_snapshot!(dr_rc.rid(), @r#"PersistedElectionDataObject(ElectionManifest)"#);
+                assert_ron_snapshot!(dr_rc.format(), @"ValidatedElectionDataObject");
+                assert_ron_snapshot!(dr_src, @"ExampleData");
+            }
+            // */
+        });
     }
 }

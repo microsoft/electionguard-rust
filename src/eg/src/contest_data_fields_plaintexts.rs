@@ -7,6 +7,8 @@
 #![allow(clippy::assertions_on_constants)]
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
+use std::option;
+
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use tracing::{
@@ -19,10 +21,11 @@ use util::{
 };
 
 use crate::{
+    ballot_style::BallotStyle,
     ciphertext::{Ciphertext, CiphertextIndex},
     contest_option_fields::ContestOptionFieldsPlaintexts,
     eg::Eg,
-    election_manifest::ContestIndex,
+    election_manifest::{ContestIndex, ElectionManifest},
     errors::{EgError, EgResult},
     pre_voting_data::PreVotingData,
     resource::{ProduceResource, ProduceResourceExt},
@@ -97,21 +100,37 @@ pub type ContestDataFieldIndex = CiphertextIndex;
 pub struct ContestDataFieldsPlaintexts(Vec1<ContestDataFieldPlaintext>);
 
 impl ContestDataFieldsPlaintexts {
-    /// - `option_fields_plaintexts` should have the same length as the
-    ///   number of options in the contest.
+    /// Produces a [`ContestDataFieldsPlaintexts`] from a [`ContestOptionFieldsPlaintexts`].
+    ///
+    /// - `election_manifest` - The [`ElectionManifest`].
+    /// - `contest_ix` - The Contest Index
+    /// - `option_fields_plaintexts` - The list of values representing voter selections. Its length must
+    ///   be equal to the number of [`ContestOption`](crate::election_manifest::ContestOption)s defined for
+    ///   the [`Contest`](crate::election_manifest::Contest). This value is returned by the
+    ///   [`Contest::qty_contest_option_data_fields()`](crate::election_manifest::Contest::qty_contest_option_data_fields)
+    ///   function.
     pub fn try_from_option_fields(
-        _produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
-        _contest_ix: ContestIndex,
+        election_manifest: &ElectionManifest,
+        ballot_style: &BallotStyle,
+        contest_ix: ContestIndex,
         option_fields_plaintexts: ContestOptionFieldsPlaintexts,
     ) -> EgResult<Self> {
-        //? TODO: This is probably where we want to add additional data fields for under/overvote
-        //? and enforce selection limit is satisfied
-        warn!(
-            "ContestDataFieldsPlaintexts::try_from_option_fields does not yet verify the count of option fields"
-        );
-        warn!(
-            "ContestDataFieldsPlaintexts::try_from_option_fields does not yet include additional data fields"
-        );
+        let contest = ballot_style.get_contest(election_manifest, contest_ix)?;
+        let qty_contest_option_data_fields = contest.qty_contest_option_data_fields();
+
+        if option_fields_plaintexts.len() != qty_contest_option_data_fields + 1 {
+            let e = EgError::IncorrectQtyOfContestOptionFieldsPlaintexts {
+                contest_ix,
+                qty_expected: qty_contest_option_data_fields,
+                qty_supplied: option_fields_plaintexts.len(),
+            };
+            error!("{e}");
+            return Err(e);
+        }
+
+        //? TODO: This is probably where we want to add system-assigned data fields for recording (under|over)vote(ed|amount)
+        //? TODO: Enforce selection limit
+        //? TODO: Include additional data fields
 
         let v1_option_fields_plaintexts = option_fields_plaintexts.into_inner();
 

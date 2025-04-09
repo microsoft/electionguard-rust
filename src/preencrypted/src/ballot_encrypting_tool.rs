@@ -11,19 +11,14 @@ use anyhow::Result;
 
 use eg::{
     ballot_style::BallotStyleIndex,
-    pre_voting_data::PreVotingData,
-    hash::{eg_h, HValue, HVALUE_BYTE_LEN},
     ciphertext::Ciphertext,
+    hash::{HVALUE_BYTE_LEN, HValue, eg_h},
     joint_public_key::JointPublicKey,
+    pre_voting_data::PreVotingData,
 };
-use util::{
-    csrng::Csrng,
-    logging::Logging,
-    vec1::Vec1,
-};
+use util::{csrng::Csrng, logging::Logging, vec1::Vec1};
 
-use crate::ballot::BallotPreEncrypted;
-use crate::contest::ContestPreEncrypted;
+use crate::{ballot::BallotPreEncrypted, contest::ContestPreEncrypted};
 
 pub struct BallotEncryptingTool {
     /// The pre-voting data.
@@ -184,7 +179,7 @@ impl BallotEncryptingTool {
 //         let sk = PrivateKey::new(csrng, fixed_parameters);
 
 //         let hashes = Hashes::new(&election_parameters, &election_manifest);
-//         // eprintln!("{:#?}", election_manifest.contests);
+//         // println!("{:#?}", election_manifest.contests);
 
 //         let config = PreEncryptedBallotConfig {
 //             election_manifest,

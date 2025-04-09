@@ -166,28 +166,27 @@ mod t {
 
     use super::*;
 
-    #[test]
+    #[test_log::test]
     fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_insecure_deterministic_csprng_seed(
+                "eg::resourceproducer_specific::t::t1",
+            );
+            let eg = eg.as_ref();
 
-    async fn t1_async() {
-        let eg =
-            Eg::new_with_insecure_deterministic_csprng_seed("eg::resourceproducer_specific::t::t0");
-        let eg = eg.as_ref();
+            let (dr_rc, dr_src) = eg
+                .produce_resource(&ResourceIdFormat {
+                    rid: ResourceId::ElectionGuardDesignSpecificationVersion,
+                    fmt: ResourceFormat::ConcreteType,
+                })
+                .await
+                .unwrap();
 
-        let (dr_rc, dr_src) = eg
-            .produce_resource(&ResourceIdFormat {
-                rid: ResourceId::ElectionGuardDesignSpecificationVersion,
-                fmt: ResourceFormat::ConcreteType,
-            })
-            .await
-            .unwrap();
-
-        assert_ron_snapshot!(dr_rc.rid(), @"ElectionGuardDesignSpecificationVersion");
-        assert_ron_snapshot!(dr_rc.format(), @"ConcreteType");
-        assert_ron_snapshot!(dr_src, @"Constructed(ConcreteType)");
-        assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
+            assert_ron_snapshot!(dr_rc.rid(), @"ElectionGuardDesignSpecificationVersion");
+            assert_ron_snapshot!(dr_rc.format(), @"ConcreteType");
+            assert_ron_snapshot!(dr_src, @"Constructed(ConcreteType)");
+            assert_ron_snapshot!(dr_rc.as_slice_bytes().map(|aby|std::str::from_utf8(aby).unwrap()),
             @r#"None"#);
+        });
     }
 }

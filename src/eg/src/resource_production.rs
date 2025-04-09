@@ -290,7 +290,7 @@ pub(crate) fn produce_resource_impl_<'a>(
                 let e = ResourceProductionError::NoProducerFound {
                     ridfmt: rp_op.requested_ridfmt().clone(),
                 };
-                info!(rf = rp_op.trace_field_rf(), "Resource production: {e}");
+                debug!(rf = rp_op.trace_field_rf(), "Resource production: {e}");
                 Err(e)
             }
         }
@@ -428,20 +428,17 @@ mod t {
     use crate::eg_config::EgConfig;
     use crate::resource::ElectionDataObjectId;
 
-    #[test]
+    #[test_log::test]
     fn t1() {
-        async_global_executor::block_on(t1_async());
-    }
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::resource_production::t::t1",
+            );
 
-    async fn t1_async() {
-        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::resource_production::t::t2",
-        );
+            // Failure cases where we don't have a ResourceProducer set up to handle the request.
 
-        // Failure cases where we don't have a ResourceProducer set up to handle the request.
-
-        let rid_edo_pvd = ResourceId::ElectionDataObject(ElectionDataObjectId::PreVotingData);
-        assert_ron_snapshot!(eg.produce_resource(
+            let rid_edo_pvd = ResourceId::ElectionDataObject(ElectionDataObjectId::PreVotingData);
+            assert_ron_snapshot!(eg.produce_resource(
             &ResourceIdFormat {
                 rid: rid_edo_pvd.clone(),
                 fmt: ResourceFormat::SliceBytes,
@@ -455,7 +452,7 @@ mod t {
         ))
         "#);
 
-        assert_ron_snapshot!(eg.produce_resource(
+            assert_ron_snapshot!(eg.produce_resource(
             &ResourceIdFormat {
                 rid: rid_edo_pvd.clone(),
                 fmt: ResourceFormat::ConcreteType,
@@ -468,5 +465,6 @@ mod t {
           ),
         ))
         "#);
+        });
     }
 }

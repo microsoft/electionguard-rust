@@ -25,7 +25,6 @@ use std::{
 
 use async_trait::async_trait;
 use either::Either;
-use maybe_owned::{MaybeOwned, MaybeOwnedMut};
 use strum::EnumCount;
 use util::{csrng::Csrng, vec1::Vec1};
 

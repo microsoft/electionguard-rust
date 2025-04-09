@@ -195,7 +195,7 @@ mod t {
         voting_device::{VotingDeviceInformation, VotingDeviceInformationHash},
     };
 
-    #[test]
+    #[test_log::test]
     fn t1() {
         assert_ron_snapshot!(
             (CHAINING_MODE_BYTE_LEN, ChainingMode::byte_len()),
@@ -217,17 +217,17 @@ mod t {
             @"0000 0000");
     }
 
-    #[test]
+    #[test_log::test]
     fn t2() {
         assert_ron_snapshot!(CHAINING_FIELD_BYTE_LEN, @r#"36"#);
         assert_ron_snapshot!(ChainingField::byte_len(), @r#"36"#);
     }
 
-    #[test]
+    #[test_log::test]
     fn t3() {
         async_global_executor::block_on(async {
             let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-                "eg::chaining_mode::t::t1",
+                "eg::chaining_mode::t::t3",
             );
             let eg = eg.as_ref();
 
@@ -241,10 +241,10 @@ mod t {
             let cf = ChainingField::new_no_chaining_mode(&h_di).unwrap();
 
             assert_snapshot!(cf, @r#"
-                ChainingField(
-                    0000 0000 8ca6 7d84 9797 85f6 30dd 0746
-                    ab22 610d 5dd4 4f37 6893 5f93 b74c 4bed
-                    b770 6d0f )
+            ChainingField(
+                0000 0000 a3f9 c0a4 3411 7058 3cf3 de40
+                e1f7 7408 b159 817b 58b1 a375 c920 6f5b
+                ec4b 52cc )
             "#);
         });
     }

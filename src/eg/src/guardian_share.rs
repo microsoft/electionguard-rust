@@ -772,7 +772,7 @@ mod test {
         resource::{ProduceResource, ProduceResourceExt},
     };
 
-    #[test]
+    #[test_log::test]
     #[allow(clippy::needless_as_bytes)]
     fn test_text_encoding() {
         assert_eq!("share_enc_keys".as_bytes().len(), 14);
@@ -782,7 +782,7 @@ mod test {
     const N: u32 = 2;
     const K: u32 = N;
 
-    #[test]
+    #[test_log::test]
     fn test_encryption_decryption() {
         async_global_executor::block_on(test_encryption_decryption_async());
     }
@@ -829,7 +829,7 @@ mod test {
         assert!(result.is_ok(), "The decrypted share should be valid");
     }
 
-    #[test]
+    #[test_log::test]
     fn test_key_sharing() {
         async_global_executor::block_on(test_key_sharing_async());
     }
@@ -892,6 +892,7 @@ mod test {
             }
             secret_key_shares
         };
+        let eg = eg.as_ref();
 
         // Compute joint secret key from secret keys
         let joint_secret_key_from_secret_keys =
@@ -920,67 +921,68 @@ mod test {
         );
     }
 
-    #[test]
+    #[test_log::test]
     fn test_public_validation() {
-        async_global_executor::block_on(test_public_validation_async());
-    }
+        async_global_executor::block_on(async {
+            let eg = {
+                let mut config = EgConfig::new();
+                config.use_insecure_deterministic_csprng_seed_str(
+                    "eg::guardian_share::test::test_public_validation",
+                );
+                config.enable_test_data_generation_n_k(N, K).unwrap();
+                Eg::from_config(config)
+            };
+            let eg = eg.as_ref();
 
-    async fn test_public_validation_async() {
-        let eg = {
-            let mut config = EgConfig::new();
-            config.use_insecure_deterministic_csprng_seed_str(
-                "eg::guardian_share::test::test_public_validation",
+            let election_parameters = eg.election_parameters().await.unwrap();
+            let election_parameters = election_parameters.as_ref();
+
+            let key_purpose = GuardianKeyPurpose::Encrypt_InterGuardianCommunication;
+
+            let gpks = eg.guardian_public_keys(key_purpose).await.unwrap();
+            let gpks = gpks.map_into(Arc::as_ref);
+
+            let gsks = eg.guardians_secret_keys(key_purpose).await.unwrap();
+            let gsks = gsks.map_into(Arc::as_ref);
+
+            let [&pk_one, &pk_two] = gpks.arr_refs::<{ N as usize }>().unwrap();
+            let [&sk_one, &sk_two] = gsks.arr_refs::<{ N as usize }>().unwrap();
+
+            let csrng = eg.csrng();
+
+            let enc_res_1 =
+                GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_two)
+                    .unwrap();
+
+            let enc_res_2 =
+                GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_one)
+                    .unwrap();
+
+            let enc_res_3 =
+                GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_two, pk_one)
+                    .unwrap();
+
+            assert!(
+                enc_res_1
+                    .ciphertext
+                    .public_validation(election_parameters, pk_one, pk_two, &enc_res_1.secret)
+                    .is_ok(),
+                "The ciphertext should be valid"
             );
-            config.enable_test_data_generation_n_k(N, K).unwrap();
-            Eg::from_config(config)
-        };
-        let eg = eg.as_ref();
-
-        let election_parameters = eg.election_parameters().await.unwrap();
-        let election_parameters = election_parameters.as_ref();
-
-        let key_purpose = GuardianKeyPurpose::Encrypt_InterGuardianCommunication;
-
-        let gpks = eg.guardian_public_keys(key_purpose).await.unwrap();
-        let gpks = gpks.map_into(Arc::as_ref);
-
-        let gsks = eg.guardians_secret_keys(key_purpose).await.unwrap();
-        let gsks = gsks.map_into(Arc::as_ref);
-
-        let [&pk_one, &pk_two] = gpks.arr_refs::<{ N as usize }>().unwrap();
-        let [&sk_one, &sk_two] = gsks.arr_refs::<{ N as usize }>().unwrap();
-
-        let csrng = eg.csrng();
-
-        let enc_res_1 =
-            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_two).unwrap();
-
-        let enc_res_2 =
-            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_one, pk_one).unwrap();
-
-        let enc_res_3 =
-            GuardianEncryptedShare::encrypt(csrng, election_parameters, sk_two, pk_one).unwrap();
-
-        assert!(
-            enc_res_1
-                .ciphertext
-                .public_validation(election_parameters, pk_one, pk_two, &enc_res_1.secret)
-                .is_ok(),
-            "The ciphertext should be valid"
-        );
-        assert!(
-            enc_res_2
-                .ciphertext
-                .public_validation(election_parameters, pk_one, pk_two, &enc_res_1.secret)
-                .is_err(),
-            "The ciphertext should not be valid"
-        );
-        assert!(
-            enc_res_3
-                .ciphertext
-                .public_validation(election_parameters, pk_one, pk_two, &enc_res_1.secret)
-                .is_err(),
-            "The ciphertext should not be valid"
-        );
+            assert!(
+                enc_res_2
+                    .ciphertext
+                    .public_validation(election_parameters, pk_one, pk_two, &enc_res_1.secret)
+                    .is_err(),
+                "The ciphertext should not be valid"
+            );
+            assert!(
+                enc_res_3
+                    .ciphertext
+                    .public_validation(election_parameters, pk_one, pk_two, &enc_res_1.secret)
+                    .is_err(),
+                "The ciphertext should not be valid"
+            );
+        });
     }
 }

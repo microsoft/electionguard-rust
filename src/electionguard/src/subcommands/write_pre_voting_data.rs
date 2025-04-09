@@ -78,7 +78,7 @@ impl Subcommand for WritePreVotingData {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote pre voting data to: {}", path.display());
+        println!("Wrote pre voting data to: {}", path.display());
 
         Ok(())
         // */

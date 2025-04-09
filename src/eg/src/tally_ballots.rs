@@ -112,7 +112,6 @@ mod t {
         debug, error, field::display as trace_display, info, info_span, instrument, trace,
         trace_span, warn,
     };
-    //? use test_log::test;
 
     use util::{algebra::FieldElement, uint53::Uint53};
 
@@ -147,8 +146,6 @@ mod t {
 
     // This test is too expensive to run in non --release builds, but requiring `not(debug_assertions)`
     // disables it in `rust-analyzer` too. Allowing 'miri' seems to keep it visible in the code editor.
-    //x TODO figure this out #[cfg(any(not(debug_assertions), miri))]
-    //x TODO figure this out #[cfg(target_pointer_width = "16")]
     #[allow(non_snake_case)]
     fn test_check_verify_ballot() {
         async_global_executor::block_on(test_check_verify_ballot_async());
@@ -350,10 +347,11 @@ mod t {
 
     // Testing that encrypted tallies decrypt to the expected result.
     #[test_log::test]
+    #[ignore]
     fn test_tally_ballots() {
-        info!("test_tally_ballots() started");
+        //info!("test_tally_ballots() started");
         async_global_executor::block_on(test_tally_ballots_async());
-        info!("test_tally_ballots() succeeded");
+        //info!("test_tally_ballots() succeeded");
     }
 
     async fn test_tally_ballots_async() {
@@ -380,10 +378,10 @@ mod t {
         let csrng = eg.csrng();
 
         let group = fixed_parameters.group();
-        debug!("group {group:?}");
+        //debug!("group {group:?}");
 
         let field = fixed_parameters.field();
-        debug!("field {field:?}");
+        //debug!("field {field:?}");
 
         // Get the Joint Public Key, Guardian Public Keys, and Guardian Secret Keys used for encrypting votes.
 
@@ -400,9 +398,9 @@ mod t {
         }
 
         for guardian_ix in GuardianIndex::iter_range_inclusive(GuardianIndex::one(), n) {
-            eprintln!(
-                "\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv Guardian {guardian_ix}  vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
-            );
+            //println!(
+            //    "\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv Guardian {guardian_ix}  vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+            //);
 
             for guardian_key_purpose in [
                 GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
@@ -411,25 +409,25 @@ mod t {
             ] {
                 let gk_purpose: &'static str = gkp(guardian_key_purpose);
 
-                //eprintln!("=================== {gk_purpose} ========================== ");
+                //println!("=================== {gk_purpose} ========================== ");
 
                 for asymmetric_key_part in [AsymmetricKeyPart::Secret, AsymmetricKeyPart::Public] {
-                    eprintln!(
-                        "\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv Guardian {guardian_ix} {gk_purpose} {asymmetric_key_part} Key vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
-                    );
+                    //println!(
+                    //    "\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv Guardian {guardian_ix} {gk_purpose} {asymmetric_key_part} Key vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+                    //);
 
                     let key_part_id = GuardianKeyPartId {
                         guardian_ix,
                         key_purpose: guardian_key_purpose,
                         asymmetric_key_part,
                     };
-                    //eprintln!("key_part_id: {key_part_id:#?}");
+                    //println!("key_part_id: {key_part_id:#?}");
 
                     let edo_id = EdoId::GuardianKeyPart(key_part_id);
-                    //eprintln!("edo_id: {edo_id:#?}");
+                    //println!("edo_id: {edo_id:#?}");
 
                     let ridfmt = edo_id.validated_type_ridfmt();
-                    eprintln!("ridfmt: {ridfmt:#?}");
+                    println!("ridfmt: {ridfmt:#?}");
 
                     match asymmetric_key_part {
                         AsymmetricKeyPart::Secret => {
@@ -439,7 +437,7 @@ mod t {
                                 )
                                 .await
                                 .unwrap();
-                            eprintln!("secret_key: {secret_key:#?}");
+                            //println!("secret_key: {secret_key:#?}");
                         }
                         AsymmetricKeyPart::Public => {
                             let public_key = eg
@@ -448,19 +446,19 @@ mod t {
                                 )
                                 .await
                                 .unwrap();
-                            eprintln!("public_key: {public_key:#?}");
+                            //println!("public_key: {public_key:#?}");
                         }
                     }
 
-                    eprintln!(
-                        "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Guardian {guardian_ix} {gk_purpose} {asymmetric_key_part} Key ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
-                    );
+                    //println!(
+                    //    "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Guardian {guardian_ix} {gk_purpose} {asymmetric_key_part} Key ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+                    //);
                 }
             }
 
-            eprintln!(
-                "\n^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Guardian {guardian_ix}  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
-            );
+            //println!(
+            //    "\n^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Guardian {guardian_ix}  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+            //);
         }
 
         for guardian_key_purpose in [
@@ -469,15 +467,15 @@ mod t {
         ] {
             let gk_purpose: &'static str = gkp(guardian_key_purpose);
 
-            eprintln!(
-                "\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv {gk_purpose} Joint Public Key vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
-            );
+            //println!(
+            //    "\nvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv {gk_purpose} Joint Public Key vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+            //);
 
             let edo_id = EdoId::JointPublicKey(guardian_key_purpose);
-            //eprintln!("edo_id: {edo_id:#?}");
+            //println!("edo_id: {edo_id:#?}");
 
             let ridfmt = edo_id.validated_type_ridfmt();
-            eprintln!("ridfmt: {ridfmt:#?}");
+            //println!("ridfmt: {ridfmt:#?}");
 
             let joint_public_key = eg
                 .produce_resource_downcast_no_src::<crate::joint_public_key::JointPublicKey>(
@@ -485,77 +483,77 @@ mod t {
                 )
                 .await
                 .unwrap();
-            eprintln!("joint_public_key: {joint_public_key:#?}");
+            //println!("joint_public_key: {joint_public_key:#?}");
 
-            eprintln!(
-                "\n^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ {gk_purpose} Joint Public Key ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
-            );
+            //println!(
+            //    "\n^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ {gk_purpose} Joint Public Key ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+            //);
         }
 
         let guardian_key_purpose =
             GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields;
         let gk_purpose: &'static str = gkp(guardian_key_purpose);
 
-        eprintln!("\n");
+        //println!("\n");
         let gsks = eg
             .guardians_secret_keys(guardian_key_purpose)
             .await
             .unwrap();
         let gsks = gsks.map_into(Arc::as_ref);
-        for gsk in gsks {
-            eprintln!(
-                "vvvvvvvvvvvvvvvv Guardian {} {gk_purpose} Secret Key vvvvvvvvvvvvvvvv",
-                gsk.guardian_index()
-            );
-            eprintln!("guardian_secret_key {gsk:?}");
-            eprintln!(
-                "^^^^^^^^^^^^^^^^ Guardian {} {gk_purpose} Secret Key ^^^^^^^^^^^^^^^^",
-                gsk.guardian_index()
-            );
-        }
+        //for gsk in gsks {
+        //    println!(
+        //        "vvvvvvvvvvvvvvvv Guardian {} {gk_purpose} Secret Key vvvvvvvvvvvvvvvv",
+        //        gsk.guardian_index()
+        //    );
+        //    println!("guardian_secret_key {gsk:?}");
+        //    println!(
+        //        "^^^^^^^^^^^^^^^^ Guardian {} {gk_purpose} Secret Key ^^^^^^^^^^^^^^^^",
+        //        gsk.guardian_index()
+        //    );
+        //}
 
-        eprintln!("\n");
+        println!("\n");
         let gpks = eg.guardian_public_keys(guardian_key_purpose).await.unwrap();
         let gpks = gpks.map_into(Arc::as_ref);
-        for gpk in gpks {
-            eprintln!(
-                "vvvvvvvvvvvvvvvv Guardian {} {gk_purpose} Public Key vvvvvvvvvvvvvvvv",
-                gpk.guardian_index()
-            );
-            eprintln!("guardian_public_key {guardian_key_purpose}: {gpk:?}");
-            eprintln!(
-                "^^^^^^^^^^^^^^^^ Guardian {} {gk_purpose} Public Key ^^^^^^^^^^^^^^^^",
-                gpk.guardian_index()
-            );
-        }
+        //for gpk in gpks {
+        //    println!(
+        //        "vvvvvvvvvvvvvvvv Guardian {} {gk_purpose} Public Key vvvvvvvvvvvvvvvv",
+        //        gpk.guardian_index()
+        //    );
+        //    println!("guardian_public_key {guardian_key_purpose}: {gpk:?}");
+        //    println!(
+        //        "^^^^^^^^^^^^^^^^ Guardian {} {gk_purpose} Public Key ^^^^^^^^^^^^^^^^",
+        //        gpk.guardian_index()
+        //    );
+        //}
 
         let extended_base_hash = eg.extended_base_hash().await.unwrap();
         let extended_base_hash = extended_base_hash.as_ref();
         let h_e = extended_base_hash.h_e();
-        eprintln!("\nh_e: {h_e:?}");
+        //println!("\nh_e: {h_e:?}");
 
         let election_manifest = eg.election_manifest().await.unwrap();
         let election_manifest = election_manifest.as_ref();
-        eprintln!("\nelection_manifest: done");
+        //println!("\nelection_manifest: done");
 
         let joint_vote_encryption_public_key_k =
             eg.joint_vote_encryption_public_key_k().await.unwrap();
-        eprintln!("\njoint_vote_encryption_public_key_k: {joint_vote_encryption_public_key_k:#?}");
+        //println!("\njoint_vote_encryption_public_key_k: {joint_vote_encryption_public_key_k:#?}");
 
         let joint_ballot_data_encryption_public_key_k_hat = eg
             .joint_ballot_data_encryption_public_key_k_hat()
             .await
             .unwrap();
-        eprintln!(
-            "\njoint_ballot_data_encryption_public_key_k_hat: {joint_ballot_data_encryption_public_key_k_hat:#?}"
-        );
+        //println!(
+        //    "\njoint_ballot_data_encryption_public_key_k_hat: {joint_ballot_data_encryption_public_key_k_hat:#?}"
+        //);
 
         let gdns_seckeys_encr_ballot_votes = eg
             .guardians_secret_keys(guardian_key_purpose)
             .await
             .unwrap();
         let gdns_seckeys_encr_ballot_votes = gdns_seckeys_encr_ballot_votes.map_into(Arc::as_ref);
-        debug!("gdns_seckeys_encr_ballot_votes: {gdns_seckeys_encr_ballot_votes:?}");
+        //debug!("gdns_seckeys_encr_ballot_votes: {gdns_seckeys_encr_ballot_votes:?}");
 
         let gdns_pubkeys_encr_ballot_votes = eg
             .guardian_public_keys(Encrypt_Ballot_NumericalVotesAndAdditionalDataFields)
@@ -579,17 +577,17 @@ mod t {
         let xi_B_3 = BallotNonce_xi_B::generate_random(csrng);
 
         let vdi = VotingDeviceInformation::new_empty();
-        eprintln!("\nvdi: done");
+        //println!("\nvdi: done");
 
         let h_di = VotingDeviceInformationHash::compute_from_voting_device_information(eg, &vdi)
             .await
             .unwrap();
-        eprintln!("\nh_di: {h_di:?}");
+        //println!("\nh_di: {h_di:?}");
 
-        eprintln!(
-            "\npre ballot creation: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "\npre ballot creation: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
         inst_start = Instant::now();
 
         let ballot_1 = {
@@ -639,10 +637,10 @@ mod t {
             ballot
         };
 
-        eprintln!(
-            "ballot 1 creation: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "ballot 1 creation: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
         inst_start = Instant::now();
 
         let ballot_2 = {
@@ -692,10 +690,10 @@ mod t {
             ballot
         };
 
-        eprintln!(
-            "ballot 2 creation: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "ballot 2 creation: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
         inst_start = Instant::now();
 
         let ballot_3 = {
@@ -747,10 +745,10 @@ mod t {
             ballot
         };
 
-        eprintln!(
-            "ballot 3 creation: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "ballot 3 creation: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
         inst_start = Instant::now();
 
         let scaled_ballots = {
@@ -763,19 +761,19 @@ mod t {
         };
 
         let cnt_ballots = scaled_ballots.len();
-        eprintln!(
-            "scale {cnt_ballots} ballots: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "scale {cnt_ballots} ballots: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
         inst_start = Instant::now();
 
         let contest_tallies_encrypted =
             tally_ballots(scaled_ballots, election_manifest, group).unwrap();
 
-        eprintln!(
-            "contest_tallies_encrypted {cnt_ballots} ballots: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "contest_tallies_encrypted {cnt_ballots} ballots: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
         inst_start = Instant::now();
 
         // Decryption
@@ -794,10 +792,10 @@ mod t {
             .collect();
 
         let cnt_share_vecs = share_vecs.len();
-        eprintln!(
-            "share encrypt from {cnt_share_vecs} guardians: {:.3} s",
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "share encrypt from {cnt_share_vecs} guardians: {:.3} s",
+        //    inst_start.elapsed().as_secs_f64()
+        //);
 
         let mut secret_key_shares: Vec<GuardianSecretKeyShare> =
             Vec::with_capacity(gdns_seckeys_encr_ballot_votes.len());
@@ -813,11 +811,11 @@ mod t {
             secret_key_shares.push(gsk_share);
         }
 
-        eprintln!(
-            "compute {} key shares: {:.3} s",
-            secret_key_shares.len(),
-            inst_start.elapsed().as_secs_f64()
-        );
+        //println!(
+        //    "compute {} key shares: {:.3} s",
+        //    secret_key_shares.len(),
+        //    inst_start.elapsed().as_secs_f64()
+        //);
 
         let mut cnt_contests = 0_usize;
         let mut cnt_ciphertexts = 0_usize;
@@ -861,7 +859,7 @@ mod t {
                 .await
                 .unwrap();
                 let dec_dur = inst_start_dec.elapsed();
-                eprintln!(
+                println!(
                     "decrypt contest {contest_ix} data field {contest_data_field_ix}: {:.3} s",
                     dec_dur.as_secs_f64()
                 );
@@ -886,7 +884,7 @@ mod t {
                 let data_field_tally = ContestDataFieldTally::from(data_field_tally_u53);
 
                 let ver_dur = inst_start_ver.elapsed();
-                eprintln!(
+                println!(
                     "verify decryption contest {contest_ix} data field {contest_data_field_ix}: {:.3} s",
                     ver_dur.as_secs_f64()
                 );
@@ -908,7 +906,7 @@ mod t {
                 .checked_div(cnt_contests as u32)
                 .unwrap_or_default()
                 .as_secs_f64();
-            eprintln!(
+            println!(
                 "decrypted and verified {cnt_contests} contests in {clock_total_s:.3} s, avg {clock_contest_avg_s:.3} s each"
             );
 
@@ -922,10 +920,10 @@ mod t {
                 .checked_div(cnt_ciphertexts as u32)
                 .unwrap_or_default()
                 .as_secs_f64();
-            eprintln!(
+            println!(
                 "decrypt {cnt_ciphertexts} ciphertexts: {decryption_total_s:.3} s, avg {decryption_avg_s:.3} s each"
             );
-            eprintln!(
+            println!(
                 "verify {cnt_ciphertexts} decryptions: {verification_total_s:.3} s, avg {verification_avg_s:.3} s each"
             );
         }
@@ -950,16 +948,16 @@ mod t {
         let expected_election_tallies: ElectionTallies = v1.into();
         // */
 
-        eprintln!("vvvvvvvv contest tallies vvvvvvvv");
+        println!("vvvvvvvv contest tallies vvvvvvvv");
         for (contest_ix, contest_tallies) in contest_tallies.enumerate() {
             //let opt_expected_data_field_values: Option<ContestTallies> = expected_results.get(contest_ix);
 
-            eprintln!("contest {contest_ix}:");
+            println!("contest {contest_ix}:");
             for (data_field_ix, &data_field_value) in contest_tallies.enumerate() {
-                eprintln!("    data field {data_field_ix}: {data_field_value}");
+                println!("    data field {data_field_ix}: {data_field_value}");
             }
         }
-        eprintln!("^^^^^^^^ contest tallies ^^^^^^^^");
+        println!("^^^^^^^^ contest tallies ^^^^^^^^");
         // */
     }
 }

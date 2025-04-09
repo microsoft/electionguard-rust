@@ -287,7 +287,7 @@ impl Resources {
             Vacant(vacant_entry) => {
                 match &resource_production_result {
                     Ok((_rpr_ok_arc, rpr_ok_resource_source)) => {
-                        info!(
+                        debug!(
                             rf = trace_field_rf,
                             "Recording for `{ridfmt}` a new `{str_ok_err}` result produced by `{rpr_ok_resource_source}`."
                         );

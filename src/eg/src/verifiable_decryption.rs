@@ -856,7 +856,7 @@ mod t1 {
         verifiable_decryption::DecryptionShareCombinationError,
     };
 
-    #[test]
+    #[test_log::test]
     fn test_decryption_share_combination() {
         let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
             "eg::verifiable_decryption::t1::test_decryption_share_combination",
@@ -966,7 +966,6 @@ mod t1 {
 }
 
 #[cfg(test)]
-//x TODO figure this out #[cfg(any(not(debug_assertions), miri))]
 #[allow(clippy::unwrap_used)]
 mod t2 {
     use std::{iter::zip, sync::Arc};

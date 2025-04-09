@@ -197,7 +197,7 @@ impl<'b, 'f, 'g> HexDumpOperation<'b, 'f, 'g> {
             self.hd.addr_min_width
         } else {
             let bits = addr_last_line.ilog2() as usize + 1;
-            let hex_digits = (bits + 3) / 4;
+            let hex_digits = bits.div_ceil(4);
             self.hd.addr_min_width.max(hex_digits)
         };
 

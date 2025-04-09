@@ -2,8 +2,102 @@
 
 #set -o xtrace
 set -o nounset
-
+set -o errexit
 umask 077
+
+this_script=$(basename -- "$0")
+printf '%s: starting\n' "$this_script" | cat -t
+
+do_help () {
+    cat <<EOD
+Usage: $this_script [OPTIONS]
+    -v --verbose Be verbose.
+
+    --rm-rf-target-subdir    Remove the target subdir.
+    --no-rm-rf-target-subdir Do not remove the target subdir. (the default)
+
+    --code-stats     Compute code stats using 'tokei' (cargo install).
+    --no-code-stats  Do not compute code stats. (the default)
+
+    --release        Supply the --release flag to cargo. (the default)
+    --no-release     Do not supply the --release flag to cargo.
+                     Uses the 'test' profile instead.
+
+    --run-ignored-tests     Run the tests marked #[ignore]. (the default)
+    --no-run-ignored-tests  Do not run the tests marked #[ignore].
+
+    --multithread-tests     Run tests multi-threaded.
+    --no-multithread-tests  Run tests single-threaded. (the default)
+
+    --help      Just display this help and exit.
+
+EOD
+}
+
+verbosity=0
+release=1
+run_ignored_tests=1
+multithread_tests=0
+rm_rf_target=0
+code_stats=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -v | --verbose)
+            verbosity=$(( verbosity + 1 ))
+            ;;
+        --rm-rf-target)
+            rm_rf_target=1
+            ;;
+        --release)
+            release=1
+            ;;
+        --no-release)
+            release=0
+            ;;
+        --run-ignored-tests)
+            run_ignored_tests=1
+            ;;
+        --no-run-ignored-tests)
+            run_ignored_tests=0
+            ;;
+        --multithread-tests)
+            multithread_tests=1
+            ;;
+        --no-multithread-tests)
+            multithread_tests=0
+            ;;
+        --code-stats)
+            code_stats=1
+            ;;
+        --no-code-stats)
+            code_stats=0
+            ;;
+        --help)
+            do_help
+            exit 0
+            ;;
+        -?*)
+            ( printf '%s: Unknown option: %s\n' "$this_script" "$1" | cat -t ) >&2
+            exit 85
+            ;;
+        *)
+            ( printf '%s: Unknown arg: %s\n' "$this_script" "$1" | cat -t ) >&2
+            exit 86
+            ;;
+    esac
+    shift
+done
+
+if [ $verbosity -gt 0 ]; then
+    print_effective_args() {
+        printf 'verbosity: %s\n' "$verbosity"
+        printf 'release: %s\n' "$release"
+        printf 'run_ignored_tests: %s\n' "$run_ignored_tests"
+        printf 'rm_rf_target: %s\n' "$rm_rf_target"
+        printf 'multithread_tests: %s\n' "$multithread_tests"
+    }
+    print_effective_args 2>&1 | cat -t
+fi
 
 sed_remove_toplevel_dir='s/[/]eg[/]wt[/]//'
 
@@ -12,6 +106,7 @@ if [ "$?" != 0 ]; then
     echo 'Error: Could not figure git toplevel dir'
     exit 76
 fi
+if [ $verbosity -gt 0 ]; then printf 'toplevel_dir: %s\n' "$toplevel_dir" | cat -t; fi
 
 toplevel_dir="${toplevel_dir:-}"
 printf 'toplevel_dir=%s\n' "$toplevel_dir"
@@ -42,54 +137,117 @@ if ! cd "$toplevel_dir/src"; then
     exit 80
 fi
 
-# profile='test'
-# target_subdir="./target/debug"
-# cargo_profile="--profile=$profile"
-profile='release'
-target_subdir="target/release"
-cargo_profile="--release"
-
-if [ -d "$target_subdir" ]; then
-    if [ "${1:-}" = '--rm-rf-target' ]; then
-        printf '\nrm -rf "%s"\n' "$target_subdir"
-        rm -rf "$target_subdir"
-    else
-        printf 'pwd: %s\n' $(pwd)
-        printf 'Directory exists: %s\n' "$target_subdir"
-        echo 'Run again with the --rm-rf-target flag, or delete it manually.'
-    fi
+if [ $release -gt 0 ]; then
+    profile='release'
+else
+    profile='test'
 fi
 
-if [ -d "$target_subdir" ]; then
-    exit 81
+if [ "$profile" = 'release' ]; then
+    cargo_profile_flag="--release"
+else
+    cargo_profile_flag="--profile=$profile"
+fi
+
+if [ "$profile" = 'test' ]; then
+    target_subdir='target/debug'
+else
+    target_subdir="target/$profile"
 fi
 
 build_info_txt="$build_dir/${profile}-build-info.txt"
 [ -f "$build_info_txt" ] && rm "$build_info_txt"
 
-printf '"%s"\n\n' "$build_info_txt" | tee -a "$build_info_txt"
+print_stuff() {
+    printf 'build_info_txt: %s\n\n' "$build_info_txt"
+    printf 'pwd: %s\n' $(pwd)
+    printf 'code_stats: %s\n' "$code_stats"
+    printf 'profile: %s\n' "$profile"
+    printf 'target_subdir: %s\n' "$target_subdir"
+    printf 'cargo_profile_flag: %s\n' "$cargo_profile_flag"
+    printf 'multithread_tests: %s\n' "$multithread_tests"
+}
+print_stuff | cat -t | tee -a "$build_info_txt"
 
-# man 1 time
-export TIME='\nexit status: %x\n\nelapsed real: %e s\nmax resident: %M KiB\npage faults:  %R'
+
+time=$(which time || true)
+if [ -n "$time" ]; then
+    # man 1 time
+    time="$time"
+    export TIME='\nexit status: %x\n\nelapsed real: %e s\nmax resident: %M KiB\npage faults:  %R'
+else
+    # MinGW doesn't have '/usr/bin/time', but it should still be a POSIX 'sh' builtin
+    time='time'
+fi
+printf '\nusing "time" prefix: %s\n' "$time" | cat -t | tee -a "$build_info_txt"
+
+cargo_features_flags='--no-default-features --features'
+cargo_features_flags="$cargo_features_flags eg-allow-unsafe-code"
+cargo_features_flags="$cargo_features_flags,eg-allow-insecure-deterministic-csprng"
+cargo_features_flags="$cargo_features_flags,eg-allow-test-data-generation"
+cargo_features_flags="$cargo_features_flags,eg-allow-toy-parameters"
+cargo_features_flags="$cargo_features_flags,eg-allow-nonstandard-egds-version"
 
 export CARGO_TERM_COLOR=never
 export RUST_LOG=off
 
-export -p | grep -P '^[^=]*\b(CARGO_TERM_COLOR|RUST_LOG|RUST_LOG_SPAN_EVENTS|TIME)=' | tee -a "$build_info_txt"
+export -p | grep -P '^[^=]*\b(CARGO_TERM_COLOR|RUST_LOG|RUST_LOG_SPAN_EVENTS|TIME)=' | cat -t | tee -a "$build_info_txt"
 
-printf '%s\n' 'unset -v RUST_LOG_SPAN_EVENTS' | tee -a "$build_info_txt"
+printf '%s\n' 'unset -v RUST_LOG_SPAN_EVENTS' | cat -t | tee -a "$build_info_txt"
 unset -v RUST_LOG_SPAN_EVENTS
 
-printf '\n======================== update-features-tree\n' $(pwd) | tee -a "$build_info_txt"
+if [ -e "$target_subdir" ]; then
+    if [ $rm_rf_target -gt 0 ]; then
+        ( set -o xtrace; rm -rf "$target_subdir" ) | cat -t
+    else
+        printf 'Target subdir exists: %s\n' "$target_subdir" | cat -t
+        echo 'Run again with the --rm-rf-target flag, or delete it manually.'
+    fi
+else
+    if [ $verbosity -gt 0 ]; then
+        printf 'Target subdir does not exist: %s\n' "$target_subdir" | cat -t
+    fi
+fi
+
+if [ -d "$target_subdir" ]; then
+    if [ $rm_rf_target -gt 0 ]; then printf '%s: Target subdir still exists: %s\n' "$this_script" "$target_subdir" | cat -t >&2; fi
+    exit 81
+fi
+
+printf '\n======================== update-features-tree\n' $(pwd) | cat -t | tee -a "$build_info_txt"
 echo >>"$build_info_txt"
-printf 'pwd=%s\n' $(pwd) | tee -a "$build_info_txt"
-printf 'target_subdir=%s\n' "$target_subdir" | tee -a "$build_info_txt"
+printf 'pwd=%s\n' $(pwd) | cat -t | tee -a "$build_info_txt"
+printf 'target_subdir=%s\n' "$target_subdir" | cat -t | tee -a "$build_info_txt"
 
 printf '\n======================== [ -f Cargo.lock ] && rm Cargo.lock\n' | tee -a "$build_info_txt"
 if [ -f Cargo.lock ]; then
     echo >>"$build_info_txt"
     printf 'rm Cargo.lock\n' >>"$build_info_txt"
     rm Cargo.lock >>"$build_info_txt" 2>&1
+fi
+
+if [ "$code_stats" != 0 ]; then
+    f="$build_dir/code-stats.txt"
+    printf '\n======================== code stats %s\n\n' "$f" | tee -a "$build_info_txt" >"$f"
+    (
+        cd ..
+        tokei=$(which tokei)
+        if [ -z "${tokei:-}" ] || [ ! -e "$tokei" ]; then
+            printf 'App "tokei" not found on path: %s\n' "${tokei:-}" | cat -t | tee -a "$build_info_txt" "$f" >&2
+            exit 92
+        fi
+        set -- -e build -e src/target
+        { printf 'tokei'
+          printf ' %s' "$@"
+          printf '\n'
+        } | cat -t | tee -a "$f" "$build_info_txt"
+         "$tokei" "$@" | cat -t | tee -a "$f" "$build_info_txt"
+    )
+    tokei_exit_code=$?
+    if [ "$tokei_exit_code" != 0 ]; then
+        printf 'tokei exited with code: %d\n' "$tokei_exit_code" | cat -t | tee -a "$build_info_txt" "$f" >&2
+        exit 93
+    fi
 fi
 
 printf '\n======================== cargo version -vv\n' | tee -a "$build_info_txt"
@@ -100,62 +258,56 @@ printf '\n======================== rustc --version -v\n' | tee -a "$build_info_t
 echo >>"$build_info_txt"
 rustc --version -v >>"$build_info_txt" 2>&1
 
-printf '\n======================== cargo update\n' | tee -a "$build_info_txt"
-echo >>"$build_info_txt"
-$(which time) cargo update >>"$build_info_txt" 2>&1
+printf '\n======================== cargo build %s %s --all-targets\n\n' "$cargo_profile_flag" "$cargo_features_flags" | tee -a "$build_info_txt"
+$time cargo build "$cargo_profile_flag" $cargo_features_flags --all-targets 2>&1 | cat -t | tee -a "$build_info_txt"
 
 printf '\n======================== cargo tree ...\n' | tee -a "$build_info_txt"
 
 cargo_tree_fmt="{p} {f}"
 
 f="$build_dir/${profile}-cargo-tree-normal.txt"
-printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 [ -f "$f" ] && rm "$f"
-printf 'cargo tree --offline -e normal -f "%s"\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+printf 'cargo tree --offline %s -e normal -f "%s"\n' "$cargo_features_flags" "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
 echo >>"$f"
-cargo tree --offline -e normal -f "$cargo_tree_fmt" >>"$f" 2>&1
+cargo tree --offline $cargo_features_flags -e normal -f "$cargo_tree_fmt" >>"$f" 2>&1
 
 f="$build_dir/${profile}-cargo-tree-normal-dups.txt"
-printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 [ -f "$f" ] && rm "$f"
-printf 'cargo tree --offline -e normal -f "%s" --duplicates\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+printf 'cargo tree --offline %s -e normal -f "%s" --duplicates\n' "$cargo_features_flags" "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
 echo >>"$f"
-cargo tree --offline -e normal -f "$cargo_tree_fmt" --duplicates >>"$f" 2>&1
+cargo tree --offline $cargo_features_flags -e normal -f "$cargo_tree_fmt" --duplicates >>"$f" 2>&1
 
 f="$build_dir/${profile}-cargo-tree-normal-list.txt"
-printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 [ -f "$f" ] && rm "$f"
-printf 'cargo tree --offline -e normal -f "%s" --prefix none --no-dedupe | sort --unique\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+printf 'cargo tree --offline %s -e normal -f "%s" --prefix none --no-dedupe | sort --unique\n' "$cargo_features_flags" "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
 echo >>"$f"
-( cargo tree --offline -e normal -f "$cargo_tree_fmt" --prefix none --no-dedupe | sort --unique ) >>"$f" 2>&1
+( cargo tree --offline $cargo_features_flags -e normal -f "$cargo_tree_fmt" --prefix none --no-dedupe | sort --unique ) >>"$f" 2>&1
 
 f="$build_dir/${profile}-cargo-tree-features.txt"
-printf '\n-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
+printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 [ -f "$f" ] && rm "$f"
-printf 'cargo tree --offline -e features -f "%s"\n' "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
+printf 'cargo tree --offline %s -e features -f "%s"\n' "$cargo_features_flags" "$cargo_tree_fmt" | cat -t | tee -a "$build_info_txt" "$f"
 echo >>"$f"
-cargo tree --offline -e features -f "$cargo_tree_fmt" >>"$f" 2>&1
+cargo tree --offline $cargo_features_flags -e features -f "$cargo_tree_fmt" >>"$f" 2>&1
 
 unset -v f cargo_tree_fmt
 
-#=============================================================== cargo build
-
-printf '\n======================== cargo build --offline %s --all-targets\n\n' "$cargo_profile" | tee -a "$build_info_txt"
-$(which time) cargo build --offline "$cargo_profile" --all-targets >>"$build_info_txt" 2>&1
-
-printf '\n======================== du -sh "%s"\n\n' "$target_subdir" | tee -a "$build_info_txt"
+printf '\n======================== du -sh "%s"\n\n' "$target_subdir" | cat -t | tee -a "$build_info_txt"
 du -sh "$target_subdir" 2>&1 | expand >>"$build_info_txt"
 
-printf '\n======================== ls -Aq1 -s --kibibytes "%s"\n\n' "$target_subdir" | tee -a "$build_info_txt"
+printf '\n======================== ls -Aq1 -s --kibibytes "%s"\n\n' "$target_subdir" | cat -t | tee -a "$build_info_txt"
 ls -Aq1 -s --kibibytes "$target_subdir" >>"$build_info_txt" 2>&1
 
-printf '\n======================== du -sh "%s"\n\n' "$target_subdir/*" | tee -a "$build_info_txt"
+printf '\n======================== du -sh "%s"\n\n' "$target_subdir/*" | cat -t | tee -a "$build_info_txt"
 du -sh "$target_subdir"/* 2>&1 | expand >>"$build_info_txt"
 
-printf '\n======================== du -sh "%s"\n\n' "$target_subdir/deps" | tee -a "$build_info_txt"
+printf '\n======================== du -sh "%s"\n\n' "$target_subdir/deps" | cat -t | tee -a "$build_info_txt"
 du -sh "$target_subdir/deps" 2>&1 | expand >>"$build_info_txt"
 
-printf '\n======================== ls -SAq1 -s --kibibytes "%s" | head -n 20\n\n' "$target_subdir/deps" | tee -a "$build_info_txt"
+printf '\n======================== ls -SAq1 -s --kibibytes "%s" | head -n 20\n\n' "$target_subdir/deps" | cat -t | tee -a "$build_info_txt"
 ls -SAq1 -s --kibibytes "$target_subdir/deps" | head -n 20 >>"$build_info_txt" 2>&1
 
 printf '\n[done]\n' | tee -a "$build_info_txt"
@@ -163,30 +315,61 @@ printf '\n[done]\n' | tee -a "$build_info_txt"
 #=============================================================== test
 
 f="$build_dir/${profile}-cargo-test.txt"
-printf '\n======================== %s\n\n' "$f" | tee -a "$build_info_txt"
 [ -f "$f" ] && rm "$f"
 
-set +o errexit
+cargo_test3() {
+    if [ $multithread_tests -gt 0 ]; then
+        cargo_test_threads_arg=''
+    else
+        cargo_test_threads_arg='--test-threads=1'
+    fi
+    ( set +o errexit
+      printf '\n'
+      set -o xtrace
+      $time cargo test "$cargo_profile_flag" $cargo_features_flags -- $cargo_test_threads_arg $cargo_test_ignored_flag
+    ) 2>&1
+    printf '\ncargo test exit code: %d\n' $?
+}
+cargo_test2() {
+    cargo_test3 \
+    | cat -t \
+    | tee -a "$f"
+}
+cargo_test() {
+    printf '\n======================== cargo test%s  [%s]\n\n' "$cargo_test_ignored_flag" "$f" | cat -t | tee -a "$build_info_txt"
 
-printf 'cargo test %s -- --test-threads=1\n' "$cargo_profile" | tee -a "$build_info_txt" "$f"
-$(which time) cargo test "$cargo_profile" -- --test-threads=1 >>"$build_info_txt" 2>&1
+    cargo_test2 \
+    | grep -P '((?:^\s*test\s+\S)|(?:cargo\s+test)|(?:exit\s+code)|(?:Running)|(?:elapsed\s+real:)|(?:max\s+resident:)|(?:page\s+faults:))' \
+    | grep -vP '^\s*test\s+\S.+?\s+[.]{3}\s+ignored\s*$' \
+    | tee -a "$build_info_txt"
+}
 
-printf '\ncargo test exit code: %d\n' $? | tee -a "$build_info_txt" "$f"
+cargo_test_ignored_flag=''
+cargo_test
+
+if [ $run_ignored_tests -gt 0 ]; then
+    cargo_test_ignored_flag=' --ignored'
+    cargo_test
+else
+    printf '\n[SKIPPING] cargo test ... -- --ignored ...\n' "$cargo_profile_flag" "$cargo_features_flags" | cat -t | tee -a "$build_info_txt" "$f"
+fi
+
+( printf '\nOverall...\n'
+    grep -P 'passed;' "$f" | grep -vP '\s+0\s+passed;\s+0\s+failed;'
+) | cat -t | tee -a "$build_info_txt"
 
 unset -v f
 
-set -o errexit
+#=============================================================== fix whitespace
 
-#===============================================================
-
-printf '\n======================== fixing whitespace\n' | tee -a "$build_info_txt"
+printf '\n======================== fixing whitespace\n' | cat -t | tee -a "$build_info_txt"
 if ! cd "$build_dir"; then
     printf '\nError: Could not cd to: %s\n' "$build_dir"
     exit 82
 fi
-printf '\n%s\n\n' 'find . type -f -execdir sed -i "s/\s*$//" \{\} \;' | tee -a "$build_info_txt"
+printf '\n%s\n\n' 'find . type -f -execdir sed -i "s/\s*$//" \{\} \;' | cat -t | tee -a "$build_info_txt"
 find . -type f -execdir sed -i 's/\s*$//' \{\} \;
 
 find . -type f -execdir sed -i "$sed_remove_toplevel_dir" \{\} \;
 
-printf '[done]\n' | tee -a "$build_info_txt"
+printf '[done]\n' | cat -t | tee -a "$build_info_txt"

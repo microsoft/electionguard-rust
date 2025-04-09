@@ -152,8 +152,8 @@ mod t {
     use anyhow::{Context, Result, anyhow, bail, ensure};
     use insta::assert_snapshot;
 
-    #[test]
-    fn t0() {
+    #[test_log::test]
+    fn t1() {
         use ElectionGuard_DesignSpecification_Version_Qualifier::*;
         assert_snapshot!(Released_Specification_Version, @"released specification version");
 
@@ -161,16 +161,16 @@ mod t {
         assert_snapshot!(Nonstandard_Specification(nonstandard_specification_string), @r###"NONSTANDARD specification "xyz""###);
     }
 
-    #[test]
-    fn t1() {
+    #[test_log::test]
+    fn t2() {
         use ElectionGuard_FixedParameters_Kind::*;
         assert_snapshot!(Standard_Parameters, @"standard parameters");
         assert_snapshot!(Nonstandard_Parameters, @"NONSTANDARD parameters");
         assert_snapshot!(Toy_Parameters, @"TOY parameters FOR TESTING ONLY");
     }
 
-    #[test]
-    fn t2() {
+    #[test_log::test]
+    fn t3() {
         let egdsv = ElectionGuard_DesignSpecification_Version {
             version_number: [1234, 56789],
             qualifier:

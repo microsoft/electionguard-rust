@@ -55,7 +55,7 @@ impl Subcommand for GenerateRandomVoterSelections {
             .ballot_styles()
             .random_index(eg.csrng())
             .ok_or_else(|| anyhow!("No ballot styles in election manifest."))?;
-        eprintln!("Using Ballot Style {ballot_style_ix}");
+        println!("Using Ballot Style {ballot_style_ix}");
 
         let voter_selection_data_plaintext =
             VoterSelectionsPlaintext::new_generate_random_selections(
@@ -76,7 +76,7 @@ impl Subcommand for GenerateRandomVoterSelections {
 
         drop(stdiowrite);
 
-        eprintln!("Wrote random voter selections to: {}", path.display());
+        println!("Wrote random voter selections to: {}", path.display());
 
         Ok(())
         // */

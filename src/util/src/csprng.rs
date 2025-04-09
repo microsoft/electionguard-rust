@@ -220,9 +220,9 @@ impl Csprng {
         // Start with the width in bits of the underlying permutation.
         let bits = Self::permutation_bits();
         // Add ceil(bits * 1/8), or at least 200 bits.
-        let bits = bits + const_max_usize(&[200, (bits + 7) / 8]);
+        let bits = bits + const_max_usize(&[200, bits.div_ceil(8)]);
         // Ensure is a multiple of 128 and at least 512.
-        let bits = const_max_usize(&[512, ((bits + 127) / 128) * 128]);
+        let bits = const_max_usize(&[512, bits.next_multiple_of(128)]);
         // Convert to bytes.
         bits / 8
     }
@@ -345,7 +345,7 @@ impl Csprng {
     fn next_biguint_impl(&mut self, bits: NonZeroUsize, set_high_bit: bool) -> BigUint {
         let bits: usize = bits.get();
 
-        let cnt_bytes = (bits + 7) / 8;
+        let cnt_bytes = bits.div_ceil(8);
         let mut buf = vec![0; cnt_bytes];
         self.fill_buf(buf.as_mut_slice());
 
