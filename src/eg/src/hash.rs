@@ -12,13 +12,16 @@ use anyhow::{Context, Result, anyhow};
 use digest::{FixedOutput, Update};
 use hmac::{Hmac, Mac};
 use util::{
-    algebra::{FieldElement, ScalarField},
     array_ascii::ArrayAscii,
     csrng::{Csrng, CsrngOps},
 };
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{errors::EgError, serializable::SerializableCanonical};
+use crate::{
+    algebra::{FieldElement, ScalarField},
+    errors::EgError,
+    serializable::SerializableCanonical,
+};
 
 type HmacSha256 = Hmac<sha2::Sha256>;
 
@@ -528,7 +531,7 @@ where
     HValue::from(aby32)
 }
 
-/// Identical to `H` but separate to follow the specification used for [`crate::guardian_share::GuardianEncryptedShare`]
+/// Identical to `H` but separate to follow the specification used for [`crate::interguardian_share::InterguardianShare`]
 pub fn eg_hmac(key: &HValue, data: &dyn AsRef<[u8]>) -> HValue {
     // `unwrap()` is justified here because `HmacSha256::new_from_slice()` seems
     // to only fail on slice of incorrect size.

@@ -141,7 +141,10 @@ mod t {
     use strum::VariantNames;
 
     use super::*;
-    use crate::guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPurpose};
+    use crate::{
+        guardian::GuardianIndex,
+        key::{AsymmetricKeyPart, KeyPurpose},
+    };
 
     #[test_log::test]
     fn t1() {

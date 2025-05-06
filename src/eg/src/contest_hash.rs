@@ -18,7 +18,8 @@ use tracing::{
 use crate::{
     ballot::HValue_H_I,
     ciphertext::Ciphertext,
-    election_manifest::ContestIndex,
+    contest::ContestIndex,
+    fixed_parameters::{FixedParametersTrait, FixedParametersTraitExt},
     hash::{HValue, eg_h},
     pre_voting_data::PreVotingData,
 };

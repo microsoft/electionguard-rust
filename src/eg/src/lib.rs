@@ -56,16 +56,34 @@
 //!
 //! - [VerifiableDecryption](crate::verifiable_decryption::VerifiableDecryption) A decrypted plain-text with a [proof of correct decryption](crate::verifiable_decryption::DecryptionProof)
 
+// There's [an issue](https://github.com/rust-lang/rust/issues/46991) that causes unimplemented
+// serde::Serialize/Deserialize traits to be reported in whatever namespace path that happens
+// to use the derive macro first. Using them here once for a trivial struct ensures they're
+// reported in a less confusing way.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct _WorkaroundPleaseIgnore;
+
+pub mod algebra;
+pub mod algebra_utils;
 pub mod ballot;
 pub mod ballot_scaled;
 pub mod ballot_style;
 pub mod chaining_mode;
 pub mod ciphertext;
+pub mod contest;
+pub mod contest_data_fields;
 pub mod contest_data_fields_ciphertexts;
 pub mod contest_data_fields_plaintexts;
 pub mod contest_data_fields_tallies;
 pub mod contest_hash;
+pub mod contest_option;
 pub mod contest_option_fields;
+
+// This is just a template to copy-and-paste to get started with new EDO types.
+// It's enabled in test builds just to verify that it compiles.
+#[cfg(any(feature = "eg-allow-test-data-generation", test))]
+pub mod edo_template;
+
 pub mod eg;
 pub mod eg_config;
 pub mod egds_version;
@@ -75,8 +93,6 @@ pub mod election_parameters;
 pub mod election_record;
 pub mod election_tallies;
 pub mod errors;
-#[cfg(any(feature = "eg-allow-test-data-generation", test))]
-pub mod example_election_manifest;
 #[cfg(any(feature = "eg-allow-test-data-generation", test))]
 pub mod example_election_parameters;
 #[cfg(any(feature = "eg-allow-test-data-generation", test))]
@@ -88,14 +104,19 @@ pub mod guardian_coeff_proof;
 pub mod guardian_public_key;
 pub mod guardian_public_key_trait;
 pub mod guardian_secret_key;
-pub mod guardian_share;
 pub mod hash;
 pub mod hashes;
 pub mod ident;
+pub mod interguardian_share;
 pub mod joint_public_key;
+pub mod key;
+pub mod label;
 pub mod loadable;
 pub mod nonce;
+#[macro_use]
+pub mod macros;
 pub mod pre_voting_data;
+pub mod preencrypted_ballots;
 pub mod resource;
 pub mod resource_category;
 pub mod resource_id;
@@ -116,8 +137,11 @@ pub mod resourceproducer_slicebytesfromvalidated;
 pub mod resourceproducer_specific;
 pub mod resourceproducer_validatetoedo;
 pub mod resources;
+pub mod secret_coefficient;
+pub mod secret_coefficients;
 pub mod selection_limits;
 pub mod serializable;
+#[macro_use]
 pub mod standard_parameters;
 pub mod tally_ballots;
 pub mod validatable;
@@ -127,395 +151,180 @@ pub mod voter_selections_plaintext;
 pub mod voting_device;
 pub mod zk;
 
+use cfg_if::cfg_if;
+
+#[rustfmt::skip]
 static_assertions::assert_cfg!(
-    not(all(
-        feature = "eg-allow-insecure-deterministic-csprng",
-        feature = "eg-forbid-insecure-deterministic-csprng"
-    )),
+    not( all( feature = "eg-allow-insecure-deterministic-csprng",
+              feature = "eg-forbid-insecure-deterministic-csprng" ) ),
     r##"Can't have both features `eg-allow-insecure-deterministic-csprng` and
  `eg-forbid-insecure-deterministic-csprng` active at the same time. You may need
  to specify `default-features = false, features = [\"only\",\"specifically\",\"desired\",\"features\"]`
- in `Cargo.toml`, and/or `--no-default-features --features only,the,specifically,desired,features`
+ in `Cargo.toml`, and/or `--no-default-features --features only,specifically,desired,features`
  on the cargo command line. In VSCode, configure the `rust-analyzer.cargo.noDefaultFeatures` and
  `rust-analyzer.cargo.features` settings."##
 );
 
+#[rustfmt::skip]
 static_assertions::assert_cfg!(
-    not(all(
-        feature = "eg-allow-test-data-generation",
-        feature = "eg-forbid-test-data-generation"
-    )),
+    not( all( feature = "eg-allow-test-data-generation",
+              feature = "eg-forbid-test-data-generation" ) ),
     r##"Can't have both features `eg-allow-test-data-generation` and
  `eg-forbid-test-data-generation` active at the same time. You may need
  to specify `default-features = false, features = [\"only\",\"specifically\",\"desired\",\"features\"]`
- in `Cargo.toml`, and/or `--no-default-features --features only,the,specifically,desired,features`
+ in `Cargo.toml`, and/or `--no-default-features --features only,specifically,desired,features`
  on the cargo command line. In VSCode, configure the `rust-analyzer.cargo.noDefaultFeatures` and
  `rust-analyzer.cargo.features` settings."##
 );
 
-static_assertions::assert_cfg!(
-    not(all(
-        feature = "eg-allow-toy-parameters",
-        feature = "eg-forbid-toy-parameters"
-    )),
-    r##"Can't have both features `eg-allow-toy-parameters` and
- `eg-forbid-toy-parameters` active at the same time. You may need
- to specify `default-features = false, features = [\"only\",\"specifically\",\"desired\",\"features\"]`
- in `Cargo.toml`, and/or `--no-default-features --features only,the,specifically,desired,features`
- on the cargo command line. In VSCode, configure the `rust-analyzer.cargo.noDefaultFeatures` and
+#[rustfmt::skip]
+static_assertions::assert_cfg!( not( any(
+    all( feature =      "eg-forbid-reduced-params",
+         any( feature = "eg-use-toy-params-q7p16",
+              feature = "eg-use-toy-params-q16p32",
+              feature = "eg-use-toy-params-q16p48",
+              feature = "eg-use-toy-params-q24p64",
+              feature = "eg-use-toy-params-q32p96",
+              feature = "eg-use-toy-params-q32p128",
+              feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q7p16",
+         any( feature = "eg-use-toy-params-q16p32",
+              feature = "eg-use-toy-params-q16p48",
+              feature = "eg-use-toy-params-q24p64",
+              feature = "eg-use-toy-params-q32p96",
+              feature = "eg-use-toy-params-q32p128",
+              feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q16p32",
+         any( feature = "eg-use-toy-params-q16p48",
+              feature = "eg-use-toy-params-q24p64",
+              feature = "eg-use-toy-params-q32p96",
+              feature = "eg-use-toy-params-q32p128",
+              feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q16p48",
+         any( feature = "eg-use-toy-params-q24p64",
+              feature = "eg-use-toy-params-q32p96",
+              feature = "eg-use-toy-params-q32p128",
+              feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q24p64",
+         any( feature = "eg-use-toy-params-q32p96",
+              feature = "eg-use-toy-params-q32p128",
+              feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q32p96",
+         any( feature = "eg-use-toy-params-q32p128",
+              feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q32p128",
+         any( feature = "eg-use-toy-params-q48p192",
+              feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q48p192",
+         any( feature = "eg-use-toy-params-q64p256",
+              feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-toy-params-q64p256",
+         any( feature = "eg-use-reduced-params-q256p3072",
+              feature = "eg-use-standard-params-256q4096p" ) ),
+    all( feature =      "eg-use-reduced-params-q256p3072",
+         any( feature = "eg-use-standard-params-256q4096p" ) ),
+    ) ),
+    r##"Can't have multiple features `eg-forbid-reduced-params` and any `eg-use-(toy|reduced)-params-*`
+ active at the same time. You may need to specify `default-features = false,
+ features = [\"only\",\"specifically\",\"desired\",\"features\"]` in `Cargo.toml`, and/or
+ `--no-default-features --features only,specifically,desired,features` on the cargo command
+ line. In VSCode, configure the `rust-analyzer.cargo.noDefaultFeatures` and
  `rust-analyzer.cargo.features` settings."##
 );
 
+#[rustfmt::skip]
 static_assertions::assert_cfg!(
-    not(all(
-        feature = "eg-allow-nonstandard-egds-version",
-        feature = "eg-forbid-nonstandard-egds-version"
-    )),
+    not( all( feature = "eg-allow-nonstandard-egds-version",
+              feature = "eg-forbid-nonstandard-egds-version" ) ),
     r##"Can't have both features `eg-allow-nonstandard-egds-version` and
  `eg-forbid-nonstandard-egds-version` active at the same time. You may need
  to specify `default-features = false, features = [\"only\",\"specifically\",\"desired\",\"features\"]`
- in `Cargo.toml`, and/or `--no-default-features --features only,the,specifically,desired,features`
+ in `Cargo.toml`, and/or `--no-default-features --features only,specifically,desired,features`
  on the cargo command line. In VSCode, configure the `rust-analyzer.cargo.noDefaultFeatures` and
  `rust-analyzer.cargo.features` settings."##
 );
 
+#[rustfmt::skip]
+static_assertions::assert_cfg!(
+    not( all( feature = "eg-allow-unsafe-code",
+              feature = "eg-forbid-unsafe-code" ) ),
+    r##"Can't have both features `eg-allow-unsafe-code` and `eg-forbid-unsafe-code` active at the
+ same time. You may need to specify `default-features = false, features =
+ [\"only\",\"specifically\",\"desired\",\"features\"]` in `Cargo.toml`, and/or
+ `--no-default-features --features only,specifically,desired,features` on the cargo command
+ line. In VSCode, configure the `rust-analyzer.cargo.noDefaultFeatures` and
+ `rust-analyzer.cargo.features` settings."##
+);
+
+cfg_if! {
+    if #[cfg( any(
+        feature = "eg-use-toy-params-q7p16",
+        feature = "eg-use-toy-params-q16p32",
+        feature = "eg-use-toy-params-q16p48",
+        feature = "eg-use-toy-params-q24p64",
+        feature = "eg-use-toy-params-q32p96",
+        feature = "eg-use-toy-params-q32p128",
+        feature = "eg-use-toy-params-q48p192",
+        feature = "eg-use-toy-params-q64p256" ) )]
+    {
+        static FIXEDPARAMETERS_KIND: crate::egds_version::ElectionGuard_FixedParameters_Kind =
+            crate::egds_version::ElectionGuard_FixedParameters_Kind::Toy_Parameters;
+    }
+    else if #[cfg( feature = "eg-use-reduced-params-q256p3072" )]
+    {
+        static FIXEDPARAMETERS_KIND: crate::egds_version::ElectionGuard_FixedParameters_Kind =
+            crate::egds_version::ElectionGuard_FixedParameters_Kind::Reduced_Security_Parameters;
+    }
+    else {
+        use static_assertions::const_assert_eq;
+
+        const_assert_eq!(cfg_parameter!(q_bits_total), 256);
+        const_assert_eq!(cfg_parameter!(p_bits_total), 4096);
+
+        static FIXEDPARAMETERS_KIND: crate::egds_version::ElectionGuard_FixedParameters_Kind =
+            crate::egds_version::ElectionGuard_FixedParameters_Kind::Standard_Parameters;
+    }
+}
+
+/// The version of the ElectionGuard Design Specification implemented by this code.
+pub static EGDS_VERSION: &crate::egds_version::ElectionGuard_DesignSpecification_Version =
+    &crate::egds_version::ElectionGuard_DesignSpecification_Version {
+        version_number: [2, 1],
+        qualifier: crate::egds_version::ElectionGuard_DesignSpecification_Version_Qualifier::Released_Specification_Version,
+        fixed_parameters_kind: FIXEDPARAMETERS_KIND,
+    };
+
+/*
 /// The version of the ElectionGuard Design Specification implemented by this code.
 pub static EGDS_RELEASED_V2_1_WITH_STANDARD_PARAMS: crate::egds_version::ElectionGuard_DesignSpecification_Version =
     crate::egds_version::ElectionGuard_DesignSpecification_Version {
         version_number: [2, 1],
         qualifier: crate::egds_version::ElectionGuard_DesignSpecification_Version_Qualifier::Released_Specification_Version,
-        fixed_parameters_kind: crate::egds_version::ElectionGuard_FixedParameters_Kind::Standard_Parameters,
+        fixed_parameters_kind: ,
     };
 
 /// The version of the ElectionGuard Design Specification implemented by this code.
 pub static EGDS_VERSION: &crate::egds_version::ElectionGuard_DesignSpecification_Version =
     &EGDS_RELEASED_V2_1_WITH_STANDARD_PARAMS;
-
-/// Implements [`KnowsFriendlyTypeName`](crate::loadable::KnowsFriendlyTypeName).
-#[macro_export]
-macro_rules! impl_knows_friendly_type_name {
-    { $src:ident } => {
-        impl $crate::loadable::KnowsFriendlyTypeName for $src {
-            fn friendly_type_name() -> std::borrow::Cow<'static, str> {
-                std::stringify!($src).into()
-            }
-        }
-    };
-}
-
-/// Implements [`MayBeValidatableUnsized`](crate::validatable::MayBeValidatableUnsized) for types that do not
-/// implement [`ValidatableUnsized`](crate::validatable::ValidatableUnsized) (which has a blanket implementation).
-#[macro_export]
-macro_rules! impl_MayBeValidatableUnsized_for_non_ValidatableUnsized {
-    { $src:ident } => {
-        impl $crate::validatable::MayBeValidatableUnsized for $src {
-            fn opt_as_validatableunsized(&self) -> Option<&dyn $crate::validatable::ValidatableUnsized> {
-                None
-            }
-        }
-    };
-}
-
-/// Implements [`MayBeResource`](crate::resource::MayBeResource) for types that do not
-/// implement [`Resource`](crate::resource::Resource) (which has a blanket implementation).
-#[macro_export]
-macro_rules! impl_MayBeResource_for_non_Resource {
-    { $src:ident } => {
-        impl $crate::resource::MayBeResource for $src {
-            fn opt_as_resource(&self) -> Option<&dyn $crate::resource::Resource> {
-                None
-            }
-            fn opt_as_resource_mut(&mut self) -> Option<&mut dyn $crate::resource::Resource> {
-                None
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_Resource_for_simple_ResourceId_type {
-    { $resource_type:path, $resource_id:ident, $resource_fmt:ident } => {
-        impl $crate::resource::HasStaticResourceIdFormat for $resource_type {
-            fn static_ridfmt(&self) -> &'static $crate::resource::ResourceIdFormat {
-                static RIDFMT: $crate::resource::ResourceIdFormat = $crate::resource::ResourceIdFormat {
-                    rid: $crate::resource::ResourceId::$resource_id,
-                    fmt: $crate::resource::ResourceFormat::$resource_fmt,
-                };
-                &RIDFMT
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! impl_Resource_for_simple_ElectionDataObjectId_type {
-    { $concrete_dr_type:path, $edoid:ident, $memfn:ident } => {
-        impl $crate::resource::HasStaticResourceIdFormat for $concrete_dr_type {
-            fn static_ridfmt(&self) -> &'static $crate::resource::ResourceIdFormat {
-                static RIDFMT: $crate::resource::ResourceIdFormat =
-                $crate::resource::ElectionDataObjectId::$edoid.$memfn();
-                &RIDFMT
-            }
-        }
-    };
-}
-
-/// Implements [`Resource`](crate::resource::Resource) for
-/// [`Validatable`](crate::validatable::Validatable) but non-[`Validated`](crate::validatable::Validated)
-/// "Info" types having simple
-/// [`ResourceId`s](crate::resource::ResourceId) which
-/// implement [`HasStaticResourceIdFormat`](crate::resource::HasStaticResourceIdFormat)
-#[macro_export]
-macro_rules! impl_Resource_for_simple_ElectionDataObjectId_info_type {
-    { $concrete_dr_type:path, $edoid:ident } => {
-        $crate::impl_Resource_for_simple_ElectionDataObjectId_type! { $concrete_dr_type, $edoid, info_type_ridfmt }
-    };
-}
-
-/// Implements [`Resource`](crate::resource::Resource) for
-/// [`Validated`](crate::validatable::Validated) (non "Info") types having simple
-/// [`ResourceId`s](crate::resource::ResourceId) which
-/// implement [`HasStaticResourceIdFormat`](crate::resource::HasStaticResourceIdFormat)
-#[macro_export]
-macro_rules! impl_Resource_for_simple_ElectionDataObjectId_validated_type {
-    { $concrete_dr_type:path, $edoid:ident } => {
-        $crate::impl_Resource_for_simple_ElectionDataObjectId_type! { $concrete_dr_type, $edoid, validated_type_ridfmt }
-    };
-}
-
-/// Implements [`Validatable`](crate::validatable::Validatable) and
-/// [`Validated`](crate::validatable::Validated).
-///
-/// This macro encloses the function body which attempts to converts the `src` type to the
-/// validated type or return a validation error.
-///
-/// See examples for use.
-#[macro_export]
-macro_rules! impl_validatable_validated {
-    // No version specifier implies version 1
-    { $src:ident : $t_validatable:path, $eg:ident => EgResult< $t_validated:path > { $( $guts:tt )* } } => {
-        $crate::impl_validatable_validated! {
-            version_1 : $src : $t_validatable, $eg => EgResult< $t_validated > { $( $guts )* } }
-    };
-
-    // Version 1 specified
-    { version_1 : $src:ident : $t_validatable:path, $eg:ident => EgResult< $t_validated:path > { $( $guts:tt )* } } => {
-        $crate::impl_validatable_validated! {
-            @common_version_1_2 : $src : $t_validatable, $eg => EgResult< $t_validated > { $( $guts )* } }
-
-        #[async_trait::async_trait(?Send)]
-        impl $crate::validatable::Validated for $t_validated {
-            type ValidatedFrom = $t_validatable;
-
-            /*#[allow(unused_variables)]
-            #[allow(unused_imports)]
-            async fn try_validate_from_async(
-                $src: Self::ValidatedFrom,
-                $eg: & $crate::eg::Eg,
-            ) -> $crate::errors::EgResult<$t_validated> {
-                static SPAN_NAME: &str = std::concat!(std::stringify!($t_validated), "::try_validate_from_async");
-                let span = tracing::trace_span!(SPAN_NAME);
-                let _enter_span = span.enter();
-
-                Self::try_validate_from_async_impl_($src, $eg).await
-            }
-
-            #[allow(unused_variables)]
-            #[allow(unused_imports)]
-            fn try_validate_from(
-                $src: Self::ValidatedFrom,
-                $eg: & $crate::eg::Eg,
-            ) -> $crate::errors::EgResult<$t_validated> {
-                static SPAN_NAME: &str = std::concat!(std::stringify!($t_validated), "::try_validate_from");
-                let span = tracing::trace_span!(SPAN_NAME);
-                let _enter_span = span.enter();
-
-                async_global_executor::block_on(Self::try_validate_from_async_impl_($src, $eg))
-            }
-            // */
-
-            #[allow(unused_variables)]
-            #[allow(unused_imports)]
-            async fn try_validate_from_async_impl_(
-                $eg: &(dyn $crate::resource::ProduceResource + Send + Sync + 'static),
-                $src: Self::ValidatedFrom,
-            ) -> $crate::errors::EgResult<$t_validated> {
-                use $crate::{
-                    resource::{ProduceResource,ProduceResourceExt},
-                    validatable::*
-                };
-                $( $guts )*
-            }
-        }
-    };
-
-    // Version 2 specified
-    { version_2: $src:ident : $t_validatable:path, $eg:ident => EgResult< $t_validated:path > { $( $guts:tt )* } } => {
-        $crate::impl_validatable_validated! {
-            @common_version_1_2 : $src : $t_validatable, $eg => EgResult< $t_validated > { $( $guts )* } }
-
-        #[async_trait::async_trait(?Send)]
-        impl $crate::validatable::Validated for $t_validated {
-            type ValidatedFrom = $t_validatable;
-
-            /*
-            #[allow(unused_variables)]
-            #[allow(unused_imports)]
-            async fn try_validate_from_async(
-                $src: Self::ValidatedFrom,
-                $eg: & $crate::eg::Eg,
-            ) -> $crate::errors::EgResult<$t_validated> {
-                static SPAN_NAME: &str = std::concat!(std::stringify!($t_validated), "::try_validate_from_async");
-                let span = tracing::trace_span!(SPAN_NAME);
-                let _enter_span = span.enter();
-
-                use $crate::validatable::*;
-                $( $guts )*
-            }
-            // */
-
-            #[allow(unused_variables)]
-            #[allow(unused_imports)]
-            async fn try_validate_from_async_impl_(
-                $eg: &(dyn $crate::resource::ProduceResource + Send + Sync + 'static),
-                $src: Self::ValidatedFrom,
-            ) -> $crate::errors::EgResult<$t_validated> {
-                use $crate::{
-                    resource::{ProduceResource,ProduceResourceExt},
-                    validatable::*
-                };
-                $( $guts )*
-            }
-        }
-    };
-
-    { @common_version_1_2 : $src:ident : $t_validatable:path, $eg:ident => EgResult< $t_validated:path > { $( $guts:tt )* } } => {
-        #[async_trait::async_trait(?Send)]
-        /*
-        impl $crate::validatable::ValidatableUnsized for $t_validatable {
-            async fn arc_validate_into_rc(
-                self: std::sync::Arc<Self>,
-                $eg: & $crate::eg::Eg,
-            ) -> $crate::errors::EgResult<std::sync::Arc<dyn $crate::validatable::ValidatedUnsized>> {
-                use std::sync::Arc;
-
-                static SPAN_NAME: &str = std::concat!(std::stringify!($t_validated), "::arc_validate_into_rc");
-                let span = tracing::trace_span!(SPAN_NAME);
-                let _enter_span = span.enter();
-
-                let src = Arc::unwrap_or_clone(self);
-                let validated = <$t_validated as $crate::validatable::Validated>::try_validate_from_async_impl_(src, $eg).await?;
-                let arc_dyn: Arc::<dyn $crate::validatable::ValidatedUnsized + '_> = Arc::new(validated);
-                Ok(arc_dyn)
-            }
-        }
-
-        /*
-        impl $crate::validatable::MayBeValidatableUnsized for $t_validatable {
-            fn opt_as_validatableunsized(&self) -> Option<&dyn $crate::validatable::ValidatableUnsized> {
-                Some(self)
-            }
-        }
-        // */
-
-        impl $crate::validatable::ValidatedUnsized for $t_validated  {
-        }
-
-        impl $crate::validatable::MayBeValidatableUnsized for $t_validated {
-            fn opt_as_validatableunsized(&self) -> Option<&dyn $crate::validatable::ValidatableUnsized> {
-                None
-            }
-        }
-        // */
-
-        impl $crate::validatable::Validatable for $t_validatable {
-            type ValidatedInto = $t_validated;
-        }
-
-        impl $crate::validatable::Validatable for $t_validated {
-            type ValidatedInto = $t_validated;
-        }
-    };
-
-    /*
-    /// Use this form when `Validatable` (_info) type implements HasStaticResourceIdFormat and Resource.
-    ///
-    /// It will register resource creation
-    {
-        $gather_rpspecific_registrations_fn:ident,
-        $resource_id:expr,
-        $src:ident : $t_validatable:path, $eg:ident => EgResult< $t_validated:path > { $( $guts:tt )* }
-    } => {
-        $crate::impl_validatable_validated! {
-            $src : $t_validatable, $eg => EgResult<$t_validated>
-        }
-
-        fn $gather_rpspecific_registrations_fn(
-            register_fn: &mut dyn FnMut($crate::resource_producer_registry::RPFnRegistration)
-        ) {
-            use $crate::{
-                eg::Eg,
-                resource::{Resource, ResourceFormat, ResourceId, ResourceIdFormat},
-                resource_producer::{
-                    ResourceProductionError,
-                    ResourceProducer,
-                    ResourceProductionResult, ResourceSource,
-                    ResourceProducer_Any_Debug_Serialize,
-                },
-                resourceproducer_specific::{
-                    GatherRPFnRegistrationsFnWrapper,
-                },
-                resource_producer_registry::{
-                    FnNewResourceProducer,
-                    GatherResourceProducerRegistrationsFnWrapper,
-                    ResourceProducerCategory,
-                    ResourceProducerRegistration,
-                    ResourceProducerRegistry,
-                    RPFnRegistration,
-                },
-                resource_production::RpOp,
-                resource_slicebytes::ResourceSliceBytes,
-            };
-
-            #[allow(non_snake_case)]
-            fn maybe_produce_ConcreteType(rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
-                let ridfmt_expected = ResourceIdFormat {
-                    rid: $resource_id,
-                    fmt: ResourceFormat::ConcreteType,
-                };
-
-                let ridfmt_requested = rp_op.target_ridfmt();
-
-                if rp_op.target_ridfmt() != &ridfmt_expected {
-                    return Some(Err(ResourceProductionError::UnexpectedResourceIdFormatRequested {
-                        ridfmt_expected,
-                        ridfmt_requested: ridfmt_requested.clone(),
-                    }));
-                }
-
-                let arc: Arc<dyn Resource> = Arc::new(crate::EGDS_VERSION);
-                let rpsrc = ResourceSource::constructed_concretetype();
-                let result: ResourceProductionResult = Ok((arc, rpsrc));
-                Some(result)
-            }
-            register_fn(RPFnRegistration::new_defaultproducer(
-                ResourceIdFormat {
-                    rid: ResourceId::ElectionGuardDesignSpecificationVersion,
-                    fmt: ResourceFormat::ConcreteType,
-                },
-                Box::new(maybe_produce_ElectionGuardDesignSpecificationVersion_ConcreteType) )
-            );
-
-
-            f(&[crate::resource_producer_registry::ResourceProducerRegistration::new_defaultproducer(
-                stringify!($t_validatable),
-                ||,
-            )]);
-        }
-
-        inventory::submit! {
-            GatherRPFnRegistrationsFnWrapper($gather_rpspecific_registrations_fn)
-        }
-    };
-    // */
-}
+// */

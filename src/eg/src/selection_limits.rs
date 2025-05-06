@@ -12,10 +12,13 @@ use util::vec1::HasIndexType;
 
 use crate::{
     ciphertext::{Ciphertext, CiphertextIndex},
+    contest::Contest,
+    contest_option::ContestOption,
     eg::Eg,
-    election_manifest::{Contest, ContestOption},
     errors::{EgError, EgResult},
 };
+
+//=================================================================================================|
 
 /// The maximum number of selections ("votes") that may be distributed over all the selectable
 /// options of a contest.
@@ -335,6 +338,27 @@ impl From<EffectiveContestSelectionLimit> for u32 {
 
 //-------------------------------------------------------------------------------------------------|
 
+/// A 1-based index of a [`EffectiveOptionSelectionLimit`] in the order it is defined within its
+/// [`Contest`](crate::contest::Contest) in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type EffectiveOptionSelectionLimitIndex = CiphertextIndex;
+
+impl HasIndexType for EffectiveOptionSelectionLimit {
+    type IndexTypeParam = Ciphertext;
+}
+
 /// The effective selection limit for an option is the smaller of the options's selection limit
 /// and its contest's selection limit.
 #[derive(
@@ -348,13 +372,6 @@ impl From<EffectiveContestSelectionLimit> for u32 {
     Ord
 )]
 pub struct EffectiveOptionSelectionLimit(pub u32);
-
-impl HasIndexType for EffectiveOptionSelectionLimit {
-    type IndexTypeParam = Ciphertext;
-}
-
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
-pub type EffectiveOptionSelectionLimitIndex = CiphertextIndex;
 
 impl EffectiveOptionSelectionLimit {
     pub fn figure(

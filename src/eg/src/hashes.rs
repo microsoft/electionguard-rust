@@ -11,12 +11,13 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
-use util::algebra_utils::to_be_bytes_left_pad;
 
 use crate::{
+    algebra_utils::to_be_bytes_left_pad,
     eg::Eg,
     election_parameters::ElectionParameters,
     errors::EgResult,
+    fixed_parameters::{FixedParametersTrait, FixedParametersTraitExt},
     hash::{HValue, eg_h},
     resource::{
         ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
@@ -26,6 +27,10 @@ use crate::{
     resource_producer_registry::RPFnRegistration,
     resourceproducer_specific::GatherRPFnRegistrationsFnWrapper,
     serializable::SerializableCanonical,
+    standard_parameters::{
+        EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_P_LEN_BYTES,
+        EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_Q_LEN_BYTES,
+    },
 };
 
 //=================================================================================================|
@@ -43,9 +48,7 @@ pub struct ParameterBaseHash {
 impl ParameterBaseHash {
     pub fn compute(election_parameters: &ElectionParameters) -> Self {
         let fixed_parameters = election_parameters.fixed_parameters();
-        let varying_parameters = &election_parameters.varying_parameters();
-        let field = fixed_parameters.field();
-        let group: &util::algebra::Group = fixed_parameters.group();
+        let varying_parameters = election_parameters.varying_parameters();
 
         // H_V = 0x76322E312E30 | b(0, 26)
         let h_v: HValue = [
@@ -56,15 +59,34 @@ impl ParameterBaseHash {
         ]
         .into();
 
-        // v = 0x00 | b(p,512)| b(q,32) | b(g,512) | b(n,4) | b(k,4)
-        let mut v = vec![0x00];
-        v.extend_from_slice(to_be_bytes_left_pad(&group.modulus(), group.p_len_bytes()).as_slice());
-        v.extend_from_slice(to_be_bytes_left_pad(&field.order(), field.q_len_bytes()).as_slice());
-        v.extend_from_slice(group.generator().to_be_bytes_left_pad(group).as_slice());
-        v.extend(varying_parameters.n().get_one_based_4_be_bytes());
-        v.extend(varying_parameters.k().get_one_based_4_be_bytes());
+        let expected_len: usize = 1065; // EGDS 2.1.0 §3.1.2 pg. 74 eq. 4
 
-        let expected_len = 1065; // EGDS 2.1.0 §3.1.2 pg. 74 eq. 4
+        // v = 0x00 | b(p,512)| b(q,32) | b(g,512) | b(n,4) | b(k,4)
+        let mut v = Vec::with_capacity(expected_len);
+        v.push(0x00);
+        v.extend_from_slice(
+            to_be_bytes_left_pad(
+                fixed_parameters.p(),
+                EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_P_LEN_BYTES,
+            )
+            .as_slice(),
+        );
+        v.extend_from_slice(
+            to_be_bytes_left_pad(
+                fixed_parameters.q(),
+                EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_Q_LEN_BYTES,
+            )
+            .as_slice(),
+        );
+        v.extend_from_slice(
+            to_be_bytes_left_pad(
+                fixed_parameters.g(),
+                EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_P_LEN_BYTES,
+            )
+            .as_slice(),
+        );
+        v.extend_from_slice(varying_parameters.n().get_one_based_4_be_bytes().as_slice());
+        v.extend_from_slice(varying_parameters.k().get_one_based_4_be_bytes().as_slice());
 
         assert_eq!(v.len(), expected_len);
 
@@ -224,14 +246,13 @@ mod t {
                 .with_context(|| "Hashes::compute() failed")
                 .unwrap();
 
-            // These hashes are to get notified if the hash computation is changed. They have
-            // not been computed externally.
-
-            assert_snapshot!(hashes.h_b,
-                @"75664571043EF9E2515E599F7FEC798D15350EA18529FFDA624854D4E59C2CD6");
-
             assert_snapshot!(hashes.h_p,
                 @"944286970EAFDB6F347F4EB93B30D48FA3EDCC89BFBAEA6F5AE8F29AFB05DDCE");
+
+            // This hash value has not been computed externally and will need to be modified
+            // whenever the example data ElectionManifest changes.
+            assert_snapshot!(hashes.h_b,
+                @"D1AACAE2ABB43078D7903157D637B881618F3606387D6A9FD5CDF789E1DF5C4F");
         });
     }
 }

@@ -11,18 +11,41 @@
 //! For more details see Section `3.3.5` of the Electionguard specification `2.0.0`. [TODO fix ref]
 
 use serde::{Deserialize, Serialize};
-use util::{
-    algebra::{FieldElement, GroupElement, ScalarField},
-    csrng::Csrng,
-    vec1::HasIndexType,
-};
+use util::{csrng::Csrng, vec1::HasIndexType};
 
 use crate::{
+    algebra::{FieldElement, GroupElement, ScalarField},
     ciphertext::{Ciphertext, CiphertextIndex},
+    fixed_parameters::{FixedParametersTrait, FixedParametersTraitExt},
     hash::eg_h,
     nonce::NonceFE,
     pre_voting_data::PreVotingData,
 };
+
+//=================================================================================================|
+
+/// A 1-based index of a [`ProofRange`] in the order it is defined within its
+/// [`Contest`](crate::contest::Contest) in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type ProofRangeIndex = CiphertextIndex;
+
+impl HasIndexType for ProofRange {
+    type IndexTypeParam = Ciphertext;
+}
+
+//-------------------------------------------------------------------------------------------------|
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRangeSingle {
@@ -32,21 +55,18 @@ pub struct ProofRangeSingle {
     pub v: FieldElement,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofRange(Vec<ProofRangeSingle>);
-
-impl HasIndexType for ProofRange {
-    type IndexTypeParam = Ciphertext;
-}
-
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
-pub type ProofRangeIndex = CiphertextIndex;
+//-------------------------------------------------------------------------------------------------|
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum ZkProofRangeError {
     #[error("It must be that 0 ≤ small_l ≤ big_l (here small_l={small_l} and big_l={big_l}).")]
     RangeNotSatisfied { small_l: usize, big_l: usize },
 }
+
+//-------------------------------------------------------------------------------------------------|
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofRange(Vec<ProofRangeSingle>);
 
 impl ProofRange {
     /// Computes the challenge for the range proof as specified in Equation `46`. [TODO fix ref]

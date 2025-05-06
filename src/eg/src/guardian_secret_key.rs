@@ -8,105 +8,46 @@
 
 //! This module provides implementation of guardian secret keys. For more details see Section `3.2`
 //! of the Electionguard specification `2.1.0`. [TODO check ref]
+//!
+//! EGDS 2.1.0 Sec 3.2.1 pg. 22:
+//! ## "Because a guardian only uses its secret shares zi and ˆzi of the joint secret keys for decryption,
+//!    the actual guardian secret keys si and ˆsi are not needed any more and may be discarded once all
+//!    shares have been successfully generated."
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
-use anyhow::Result;
+use either::Either;
 use serde::{Deserialize, Serialize};
-use util::{
-    algebra::{FieldElement, GroupElement, ScalarField},
-    csrng::Csrng,
-    vec1::HasIndexType,
+use strum::IntoStaticStr;
+use tracing::{
+    debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
+    warn,
 };
+
+use util::{csrng::Csrng, vec1::HasIndexType};
 
 /// Same type as [`GuardianPublicKeyIndex`].
 pub use crate::guardian::GuardianIndex;
 use crate::{
+    algebra::{FieldElement, GroupElement, ScalarField},
     eg::Eg,
     election_parameters::{self, ElectionParameters},
-    errors::EgResult,
-    fixed_parameters::FixedParameters,
-    guardian::{AsymmetricKeyPart, GuardianKeyPartId, GuardianKeyPurpose},
+    errors::{EgError, EgResult},
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
+    guardian::GuardianKeyPartId,
     guardian_coeff_proof::CoefficientsProof,
     guardian_public_key::GuardianPublicKey,
     guardian_public_key_trait::GuardianKeyInfoTrait,
-    resource::{ElectionDataObjectId, Resource, ResourceFormat, ResourceIdFormat},
-    resource::{ProduceResource, ProduceResourceExt},
+    key::{AsymmetricKeyPart, KeyPurpose},
+    resource::{
+        ElectionDataObjectId, ProduceResource, ProduceResourceExt, Resource, ResourceFormat,
+        ResourceIdFormat,
+    },
+    secret_coefficient::SecretCoefficient,
+    secret_coefficients::{SecretCoefficients, SecretCoefficientsInfo, SecretCoefficientsTrait},
     serializable::SerializableCanonical,
     validatable::{Validatable, Validated},
 };
-
-/// A polynomial coefficient used to define a secret key sharing.
-///
-/// This corresponds to the `a_{i,j}` in Equation `9`. [TODO fix ref]
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SecretCoefficient(pub FieldElement);
-
-impl SecretCoefficient {
-    /// Generates a new [`SecretCoefficient`] by picking a random [`FieldElement`].
-    pub fn new_random(csrng: &dyn Csrng, field: &ScalarField) -> Self {
-        Self(field.random_field_elem(csrng))
-    }
-}
-
-impl AsRef<FieldElement> for SecretCoefficient {
-    #[inline]
-    fn as_ref(&self) -> &FieldElement {
-        &self.0
-    }
-}
-
-impl From<FieldElement> for SecretCoefficient {
-    /// A [`SecretCoefficient`] can always be made from a [`FieldElement`].
-    #[inline]
-    fn from(field_elem: FieldElement) -> Self {
-        SecretCoefficient(field_elem)
-    }
-}
-
-/// A vector of [`SecretCoefficient`]s defining a sharing of the guardian's secret key.
-///
-/// "Each guardian G_i in an election with a decryption threshold of k generates k secret
-/// polynomial coefficients a_i,j, for 0 ≤ j < k, by sampling them uniformly, at random in
-/// the range 0 ≤ a_i,j < q.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SecretCoefficients(pub Vec<SecretCoefficient>);
-
-impl SecretCoefficients {
-    /// Generates a fresh [`SecretCoefficients`].
-    ///
-    /// The arguments are
-    /// - `csrng` - secure randomness generator
-    /// - `election_parameters` - the election parameters
-    pub fn generate(csrng: &dyn Csrng, election_parameters: &ElectionParameters) -> Self {
-        let fixed_parameters = election_parameters.fixed_parameters();
-        let varying_parameters = election_parameters.varying_parameters();
-        let field = fixed_parameters.field();
-        let k = varying_parameters.k().as_quantity();
-
-        SecretCoefficients(
-            std::iter::repeat_with(|| SecretCoefficient::new_random(csrng, field))
-                .take(k)
-                .collect(),
-        )
-    }
-
-    /// Returns the number of [`SecretCoefficient`]s.
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Provides access to the secret coefficients as [`&[SecretCoefficient]`](std::slice).
-    pub fn as_slice(&self) -> &[SecretCoefficient] {
-        self.0.as_slice()
-    }
-
-    /// Provides [`Iterator`] access to the [`SecretCoefficient`]s.
-    pub fn iter(&self) -> impl Iterator<Item = &SecretCoefficient> {
-        self.0.iter()
-    }
-}
 
 /// A commitment to a single [`SecretCoefficient`].
 ///
@@ -175,7 +116,7 @@ pub struct GuardianSecretKeyInfo {
     pub opt_coefficients_proof: Option<Arc<CoefficientsProof>>,
 
     /// Secret polynomial coefficients.
-    pub secret_coefficients: SecretCoefficients,
+    pub secret_coefficients: Either<SecretCoefficientsInfo, SecretCoefficients>,
 
     /// Refers to this object as a [`Resource`].
     ridfmt: ResourceIdFormat,
@@ -207,7 +148,7 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
         use serde::de::{Error, MapAccess, Visitor};
         use strum::VariantNames;
 
-        #[derive(Deserialize, VariantNames)]
+        #[derive(Deserialize, IntoStaticStr, VariantNames)]
         #[serde(field_identifier)]
         #[allow(non_camel_case_types)]
         enum Field {
@@ -236,7 +177,7 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
                 MapAcc: MapAccess<'de>,
             {
                 let Some((Field::i, i)) = map.next_entry()? else {
-                    return Err(MapAcc::Error::missing_field("i"));
+                    return Err(MapAcc::Error::missing_field(Field::i.into()));
                 };
 
                 let (name, next_entry): (String, _) = match map.next_key()? {
@@ -246,13 +187,15 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
                 };
 
                 let Some((Field::purpose, purpose)) = next_entry else {
-                    return Err(MapAcc::Error::missing_field("purpose"));
+                    return Err(MapAcc::Error::missing_field(Field::purpose.into()));
                 };
 
                 let Some((Field::coefficient_commitments, coefficient_commitments)) =
                     map.next_entry()?
                 else {
-                    return Err(MapAcc::Error::missing_field("coefficient_commitments"));
+                    return Err(MapAcc::Error::missing_field(
+                        Field::coefficient_commitments.into(),
+                    ));
                 };
 
                 let (opt_coefficients_proof, next_entry): (Option<Arc<CoefficientsProof>>, _) =
@@ -264,8 +207,11 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
                         None => (None, None),
                     };
 
-                let Some((Field::secret_coefficients, secret_coefficients)) = next_entry else {
-                    return Err(MapAcc::Error::missing_field("secret_coefficients"));
+                let Some((Field::secret_coefficients, secret_coefficients_info)) = next_entry
+                else {
+                    return Err(MapAcc::Error::missing_field(
+                        Field::secret_coefficients.into(),
+                    ));
                 };
 
                 let key_id = GuardianKeyPartId {
@@ -282,7 +228,7 @@ impl<'de> Deserialize<'de> for GuardianSecretKeyInfo {
                     name,
                     coefficient_commitments,
                     opt_coefficients_proof,
-                    secret_coefficients,
+                    secret_coefficients: Either::Left(secret_coefficients_info),
                     ridfmt,
                 })
             }
@@ -299,7 +245,7 @@ impl SerializableCanonical for GuardianSecretKeyInfo {}
 crate::impl_knows_friendly_type_name! { GuardianSecretKeyInfo }
 
 impl Resource for GuardianSecretKeyInfo {
-    fn ridfmt(&self) -> &ResourceIdFormat {
+    fn ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
         #[cfg(debug_assertions)]
         {
             let key_id_expected = GuardianKeyPartId {
@@ -310,7 +256,7 @@ impl Resource for GuardianSecretKeyInfo {
             let ridfmt_expected = edoid_expected.info_type_ridfmt();
             debug_assert_eq!(self.ridfmt, ridfmt_expected);
         }
-        &self.ridfmt
+        Cow::Borrowed(&self.ridfmt)
     }
 }
 
@@ -324,26 +270,45 @@ crate::impl_validatable_validated! {
             name,
             coefficient_commitments,
             opt_coefficients_proof,
-            secret_coefficients,
+            secret_coefficients: either_secret_coefficients,
             ridfmt,
         } = src;
 
         //? TODO leverage some common code for GuardianSecretKey and GuardianPublicKey? See GuardianPublicKeyTrait::validate_public_key_info_to_election_parameters
 
-        // Validate the key_id
+        //----- Validate `key_id`.
+
         let key_id_expected = GuardianKeyPartId {
                 guardian_ix: key_id.guardian_ix,
                 key_purpose: key_id.key_purpose,
                 asymmetric_key_part: AsymmetricKeyPart::Secret,
             };
 
-        //? TODO validate the name
+        if key_id != key_id_expected {
+            let s = format!("Expecting: `{key_id_expected}`, got: `{key_id}`"); //? TODO proper error type
+            return Err(EgValidateError::Other(s))?;
+        }
 
-        //? TODO validate/verify the coefficient_commitments
+        //----- Validate `name`.
 
-        //? TODO validate/verify the opt_coefficients_proof
+        //? TODO: validate `name`
 
-        //? TODO validate the secret_coefficients
+        //----- Validate `coefficient_commitments`.
+
+        //? TODO: validate `coefficient_commitments`
+
+        //----- Validate `opt_coefficients_proof`.
+
+        //? TODO: validate `opt_coefficients_proof`
+
+        //----- Validate `secret_coefficients`.
+
+        let secret_coefficients: SecretCoefficients = match either_secret_coefficients {
+            Either::Left(secret_coefficients_info) => {
+                SecretCoefficients::try_validate_from(secret_coefficients_info, produce_resource)?
+            }
+            Either::Right(secret_coefficients) => secret_coefficients,
+        };
 
         let edoid_expected = ElectionDataObjectId::GuardianKeyPart(key_id_expected);
         let ridfmt_expected = edoid_expected.info_type_ridfmt();
@@ -379,12 +344,14 @@ impl From<GuardianSecretKey> for GuardianSecretKeyInfo {
             ridfmt: _,
         } = src;
 
+        let secret_coefficients_info = SecretCoefficientsInfo::from(secret_coefficients);
+
         Self {
             key_id,
             name,
             coefficient_commitments,
             opt_coefficients_proof,
-            secret_coefficients,
+            secret_coefficients: Either::Left(secret_coefficients_info),
             ridfmt: ElectionDataObjectId::GuardianKeyPart(key_id).info_type_ridfmt(),
         }
     }
@@ -465,13 +432,13 @@ impl GuardianSecretKey {
         produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
         guardian_ix: GuardianIndex,
         name: String,
-        key_purpose: GuardianKeyPurpose,
+        key_purpose: KeyPurpose,
     ) -> EgResult<Arc<Self>> {
         let election_parameters = produce_resource.election_parameters().await?;
         let election_parameters = election_parameters.as_ref();
         let fixed_parameters = election_parameters.fixed_parameters();
+        let k = election_parameters.k();
         let group = fixed_parameters.group();
-        let csrng = produce_resource.csrng();
 
         let key_id = GuardianKeyPartId {
             guardian_ix,
@@ -479,7 +446,15 @@ impl GuardianSecretKey {
             asymmetric_key_part: AsymmetricKeyPart::Secret,
         };
 
-        let secret_coefficients = SecretCoefficients::generate(csrng, election_parameters);
+        let secret_coefficients = SecretCoefficients::generate(produce_resource).await?;
+        if secret_coefficients.len() != k.as_quantity() {
+            let e = EgError::SecretCoefficientsIncorrectQuantity {
+                qty_expected: k.as_quantity(),
+                qty_found: secret_coefficients.len(),
+            };
+            trace!("{e}");
+            return Err(e);
+        }
 
         let coefficient_commitments: CoefficientCommitments = secret_coefficients
             .iter()
@@ -488,6 +463,14 @@ impl GuardianSecretKey {
             })
             .collect::<Vec<_>>()
             .into();
+        if coefficient_commitments.len() != k.as_quantity() {
+            let e = EgError::CoefficientCommitmentsIncorrectQuantity {
+                qty_expected: k.as_quantity(),
+                qty_found: coefficient_commitments.len(),
+            };
+            trace!("{e}");
+            return Err(e);
+        }
 
         let opt_coefficients_proof = None;
 
@@ -496,7 +479,7 @@ impl GuardianSecretKey {
             name,
             coefficient_commitments,
             opt_coefficients_proof,
-            secret_coefficients,
+            secret_coefficients: Either::Right(secret_coefficients),
             ridfmt: ElectionDataObjectId::GuardianKeyPart(key_id).info_type_ridfmt(),
         };
 
@@ -514,7 +497,7 @@ impl GuardianSecretKey {
     ///
     /// The returned value corresponds to `a_{i,0}` as defined in Section `3.2.2`.
     pub fn secret_s(&self) -> &FieldElement {
-        &self.secret_coefficients.0[0].0
+        self.secret_coefficients.as_slice()[0].as_ref()
     }
 
     /// Computes the [`GuardianPublicKey`] corresponding to the [`GuardianSecretKey`].
@@ -556,7 +539,7 @@ impl SerializableCanonical for GuardianSecretKey {}
 crate::impl_knows_friendly_type_name! { GuardianSecretKey }
 
 impl Resource for GuardianSecretKey {
-    fn ridfmt(&self) -> &ResourceIdFormat {
+    fn ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
         #[cfg(debug_assertions)]
         {
             let key_id_expected = GuardianKeyPartId {
@@ -567,7 +550,7 @@ impl Resource for GuardianSecretKey {
             let ridfmt_expected = edoid_expected.validated_type_ridfmt();
             debug_assert_eq!(self.ridfmt, ridfmt_expected);
         }
-        &self.ridfmt
+        Cow::Borrowed(&self.ridfmt)
     }
 }
 

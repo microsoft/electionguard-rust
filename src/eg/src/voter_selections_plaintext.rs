@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ballot_style::BallotStyleIndex,
+    contest::{Contest, ContestIndex},
+    contest_option::ContestOptionIndex,
     contest_option_fields::ContestOptionFieldsPlaintexts,
-    election_manifest::{ContestIndex, ContestOptionIndex},
     errors::{EgError, EgResult},
     extended_base_hash::ExtendedBaseHash_H_E,
     resource::{ProduceResource, ProduceResourceExt},
@@ -24,11 +25,11 @@ use crate::{
 cfg_if::cfg_if! { if #[cfg(feature = "eg-allow-test-data-generation")] {
     use crate::{
         contest_option_fields::ContestOptionFieldPlaintext,
-        election_manifest::Contest,
-
     };
     use util::{csrng::Csrng, vec1::Vec1};
 } }
+
+//=================================================================================================|
 
 /// Info for constructing a [`VoterSelectionsPlaintextInfo`] through validation.
 ///

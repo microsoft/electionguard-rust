@@ -57,6 +57,13 @@ pub enum ElectionGuard_DesignSpecification_Version_Qualifier {
     Nonstandard_Specification(String),
 }
 
+impl ElectionGuard_DesignSpecification_Version_Qualifier {
+    /// Returns true iff is [`Released_Specification_Version`](ElectionGuard_DesignSpecification_Version_Qualifier::Released_Specification_Version) value.
+    pub fn is_released_specification_version(&self) -> bool {
+        matches!(self, Self::Released_Specification_Version)
+    }
+}
+
 //=================================================================================================|
 
 /// Specification version qualifier.
@@ -72,7 +79,7 @@ pub enum ElectionGuard_DesignSpecification_Version_Qualifier {
 )]
 #[allow(non_camel_case_types)]
 pub enum ElectionGuard_FixedParameters_Kind {
-    /// The standard parameters defined in the released specification.
+    /// The standard parameters defined in a released specification.
     ///
     /// This is the value expected for all real-world use.
     #[strum(to_string = "standard parameters")]
@@ -83,9 +90,23 @@ pub enum ElectionGuard_FixedParameters_Kind {
     #[strum(to_string = "NONSTANDARD parameters")]
     Nonstandard_Parameters,
 
-    /// "Toy" parameters defined in the released specification, or other non-serious parameters.
+    /// "Reduced security" parameters defined in a released specification.
+    #[strum(to_string = "reduced security parameters")]
+    Reduced_Security_Parameters,
+
+    /// "Toy" parameters defined in thae released specification, or other non-serious parameters.
     #[strum(to_string = "TOY parameters FOR TESTING ONLY")]
     Toy_Parameters,
+}
+
+impl ElectionGuard_FixedParameters_Kind {
+    /// Returns true iff the FixedParameters "kind" indicates standard parameters defined in a
+    /// released specification.
+    ///
+    /// This should return `true` all real-world use.
+    pub fn is_standard_parameters(self) -> bool {
+        matches!(self, Self::Standard_Parameters)
+    }
 }
 
 //=================================================================================================|
@@ -101,6 +122,17 @@ pub struct ElectionGuard_DesignSpecification_Version {
 
     /// Kind of [`FixedParameters`].
     pub fixed_parameters_kind: ElectionGuard_FixedParameters_Kind,
+}
+
+impl ElectionGuard_DesignSpecification_Version {
+    /// Returns true iff:
+    ///
+    /// - `qualifier` is  [`Released_Specification_Version`](ElectionGuard_DesignSpecification_Version_Qualifier::Released_Specification_Version) value.
+    /// - `fixed_parameters_kind` is [`Standard_Parameters`](ElectionGuard_FixedParameters_Kind::Standard_Parameters).
+    pub fn is_released_specification_version_with_standard_parameters(&self) -> bool {
+        self.qualifier.is_released_specification_version()
+            && self.fixed_parameters_kind.is_standard_parameters()
+    }
 }
 
 impl std::fmt::Debug for ElectionGuard_DesignSpecification_Version {

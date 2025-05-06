@@ -242,9 +242,9 @@ mod t {
 
             assert_snapshot!(cf, @r#"
             ChainingField(
-                0000 0000 a3f9 c0a4 3411 7058 3cf3 de40
-                e1f7 7408 b159 817b 58b1 a375 c920 6f5b
-                ec4b 52cc )
+                0000 0000 b731 31d8 8930 5595 9647 66f9
+                fbbb 1887 9396 e335 7686 a519 7c32 45a2
+                bf97 8732 )
             "#);
         });
     }

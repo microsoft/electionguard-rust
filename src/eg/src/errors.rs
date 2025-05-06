@@ -6,24 +6,29 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 #![allow(non_camel_case_types)] // We use underscores for clarity in some error message identifiers
-#![allow(unused_imports)] //? TODO: Remove temp development code
 
-use std::{any, char::MAX, sync::Arc};
+use std::sync::Arc;
 
 use static_assertions::assert_impl_all;
 
 use crate::{
     ballot_style::BallotStyleIndex,
     ciphertext::CiphertextIndex,
+    contest::ContestIndex,
+    contest_option::ContestOptionIndex,
     egds_version::ElectionGuard_DesignSpecification_Version,
-    election_manifest::{ContestIndex, ContestOptionIndex},
-    guardian::{GuardianIndex, GuardianKeyPurpose},
-    hash::HValue,
+    guardian::GuardianIndex,
+    key::KeyPurpose,
+    label::EgLabelError,
     resource::{ElectionDataObjectId, ResourceId, ResourceIdFormat},
 };
+
 pub use crate::{
     el_gamal::ElGamalError,
     guardian_public_key_trait::PublicKeyValidationError,
+    interguardian_share::{
+        InterGuardianShareGenerationError, InterGuardianSharePublicValidationError,
+    },
     loadable::EgLoadingError,
     resource_producer::ResourceProductionError,
     validatable::EgValidateError,
@@ -32,6 +37,8 @@ pub use crate::{
     },
     zk::ZkProofRangeError,
 };
+
+//=================================================================================================|
 
 /// The main [`std::error::Error`] type returned by functions of the `eg` crate.
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
@@ -49,25 +56,40 @@ pub enum EgError {
         contests_contest_ix: ContestIndex,
     },
 
-    #[error("Ballot style `{0}` doesn't know its index, at a place and time when it should.")]
+    #[error("Ballot Style `{0}` doesn't know its index, at a place and time when it should.")]
     BallotStyleDoesntKnowItsIndex(BallotStyleIndex),
 
     #[error(
-        "A ballot style doesn't know its index, at a place and time when it should, and it wasn't known from context either."
+        "A Ballot Style doesn't know its index, at a place and time when it should, and it wasn't known from context either."
     )]
     BallotStyleDoesntKnowItsIndexAndItWasNotClearFromContextEither,
 
     #[error(
-        "A ballot style that believes it has ballot style index `{0}`, but it doesn't match the ballot style in the election manifest at that index."
+        "A Ballot Style that believes it has Ballot Style index `{0}`, but it doesn't match the Ballot Style in the election manifest at that index."
     )]
     BallotStyleDoesntMatchElectionManifest(BallotStyleIndex),
 
     #[error(
-        "The ballot style at index `{actual_ballot_style_ix}` in the election manifest incorrectly believes it is at index `{bs_ballot_style_ix}`."
+        "The Ballot Style at index `{actual_ballot_style_ix}` in the election manifest incorrectly believes it is at index `{bs_ballot_style_ix}`."
     )]
     BallotStyleIndexMismatch {
         actual_ballot_style_ix: BallotStyleIndex,
         bs_ballot_style_ix: BallotStyleIndex,
+    },
+
+    #[error(
+        "Ballot Style `{ballot_style_ix}` `{ballot_style_label}` lists Contest `{contest_ix}` more than once."
+    )]
+    BallotStyleByIndexAndLabelDuplicateContest {
+        ballot_style_ix: BallotStyleIndex,
+        ballot_style_label: String,
+        contest_ix: ContestIndex,
+    },
+
+    #[error("Ballot Style `{ballot_style_label}` lists Contest `{contest_ix}` more than once.")]
+    BallotStyleByLabelDuplicateContest {
+        ballot_style_label: String,
+        contest_ix: ContestIndex,
     },
 
     #[error(
@@ -86,6 +108,25 @@ pub enum EgError {
         contest_ix: ContestIndex,
         actual_contest_option_ix: ContestOptionIndex,
         co_contest_option_ix: ContestOptionIndex,
+    },
+
+    #[error(
+        "Election manifest contests `{contest_ix_a}` and `{contest_ix_b}` have the same label `{duplicate_label}`."
+    )]
+    ContestsHaveDuplicateLabels {
+        contest_ix_a: ContestIndex,
+        contest_ix_b: ContestIndex,
+        duplicate_label: String,
+    },
+
+    #[error(
+        "Election manifest contest `{contest_ix}` options `{contest_option_ix_a}` and `{contest_option_ix_b}` have the same label `{duplicate_label}`."
+    )]
+    ContestOptionsHaveDuplicateLabels {
+        contest_ix: ContestIndex,
+        contest_option_ix_a: ContestOptionIndex,
+        contest_option_ix_b: ContestOptionIndex,
+        duplicate_label: String,
     },
 
     #[error(
@@ -112,6 +153,18 @@ pub enum EgError {
     #[error("Contest option index `{0}` is not found in the contest.")]
     ContestOptionIndexNotInContest(ContestOptionIndex),
 
+    #[error("`{qty_expected}` SecretCoefficients were expected, but `{qty_found}` were found.")]
+    SecretCoefficientsIncorrectQuantity {
+        qty_expected: usize,
+        qty_found: usize,
+    },
+
+    #[error("`{qty_expected}` CoefficientCommitments were expected, but `{qty_found}` were found.")]
+    CoefficientCommitmentsIncorrectQuantity {
+        qty_expected: usize,
+        qty_found: usize,
+    },
+
     #[error(
         "Contest option `{contest_option_ix}` of contest `{contestoption_contest_ix}` was asked to compute its effective selection limit as if it were in contest `{containing_contest_ix}` instead."
     )]
@@ -133,7 +186,7 @@ pub enum EgError {
     PublicKeyValidationError(#[from] PublicKeyValidationError),
 
     #[error("Guardian key purpose `{key_purpose}` does not form a joint public key.")]
-    NoJointPublicKeyForPurpose { key_purpose: GuardianKeyPurpose },
+    NoJointPublicKeyForPurpose { key_purpose: KeyPurpose },
 
     #[error("Guardian(s) `{0:?}` are not represented in a joint public key")]
     JointPublicKeyCompute_GuardiansMissing(Vec<GuardianIndex>),
@@ -142,19 +195,24 @@ pub enum EgError {
     JointPublicKeyCompute_GuardianMultiple(GuardianIndex),
 
     #[error("Guardian {0} is represented more than once in a joint public key")]
-    JointPublicKey_InvalidGroupElement(GuardianKeyPurpose),
+    JointPublicKey_InvalidGroupElement(KeyPurpose),
 
     #[error("Error producing ballot proofs: {0}")]
     ProofError(#[from] ZkProofRangeError),
 
-    #[error("Ballot style `{0}` not in election manifest.")]
-    BallotStyleNotInElectionManifest(BallotStyleIndex),
+    #[error(
+        "Ballot Style `{ballot_style_ix}` is not present in the ElectionManifest, which has only `{election_manifest_cnt_ballot_styles}` Ballot Styles."
+    )]
+    BallotStyleNotInElectionManifest {
+        ballot_style_ix: BallotStyleIndex,
+        election_manifest_cnt_ballot_styles: usize,
+    },
 
     #[error("Contest index `{0}` does not exist in ElectionManifest.")]
     ContestNotInManifest(ContestIndex),
 
     #[error(
-        "Contest `{contest_ix}` does not exist in ballot style label `{ballot_style_label}`. If known, the ballot style index within the election manifest is `{opt_ballot_style_ix:?}`."
+        "Contest `{contest_ix}` does not exist in Ballot Style labeled `{ballot_style_label}`. If known, the Ballot Style index within the election manifest is `{opt_ballot_style_ix:?}`."
     )]
     ContestNotInBallotStyle {
         contest_ix: ContestIndex,
@@ -163,7 +221,7 @@ pub enum EgError {
     },
 
     #[error(
-        "A `VoterSelectionsPlaintext` provided selections for contest `{contest_ix}` which does not exist in the election manifest. If known, the ballot style index within the election manifest is `{opt_ballot_style_ix:?}`."
+        "A `VoterSelectionsPlaintext` provided selections for contest `{contest_ix}` which does not exist in the election manifest. If known, the Ballot Style index within the election manifest is `{opt_ballot_style_ix:?}`."
     )]
     VoterSelectionsPlaintextSuppliesSelectionsForContestNotInElectionManifest {
         contest_ix: ContestIndex,
@@ -171,7 +229,7 @@ pub enum EgError {
     },
 
     #[error(
-        "A `VoterSelectionsPlaintext` provided selections for contest `{contest_ix}` which does not exist in ballot style labeled `{ballot_style_label}`. If known, the ballot style index within the election manifest is `{opt_ballot_style_ix:?}`."
+        "A `VoterSelectionsPlaintext` provided selections for contest `{contest_ix}` which does not exist in Ballot Style labeled `{ballot_style_label}`. If known, the Ballot Style index within the election manifest is `{opt_ballot_style_ix:?}`."
     )]
     VoterSelectionsPlaintextSuppliesSelectionsForContestNotInBallotStyle {
         contest_ix: ContestIndex,
@@ -180,7 +238,7 @@ pub enum EgError {
     },
 
     #[error(
-        "A `VoterSelectionsPlaintext` of ballot style `{ballot_style_ix}`, provided selections for contest `{contest_ix}` having {num_options_defined} selectable options, but `{num_options_supplied}` options were supplied."
+        "A `VoterSelectionsPlaintext` of Ballot Style `{ballot_style_ix}`, provided selections for contest `{contest_ix}` having {num_options_defined} selectable options, but `{num_options_supplied}` options were supplied."
     )]
     VoterSelectionsPlaintextSuppliesWrongNumberOfOptionSelectionsForContest {
         ballot_style_ix: BallotStyleIndex,
@@ -190,7 +248,7 @@ pub enum EgError {
     },
 
     #[error(
-        "While producing a `ContestDataFieldsPlaintexts` for contest `{contest_ix}`, `{qty_expected}` values were expected for that contest, but `{qty_supplied}` values were supplied."
+        "While producing a `ContestDataFieldsPlaintexts` for contest `{contest_ix}`, there were `{qty_expected}` values were expected, but `{qty_supplied}` were supplied."
     )]
     IncorrectQtyOfContestOptionFieldsPlaintexts {
         contest_ix: ContestIndex,
@@ -199,8 +257,8 @@ pub enum EgError {
     },
 
     #[error(
-        "While producing a `Ballot`, the provided `VoterSelectionsPlaintext` contains a value for the extended base hash `H_E` that does not match the `H_E` for this election. \
-Possibly this `VoterSelectionsPlaintext` was created for a different election or election configuration. \
+        "While producing a Ballot, the provided VoterSelectionsPlaintext contains a value for the extended base hash `H_E` that does not match the `H_E` for this election. \
+Possibly this VoterSelectionsPlaintext was created for a different election or election configuration. \
 VoterSelectionsPlaintext h_e=`{voterselections_h_e}`, \
 PreVotingData h_e=`{election_h_e}`"
     )]
@@ -221,11 +279,12 @@ PreVotingData h_e=`{election_h_e}`"
         contest_ix: ContestIndex,
     },
 
-    #[error(
-        "Ballot style `{ballot_style_ix}` claims to contain contest `{contest_ix}` which does not exist in the election manifest."
+    #[error(r#"Ballot Style{bsix} "{ballot_style_label}" claims to include Contest `{contest_ix}`, but that Contest does not exist in the ElectionManifest."#,
+        bsix = opt_ballot_style_ix.map(|ix| format!(" `{ix}`")).unwrap_or_default()
     )]
-    BallotStyleClaimsNonExistentContest {
-        ballot_style_ix: BallotStyleIndex,
+    BallotStyleContestNotInElectionManifest {
+        opt_ballot_style_ix: Option<BallotStyleIndex>,
+        ballot_style_label: String,
         contest_ix: ContestIndex,
     },
 
@@ -238,7 +297,7 @@ PreVotingData h_e=`{election_h_e}`"
     },
 
     #[error(
-        "While trying to construct a `VoterSelectionsPlaintext` of ballot style `{ballot_style_ix}`, selections were provided for contest `{contest_ix}` which does not exist in the election manifest."
+        "While trying to construct a `VoterSelectionsPlaintext` of Ballot Style `{ballot_style_ix}`, selections were provided for contest `{contest_ix}` which does not exist in the election manifest."
     )]
     VoterSelectionsPlaintextClaimsNonExistentContest {
         ballot_style_ix: BallotStyleIndex,
@@ -246,7 +305,7 @@ PreVotingData h_e=`{election_h_e}`"
     },
 
     #[error(
-        "Ballot of style `{ballot_style_ix}` claims to contain contest `{contest_ix}` which is not present in the ballot style."
+        "Ballot of style `{ballot_style_ix}` claims to contain contest `{contest_ix}` which is not present in the Ballot Style."
     )]
     BallotClaimsContestNonExistentInBallotStyle {
         ballot_style_ix: BallotStyleIndex,
@@ -290,18 +349,18 @@ PreVotingData h_e=`{election_h_e}`"
     CombineProofError(#[from] CombineProofError),
 
     #[error(
-        "The fixed parameters claim to be for `{egds_version_from_fp_info}`, but they do not match the standard parameters `{egds_version_from_standard_params}`."
+        "The fixed parameters claim to be for `{egds_version_from_fp_info}`, but they do not match the build configured parameters `{egds_version_from_buildcfg}`."
     )]
     FixedParametersDoNotMatchStatedElectionGuardDesignSpecificationVersion {
         egds_version_from_fp_info: ElectionGuard_DesignSpecification_Version,
-        egds_version_from_standard_params: ElectionGuard_DesignSpecification_Version,
+        egds_version_from_buildcfg: ElectionGuard_DesignSpecification_Version,
     },
 
     #[error(
-        "The fixed parameters neither declare an ElectionGuard Design Specification version, nor do they do not match the standard parameters `{egds_version_from_standard_params}`."
+        "The fixed parameters neither declare an ElectionGuard Design Specification version, nor do they match the build configured parameters `{egds_version_from_buildcfg}`."
     )]
     FixedParametersDoNotDeclareAnElectionGuardDesignSpecificationVersionOrMatchStandardParams {
-        egds_version_from_standard_params: ElectionGuard_DesignSpecification_Version,
+        egds_version_from_buildcfg: ElectionGuard_DesignSpecification_Version,
     },
 
     #[error(
@@ -319,14 +378,10 @@ PreVotingData h_e=`{election_h_e}`"
     },
 
     #[error(transparent)]
-    GuardianSecretKeyShareGenerationError(
-        #[from] crate::guardian_share::GuardianSecretKeyShareGenerationError,
-    ),
+    InterGuardianShareGenerationError(#[from] InterGuardianShareGenerationError),
 
     #[error(transparent)]
-    GuardianEncryptedSharePublicValidationError(
-        #[from] crate::guardian_share::GuardianEncryptedSharePublicValidationError,
-    ),
+    InterGuardianSharePublicValidationError(#[from] InterGuardianSharePublicValidationError),
 
     #[error(transparent)]
     DecryptionShareCombinationError(#[from] DecryptionShareCombinationError),
@@ -345,6 +400,9 @@ PreVotingData h_e=`{election_h_e}`"
 
     #[error("During validation: {_0}.")]
     DuringValidation(Box<EgError>),
+
+    #[error("Label error: {_0}.")]
+    LabelError(EgLabelError),
 
     #[error(transparent)]
     TooLargeFor31Bits(#[from] util::uint31::U31Error),
@@ -377,7 +435,7 @@ PreVotingData h_e=`{election_h_e}`"
     ),
 
     #[error(transparent)]
-    FieldError(#[from] util::algebra::FieldError),
+    FieldError(#[from] crate::algebra::FieldError),
 
     #[error(transparent)]
     ParseIntError(
@@ -428,7 +486,7 @@ PreVotingData h_e=`{election_h_e}`"
     },
 
     #[error(
-        "Contest `{contest_ix}` was listed in the ballot style `{ballot_style_ix}`, but it was not verified."
+        "Contest `{contest_ix}` was listed in the Ballot Style `{ballot_style_ix}`, but it was not verified."
     )]
     BallotContestNotVerified {
         ballot_style_ix: BallotStyleIndex,
@@ -436,7 +494,7 @@ PreVotingData h_e=`{election_h_e}`"
     },
 
     #[error(
-        "Contest `{contest_ix}` was verified, but it is not listed in the ballot style `{ballot_style_ix}`."
+        "Contest `{contest_ix}` was verified, but it is not listed in the Ballot Style `{ballot_style_ix}`."
     )]
     BallotContestVerifiedNotInBallotStyle {
         ballot_style_ix: BallotStyleIndex,
@@ -490,6 +548,9 @@ PreVotingData h_e=`{election_h_e}`"
 
     #[error("JSON error: {0}")]
     JsonError(WrapAnnoyingError<serde_json::Error>),
+
+    #[error("Deserializing (serde::de) error: {0}")]
+    DeserializeError(String),
 }
 
 assert_impl_all!(EgError: Send, Sync);
@@ -501,6 +562,14 @@ impl EgError {
         E: Into<EgError>,
     {
         if cond { Ok(()) } else { Err(f().into()) }
+    }
+
+    /// Wraps an `EgError` in an `EgError::WhileProducingBallot`.
+    pub fn while_producing_ballot(self, ballot_style_ix: BallotStyleIndex) -> Self {
+        EgError::WhileProducingBallot {
+            ballot_style_ix,
+            bx_err: Box::new(self),
+        }
     }
 }
 
@@ -537,6 +606,13 @@ impl From<EgLoadingError> for EgError {
     }
 }
 
+impl From<EgLabelError> for EgError {
+    /// An [`EgError`] can always be made from a [`EgLabelError`].
+    fn from(src: EgLabelError) -> Self {
+        Self::LabelError(src)
+    }
+}
+
 impl From<ResourceProductionError> for EgError {
     /// An [`EgError`] can always be made from a [`ResourceProductionError`].
     fn from(src: ResourceProductionError) -> Self {
@@ -556,6 +632,7 @@ impl From<anyhow::Error> for EgError {
         EgError::OtherError(WrapAnnoyingError::from_anyhow_Error(anyhow_error))
     }
 }
+
 impl From<std::io::Error> for EgError {
     /// A [`EgError`] can always be made from a [`std::io::Error`].
     #[inline]
@@ -604,6 +681,7 @@ where
         Self(self.0.clone(), self.1.clone())
     }
 }
+
 impl<T> WrapAnnoyingError<T>
 where
     T: std::fmt::Debug + std::fmt::Display + Send + Sync,
@@ -654,6 +732,22 @@ impl From<serde_json::Error> for EgError {
     }
 }
 
+/*
+impl From<EgError> for serde::de::MapAccess<'de>::Error {
+    /// A [`serde::de::MapAccess<'de>::Error`] can always be made from a [`EgError`].
+    #[inline]
+    fn from(src: EgError) -> Self {
+        serde::de::MapAccess<'de>::Error
+    }
+}
+// */
+impl serde::de::Error for EgError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        let s = msg.to_string();
+        EgError::DeserializeError(s)
+    }
+}
+
 impl<T> From<T> for WrapAnnoyingError<T>
 where
     T: std::error::Error + std::fmt::Debug + std::fmt::Display + Send + Sync,
@@ -677,6 +771,7 @@ where
         std::fmt::Debug::fmt(self.1.as_ref(), f)
     }
 }
+
 impl<T> std::fmt::Display for WrapAnnoyingError<T>
 where
     T: std::fmt::Debug + std::fmt::Display + Send + Sync,
@@ -686,6 +781,7 @@ where
         std::fmt::Display::fmt(self.1.as_ref(), f)
     }
 }
+
 impl<T> PartialEq for WrapAnnoyingError<T>
 where
     T: std::fmt::Debug + std::fmt::Display + Send + Sync,
@@ -696,4 +792,5 @@ where
         self.0.eq(&rhs.0)
     }
 }
+
 impl<T> Eq for WrapAnnoyingError<T> where T: std::fmt::Debug + std::fmt::Display + Send + Sync {}

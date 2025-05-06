@@ -168,8 +168,8 @@ impl RPFnRegistration {
         self.category
     }
 
-    pub fn ridfmt(&self) -> &ResourceIdFormat {
-        &self.ridfmt
+    pub fn ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
+        Cow::Borrowed(&self.ridfmt)
     }
 
     //cost
@@ -287,7 +287,9 @@ pub struct ResourceProducerRegistry {
 }
 
 impl ResourceProducerRegistry {
-    /// Returns a new [`ResourceProducerRegistry`] with all the [`ResourceProducers`] for [`DefaultProducer`](ResourceProducerCategory::DefaultProducer) category provided by [`inventoried`](inventory) static registration functions
+    /// Returns a new [`ResourceProducerRegistry`] with all the [`ResourceProducers`] for
+    /// [`DefaultProducer`](ResourceProducerCategory::DefaultProducer) category provided by
+    /// [`inventoried`](inventory) static registration functions.
     pub fn new_with_defaultproducers() -> ResourceProducerRegistry {
         let mut self_ = Self::default();
 
@@ -309,7 +311,16 @@ impl ResourceProducerRegistry {
         let f: FnMut_ = &mut |resource_producer_factory_registrations| {
             for rp_registration in resource_producer_factory_registrations {
                 if predicate(rp_registration) {
+                    debug!(
+                        "ResourceProducerRegistry::add_static_registrations_conditionally: Adding {}",
+                        rp_registration.name
+                    );
                     self.add_rp_registration(rp_registration);
+                } else {
+                    debug!(
+                        "ResourceProducerRegistry::add_static_registrations_conditionally: NOT adding {}",
+                        rp_registration.name
+                    );
                 }
             }
         };
@@ -317,6 +328,10 @@ impl ResourceProducerRegistry {
         for register_resource_producer_factory_fn_wrapper in
             inventory::iter::<GatherResourceProducerRegistrationsFnWrapper>
         {
+            debug!(
+                "ResourceProducerRegistry::add_static_registrations_conditionally: calling register_resource_producer_factory_fn_wrapper"
+            );
+
             let register_resource_producer_factory_fn =
                 register_resource_producer_factory_fn_wrapper.0;
             register_resource_producer_factory_fn(f);
@@ -353,7 +368,13 @@ impl ResourceProducerRegistry {
     ) -> Option<Arc<RPRegistryEntry_Value>> {
         use std::collections::btree_map::Entry::*;
 
-        match self.map.entry(arc_value.arc_key.clone()) {
+        let arc_key = arc_value.arc_key.clone();
+        trace!(
+            "ResourceProducerRegistry::add_rpregistry_entry_value: Adding entry {}",
+            arc_key.name
+        );
+
+        match self.map.entry(arc_key) {
             Vacant(v) => {
                 v.insert(arc_value);
                 None
@@ -381,8 +402,43 @@ impl ResourceProducerRegistry {
     where
         F: FnMut(&RPRegistryEntry_Key, &RPRegistryEntry_Value) -> bool,
     {
+        debug!(
+            "vvvvvvvvvvvvvvvvvvvv ResourceProducerRegistry::registrations_retain vvvvvvvvvvvvvvvvvvvv"
+        );
+
         let mut f = f;
-        self.map.retain(|arc_key, arc_value| f(arc_key, arc_value))
+        self.map.retain(|arc_key, arc_value| {
+            let keep = f(arc_key, arc_value);
+            debug!(
+                "{} {}",
+                ["Discarding:", "Retaining: "][keep as usize],
+                arc_key.name
+            );
+            keep
+        });
+
+        debug!(
+            "^^^^^^^^^^^^^^^^^^^^ ResourceProducerRegistry::registrations_retain ^^^^^^^^^^^^^^^^^^^^"
+        );
+    }
+
+    /// Emits debug-level log messages listing the current entries.
+    pub fn debug_log_entries(&self) {
+        let v: Vec<String> = self
+            .registrations()
+            .map(|rprev| format!("{rprev:?}"))
+            .collect();
+        let cnt = v.len();
+        debug!(
+            "vvvvvvvvvvvvvvvvvvvv ResourceProducerRegistry entries (N = {cnt}) vvvvvvvvvvvvvvvvvvvv"
+        );
+        for (ix0, s) in v.iter().enumerate() {
+            let ix1 = ix0 + 1;
+            debug!("ResourceProducerRegistry entry {ix1}/{cnt}: {s}");
+        }
+        debug!(
+            "^^^^^^^^^^^^^^^^^^^^ ResourceProducerRegistry entries (N = {cnt}) ^^^^^^^^^^^^^^^^^^^^"
+        );
     }
 }
 

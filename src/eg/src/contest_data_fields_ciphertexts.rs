@@ -9,22 +9,25 @@
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use util::vec1::Vec1;
-use util::{algebra::FieldElement, csrng::Csrng};
 
-/// Same type as [`CiphertextIndex`](crate::ciphertext::CiphertextIndex), [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
-pub use crate::contest_data_fields_plaintexts::ContestDataFieldIndex;
+//
+use util::{
+    csrng::Csrng,
+    vec1::{HasIndexType, Vec1},
+};
+
 use crate::{
-    ballot::BallotNonce_xi_B,
-    ballot::HValue_H_I,
+    algebra::FieldElement,
+    ballot::{BallotNonce_xi_B, HValue_H_I},
     ballot_scaled::ContestEncryptedScaled,
-    ciphertext::Ciphertext,
+    ciphertext::{Ciphertext, CiphertextIndex},
+    contest::ContestIndex,
+    contest_data_fields::ContestDataFieldIndex,
     contest_data_fields_plaintexts::{ContestDataFieldPlaintext, ContestDataFieldsPlaintexts},
     contest_hash::contest_hash_chi_l,
     eg::Eg,
-    election_manifest::ContestIndex,
     errors::{EgError, EgResult},
-    fixed_parameters::FixedParameters,
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
     hash::HValue,
     nonce::{NonceFE, derive_xi_i_j_as_hvalue},
     pre_voting_data::PreVotingData,
@@ -33,7 +36,27 @@ use crate::{
     zk::ProofRange,
 };
 
-//-------------------------------------------------------------------------------------------------|
+//=================================================================================================|
+
+/// A 1-based index of a [`Ciphertext`] for a data field in
+/// the order that the data field is allocated based on the
+/// [`Contest`](crate::contest::Contest)s configuration in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type ContestDataFieldCiphertextIndex = CiphertextIndex;
+
+//=================================================================================================|
 
 /// A contest in an encrypted ballot.
 ///
@@ -112,7 +135,7 @@ impl ContestDataFieldsCiphertexts {
             pre_voting_data,
             h_i,
             contest_ix,
-            ciphertexts.as_slice(),
+            ciphertexts.as_zero_based_slice(),
             encrypted_contest_data_blocks.as_slice(),
         );
 
@@ -423,6 +446,6 @@ impl ContestDataFieldsCiphertexts {
     }
 
     pub fn ciphertexts_as_slice(&self) -> &[Ciphertext] {
-        self.ciphertexts.as_slice()
+        self.ciphertexts.as_zero_based_slice()
     }
 }

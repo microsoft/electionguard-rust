@@ -2,29 +2,43 @@
 name = "eg"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/microsoft/electionguard-rust"
+license = "Apache-2.0 OR MIT"
 publish = false
 
 [features]
 
 default = [
-    "eg-forbid-unsafe-code",
     "eg-forbid-insecure-deterministic-csprng",
-    "eg-forbid-test-data-generation",
-    "eg-forbid-toy-parameters",
     "eg-forbid-nonstandard-egds-version",
+    "eg-forbid-test-data-generation",
+    "eg-forbid-reduced-params",
+    "eg-forbid-unsafe-code",
 ]
 
-eg-allow-unsafe-code                    = [ "util/eg-allow-unsafe-code" ]
-eg-allow-insecure-deterministic-csprng  = [ "util/eg-allow-insecure-deterministic-csprng" ]
-eg-allow-test-data-generation           = [ "util/eg-allow-test-data-generation" ]
-eg-allow-toy-parameters                 = [ "util/eg-allow-toy-parameters" ]
-eg-allow-nonstandard-egds-version       = [ "util/eg-allow-nonstandard-egds-version" ]
+eg-allow-insecure-deterministic-csprng  = [ ]
+eg-forbid-insecure-deterministic-csprng = [ ]
 
+eg-allow-nonstandard-egds-version       = [ ]
+eg-forbid-nonstandard-egds-version      = [ ]
+
+eg-allow-test-data-generation           = [ ]
+eg-forbid-test-data-generation          = [ ]
+
+eg-use-toy-params-q7p16                 = [ ]
+eg-use-toy-params-q16p32                = [ ]
+eg-use-toy-params-q16p48                = [ ]
+eg-use-toy-params-q24p64                = [ ]
+eg-use-toy-params-q32p96                = [ ]
+eg-use-toy-params-q32p128               = [ ]
+eg-use-toy-params-q48p192               = [ ]
+eg-use-toy-params-q64p256               = [ ]
+eg-use-reduced-params-q256p3072         = [ ]
+eg-use-standard-params-256q4096p        = [ ]
+eg-forbid-reduced-params                = [ ]
+
+eg-allow-unsafe-code                    = [ "util/eg-allow-unsafe-code" ]
 eg-forbid-unsafe-code                   = [ "util/eg-forbid-unsafe-code" ]
-eg-forbid-insecure-deterministic-csprng = [ "util/eg-forbid-insecure-deterministic-csprng" ]
-eg-forbid-test-data-generation          = [ "util/eg-forbid-test-data-generation" ]
-eg-forbid-toy-parameters                = [ "util/eg-forbid-toy-parameters" ]
-eg-forbid-nonstandard-egds-version      = [ "util/eg-forbid-nonstandard-egds-version" ]
 
 [dependencies]
 
@@ -45,10 +59,6 @@ hex-literal.workspace = true
 inventory.workspace = true
 itertools.workspace = true
 lazy_static.workspace = true
-num-bigint.workspace = true
-#num-integer.workspace = true
-num-traits.workspace = true
-rand.workspace = true
 static_assertions.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
@@ -59,16 +69,25 @@ thiserror.workspace = true
 async-global-executor.workspace = true
 async-lock.workspace = true
 async-trait.workspace = true
-futures-core.workspace = true
+#futures-core.workspace = true
 futures-lite.workspace = true
 #trait-variant.workspace = true
 
-#--- proc_macro2, quote, syn, unicode-ident
+#--- Num-*, typenum, generic-array, hybrid-array
 
-# proc-macro2.workspace = true
-# quote.workspace = true
-# syn.workspace = true
-unicode-ident.workspace = true
+# generic-array.workspace = true
+# hybrid-array.workspace = true
+num-bigint.workspace = true
+num-integer.workspace = true
+num-traits.workspace = true
+# typenum.workspace = true
+
+#--- Rand
+
+rand.workspace = true
+# rand_core.workspace = true
+# rand_distr.workspace = true
+# rand_xorshift.workspace = true
 
 #--- RustCrypto
 
@@ -92,7 +111,17 @@ serde_with.workspace = true
 tracing.workspace = true
 #valuable.workspace = true
 
-[dev-dependencies]
+#--- Unicode, ICU
+
+unicode-ident.workspace = true
+unicode-properties.workspace = true
+# unicode-normalization.workspace = true
+
+# icu_collator.workspace = true
+# icu_locid.workspace = true
+
+[dev-dependencies] #=============================================================== dev-dependencies
+
 derive_more = { workspace = true, features = ["add_assign"] }
-insta = { version = "1.42.1", features = ["json", "ron"] }
+insta = { version = "1.43.1", features = ["json", "ron"] }
 test-log.workspace = true

@@ -63,8 +63,9 @@ use util::abbreviation::Abbreviation;
 
 use crate::{
     eg::Eg,
-    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPartId, GuardianKeyPurpose},
+    guardian::{GuardianIndex, GuardianKeyPartId},
     guardian_secret_key::GuardianSecretKey,
+    key::{AsymmetricKeyPart, KeyPurpose},
     loadable::KnowsFriendlyTypeName,
     resource::{
         ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, Resource,
@@ -111,7 +112,8 @@ impl ResourceProducer for ResourceProducer_PublicFromSecretKey {
     }
 
     fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
-        let ResourceIdFormat { rid, fmt } = rp_op.requested_ridfmt();
+        let requested_ridfmt = rp_op.requested_ridfmt();
+        let ResourceIdFormat { rid, fmt } = requested_ridfmt.as_ref();
 
         // We only handle the case of requesting a ValidElectionDataObject, Edo, GuardianKey, Public.
         let opt_ix_purpose: Option<GuardianKeyPartId> = match (fmt, rid) {
@@ -141,6 +143,7 @@ impl ResourceProducer for ResourceProducer_PublicFromSecretKey {
 impl ResourceProducer_PublicFromSecretKey {
     #[instrument(
         name = "RP_PublicFromSecretKey::maybe_extract_guardian_public_key",
+        level = "debug",
         fields(rf = trace_display(rp_op.requested_ridfmt().abbreviation())),
         skip(self, rp_op),
         ret

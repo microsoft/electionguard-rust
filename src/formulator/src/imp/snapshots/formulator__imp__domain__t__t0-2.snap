@@ -1,7 +1,0 @@
----
-source: formulator/src/imp/domain.rs
-expression: domain
----
-Domain {
-    a
-}

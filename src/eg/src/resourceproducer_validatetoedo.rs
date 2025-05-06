@@ -28,12 +28,15 @@ use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
+
+//
 use util::abbreviation::Abbreviation;
 
 use crate::{
     eg::Eg,
     errors::EgError,
-    guardian::{AsymmetricKeyPart, GuardianKeyPartId},
+    guardian::GuardianKeyPartId,
+    key::{AsymmetricKeyPart, KeyPurpose},
     loadable::KnowsFriendlyTypeName,
     resource::{
         ElectionDataObjectId as EdoId, MayBeResource, ProduceResource, ProduceResourceExt,
@@ -79,7 +82,8 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
 
     #[instrument(
         name = "RP_ValidateToEdo",
-        fields(rf = trace_display(&rp_op.requested_ridfmt())),
+        level = "debug",
+        fields(rf = trace_display(&rp_op.requested_ridfmt().abbreviation())),
         skip(self, rp_op),
         ret
     )]
@@ -95,7 +99,7 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
 
         let produce_resource = rp_op.as_ref();
 
-        let edo_id = match rp_op.requested_ridfmt() {
+        let edo_id = match rp_op.requested_ridfmt().into_owned() {
             ResourceIdFormat {
                 rid: ResourceId::ElectionDataObject(edo_id),
                 fmt: ResourceFormat::ValidElectionDataObject,
@@ -116,7 +120,7 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
         // Try to obtain the resource in its not-yet-validated `Info` format.
 
         let ridfmt_validatable = ResourceIdFormat {
-            rid: rp_op.requested_rid().clone(),
+            rid: rp_op.requested_rid().into_owned(),
             fmt: ResourceFormat::ConcreteType,
         };
 
@@ -129,9 +133,9 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
             Ok((arc_validatable, resource_source_validatable)) => {
                 // We managed to produce the requested `Validatable` type.
 
-                debug_assert_eq!(arc_validatable.ridfmt(), &ridfmt_validatable);
+                debug_assert_eq!(arc_validatable.ridfmt().as_ref(), &ridfmt_validatable);
 
-                if arc_validatable.ridfmt() == &ridfmt_validatable {
+                if arc_validatable.ridfmt().as_ref() == &ridfmt_validatable {
                     // Continue on to the next function to try to validate it to the type we need.
                     self.maybe_produce2_(
                         produce_resource,
@@ -144,10 +148,10 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
                 } else {
                     let e = ResourceProductionError::UnexpectedResourceIdFormatProduced {
                         requested: ridfmt_validatable.clone(),
-                        produced: arc_validatable.ridfmt().clone(),
+                        produced: arc_validatable.ridfmt().into_owned(),
                     };
                     let e = ResourceProductionError::DependencyProductionError {
-                        ridfmt_request: rp_op.requested_ridfmt().clone(),
+                        ridfmt_request: rp_op.requested_ridfmt().into_owned(),
                         dep_err: Box::new(e),
                     };
                     error!("{e:?}");
@@ -157,7 +161,7 @@ impl ResourceProducer for ResourceProducer_ValidateToEdo {
             Err(ResourceProductionError::NoProducerFound { .. }) => None,
             Err(dep_err) => {
                 let e = ResourceProductionError::DependencyProductionError {
-                    ridfmt_request: rp_op.requested_ridfmt().clone(),
+                    ridfmt_request: rp_op.requested_ridfmt().into_owned(),
                     dep_err: Box::new(dep_err),
                 };
                 error!("{e:?}");
@@ -329,13 +333,23 @@ impl ResourceProducer_ValidateToEdo {
 
 //=================================================================================================|
 
+#[allow(non_snake_case)]
 fn gather_resourceproducer_registrations_ValidateToEdo(
     f: &mut dyn for<'a> FnMut(&'a [ResourceProducerRegistration]),
 ) {
-    f(&[ResourceProducerRegistration::new_defaultproducer(
-        ResourceProducer_ValidateToEdo::NAME,
-        ResourceProducer_ValidateToEdo::arc_new,
-    )]);
+    trace!("gather_resourceproducer_registrations_ValidateToEdo");
+
+    let registration = {
+        let name = ResourceProducer_ValidateToEdo::NAME.into();
+        let category = ResourceProducerCategory::DefaultProducer;
+        let fn_rc_new = ResourceProducer_ValidateToEdo::arc_new;
+        ResourceProducerRegistration {
+            name,
+            category,
+            fn_rc_new,
+        }
+    };
+    f(&[registration]);
 }
 
 inventory::submit! {
@@ -390,8 +404,7 @@ mod t {
                 id: ElectionDataObject(ElectionManifest),
                 fmt: ConcreteType,
               ),
-            ))
-            "#);
+            ))"#);
             }
 
             /*

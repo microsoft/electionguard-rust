@@ -21,7 +21,7 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-//! This module provides types representing the fixed parameters.
+//! Types representing the fixed parameters.
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 //use either::Either;
@@ -33,13 +33,11 @@ use tracing::{
 };
 //use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use util::{
-    algebra::{Group, ScalarField},
-    algebra_utils::{cnt_bits_repr, leading_ones},
-    csrng::Csrng,
-};
+use util::csrng::Csrng;
 
 use crate::{
+    algebra::{Group, ScalarField},
+    algebra_utils::{cnt_bits_repr, leading_ones},
     eg::Eg,
     egds_version::{
         ElectionGuard_DesignSpecification_Version,
@@ -51,6 +49,7 @@ use crate::{
     },
     resource::{ProduceResource, ProduceResourceExt},
     serializable::{SerializableCanonical, SerializablePretty},
+    standard_parameters::buildcfg_fixed_parameters_info,
     validatable::{Validatable, Validated},
 };
 
@@ -120,6 +119,94 @@ pub struct FixedParameterGenerationParameters {
     pub p_bits_lsb_fixed_1: usize,
 }
 
+/// Element access and other operations common to [`FixedParametersInfo`] and [`FixedParameters`].
+#[async_trait::async_trait(?Send)]
+pub trait FixedParametersTrait {
+    /// The [`ElectionGuard_DesignSpecification_Version`], if present.
+    fn opt_egds_version(&self) -> &Option<ElectionGuard_DesignSpecification_Version>;
+
+    /// The [`FixedParameterGenerationParameters`].
+    fn generation_parameters(&self) -> &FixedParameterGenerationParameters;
+
+    /// The prime order field of nonnegative  `p` and `g`.
+    fn field(&self) -> &ScalarField;
+
+    /// The order-`q` multiplicitave subgroup defined by `p` and `g`.
+    fn group(&self) -> &Group;
+}
+
+pub trait FixedParametersTraitExt: FixedParametersTrait {
+    /// Parameter `q`.
+    fn q(&self) -> &num_bigint::BigUint {
+        self.field().q()
+    }
+
+    /// Returns the length of the byte-array representation of parameter `q`.
+    ///
+    /// E.g., for the standard parameters, this is `32`.
+    fn q_len_bytes(&self) -> usize {
+        self.field().q_len_bytes()
+    }
+
+    /// Parameter `p`.
+    fn p(&self) -> &num_bigint::BigUint {
+        self.group().p()
+    }
+
+    /// Returns the length of the byte-array representation of parameter `p`.
+    ///
+    /// E.g., for the standard parameters, this is `512`.
+    fn p_len_bytes(&self) -> usize {
+        self.group().p_len_bytes()
+    }
+
+    /// Parameter `g`.
+    fn g(&self) -> &num_bigint::BigUint {
+        self.group().g()
+    }
+
+    /// Returns true iff `q`, `p`, and `g` of `self` match those of `rhs`.
+    fn equal_q_p_g(&self, rhs: &dyn FixedParametersTraitExt) -> bool {
+        self.q() == rhs.q() || self.p() == rhs.p() || self.g() == rhs.g()
+    }
+
+    /// Returns true if self is unequal to `rhs`.
+    ///
+    /// If either `self` or `rhs` returns `None` for [`opt_egds_version()`](FixedParametersTrait::opt_egds_version),
+    /// that field is ignored in the comparison.
+    fn is_unequal_to(&self, rhs: &dyn FixedParametersTraitExt) -> bool {
+        if let (Some(lhs_ver), Some(rhs_ver)) = (self.opt_egds_version(), rhs.opt_egds_version()) {
+            if lhs_ver != rhs_ver {
+                return true;
+            }
+        }
+        !self.equal_q_p_g(rhs)
+    }
+
+    /// Returns true iff this set of [`FixedParameters`]
+    ///
+    /// - Matches the build configuration [`FixedParameters`],
+    /// - has `Some` [`opt_egds_version()`](FixedParametersTrait::opt_egds_version),
+    /// - which is a [`Released_Specification_Version`](ElectionGuard_DesignSpecification_Version_Qualifier::Released_Specification_Version),
+    /// - using [`Standard_Parameters`](ElectionGuard_FixedParameters_Kind::Standard_Parameters).
+    fn is_not_explicitly_egds_released_specification_standard_parameters(&self) -> bool {
+        let buildcfg_fpi = buildcfg_fixed_parameters_info();
+
+        if let Some(egds_version) = buildcfg_fpi.opt_egds_version() {
+            !egds_version.is_released_specification_version_with_standard_parameters()
+                || self.is_unequal_to(buildcfg_fpi)
+        } else {
+            debug_assert!(
+                false,
+                "Odd that buildcfg_fixed_parameters_info() does not have Some(egds_version)"
+            );
+            false
+        }
+    }
+}
+
+impl<T> FixedParametersTraitExt for T where T: FixedParametersTrait {}
+
 /// Info for constructing a [`FixedParameters`] through validation.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct FixedParametersInfo {
@@ -162,6 +249,24 @@ impl FixedParametersInfo {
             field,
             group,
         }
+    }
+}
+
+impl FixedParametersTrait for FixedParametersInfo {
+    fn opt_egds_version(&self) -> &Option<ElectionGuard_DesignSpecification_Version> {
+        &self.opt_egds_version
+    }
+
+    fn generation_parameters(&self) -> &FixedParameterGenerationParameters {
+        &self.generation_parameters
+    }
+
+    fn field(&self) -> &ScalarField {
+        &self.field
+    }
+
+    fn group(&self) -> &Group {
+        &self.group
     }
 }
 
@@ -246,20 +351,18 @@ crate::impl_validatable_validated! {
         use ElectionGuard_DesignSpecification_Version_Qualifier as EgdsVersionQualifier;
         use ElectionGuard_FixedParameters_Kind as FPKind;
 
-        let standard_params_info = crate::standard_parameters::make_standard_parameters_info();
+        let buildcfg_fixed_parameters_info = buildcfg_fixed_parameters_info();
 
-        let Some(egds_version_from_standard_params) = standard_params_info.opt_egds_version.clone() else {
+        let Some(egds_version_from_buildcfg) = buildcfg_fixed_parameters_info.opt_egds_version.clone() else {
             return Err(EgValidateError::Str("Standard parameters missing egds_version").into());
         };
 
-        debug!("StandardParameters EGDS version: {egds_version_from_standard_params}");
+        debug!("Build-configured EGDS version: {egds_version_from_buildcfg}");
         debug!("FixedParametersInfo EGDS version: {:?}", fixed_parameters_info.opt_egds_version);
 
         assert_eq!(
-            egds_version_from_standard_params.qualifier,
+            egds_version_from_buildcfg.qualifier,
             EgdsVersionQualifier::Released_Specification_Version );
-
-        assert_eq!(egds_version_from_standard_params.fixed_parameters_kind, FPKind::Standard_Parameters );
 
         let mut require_that_fixed_parameters_exactly_match_standard_parameters = true;
         let mut toy_parameters_permitted = false;
@@ -288,7 +391,7 @@ crate::impl_validatable_validated! {
             // then consider relaxing that requirement.
             match egds_version_from_fp_info.fixed_parameters_kind {
                 ElectionGuard_FixedParameters_Kind::Toy_Parameters => {
-                    if cfg!(feature = "eg-allow-toy-parameters") {
+                    if cfg!(not(feature = "eg-forbid-reduced-params")) {
                         toy_parameters_permitted = true;
                     } else {
                         return Err(EgError::ToyParametersNotSupported {
@@ -303,18 +406,18 @@ crate::impl_validatable_validated! {
         };
 
         // Compare the fixed_parametrs_info to the standard parameters.
-        let fixed_parameters_do_exactly_match_standard_parameters = fixed_parameters_info == standard_params_info;
+        let fixed_parameters_do_exactly_match_standard_parameters = &fixed_parameters_info == buildcfg_fixed_parameters_info;
 
         // If we require that the fixed parameters match exactly the standard parameters, but they didn't, return an error.
         if require_that_fixed_parameters_exactly_match_standard_parameters && ! fixed_parameters_do_exactly_match_standard_parameters {
             let e = if let Some(egds_version_from_fp_info) = fixed_parameters_info.opt_egds_version {
                 EgError::FixedParametersDoNotMatchStatedElectionGuardDesignSpecificationVersion {
                     egds_version_from_fp_info,
-                    egds_version_from_standard_params,
+                    egds_version_from_buildcfg,
                 }
             } else {
                 EgError::FixedParametersDoNotDeclareAnElectionGuardDesignSpecificationVersionOrMatchStandardParams {
-                    egds_version_from_standard_params,
+                    egds_version_from_buildcfg,
                 }
             };
             return Err(e);
@@ -402,43 +505,37 @@ impl From<FixedParameters> for FixedParametersInfo {
     }
 }
 
-/// The fixed parameters define the used field and group.
+/// Parameters which do not change across elections (`p`, `q`, `g`, etc.) and
+/// are inputs to the `ParameterBaseHash`.
+///
+/// These define the field and group.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub struct FixedParameters {
-    /// Version of the ElectionGuard Design Specification to which these parameters conform.
-    /// E.g., `Some([2, 1])` for v2.1.
-    /// `None` means the parameters may not conform to any version of the ElectionGuard spec.
     #[serde(
         rename = "ElectionGuard_Design_Specification_version",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     opt_egds_version: Option<ElectionGuard_DesignSpecification_Version>,
-
-    /// Parameters used to generate the fixed parameters.
     generation_parameters: FixedParameterGenerationParameters,
-
-    /// Prime field `Z_q`.
     field: ScalarField,
-
-    /// Group `Z_p^r` of the same order as `Z_q` including generator `g`.
     group: Group,
 }
 
-impl FixedParameters {
-    pub fn opt_egds_version(&self) -> &Option<ElectionGuard_DesignSpecification_Version> {
+impl FixedParametersTrait for FixedParameters {
+    fn opt_egds_version(&self) -> &Option<ElectionGuard_DesignSpecification_Version> {
         &self.opt_egds_version
     }
 
-    pub fn generation_parameters(&self) -> &FixedParameterGenerationParameters {
+    fn generation_parameters(&self) -> &FixedParameterGenerationParameters {
         &self.generation_parameters
     }
 
-    pub fn field(&self) -> &ScalarField {
+    fn field(&self) -> &ScalarField {
         &self.field
     }
 
-    pub fn group(&self) -> &Group {
+    fn group(&self) -> &Group {
         &self.group
     }
 }

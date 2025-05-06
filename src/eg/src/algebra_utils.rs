@@ -36,7 +36,8 @@ pub fn to_be_bytes_left_pad<T: Borrow<BigUint>>(n: &T, len: usize) -> Vec<u8> {
     if v.len() < len {
         let left_pad = len - v.len();
         v.reserve(left_pad);
-        v.extend(std::iter::repeat_n(0, left_pad));
+        //? TODO this could re-allocate and leak memory that is not properly zeroized.
+        v.extend(std::iter::repeat_n(0x00, left_pad));
         v.rotate_right(left_pad);
     }
 
@@ -284,7 +285,7 @@ mod tests {
     use num_traits::Num;
 
     use super::*;
-    use crate::csrng::{Csrng, DeterministicCsrng};
+    use util::csrng::{Csrng, DeterministicCsrng};
 
     #[test]
     fn test_cnt_bits_repr_usize() {
@@ -346,7 +347,7 @@ mod tests {
     #[test]
     fn test_group_dlog() {
         let csrng: &dyn Csrng =
-            &DeterministicCsrng::from_seed_str("util::algebra_utils::test_group_dlog");
+            &DeterministicCsrng::from_seed_str("crate::algebra_utils::test_group_dlog");
 
         let (field, group) = get_medium_toy_algebras();
 

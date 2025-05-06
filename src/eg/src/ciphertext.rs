@@ -9,36 +9,51 @@
 
 use serde::{Deserialize, Serialize};
 
-use util::{
-    algebra::{FieldElement, Group, GroupElement},
-    index::Index,
-    vec1::HasIndexType,
-};
+//
+use util::{index::Index, vec1::HasIndexType};
 
 use crate::{
+    algebra::{FieldElement, Group, GroupElement},
+    contest::ContestIndex,
     eg::Eg,
-    election_manifest::ContestIndex,
     errors::{EgError, EgResult},
-    fixed_parameters::FixedParameters,
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
     pre_voting_data::PreVotingData,
     selection_limits::EffectiveOptionSelectionLimit,
     zk::ProofRange,
 };
+
+//=================================================================================================|
+
+/// A 1-based index of a [`Ciphertext`] in the order that
+/// the [`ContestOption`](crate::contest_option::ContestOption) is defined within its
+/// [`Contest`](crate::contest::Contest) in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type CiphertextIndex = Index<Ciphertext>;
+
+impl HasIndexType for Ciphertext {
+    type IndexTypeParam = Ciphertext;
+}
+
+//-------------------------------------------------------------------------------------------------|
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq)]
 pub struct Ciphertext {
     pub alpha: GroupElement,
     pub beta: GroupElement,
 }
-
-impl HasIndexType for Ciphertext {
-    type IndexTypeParam = Ciphertext;
-}
-
-/// A 1-based index of a [`Ciphertext`] in the order it is defined in the [`ElectionManifest`](crate::election_manifest::ElectionManifest).
-///
-/// Same type as [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
-pub type CiphertextIndex = Index<Ciphertext>;
 
 impl Ciphertext {
     /// Verify the proof that the cipher text is an encryption of 0 or 1.

@@ -1,4 +1,4 @@
-# ElectionGuard 2.0 - Data Serialization Specification - Version 0.0.1 - 2024-07-30
+# ElectionGuard 2.1.0 - Data Serialization Specification - Version 0.0.1 - 2024-07-30
 
 `TBD: bump version`
 
@@ -32,7 +32,7 @@ allow use of existing off-the-shelf libraries to the extent practical.
 
 ## Conventions Used in This Document
 
-'Design Specification' refers to the ElectionGuard 2.0 Design Specification document.
+'Design Specification' refers to the ElectionGuard 2.1.0 Design Specification document.
 
 Unless otherwise qualified, the terms 'data structures', 'instances', 'objects',
 'values', etc. are used interchangably.
@@ -126,7 +126,7 @@ be appropriate.
 ### Order of properties in objects
 
 Neither the JSON specification nor widespread practice clearly state whether the order of
-object names carries semantic meaning. The notes that many parsing libraries do not expose
+object names carries semantic meaning. Many parsing libraries do not expose
 this order to the Readers of the data structure. However, ElectionGuard objects require a
 defined serialized canonical form for hashing purposes, so in this case it definitely
 matters.
@@ -203,35 +203,17 @@ Description-type text MAY:
 * Use `U+2007 FIGURE SPACE` characters to line up with digits on nearby lines.
 * Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` as necessary.
 
-### Name-type text fields
 
-An example of a name-type text field is the `opt_name` field of `GuardianPublicKey` data structure.
+### Labels and Name-type text fields
 
-In addition to the general requirements applicable to all text data...
-
-Name-type text SHOULD:
-
-* Be human readable and meaningful.
-* Be as concise as practical.
-
-Name-type text SHOULD NOT:
-
-* Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` characters.
-* Contain any leading or trailing whitespace characters.
-* Contain contiguous sequences of multiple whitespace characters.
-
-Name-type text MAY:
-
-* Contain line break characters.
-
-### Labels
+Labels are used to identify the `ElectionManifest`, `Contest`s, `ContestOption`s, `BallotStyle`s,
+and other election data objects.
 
 In addition to the general requirements applicable to all text data...
 
 Labels MUST:
 
 * Be human readable and meaningful.
-* Be as concise as practical.
 * Identify the item uniquely within its scope.
 * Define an equivalence relation that is reflexive and symmetric.
 * Be processed with due regard to security considerations.
@@ -242,20 +224,17 @@ Labels MUST NOT:
 * Use `U+00A0 NO-BREAK SPACE` or `U+202F NARROW NO-BREAK SPACE` characters.
 * Contain any leading or trailing whitespace characters.
 * Contain contiguous sequences of multiple whitespace characters.
-
-Labels text MAY:
-
 * Contain line break characters.
+
+Labels SHOULD:
+
+* Be as concise as practical, to support the widest variety of display formats.
+* Be compatible with [NIST SP 1500-20](References) and [1500-100r2](References)
 
 Writers MUST NOT emit serialized data that does not meet "MUST level" requirements.
 
 Readers MUST verify and reject any serialized data that does not meet "MUST level"
 requirements.
-
-Labels SHOULD:
-
-* Be human readable. Meaningful is a bonus.
-* Be compatible with [NIST SP 1500-20](References) and [1500-100r2](References)
 
 ## Numeric and hash values
 
@@ -299,7 +278,7 @@ where `N` is the number of hex digits specified above.
 
 ### Hash values
 
-The `HMAC-SHA-256` function used in ElectionGuard 2.0 produces fixed size of 32 bytes
+The `HMAC-SHA-256` function used in ElectionGuard 2.1.0 produces fixed size of 32 bytes
 
 which are interpreted (using big-endian) as [large integers](#Large_integers) of that size and
 written as described above. See the [Design Specification][EGDS20] sections 5.1 and 5.4 for more information.

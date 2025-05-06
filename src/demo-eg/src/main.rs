@@ -20,6 +20,10 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
+mod actor_cell_ext;
+mod key_ceremony;
+mod router;
+
 #[rustfmt::skip] //? TODO: Remove temp development code
 use std::{
     //borrow::Cow,
@@ -41,6 +45,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
+use cfg_if::cfg_if;
+use futures_lite::future;
 //use either::Either;
 //use hashbrown::HashMap;
 //use rand::{distr::Uniform, Rng, RngCore};
@@ -50,66 +56,117 @@ use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
-//use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use util::abbreviation::Abbreviation;
 
 use eg::{
     eg::{Eg, EgConfig},
     election_parameters::ElectionParameters,
-    fixed_parameters::FixedParameters,
+    fixed_parameters::{
+        FixedParameters, FixedParametersInfo, FixedParametersTrait, FixedParametersTraitExt,
+    },
     resource::{
         ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, Resource,
         ResourceFormat, ResourceId, ResourceIdFormat,
     },
     serializable::SerializablePretty,
-    varying_parameters::VaryingParameters,
+    varying_parameters::{VaryingParameters, VaryingParametersInfo},
 };
+
+use crate::{actor_cell_ext::ActorCellExt, key_ceremony::key_ceremony, router::Router};
 
 //=================================================================================================|
 
 fn main() -> ExitCode {
+    // Call `main2`
+    let result = main1();
+
+    let ec = match result {
+        Ok(_) => {
+            info!("Success!");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            error!("Error: {e:#}");
+            ExitCode::FAILURE
+        }
+    };
+    info!(name: "finished", "Finished, exiting with code: {ec:?}");
+    ec
+}
+
+fn main1() -> Result<()> {
     use tracing::Level;
     use tracing_subscriber::fmt::format::FmtSpan;
 
+    //let max_level = Level::DEBUG;
+    let max_level = Level::INFO;
+
     // Tracing Subscriber for logging.
     let subscriber_fmt = tracing_subscriber::fmt()
-        //.with_ansi(false)
-        //.with_file(false)
-        .with_max_level(Level::TRACE)
-        //.with_level(true)
-        //.with_line_number(false)
-        .with_span_events(FmtSpan::ACTIVE)
+        .with_ansi(true)
+        .with_file(false)
+        .with_max_level(max_level)
+        .with_level(true)
+        .with_line_number(false)
+        .with_span_events(FmtSpan::NONE)
         .with_target(false)
-        //.with_thread_ids(false)
-        //.with_thread_names(false)
+        .with_thread_ids(false)
+        .with_thread_names(false)
         .without_time()
         .finish();
 
-    // Call `main2`
-    tracing::subscriber::with_default(subscriber_fmt, || -> ExitCode {
-        let result = async_global_executor::block_on(main2());
+    tracing::subscriber::set_global_default(subscriber_fmt)
+        .context("Setting global default tracing subscriber")?;
 
-        let ec = match result {
-            Ok(_) => {
-                info!("Success!");
-                ExitCode::SUCCESS
-            }
-            Err(e) => {
-                error!("Error: {e:#}");
-                ExitCode::FAILURE
-            }
-        };
-        info!(name: "finished", "Finished, exiting with code: {ec:?}");
-        ec
-    })
+    main2()
 }
 
-async fn main2() -> Result<()> {
+fn main2() -> Result<()> {
+    /*
+    let async_global_executor_config =
+        async_global_executor::GlobalExecutorConfig::default()
+            .with_env_var("=")
+            .with_min_threads(0)
+            .with_max_threads(0)
+            .with_thread_name_fn(|| {
+                use std::sync::atomic::{AtomicU64, Ordering};
+                static ATOMIC_THREAD_IX: AtomicU64 = AtomicU64::new(1);
+                let thread_ix = ATOMIC_THREAD_IX.fetch_add(1, Ordering::SeqCst);
+                let name = format!("th{thread_ix}");
+                info!("Spawining thread `{name}`");
+                name
+            });
+    async_global_executor::init_with_config(async_global_executor_config);
+
+    let main3_task = async_global_executor::spawn_local(main3());
+    async_global_executor::block_on(main3_task)
+    async_global_executor::spawn_blocking(main3()).await
+    // */
+
+    info!("{:?} Creating LocalExecutor", std::thread::current().id());
+    let ex = async_executor::LocalExecutor::new();
+    info!(
+        "{:?} Spawning and blocking on task",
+        std::thread::current().id()
+    );
+    let task = ex.spawn(main3());
+    future::block_on(ex.run(task))
+}
+
+async fn main3() -> Result<()> {
+    sep("");
+
     info!(name: "started", "Started");
 
-    let csprng_seed_str = "demo-eg";
-    info!(csprng_seed_str);
+    cfg_if! {
+        if #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))] {
+            let csprng_seed_str = "demo-eg";
+            info!("Built with `eg-allow-insecure-deterministic-csprng` feature, `csprng_seed_str` is: {csprng_seed_str:?}");
+        } else {
+            info!("Not built with `eg-allow-insecure-deterministic-csprng` feature.");
+        }
+    }
 
     // Specify the election parameters
     let n = 5;
@@ -121,25 +178,28 @@ async fn main2() -> Result<()> {
     let cnt_ballots = 10_usize;
     info!(cnt_ballots, "Number of ballots:");
 
-    let eg = {
-        let mut config = EgConfig::new();
-        config.use_insecure_deterministic_csprng_seed_str(csprng_seed_str);
-        config.enable_test_data_generation_n_k(n, k)?;
+    sep("Eg"); //================================================================================ Eg
 
-        // test code to only show specific mappings
-        config.resourceproducer_registry_mut().registrations_retain(
-            |registryengry_key, registryengry_value| {
-                registryengry_key.name == "Specific" || registryengry_key.name == "ExampleData"
-            },
-        );
+    let arc_eg = {
+        let mut config = EgConfig::new();
+
+        #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
+        config.use_insecure_deterministic_csprng_seed_str(csprng_seed_str);
+
+        config.enable_test_data_generation_n_k(n, k)?;
 
         Eg::from_config(config)
     };
-    let eg = eg.as_ref();
+    let eg = arc_eg.as_ref();
 
+    /*
     format!("{eg:#?}")
         .lines()
         .for_each(|line| debug!("`Eg`: {line}"));
+    // */
+
+    /*
+    sep("ElectionGuard_DesignSpecification_Version"); //== ElectionGuard_DesignSpecification_Version
 
     let (egds_version, egds_version_rsrc): (
         Arc<eg::egds_version::ElectionGuard_DesignSpecification_Version>,
@@ -166,28 +226,85 @@ async fn main2() -> Result<()> {
         .await?;
     info!("{egds_version_slicebytes:#?} {egds_version_slicebytes_rsrc}");
     info!("{egds_version_slicebytes:?} {egds_version_slicebytes_rsrc}");
+    // */
+
+    sep("ResourceProducer Registrations"); //======================== ResourceProducer Registrations
+
+    eg.config().resourceproducer_registry().debug_log_entries();
+
+    /*
+    sep("FixedParametersInfo"); //============================================== FixedParametersInfo
+    let (fixed_parameters_info, rsrc): (Arc<FixedParametersInfo>, _) = eg
+        .produce_resource_downcast(&EdoId::FixedParameters.info_type_ridfmt())
+        .await?;
+    pretty_print_resource_to_stderr(fixed_parameters_info);
+    // */
+
+    sep("FixedParameters"); //====================================================== FixedParameters
 
     let (fixed_parameters, rsrc): (Arc<FixedParameters>, _) = eg
         .produce_resource_downcast(&EdoId::FixedParameters.validated_type_ridfmt())
         .await?;
+    /*
     info!("{fixed_parameters:#?}");
     info!("source: {rsrc}");
-
     pretty_print_resource_to_stderr(fixed_parameters);
-
-    let (fixed_parameters_info, rsrc): (Arc<FixedParameters>, _) = eg
-        .produce_resource_downcast(&EdoId::FixedParameters.info_type_ridfmt())
+    // */
+    /*
+    sep("VaryingParametersInfo"); //========================================== VaryingParametersInfo
+    let (varying_parameters_info, rsrc): (Arc<VaryingParametersInfo>, _) = eg
+        .produce_resource_downcast(&EdoId::VaryingParameters.info_type_ridfmt())
         .await?;
+    pretty_print_resource_to_stderr(varying_parameters_info);
+    // */
 
-    pretty_print_resource_to_stderr(fixed_parameters_info);
+    /*
+    sep("VaryingParameters"); //================================================== VaryingParameters
+    let (varying_parameters, rsrc): (Arc<VaryingParameters>, _) =
+        eg.produce_resource_downcast(&EdoId::VaryingParameters.validated_type_ridfmt())
+        .await?;
+    info!("{varying_parameters:#?}");
+    info!("source: {rsrc}");
+    // */
+
+    sep("ElectionParametersInfo"); //======================================== ElectionParametersInfo
+
+    let (election_parameters_info, rsrc): (Arc<ElectionParameters>, _) = eg
+        .produce_resource_downcast(&EdoId::ElectionParameters.validated_type_ridfmt())
+        .await?;
+    /*
+    info!("{election_parameters_info:#?}");
+    info!("source: {rsrc}");
+    pretty_print_resource_to_stderr(election_parameters_info);
+    // */
+
+    sep("ElectionParameters"); //================================================ ElectionParameters
+
+    let (election_parameters, rsrc): (Arc<ElectionParameters>, _) = eg
+        .produce_resource_downcast(&EdoId::ElectionParameters.validated_type_ridfmt())
+        .await?;
+    /*
+    info!("{election_parameters:#?}");
+    info!("source: {rsrc}");
+    //pretty_print_resource_to_stderr(election_parameters);
+    // */
+
+    sep("Key Ceremony"); //============================================================ Key Ceremony
+
+    key_ceremony(&arc_eg).await?;
+
+    /*
+    sep(""); //===================================================
+
+    sep(""); //===================================================
+
+    sep(""); //===================================================
+
+    sep(""); //===================================================
+    // */
 
     /*
     info!("{fixed_parameters_info:#?}");
-    info!("source: {rsrc}");
-
-    let (varying_parameters, rsrc): (Arc<VaryingParameters>, _) =
-        eg.produce_resource_downcast(&EdoId::VaryingParameters.validated_type_ridfmt())?;
-    info!("{varying_parameters:#?}");
     info!("source: {rsrc}");
 
     let (election_parameters, rsrc): (Arc<ElectionParameters>, _) =
@@ -195,6 +312,8 @@ async fn main2() -> Result<()> {
     info!("{election_parameters:#?}");
     info!("source: {rsrc}");
     // */
+
+    sep("Done"); //=================================================== Done
 
     Ok(())
 }
@@ -391,6 +510,23 @@ async fn main2() -> Result<()> {
 //?         ]
 //?     }
 //? }
+
+fn sep(s: &str) {
+    let line_len: usize = 100;
+    let s_cnt_chars = s.chars().count();
+
+    if s_cnt_chars == 0 {
+        let s2 = "=".repeat(line_len);
+        println!("\n{s2}\n");
+    } else {
+        let total_repeat = line_len.saturating_sub(s_cnt_chars + 2).max(8);
+        let repeat_len1 = total_repeat / 2;
+        let repeat_len3 = total_repeat.div_ceil(2);
+        let s1 = "=".repeat(repeat_len1);
+        let s3 = "=".repeat(repeat_len3);
+        println!("\n{s1} {s} {s3}\n");
+    }
+}
 
 fn pretty_print_to_stderr(sp: &dyn SerializablePretty, title: &str) {
     let _ = (|| -> anyhow::Result<()> {

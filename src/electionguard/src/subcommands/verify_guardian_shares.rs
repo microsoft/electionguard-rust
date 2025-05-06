@@ -88,10 +88,10 @@ impl Subcommand for VerifyGuardianShares {
         //                 .join(format!("{}", l)),
         //         )
         //         .unwrap();
-        //         // Read encrypted share and proof
-        //         let encrypted_shares = shares_from_json(
+        //         // Read inter-Guardian share and proof
+        //         let interguardian_shares = shares_from_json(
         //             &String::from_utf8(read_path(&their_artifacts.path(
-        //                 ArtifactFile::GuardianEncryptedShares(l as u16, guardian.i as u16),
+        //                 ArtifactFile::InterguardianShares(l as u16, guardian.i as u16),
         //             )))
         //             .unwrap(),
         //         );
@@ -103,8 +103,8 @@ impl Subcommand for VerifyGuardianShares {
         //         );
 
         //         // let mut idx = self.i - 1;
-        //         let mut idx = encrypted_shares.len();
-        //         for (i, s) in encrypted_shares.iter().enumerate() {
+        //         let mut idx = interguardian_shares.len();
+        //         for (i, s) in interguardian_shares.iter().enumerate() {
         //             assert!(s.i != l);
         //             if s.i == guardian.i as u16 {
         //                 idx = i as usize;
@@ -117,7 +117,7 @@ impl Subcommand for VerifyGuardianShares {
         //             &election_parameters,
         //             &hashes.h_p,
         //             l as usize,
-        //             &encrypted_shares[idx as usize],
+        //             &interguardian_shares[idx as usize],
         //         );
 
         //         // Verify secret key share

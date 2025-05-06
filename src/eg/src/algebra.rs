@@ -14,13 +14,9 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::{
-    algebra_utils::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad},
-    base16::to_string_uppercase_hex_infer_len,
-    csrng::Csrng,
-    prime::is_prime,
-};
+use util::{base16::to_string_uppercase_hex_infer_len, csrng::Csrng, prime::is_prime};
 
+use crate::algebra_utils::{cnt_bits_repr, mod_inverse, to_be_bytes_left_pad};
 /// Sub-optimal method of zeroing-out [`BigUint`] type on a best-effort basis.
 /// Unfortunately, BigUint does not expose enough of its internals to provide
 /// any guarantees.
@@ -41,8 +37,8 @@ fn try_to_zeroize_biguint(b: &mut BigUint) {
 pub struct FieldElement(
     #[serde(
         //? TODO don't hardcode 256 bits
-        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
+        serialize_with = "util::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "util::biguint_serde::biguint_deserialize_256_bits"
     )]
     BigUint,
 );
@@ -242,8 +238,8 @@ pub struct ScalarField {
     /// Subgroup order.
     #[serde(
         //? TODO don't hardcode 256 bits
-        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
+        serialize_with = "util::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "util::biguint_serde::biguint_deserialize_256_bits"
     )]
     q: BigUint,
 }
@@ -256,19 +252,17 @@ impl ScalarField {
     /// A field should therefore be constructed once and then reused as much as possible.
     ///
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`ScalarField::new_unchecked`].
-    pub fn new(order: BigUint, csrng: &dyn Csrng) -> Option<Self> {
-        let f = ScalarField { q: order };
-        if f.is_valid(csrng) {
-            return Some(f);
-        }
-        None
+    #[inline]
+    pub fn new<T: Into<BigUint>>(order: T, csrng: &dyn Csrng) -> Option<Self> {
+        Some(Self::new_unchecked(order)).filter(|f| f.is_valid(csrng))
     }
 
     /// Constructs a new scalar field from a given order without checking primality.
     ///
     /// This function *assumes* that the given order is prime.
-    pub fn new_unchecked(order: BigUint) -> Self {
-        ScalarField { q: order }
+    #[inline]
+    pub fn new_unchecked<T: Into<BigUint>>(order: T) -> Self {
+        ScalarField { q: order.into() }
     }
 
     /// The function validates the given field by checking that the modulus is prime. The call is expensive.
@@ -294,8 +288,13 @@ impl ScalarField {
         FieldElement(csrng.next_biguint_lt(&self.q).unwrap())
     }
 
-    /// Returns the order `q` of the field
+    /// Returns the order of the field, `q`.
     pub fn order(&self) -> &BigUint {
+        &self.q
+    }
+
+    /// Returns `q`, the order of the field.
+    pub fn q(&self) -> &BigUint {
         &self.q
     }
 
@@ -331,8 +330,8 @@ impl std::fmt::Display for ScalarField {
 pub struct GroupElement(
     #[serde(
         //? TODO don't hardcode 4096 bits
-        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
+        serialize_with = "util::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "util::biguint_serde::biguint_deserialize_4096_bits"
     )]
     BigUint,
 );
@@ -427,30 +426,30 @@ pub struct Group {
     /// Prime modulus `p`.
     #[serde(
         //? TODO don't hardcode 4096 bits
-        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
+        serialize_with = "util::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "util::biguint_serde::biguint_deserialize_4096_bits"
     )]
     p: BigUint,
 
     /// Subgroup generator `g`.
     #[serde(
         //? TODO don't hardcode 4096 bits
-        serialize_with = "crate::biguint_serde::biguint_serialize_4096_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_4096_bits"
+        serialize_with = "util::biguint_serde::biguint_serialize_4096_bits",
+        deserialize_with = "util::biguint_serde::biguint_deserialize_4096_bits"
     )]
     g: BigUint,
 
     /// Group order `q`.
     #[serde(
         //? TODO don't hardcode 256 bits
-        serialize_with = "crate::biguint_serde::biguint_serialize_256_bits",
-        deserialize_with = "crate::biguint_serde::biguint_deserialize_256_bits"
+        serialize_with = "util::biguint_serde::biguint_serialize_256_bits",
+        deserialize_with = "util::biguint_serde::biguint_deserialize_256_bits"
     )]
     q: BigUint,
 }
 
 impl Group {
-    /// Constructs a new multiplicative integer group `Z_p^r`.
+    /// Constructs a new multiplicative subgroup `Z_p^r`.
     ///
     /// The arguments are
     /// - `modulus` - the modulus `p`
@@ -463,29 +462,27 @@ impl Group {
     /// then reused as much as possible.
     ///
     /// Alternatively, one can use fixed, *trusted/tested* parameters with [`Group::new_unchecked`].
-    pub fn new(
-        modulus: BigUint,
-        order: BigUint,
-        generator: BigUint,
+    #[inline]
+    pub fn new<T: Into<BigUint>, U: Into<BigUint>, V: Into<BigUint>>(
+        modulus: T,
+        order: U,
+        generator: V,
         csrng: &dyn Csrng,
     ) -> Option<Self> {
-        let group = Group {
-            p: modulus,
-            g: generator,
-            q: order,
-        };
-        if group.is_valid(csrng) {
-            return Some(group);
-        }
-        None
+        Some(Self::new_unchecked(modulus, order, generator)).filter(|g| g.is_valid(csrng))
     }
 
     /// Constructs a new [`Group`] without checking the validity according to [`Group::is_valid`].
-    pub fn new_unchecked(modulus: BigUint, order: BigUint, generator: BigUint) -> Self {
+    #[inline]
+    pub fn new_unchecked<T: Into<BigUint>, U: Into<BigUint>, V: Into<BigUint>>(
+        modulus: T,
+        order: U,
+        generator: V,
+    ) -> Self {
         Group {
-            p: modulus,
-            g: generator,
-            q: order,
+            p: modulus.into(),
+            g: generator.into(),
+            q: order.into(),
         }
     }
 
@@ -553,14 +550,29 @@ impl Group {
         &self.q
     }
 
+    /// Returns `q`, the group order.
+    pub fn q(&self) -> &BigUint {
+        &self.q
+    }
+
     /// Returns a reference to the modulus of the group
     pub fn modulus(&self) -> &BigUint {
+        &self.p
+    }
+
+    /// Returns `p`, the modulus.
+    pub fn p(&self) -> &BigUint {
         &self.p
     }
 
     /// Returns a generator of the group
     pub fn generator(&self) -> GroupElement {
         GroupElement(self.g.clone())
+    }
+
+    /// Returns `g`, the generator.
+    pub fn g(&self) -> &BigUint {
+        &self.g
     }
 
     /// Returns the length of the byte array representation of modulus `p`.
@@ -610,10 +622,9 @@ impl std::fmt::Display for Group {
 mod test {
     use num_bigint::BigUint;
 
-    use crate::{
-        algebra::{FieldElement, Group, GroupElement, ScalarField},
-        csrng::{Csrng, DeterministicCsrng},
-    };
+    use util::csrng::{Csrng, DeterministicCsrng};
+
+    use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
 
     fn get_toy_algebras() -> (ScalarField, Group) {
         (

@@ -33,8 +33,6 @@ use std::{
 
 //use anyhow::{anyhow, bail, ensure, Context, Result};
 //use either::Either;
-//use proc_macro2::{Ident,Literal,TokenStream};
-//use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 //use rand::{distr::Uniform, Rng, RngCore};
 use serde::Serialize;
 //use static_assertions::assert_obj_safe;
@@ -97,6 +95,8 @@ impl EgConfig {
     pub fn new() -> EgConfig {
         Self {
             rpregistry: ResourceProducerRegistry::new_with_defaultproducers(),
+
+            #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
             opt_insecure_deterministic_seed_data: None,
         }
     }

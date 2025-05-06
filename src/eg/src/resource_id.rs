@@ -32,8 +32,6 @@ use std::{
 
 //use anyhow::{anyhow, bail, ensure, Context, Result};
 //use either::Either;
-//use proc_macro2::{Ident,Literal,TokenStream};
-//use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 //use rand::{distr::Uniform, Rng, RngCore};
 //use serde::{Deserialize, Serialize};
 //use static_assertions::assert_obj_safe;
@@ -43,7 +41,8 @@ use util::abbreviation::Abbreviation;
 use crate::{
     //eg::Eg,
     //errors::EgResult,
-    guardian::{GuardianKeyPartId, GuardianKeyPurpose},
+    guardian::{GuardianIndex, GuardianKeyPartId},
+    key::KeyPurpose,
     resource::Resource,
     resource_path::ResourceNamespacePath,
 };
@@ -67,6 +66,13 @@ pub enum ElectionDataObjectId {
     VaryingParameters,
     ElectionParameters,
 
+    /// A Guardian, identified by [`GuardianIndex`].
+    #[display("Guardian({_0})")]
+    Guardian(GuardianIndex),
+
+    /// A specific set of Guardians which, if changed, requires all keys be regenerated from scratch.
+    GuardianSet,
+
     /// Defines a [`BallotStyle`]. Part of the [`ElectionManifest`].
     BallotStyle,
 
@@ -85,9 +91,16 @@ pub enum ElectionDataObjectId {
     #[display("GuardianKeyPart({_0})")]
     GuardianKeyPart(GuardianKeyPartId),
 
+    // /// The set of three public keys for a specific Guardian.
+    // #[display("GuardianPublicKeys({_0})")]
+    // GuardianPublicKeys(GuardianIndex),
+
+    // /// The set of three secret keys held by a specific Guardian.
+    // #[display("GuardianSecretKeys({_0})")]
+    // GuardianSecretKeys(GuardianIndex),
     ///? TODO Consider making this two separate identifiers, as there's no joint key for `kappa`.
     #[display("JointPublicKey({_0})")]
-    JointPublicKey(GuardianKeyPurpose),
+    JointPublicKey(KeyPurpose),
 
     /// `H_E` [`ExtendedBaseHash`](crate::extended_base_hash::ExtendedBaseHash)
     ///
@@ -106,6 +119,11 @@ pub enum ElectionDataObjectId {
 
     /// The election tallies.
     ElectionTallies,
+
+    // This is just a template to copy-and-paste to get started with new EDO types.
+    // It's only enabled in test builds just to verify it compiles.
+    #[cfg(any(feature = "eg-allow-test-data-generation", test))]
+    EdoTemplateSimple,
 }
 
 impl ElectionDataObjectId {
@@ -136,6 +154,8 @@ impl Abbreviation for ElectionDataObjectId {
             FixedParameters => "FixedParameters".into(),
             VaryingParameters => "VaryingParameters".into(),
             ElectionParameters => "ElectionParameters".into(),
+            Guardian(ix) => format!("Guardian_{ix}").into(),
+            GuardianSet => "GuardianSet".into(),
             BallotStyle => "BallotStyle".into(),
             VotingDeviceInformationSpec => "VotingDeviceInformationSpec".into(),
             ElectionManifest => "ElectionManifest".into(),
@@ -151,6 +171,8 @@ impl Abbreviation for ElectionDataObjectId {
             .into(),
             VotingDeviceInformation => "VotingDeviceInformation".into(),
             ElectionTallies => "ElectionTallies".into(),
+            #[cfg(any(feature = "eg-allow-test-data-generation", test))]
+            EdoTemplateSimple => "EdoTemplateSimple".into(),
         }
     }
 }

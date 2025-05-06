@@ -8,6 +8,7 @@
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     ops::DerefMut,
 };
@@ -17,17 +18,16 @@ use tracing::{
     warn,
 };
 
-use util::algebra::FieldElement;
-
 use crate::{
-    ballot_style::{BallotStyle, BallotStyleIndex},
+    algebra::FieldElement,
+    ballot_style::{BallotStyle, BallotStyleIndex, BallotStyleTrait},
     chaining_mode::ChainingField,
+    contest::ContestIndex,
     contest_data_fields_ciphertexts::ContestDataFieldsCiphertexts,
     contest_data_fields_plaintexts::ContestDataFieldsPlaintexts,
     eg::Eg,
-    election_manifest::ContestIndex,
     errors::{EgError, EgResult},
-    fixed_parameters::FixedParameters,
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
     hash::{HValue, SpecificHValue, eg_h},
     pre_voting_data::PreVotingData,
     resource::{ProduceResource, ProduceResourceExt},
@@ -504,16 +504,28 @@ impl Ballot {
 
         // Check the h_e from the VSP with that from PVD.
         if &voterselections_h_e != election_h_e {
-            return Err(EgError::VoterSelectionsPlaintextDoesNotMatchExpected {
+            let e = EgError::VoterSelectionsPlaintextDoesNotMatchExpected {
                 voterselections_h_e,
                 election_h_e: election_h_e.clone(),
-            });
+            }
+            .while_producing_ballot(ballot_style_ix);
+            trace!("{e}");
+            return Err(e);
         }
 
         let h_e = voterselections_h_e;
 
         // Get the BallotStyle
-        let ballot_style = election_manifest.ballot_styles().try_get(ballot_style_ix)?;
+        let ballot_style = election_manifest
+            .ballot_styles()
+            .try_get(ballot_style_ix)
+            .map_err(|_e| {
+                EgError::BallotStyleNotInElectionManifest {
+                    ballot_style_ix,
+                    election_manifest_cnt_ballot_styles: election_manifest.ballot_styles().len(),
+                }
+                .while_producing_ballot(ballot_style_ix)
+            })?;
 
         // Generate a random ballot nonce `xi_B` if one is not provided.
         let ballot_nonce_xi_B = opt_ballot_nonce_xi_B
@@ -532,10 +544,7 @@ impl Ballot {
                     contest_ix,
                     contest_option_fields_plaintexts,
                 )
-                .map_err(|e| EgError::WhileProducingBallot {
-                    ballot_style_ix,
-                    bx_err: Box::new(e),
-                })
+                .map_err(|e| e.while_producing_ballot(ballot_style_ix))
                 .inspect_err(|e| error!("{e}"))?;
             contests_data_fields_plaintexts
                 .insert(contest_ix, specific_contest_data_fields_plaintexts);
@@ -570,7 +579,8 @@ impl Ballot {
                     contest_ix,
                     contest_data_fields_plaintexts,
                 )
-                .await?
+                .await
+                .map_err(|e| e.while_producing_ballot(ballot_style_ix))?
             };
 
             contests_data_fields_ciphertexts.insert(contest_ix, contest_data_fields_ciphertexts);
@@ -632,6 +642,7 @@ impl SerializableCanonical for Ballot {}
 #[allow(clippy::unwrap_used)]
 mod t {
     use anyhow::{Context, Result, anyhow, bail, ensure};
+    use insta::assert_ron_snapshot;
 
     use util::csrng::{self, Csrng};
 
@@ -643,11 +654,16 @@ mod t {
 
     use super::*;
 
-    fn test_verify_ballot_common(
+    fn test_verify_ballot_common<BSI>(
         csprng_seed_str: &str,
-        ballot_style_ix: BallotStyleIndex,
+        ballot_style_ix: BSI,
         contests_option_fields_plaintexts: BTreeMap<ContestIndex, ContestOptionFieldsPlaintexts>,
-    ) -> EgResult<()> {
+    ) -> EgResult<()>
+    where
+        BSI: TryInto<BallotStyleIndex>,
+        EgError: From<<BSI as TryInto<BallotStyleIndex>>::Error>,
+    {
+        let ballot_style_ix = ballot_style_ix.try_into()?;
         async_global_executor::block_on(test_verify_ballot_common_async(
             csprng_seed_str,
             ballot_style_ix,
@@ -720,7 +736,7 @@ mod t {
     fn ballotstyle1_contest1_votes_0_0() -> EgResult<()> {
         test_verify_ballot_common(
             "ballot::t::ballotstyle1_contest1_votes_0_0",
-            1.try_into()?,
+            1, // ballot_style_ix
             [(
                 1.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0])?,
@@ -734,7 +750,7 @@ mod t {
     fn ballotstyle1_contest1_votes_0_1() -> EgResult<()> {
         test_verify_ballot_common(
             "ballot::t::ballotstyle1_contest1_votes_0_1",
-            1.try_into()?,
+            1, // ballot_style_ix
             [(
                 1.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1])?,
@@ -748,7 +764,7 @@ mod t {
     fn ballotstyle1_contest1_votes_1_0() -> EgResult<()> {
         test_verify_ballot_common(
             "ballot::t::ballotstyle1_contest1_votes_1_0",
-            1.try_into()?,
+            1, // ballot_style_ix
             [(
                 1.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0])?,
@@ -762,7 +778,7 @@ mod t {
     fn ballotstyle1_contest1_votes_1_1() -> EgResult<()> {
         test_verify_ballot_common(
             "ballot::t::ballotstyle1_contest1_votes_1_1",
-            1.try_into()?,
+            1, // ballot_style_ix
             [(
                 1.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0])?,
@@ -774,10 +790,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_0_0_0_0_0_0() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_0_0_0_0_0_0",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 0, 0, 0])?,
@@ -789,10 +804,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_0_0_0_0_0_1() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_0_0_0_0_0_1",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 0, 0, 1])?,
@@ -804,10 +818,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_0_0_0_0_1_0() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_0_0_0_0_1_0",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 0, 1, 0])?,
@@ -819,10 +832,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_0_0_0_1_0_0() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_0_0_0_1_0_0",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 0, 1, 0, 0])?,
@@ -834,10 +846,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_0_0_1_0_0_0() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_0_0_1_0_0_0",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0, 1, 0, 0, 0])?,
@@ -849,10 +860,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_0_1_0_0_0_0() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_0_1_0_0_0_0",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1, 0, 0, 0, 0])?,
@@ -864,10 +874,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle5_contest5_votes_1_0_0_0_0_0() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_1_0_0_0_0_0",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
                 5.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0, 0, 0, 0, 0])?,
@@ -878,34 +887,32 @@ mod t {
 
     #[test_log::test]
     #[ignore]
-    fn ballotstyle5_contest5_votes_1_0_0_0_0_1_range_proof_error() -> EgResult<()> {
-        let ballot_style_ix = 5.try_into()?;
+    fn ballotstyle5_contest5_votes_1_0_0_0_0_1_range_proof_error() {
         let result = test_verify_ballot_common(
             "ballot::t::ballotstyle5_contest5_votes_1_0_0_0_0_1_range_proof_error",
-            ballot_style_ix,
+            5, // ballot_style_ix
             [(
-                5.try_into()?,
-                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0, 0, 0, 0, 1])?,
+                5.try_into().unwrap(),
+                ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0, 0, 0, 0, 1]).unwrap(),
             )]
             .into(),
         );
-        assert!(matches!(
-            result,
-            Err(EgError::ProofError(ZkProofRangeError::RangeNotSatisfied {
-                small_l: 2,
-                big_l: 1
-            }))
-        ));
-        Ok(())
+        assert_ron_snapshot!(result, @r#"
+        Err(WhileProducingBallot(
+          ballot_style_ix: 5,
+          bx_err: ProofError(RangeNotSatisfied(
+            small_l: 2,
+            big_l: 1,
+          )),
+        ))"#);
     }
 
     #[test_log::test]
     #[ignore]
     fn ballotstyle6_contest6_votes_0_0() -> EgResult<()> {
-        let ballot_style_ix = 6.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle6_contest6_votes_0_0",
-            ballot_style_ix,
+            6, // ballot_style_ix
             [(
                 6.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 0])?,
@@ -919,7 +926,7 @@ mod t {
     fn ballotstyle6_contest6_votes_0_1() -> EgResult<()> {
         test_verify_ballot_common(
             "ballot::t::ballotstyle6_contest6_votes_0_1",
-            6.try_into()?,
+            6,
             [(
                 6.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([0_u8, 1])?,
@@ -931,10 +938,9 @@ mod t {
     #[test_log::test]
     #[ignore]
     fn ballotstyle6_contest6_votes_1_0() -> EgResult<()> {
-        let ballot_style_ix = 6.try_into()?;
         test_verify_ballot_common(
             "ballot::t::ballotstyle6_contest6_votes_1_0",
-            ballot_style_ix,
+            6, // ballot_style_ix
             [(
                 6.try_into()?,
                 ContestOptionFieldsPlaintexts::try_new_from([1_u8, 0])?,
@@ -948,19 +954,20 @@ mod t {
     fn ballotstyle6_contest6_votes_1_1_range_proof_error() {
         let result = test_verify_ballot_common(
             "ballot::t::ballotstyle6_contest6_votes_1_1_range_proof_error",
-            6.try_into().unwrap(),
+            6, // ballot_style_ix
             [(
                 6.try_into().unwrap(),
                 ContestOptionFieldsPlaintexts::try_new_from([1_u8, 1]).unwrap(),
             )]
             .into(),
         );
-        assert!(matches!(
-            result,
-            Err(EgError::ProofError(ZkProofRangeError::RangeNotSatisfied {
-                small_l: 2,
-                big_l: 1
-            }))
-        ));
+        assert_ron_snapshot!(result, @r#"
+        Err(WhileProducingBallot(
+          ballot_style_ix: 6,
+          bx_err: ProofError(RangeNotSatisfied(
+            small_l: 2,
+            big_l: 1,
+          )),
+        ))"#);
     }
 }

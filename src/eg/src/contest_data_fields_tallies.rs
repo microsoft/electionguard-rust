@@ -20,22 +20,54 @@
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
 use serde::{Deserialize, Serialize};
+
+//
 use util::{
+    index::Index,
     uint53::{Uint53, Uint53Error},
     vec1::{HasIndexType, Vec1},
 };
 
 use crate::{
     ciphertext::{Ciphertext, CiphertextIndex},
+    contest::{Contest, ContestIndex},
     eg::Eg,
-    election_manifest::{Contest, ElectionManifest},
+    election_manifest::ElectionManifest,
     errors::EgResult,
 };
 
-/// Plaintext value of a tally of a contest data field, which could represent either a selectable option or additional data.
+//=================================================================================================|
+
+/// A 1-based index of a [`ContestDataFieldTally`] in the order that
+/// the [`ContestOption`](crate::contest_option::ContestOption) is defined within its
+/// [`Contest`](crate::contest::Contest) in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
 ///
-/// Note that in many cases you would instead use 'ContestDataFieldsCiphertexts' and 'ContestDataFieldsVerifiableDecryptions',
-/// as those will allow verification of both the [`ContestSelectionLimit`] and individual [`ContestDataFieldLimit`].
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type ContestDataFieldTallyIndex = CiphertextIndex;
+
+impl HasIndexType for ContestDataFieldTally {
+    type IndexTypeParam = Ciphertext;
+}
+
+//-------------------------------------------------------------------------------------------------|
+
+/// Plaintext value of a tally of a contest data field, which could represent either a selectable
+/// option or additional data.
+///
+/// Note that in many cases you would instead use 'ContestDataFieldsCiphertexts' and
+/// 'ContestDataFieldsVerifiableDecryptions', as those will allow verification of bot
+/// the [`ContestSelectionLimit`] and individual [`ContestDataFieldLimit`].
 ///
 //? TODO maybe this goes away entirely?
 #[derive(
@@ -232,14 +264,21 @@ impl From<ContestDataFieldTally> for u128 {
     }
 }
 
-impl HasIndexType for ContestDataFieldTally {
-    type IndexTypeParam = Ciphertext;
-}
+//=================================================================================================|
 
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex),
-/// [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex),
-/// [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
-pub type ContestDataFieldTallyIndex = CiphertextIndex;
+/// A 1-based index of a [`ContestTallies`] in the order that
+/// the [`Contest`](crate::contest::Contest) is defined in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`ContestIndex`](crate::contest::ContestIndex)
+/// - [`ContestTalliesIndex`](crate::contest_data_fields_tallies::ContestTalliesIndex)
+pub type ContestTalliesIndex = ContestIndex;
+
+impl HasIndexType for ContestTallies {
+    type IndexTypeParam = Contest;
+}
 
 //-------------------------------------------------------------------------------------------------|
 
@@ -279,13 +318,6 @@ impl ContestTallies {
         Ok(contest_tallies)
     }
 }
-
-impl HasIndexType for ContestTallies {
-    type IndexTypeParam = Contest;
-}
-
-/// Same type as [`ContestIndex`](crate::election_manifest::ContestIndex).
-pub type ContestTalliesIndex = crate::election_manifest::ContestIndex;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

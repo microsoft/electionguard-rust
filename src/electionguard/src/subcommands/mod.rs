@@ -7,7 +7,7 @@
 #![allow(clippy::assertions_on_constants)]
 
 mod guardian_secret_key_generate;
-//? TODO guardian_secret_key_write_encrypted_share;
+//? TODO guardian_secret_key_write_interguardian_share;
 mod guardian_secret_key_write_public_key;
 mod none;
 //? TODO #preencrypted_ballot# mod preencrypted_ballot_generate;
@@ -99,8 +99,8 @@ pub(crate) enum Subcommands {
     // ),
 
     //? TODO #preencrypted_ballot#
-    // /// Generate an encrypted share of the guardian secret key.
-    // GuardianSecretKeyWriteEncryptedShare(crate::subcommands::guardian_secret_key_write_encrypted_share::GuardianSecretKeyWriteEncryptedShare),
+    // /// Generate an inter-Guardian share of the guardian secret key.
+    // GuardianSecretKeyWriteInterGuardianShare(crate::subcommands::guardian_secret_key_write_interguardian_share::GuardianSecretKeyWriteInterGuardianShare),
     //
     // /// Generate pre-encrypted ballots.
     // PreEncryptedBallotGenerate(
@@ -131,7 +131,7 @@ impl<'a> From<&'a mut Subcommands> for &'a mut dyn Subcommand {
             WriteHashes(a) => a,
             GuardianSecretKeyGenerate(a) => a,
             GuardianSecretKeyWritePublicKey(a) => a,
-            //TODO GuardianSecretKeyWriteEncryptedShare(a) => a,
+            //TODO GuardianSecretKeyWriteInterGuardianShare(a) => a,
             //? WriteJointPublicKey(a) => a,
             //? WriteExtendedBaseHash(a) => a,
             WritePreVotingData(a) => a,

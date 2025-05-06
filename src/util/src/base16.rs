@@ -8,6 +8,7 @@
 
 use anyhow::{Result, bail, ensure};
 use num_bigint::BigUint;
+use num_traits::Num;
 
 /// Converts a `BigUint` to a string using uppercase hex digits with no prefix.
 ///
@@ -68,9 +69,8 @@ pub fn to_string_uppercase_hex_infer_len(u: &BigUint) -> String {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod to_string {
-    use insta::assert_ron_snapshot;
-
     use super::*;
+    use insta::assert_ron_snapshot;
 
     #[test]
     fn fixed_len_specified() {
@@ -119,6 +119,17 @@ mod to_string {
         assert_ron_snapshot!(r(0x_00000001_00000000), @r###""0000000100000000""###);
         assert_ron_snapshot!(r(0x_FFFFFFFF_FFFFFFFF), @r###""FFFFFFFFFFFFFFFF""###);
     }
+}
+
+//-------------------------------------------------------------------------------------------------|
+
+/// Read a base16 hex `BigUint` number from a str, using [`num_traits::Num::from_str_radix()`].
+pub fn hex_to_biguint(s: &str) -> BigUint {
+    let s = s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+
+    // `unwrap()` is justified here because `s` is fixed at compile time.
+    #[allow(clippy::unwrap_used)]
+    BigUint::from_str_radix(s.as_str(), 16).unwrap()
 }
 
 //-------------------------------------------------------------------------------------------------|

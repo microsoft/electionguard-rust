@@ -12,25 +12,26 @@
 //!
 //! For more details see EGDS 2.1.0 sec. 3.2.2 pg. 26 eq. 25-26
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result, ensure};
 use num_bigint::BigUint;
-use util::{
-    algebra::{FieldElement, Group, GroupElement},
-    index::IndexResult,
-};
+use util::index::IndexResult;
 
-use util::algebra_utils::to_be_bytes_left_pad;
+use crate::{
+    algebra::{FieldElement, Group, GroupElement},
+    algebra_utils::to_be_bytes_left_pad,
+};
 
 use crate::{
     ciphertext::Ciphertext,
     eg::Eg,
     election_parameters::ElectionParameters,
     errors::{EgError, EgResult, ResourceProductionError},
-    fixed_parameters::FixedParameters,
-    guardian::{GuardianIndex, GuardianKeyPurpose},
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
+    guardian::GuardianIndex,
     guardian_public_key_trait::GuardianKeyInfoTrait,
+    key::KeyPurpose,
     resource::{
         ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
     },
@@ -59,7 +60,7 @@ pub struct JointPublicKey {
 
 impl JointPublicKey {
     /// [Key purpose](crate::guardian::GuardianKeyPurpose).
-    pub fn key_purpose(&self) -> EgResult<GuardianKeyPurpose> {
+    pub fn key_purpose(&self) -> EgResult<KeyPurpose> {
         use ResourceId::ElectionDataObject;
 
         let ElectionDataObject(EdoId::JointPublicKey(key_purpose)) = self.ridfmt.rid else {
@@ -84,7 +85,7 @@ impl JointPublicKey {
     /// Computes the [`JointPublicKey`].
     pub async fn compute(
         produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
-        key_purpose: GuardianKeyPurpose,
+        key_purpose: KeyPurpose,
     ) -> EgResult<JointPublicKey> {
         let election_parameters = produce_resource.election_parameters().await?;
         let election_parameters = election_parameters.as_ref();
@@ -95,7 +96,7 @@ impl JointPublicKey {
         let n = varying_parameters.n().get_one_based_usize();
 
         let gpks = produce_resource.guardian_public_keys(key_purpose).await?;
-        let gpks = gpks.map_into(Arc::as_ref);
+        let gpks = gpks.iter_map_into(Arc::as_ref);
 
         // Validate every guardian public key against the election parameters.
         for &gpk in gpks.iter() {
@@ -216,20 +217,33 @@ crate::impl_MayBeValidatableUnsized_for_non_ValidatableUnsized! { JointPublicKey
 impl Resource for JointPublicKey {
     // Unwrap() is justified here because that expression is evaluated in the debug build only.
     #[allow(clippy::unwrap_used)]
-    fn ridfmt(&self) -> &ResourceIdFormat {
+    fn ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
         debug_assert_eq!(
             self.ridfmt,
             EdoId::JointPublicKey(self.key_purpose().unwrap()).validated_type_ridfmt()
         );
-        &self.ridfmt
+        Cow::Borrowed(&self.ridfmt)
+    }
+}
+
+impl std::borrow::Borrow<GroupElement> for JointPublicKey {
+    #[inline]
+    fn borrow(&self) -> &GroupElement {
+        &self.group_element
+    }
+}
+
+impl std::borrow::Borrow<BigUint> for JointPublicKey {
+    #[inline]
+    fn borrow(&self) -> &BigUint {
+        self.group_element.as_biguint()
     }
 }
 
 //=================================================================================================|
 
 #[allow(non_upper_case_globals)]
-const JVEPK_K_KEY_PURPOSE: GuardianKeyPurpose =
-    GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields;
+const JVEPK_K_KEY_PURPOSE: KeyPurpose = KeyPurpose::Ballot_Votes;
 
 #[allow(non_upper_case_globals)]
 const JVEPK_K_EDOID: EdoId = EdoId::JointPublicKey(JVEPK_K_KEY_PURPOSE);
@@ -246,8 +260,7 @@ const JVEPK_K_RIDFMT_ValidatedEdo: ResourceIdFormat = ResourceIdFormat {
 //=================================================================================================|
 
 #[allow(non_upper_case_globals)]
-const JVEPK_K_HAT_KEY_PURPOSE: GuardianKeyPurpose =
-    GuardianKeyPurpose::Encrypt_Ballot_AdditionalFreeFormData;
+const JVEPK_K_HAT_KEY_PURPOSE: KeyPurpose = KeyPurpose::Ballot_OtherData;
 
 #[allow(non_upper_case_globals)]
 const JVEPK_K_HAT_EDOID: EdoId = EdoId::JointPublicKey(JVEPK_K_HAT_KEY_PURPOSE);
@@ -272,7 +285,8 @@ fn maybe_produce_JVEPK_K_KHAT_ValidatedEdo(rp_op: &Arc<RpOp>) -> Option<Resource
 
 #[allow(non_snake_case)]
 async fn produce_JVEPK_K_KHAT_ValidatedEdo(rp_op: &Arc<RpOp>) -> ResourceProductionResult {
-    let ResourceIdFormat { rid, fmt } = rp_op.requested_ridfmt();
+    let requested_ridfmt = rp_op.requested_ridfmt();
+    let ResourceIdFormat { rid, fmt } = requested_ridfmt.as_ref();
 
     let opt_guardian_key_purpose = match fmt {
         ResourceFormat::ValidElectionDataObject => {
@@ -292,7 +306,7 @@ async fn produce_JVEPK_K_KHAT_ValidatedEdo(rp_op: &Arc<RpOp>) -> ResourceProduct
     let Some(guardian_key_purpose) = opt_guardian_key_purpose else {
         let e = ResourceProductionError::UnexpectedResourceIdFormatRequested {
             ridfmt_expected: JVEPK_K_RIDFMT_ValidatedEdo,
-            ridfmt_requested: rp_op.requested_ridfmt().clone(),
+            ridfmt_requested: rp_op.requested_ridfmt().into_owned(),
         };
         Err(e)?
     };
@@ -349,20 +363,19 @@ mod t {
         trace_span, warn,
     };
 
-    use util::{
+    use crate::{
         algebra::{FieldElement, ScalarField},
         algebra_utils::DiscreteLog,
+        eg::Eg,
+        errors::EgResult,
+        fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
+        key::KeyPurpose,
+        resource::{ProduceResource, ProduceResourceExt},
+        secret_coefficient::SecretCoefficient,
+        secret_coefficients::SecretCoefficientsTrait,
     };
 
     use super::{Ciphertext, JointPublicKey};
-    use crate::{
-        eg::Eg,
-        errors::EgResult,
-        fixed_parameters::FixedParameters,
-        guardian::GuardianKeyPurpose,
-        guardian_secret_key::SecretCoefficient,
-        resource::{ProduceResource, ProduceResourceExt},
-    };
 
     fn decrypt_ciphertext(
         ciphertext: &Ciphertext,
@@ -381,10 +394,47 @@ mod t {
     }
 
     #[test_log::test]
-    #[ignore]
-    pub fn jvepk_k_scaling() {
+    pub fn t1_generate_jvepk_k() {
         async_global_executor::block_on(async {
-            use crate::guardian::GuardianKeyPurpose;
+            use crate::key::KeyPurpose;
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::joint_public_key::t::t1_generate_jvepk_k",
+            );
+
+            let jvepk_k = eg.joint_vote_encryption_public_key_k().await.unwrap();
+
+            let fixed_parameters = eg.fixed_parameters().await.unwrap();
+            let group = fixed_parameters.group();
+
+            assert!(jvepk_k.group_element().is_valid(group));
+        });
+    }
+
+    #[test_log::test]
+    pub fn t2_generate_jbdepk_k_hat() {
+        async_global_executor::block_on(async {
+            use crate::key::KeyPurpose;
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::joint_public_key::t::t2_generate_jbdepk_k_hat",
+            );
+
+            let jbdepk_k_hat = eg
+                .joint_ballot_data_encryption_public_key_k_hat()
+                .await
+                .unwrap();
+
+            let fixed_parameters = eg.fixed_parameters().await.unwrap();
+            let group = fixed_parameters.group();
+
+            assert!(jbdepk_k_hat.group_element().is_valid(group));
+        });
+    }
+
+    #[test_log::test]
+    #[ignore]
+    pub fn t3_jvepk_k_scaling() {
+        async_global_executor::block_on(async {
+            use crate::key::KeyPurpose;
             let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
                 "eg::joint_public_key::t::jvepk_k_scaling",
             );
@@ -396,8 +446,7 @@ mod t {
 
             let field = election_parameters.fixed_parameters().field();
 
-            let guardian_key_purpose =
-                GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields;
+            let guardian_key_purpose = KeyPurpose::Ballot_Votes;
 
             let sk = eg
                 .guardians_secret_keys(guardian_key_purpose)
@@ -405,7 +454,7 @@ mod t {
                 .unwrap()
                 .iter()
                 .fold(ScalarField::zero(), |a, b| {
-                    a.add(&b.secret_coefficients().0[0].0, field)
+                    a.add(&b.secret_coefficients().as_slice()[0].0, field)
                 });
             let secret_coeff = SecretCoefficient(sk);
 

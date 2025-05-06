@@ -111,8 +111,7 @@ impl<T: ?Sized> std::cmp::Ord for Index<T> {
 // If someone needs to target a 16-bit platform with this code, we will have to deal
 // with `Vec` index type being too small to represent the spec commitment.
 const INDEX_MAX_U32: u32 = (1u32 << 31) - 1;
-const_assert!(INDEX_MAX_U32 as u64 <= (usize::MAX as u64));
-const_assert!(INDEX_MAX_U32 as usize <= usize::MAX);
+const_assert!(INDEX_MAX_U32 as u128 <= usize::MAX as u128);
 
 impl<T: ?Sized> Index<T> {
     /// Minimum valid value as a `u32`.
@@ -149,6 +148,13 @@ impl<T: ?Sized> Index<T> {
     /// Returns the index value `1 + rhs`. Since rhs is a `u16`, the result is always in the valid range.
     pub const fn one_plus_u16(rhs: u16) -> Self {
         Self(Self::VALID_MIN_U32 + rhs as u32, PhantomData)
+    }
+
+    /// Returns the index value `MAX - rhs`. Since rhs is a `u16`, the result is always in the valid range.
+    ///
+    /// This is probably mostly just useful for unit tests.
+    pub const fn max_minus_u16(rhs: u16) -> Self {
+        Self(Self::VALID_MAX_U32 - rhs as u32, PhantomData)
     }
 
     /// An [`Iterator`] over [`Index`] values over the inclusive range defined by [start, last].
@@ -246,6 +252,34 @@ impl<T: ?Sized> Index<T> {
             .and_then(Self::try_from_zero_based_index_u32)
     }
 
+    /// Creates a new `Index` from a 0-based index value, substituting [`Self::MAX`] for any values above
+    /// the valid range.
+    ///
+    /// This should be used with care, as the situations in which saturating an index value is the
+    /// right thing to do are probably pretty rare.
+    #[inline]
+    pub fn from_zero_based_index_saturating_u32_use_with_care(ix0: u32) -> Self {
+        let ix0 = ix0.min(Self::VALID_MAX_U32 - 1);
+        let ix1 = ix0 + 1;
+        Self(ix1, PhantomData)
+    }
+
+    /// Creates a new `Index` from a 0-based index value of non-negative "unsigned" type, substituting
+    /// [`Self::MAX`] for any values above the valid range.
+    ///
+    /// This should be used with care, as the situations in which saturating an index value is the
+    /// right thing to do are probably pretty rare.
+    pub fn from_zero_based_index_saturating_use_with_care<U>(ix0: U) -> Self
+    where
+        U: num_traits::sign::Unsigned + TryInto<u32> + Copy,
+    {
+        if let Ok(ix0) = TryInto::<u32>::try_into(ix0) {
+            Self::from_zero_based_index_saturating_u32_use_with_care(ix0)
+        } else {
+            Self::MAX
+        }
+    }
+
     /// Creates a new `Index` from a 1-based index value.
     /// All [`std::num::NonZeroU8`] values are valid.
     #[inline]
@@ -263,7 +297,7 @@ impl<T: ?Sized> Index<T> {
     /// Creates a new `Index` from a 1-based index value. It is a precondition that
     /// Self::VALID_MIN_U32 <= ix1 && ix1 <= Self::VALID_MAX_U32.
     #[inline]
-    pub fn from_one_based_index_unchecked(ix1: u32) -> Self {
+    pub const fn from_one_based_index_unchecked(ix1: u32) -> Self {
         debug_assert!(Self::is_valid_one_based_index_u32(ix1));
         Self(ix1, PhantomData)
     }
@@ -291,15 +325,13 @@ impl<T: ?Sized> Index<T> {
     /// Obtains the 1-based index value as a `usize`.
     #[inline]
     pub const fn get_one_based_usize(&self) -> usize {
-        debug_assert!(Self::is_valid_one_based_index_u32(self.0));
-        self.0 as usize
+        self.get_one_based_u32() as usize
     }
 
     /// Obtains the 1-based index value as a `u64`.
     #[inline]
     pub const fn get_one_based_u64(&self) -> u64 {
-        debug_assert!(Self::is_valid_one_based_index_u32(self.0));
-        self.0 as u64
+        self.get_one_based_u32() as u64
     }
 
     /// Size of a container needed for this to be the highest index.
@@ -310,11 +342,55 @@ impl<T: ?Sized> Index<T> {
         self.get_one_based_usize()
     }
 
+    /// Converts the 1-based index into a 0-based index as a `u32`.
+    #[inline]
+    pub const fn get_zero_based_u32(&self) -> u32 {
+        self.get_one_based_u32() - 1
+    }
+
     /// Converts the 1-based index into a 0-based index as a `usize`.
     /// Suitable for indexing into a `std::Vec`.
     #[inline]
     pub const fn get_zero_based_usize(&self) -> usize {
-        self.get_one_based_usize() - 1
+        self.get_zero_based_u32() as usize
+    }
+
+    /// Converts the 1-based index into a 0-based index as a `u64`.
+    #[inline]
+    pub const fn get_zero_based_u64(&self) -> u64 {
+        self.get_zero_based_u32() as u64
+    }
+
+    /// Returns true iff the index value has a successor (i.e., plus `1`).
+    #[inline]
+    pub const fn has_successor(self) -> bool {
+        self.0 < Self::VALID_MAX_U32
+    }
+
+    /// Returns the successor (i.e., plus `1`) index value, if there is one.
+    #[inline]
+    pub const fn successor(self) -> Option<Self> {
+        if self.has_successor() {
+            Some(Self(self.0 + 1, PhantomData))
+        } else {
+            None
+        }
+    }
+
+    /// Returns true iff this index value has a predecessor (i.e., minus `1`).
+    #[inline]
+    pub const fn has_predecessor(self) -> bool {
+        Self::VALID_MIN_U32 < self.0
+    }
+
+    /// Returns the predecessor (i.e., minus `1`) index value, if there is one.
+    #[inline]
+    pub const fn predecessor(self) -> Option<Self> {
+        if self.has_predecessor() {
+            Some(Self(self.0 - 1, PhantomData))
+        } else {
+            None
+        }
     }
 }
 
@@ -581,11 +657,12 @@ mod t {
     struct Bar;
 
     type FooIndex = Index<Foo>;
-    const FOO_IX_1: FooIndex = FooIndex::one();
+    const FOO_IX_1: FooIndex = FooIndex::one_plus_u16(0);
     const FOO_IX_2: FooIndex = FooIndex::one_plus_u16(1);
     const FOO_IX_3: FooIndex = FooIndex::one_plus_u16(2);
-    #[allow(dead_code)]
-    const FOO_IX_4: FooIndex = FooIndex::one_plus_u16(4);
+    const FOO_IX_MAX_M2: FooIndex = FooIndex::max_minus_u16(2);
+    const FOO_IX_MAX_M1: FooIndex = FooIndex::max_minus_u16(1);
+    const FOO_IX_MAX: FooIndex = FooIndex::max_minus_u16(0);
 
     type BarIndex = Index<Bar>;
 
@@ -700,5 +777,63 @@ mod t {
         // Verify that we can't mix up indices of different kinds.
         // Expected `Index<Foo>`, found `Index<Bar>`
         //let foo_index: FooIndex = bar_index;
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn has_successor() {
+        assert!(   FOO_IX_1      .has_successor() );
+        assert!(   FOO_IX_2      .has_successor() );
+        assert!(   FOO_IX_MAX_M1 .has_successor() );
+        assert!( ! FOO_IX_MAX    .has_successor() );
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn successor() {
+        assert_eq!( FOO_IX_1      .successor(),   Some(FOO_IX_2)   );
+        assert_eq!( FOO_IX_2      .successor(),   Some(FOO_IX_3)   );
+        assert_eq!( FOO_IX_MAX_M1 .successor(),   Some(FOO_IX_MAX) );
+        assert_eq!( FOO_IX_MAX    .successor(),   None             );
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn has_predecessor() {
+        assert!( ! FOO_IX_1      .has_predecessor() );
+        assert!(   FOO_IX_2      .has_predecessor() );
+        assert!(   FOO_IX_MAX_M1 .has_predecessor() );
+        assert!(   FOO_IX_MAX    .has_predecessor() );
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn predecessor() {
+        assert_eq!( FOO_IX_1      .predecessor(), None                );
+        assert_eq!( FOO_IX_2      .predecessor(), Some(FOO_IX_1)      );
+        assert_eq!( FOO_IX_MAX_M1 .predecessor(), Some(FOO_IX_MAX_M2) );
+        assert_eq!( FOO_IX_MAX    .predecessor(), Some(FOO_IX_MAX_M1) );
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn from_zbi_saturating_u32() {
+        assert_eq!(FooIndex::from_zero_based_index_saturating_u32_use_with_care( FOO_IX_1      .get_one_based_u32()      - 1), FOO_IX_1      );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_u32_use_with_care( FOO_IX_2      .get_one_based_u32()      - 1), FOO_IX_2      );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_u32_use_with_care( FOO_IX_MAX_M2 .get_one_based_u32()      - 1), FOO_IX_MAX_M2 );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_u32_use_with_care( FOO_IX_MAX_M1 .get_one_based_u32()      - 1), FOO_IX_MAX_M1 );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_u32_use_with_care( FOO_IX_MAX    .get_one_based_u32()      - 1), FOO_IX_MAX    );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_u32_use_with_care((FOO_IX_MAX    .get_one_based_u32() + 1) - 1), FOO_IX_MAX    );
+    }
+
+    #[rustfmt::skip]
+    #[test]
+    fn from_zbi_saturating() {
+        assert_eq!(FooIndex::from_zero_based_index_saturating_use_with_care((FOO_IX_1      .get_one_based_u32() as    u8   ) - 1), FOO_IX_1      );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_use_with_care((FOO_IX_2      .get_one_based_u32() as usize   ) - 1), FOO_IX_2      );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_use_with_care((FOO_IX_MAX_M2 .get_one_based_u32()            ) - 1), FOO_IX_MAX_M2 );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_use_with_care((FOO_IX_MAX_M1 .get_one_based_u32() as   u64   ) - 1), FOO_IX_MAX_M1 );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_use_with_care((FOO_IX_MAX    .get_one_based_u32() as   u64   ) - 1), FOO_IX_MAX    );
+        assert_eq!(FooIndex::from_zero_based_index_saturating_use_with_care((FOO_IX_MAX    .get_one_based_u32() as u128 + 1) - 1), FOO_IX_MAX    );
     }
 }

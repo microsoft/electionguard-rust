@@ -10,7 +10,7 @@ use eg::{
     contest_option_fields::ContestDataFieldPlaintext,
     election_manifest::{Contest, ContestIndex, ContestDataFieldIndex},
     pre_voting_data::PreVotingData,
-    fixed_parameters::FixedParameters,
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
     hash::HValue,
     index::Index,
     ciphertext::{Ciphertext, Nonce},
@@ -25,14 +25,26 @@ use crate::{
     contest_selection::{ContestSelectionPreEncrypted, ContestSelectionPreEncryptedIndex},
 };
 
-/// A 1-based index of a [`ContestPreEncrypted`] in the order it is defined in the [`crate::ballot::BallotPreEncrypted`].
-pub type ContestPreEncryptedIndex = Index<ContestPreEncrypted>;
+//=================================================================================================|
 
+/// A 1-based index of a [`ContestPreEncrypted`] in the order that
+/// the [`ContestPreEncrypted`](crate::contest::ContestPreEncrypted) appears in the
+/// [`BallotPreEncrypted`](crate::ballot::BallotPreEncrypted).
+pub type ContestPreEncryptedInBallotPreEncryptedIndex = Index<ContestPreEncrypted>;
+
+impl HasIndexType for ContestPreEncrypted {
+    type IndexTypeParam = ContestPreEncrypted;
+}
+
+//-------------------------------------------------------------------------------------------------|
 /// A contest in a pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ContestPreEncrypted {
     /// Index of the contest in the election manifest.
     pub contest_ix: ContestIndex,
+
+    /// Index of the [`ContestPreEncrypted`] in the [`BallotPreEncrypted`], if known.
+    pub opt_contestpreencrypted_in_ballotpreencrypted_ix: Option<ContestPreEncryptedInBallotPreEncryptedIndex>,
 
     /// Selections in this contest.
     pub selections: Vec1<ContestSelectionPreEncrypted>,
@@ -40,10 +52,6 @@ pub struct ContestPreEncrypted {
     /// Contest hash
     #[serde(skip)]
     pub contest_hash: HValue,
-}
-
-impl HasIndexType for ContestPreEncrypted {
-    type IndexTypeParam = Contest;
 }
 
 impl PartialEq for ContestPreEncrypted {

@@ -35,11 +35,12 @@ use crate::{
     election_parameters::ElectionParameters,
     errors::{EgError, EgResult},
     extended_base_hash::ExtendedBaseHash_H_E,
-    guardian::{GuardianIndex, GuardianKeyPurpose},
+    guardian::GuardianIndex,
     guardian_public_key::GuardianPublicKey,
     guardian_secret_key::GuardianSecretKey,
     hashes::Hashes,
     joint_public_key::JointPublicKey,
+    key::KeyPurpose,
     pre_voting_data::PreVotingData,
     resource::{MayBeResource, ProduceResource, ProduceResourceExt},
 };

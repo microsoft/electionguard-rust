@@ -6,7 +6,7 @@
 #![deny(clippy::unwrap_used)]
 #![allow(clippy::assertions_on_constants)]
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use util::abbreviation::Abbreviation;
 
@@ -43,7 +43,7 @@ impl ResourceSliceBytes {
         rpsrc_serialized_from: ResourceSource,
     ) -> ResourceProductionResult {
         let vby = resource.to_canonical_bytes()?;
-        let drsb = ResourceSliceBytes::new(resource.rid(), vby);
+        let drsb = ResourceSliceBytes::new(resource.rid().as_ref(), vby);
         let rsrc =
             ResourceSource::serialized_from(ResourceFormat::SliceBytes, rpsrc_serialized_from);
         Ok((Arc::new(drsb), rsrc))
@@ -55,8 +55,8 @@ impl SerializableCanonical for ResourceSliceBytes {}
 crate::impl_MayBeValidatableUnsized_for_non_ValidatableUnsized! { ResourceSliceBytes }
 
 impl Resource for ResourceSliceBytes {
-    fn ridfmt(&self) -> &ResourceIdFormat {
-        &self.ridfmt
+    fn ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
+        Cow::Borrowed(&self.ridfmt)
     }
 
     fn as_slice_bytes(&self) -> Option<&[u8]> {

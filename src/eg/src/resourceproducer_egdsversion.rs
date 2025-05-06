@@ -58,11 +58,11 @@ fn maybe_produce_ElectionGuardDesignSpecificationVersion_ConcreteType(
 
     let ridfmt_requested = rp_op.requested_ridfmt();
 
-    if rp_op.requested_ridfmt() != &ridfmt_expected {
+    if rp_op.requested_ridfmt().as_ref() != &ridfmt_expected {
         return Some(Err(
             ResourceProductionError::UnexpectedResourceIdFormatRequested {
                 ridfmt_expected,
-                ridfmt_requested: ridfmt_requested.clone(),
+                ridfmt_requested: ridfmt_requested.into_owned(),
             },
         ));
     }

@@ -117,7 +117,7 @@ impl Subcommand for GenerateGuardianShares {
         }
 
         // let mut shares = Vec::with_capacity(election_parameters.varying_parameters.n as usize - 1);
-        // Generate encrypted share for each other guardian
+        // Generate an inter-Guardian share for each other guardian
         for l in 1..election_parameters.varying_parameters().n() + 1 {
             if guardian.i != l as usize {
                 let share = guardian.share_for(
@@ -132,13 +132,13 @@ impl Subcommand for GenerateGuardianShares {
                 //     &Some(
                 //         subcommand_helper
                 //             .artifacts_dir
-                //             .path(ArtifactFile::GuardianEncryptedShares(guardian.i as u16, l)),
+                //             .path(ArtifactFile::InterguardianShares(guardian.i as u16, l)),
                 //     ),
-                //     ArtifactFile::GuardianEncryptedShares(ArtifactFile::GuardianEncryptedShares(
+                //     ArtifactFile::InterguardianShares(ArtifactFile::InterguardianShares(
                 //         guardian.i as u16,
                 //         l,
                 //     )),
-                //     "guardian encrypted shares",
+                //     "guardian inter-Guardian shares",
                 //     share.as_bytes(),
                 // );
             }

@@ -18,9 +18,9 @@ use crate::{
     election_parameters::{ElectionParameters, ElectionParametersInfo},
     errors::{EgError, EgResult},
     extended_base_hash::ExtendedBaseHash_H_E,
-    guardian::GuardianKeyPurpose,
     hashes::Hashes,
     joint_public_key::JointPublicKey,
+    key::KeyPurpose,
     resource::{
         ProduceResource, ProduceResourceExt, Resource, ResourceFormat, ResourceId, ResourceIdFormat,
     },

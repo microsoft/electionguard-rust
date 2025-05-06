@@ -10,26 +10,25 @@
 use std::{iter::OnceWith, sync::Arc};
 
 use serde::{Deserialize, Serialize};
-use util::{
-    algebra::{FieldElement, GroupElement, ScalarField},
-    csrng::Csrng,
-};
+use util::csrng::Csrng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
+    algebra::{FieldElement, GroupElement, ScalarField},
     eg::Eg,
     el_gamal::{ElGamalPublicKey, ElGamalSecretKey},
     election_parameters::ElectionParameters,
     errors::{EgError, EgResult},
-    guardian::{GuardianIndex, GuardianKeyPartId, GuardianKeyPurpose},
+    fixed_parameters::{FixedParametersTrait, FixedParametersTraitExt},
+    guardian::{GuardianIndex, GuardianKeyPartId},
     guardian_public_key_trait::GuardianKeyInfoTrait,
-    guardian_secret_key::{
-        CoefficientCommitment, CoefficientCommitments, GuardianSecretKey, SecretCoefficient,
-        SecretCoefficients,
-    },
+    guardian_secret_key::{CoefficientCommitment, CoefficientCommitments, GuardianSecretKey},
     hash::{HVALUE_BYTE_LEN, eg_h, eg_h_q_as_field_element},
     hashes::ParameterBaseHash,
+    key::KeyPurpose,
     resource::{ProduceResource, ProduceResourceExt},
+    secret_coefficient::SecretCoefficient,
+    secret_coefficients::{SecretCoefficients, SecretCoefficientsTrait},
 };
 
 /// Represents errors occurring during the validation of a coefficient proof.
@@ -112,8 +111,8 @@ impl CoefficientsProof {
         debug_assert_eq!(guardian_secret_key.secret_coefficients().len(), k);
 
         let aby_pk_label = match guardian_key_id.key_purpose {
-            GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields => b"pk_vote",
-            GuardianKeyPurpose::Encrypt_Ballot_AdditionalFreeFormData => b"pk_data",
+            KeyPurpose::Ballot_Votes => b"pk_vote",
+            KeyPurpose::Ballot_OtherData => b"pk_data",
             _ => Err(EgError::NoJointPublicKeyForPurpose {
                 key_purpose: guardian_key_id.key_purpose,
             })?,
@@ -333,12 +332,14 @@ mod t0 {
     use crate::{
         eg::Eg,
         errors::EgResult,
-        fixed_parameters::FixedParameters,
+        fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
         guardian::GuardianIndex,
-        guardian_secret_key::{CoefficientCommitment, SecretCoefficient},
+        guardian_secret_key::CoefficientCommitment,
+        secret_coefficient::SecretCoefficient,
+        secret_coefficients::SecretCoefficients,
     };
-    /*
 
+    /*
     fn set_up(
         csrng: &dyn Csrng,
         fixed_parameters: &FixedParameters,

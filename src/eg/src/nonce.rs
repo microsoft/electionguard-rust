@@ -7,17 +7,18 @@
 #![allow(clippy::assertions_on_constants)]
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
-use util::algebra::{FieldElement, ScalarField};
+use crate::algebra::{FieldElement, ScalarField};
 
 use crate::{
-    ballot::BallotNonce_xi_B,
-    ballot::HValue_H_I,
-    contest_data_fields_plaintexts::ContestDataFieldIndex,
+    ballot::{BallotNonce_xi_B, HValue_H_I},
+    contest::ContestIndex,
+    contest_data_fields::ContestDataFieldIndex,
     eg::Eg,
-    election_manifest::ContestIndex,
     hash::{HValue, eg_h, eg_h_q},
     pre_voting_data::PreVotingData,
 };
+
+//=================================================================================================|
 
 /// EG DS v2.1.0 sec 3.3.3 Generation of the ... encryption nonces
 ///

@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     errors::{EgError, EgResult},
-    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPartId},
+    guardian::{GuardianIndex, GuardianKeyPartId},
+    key::{AsymmetricKeyPart, KeyPurpose},
     resource::{ElectionDataObjectId, ResourceId},
     resource_category::ResourceCategory,
 };
@@ -250,7 +251,10 @@ mod t {
     use insta::assert_ron_snapshot;
 
     use super::*;
-    use crate::guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPurpose};
+    use crate::{
+        guardian::GuardianIndex,
+        key::{AsymmetricKeyPart, KeyPurpose},
+    };
 
     #[test_log::test]
     fn dr_ns_path() {
@@ -283,8 +287,7 @@ mod t {
               filename_base: "election_parameters",
               filename_qualifier: "canonical",
               filename_ext: "json",
-            )
-            "#);
+            )"#);
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/election_parameters.canonical.json""#);
         }
         {
@@ -298,8 +301,7 @@ mod t {
               filename_base: "election_manifest",
               filename_qualifier: "pretty",
               filename_ext: "json",
-            )
-            "#);
+            )"#);
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/election_manifest.pretty.json""#);
         }
         {
@@ -312,15 +314,13 @@ mod t {
               filename_base: "hashes",
               filename_qualifier: "",
               filename_ext: "json",
-            )
-            "#);
+            )"#);
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/hashes.json""#);
         }
         {
             let edoid = GuardianKeyPart(GuardianKeyPartId {
                 guardian_ix: GuardianIndex::one(),
-                key_purpose:
-                    GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
+                key_purpose: KeyPurpose::Ballot_Votes,
                 asymmetric_key_part: AsymmetricKeyPart::Secret,
             });
             let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
@@ -331,25 +331,21 @@ mod t {
               filename_base: "guardian_1.SECRET_key",
               filename_qualifier: "",
               filename_ext: "json",
-            )
-            "#);
+            )"#);
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""SECRET_for_guardian_1/guardian_1.SECRET_key.json""#);
         }
         {
-            let edoid = JointPublicKey(
-                GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-            );
+            let edoid = JointPublicKey(KeyPurpose::Ballot_Votes);
             let rnsp = ResourceNamespacePath::try_from_edoid_opt(edoid).unwrap();
             assert_ron_snapshot!(rnsp, @r#"
             ResourceNamespacePath(
               resource_category: BeforeVotingBegins_Published,
               dir_path_components: [],
-              filename_base: "joint_public_key_encrypt_ballot_numerical_votes_and_additional_data_fields",
+              filename_base: "joint_public_key_encrypt_ballot_votes",
               filename_qualifier: "",
               filename_ext: "json",
-            )
-            "#);
-            assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/joint_public_key_encrypt_ballot_numerical_votes_and_additional_data_fields.json""#);
+            )"#);
+            assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/joint_public_key_encrypt_ballot_votes.json""#);
         }
         {
             let edoid = ExtendedBaseHash;
@@ -361,8 +357,7 @@ mod t {
               filename_base: "extended_base_hash",
               filename_qualifier: "",
               filename_ext: "json",
-            )
-            "#);
+            )"#);
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""before_voting_begins/published/extended_base_hash.json""#);
         }
         {
@@ -392,8 +387,7 @@ mod t {
               filename_base: "505152535455565758595A5B5C5D5E5F606162636465666768696A6B6C6D6E6F",
               filename_qualifier: "",
               filename_ext: "json",
-            )
-            "#);
+            )"#);
             assert_ron_snapshot!(rnsp.into_xplatform_string_lossy().unwrap(), @r#""generated_test_data/voter_selections/505152535455565758595A5B5C5D5E5F606162636465666768696A6B6C6D6E6F.json""#);
         }
     }

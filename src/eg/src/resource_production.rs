@@ -150,18 +150,18 @@ impl RpOp {
     }
 
     #[inline]
-    pub fn requested_ridfmt(&self) -> &ResourceIdFormat {
-        &self.ridfmt
+    pub fn requested_ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
+        Cow::Borrowed(&self.ridfmt)
     }
 
     #[inline]
-    pub fn requested_rid(&self) -> &ResourceId {
-        &self.ridfmt.rid
+    pub fn requested_rid(&self) -> Cow<'_, ResourceId> {
+        Cow::Borrowed(&self.ridfmt.rid)
     }
 
     #[inline]
-    pub fn requested_fmt(&self) -> &ResourceFormat {
-        &self.ridfmt.fmt
+    pub fn requested_fmt(&self) -> Cow<'_, ResourceFormat> {
+        Cow::Borrowed(&self.ridfmt.fmt)
     }
 
     #[inline]
@@ -188,10 +188,10 @@ impl RpOp {
         &self,
         ridfmt_expected: &ResourceIdFormat,
     ) -> Result<(), ResourceProductionError> {
-        if self.requested_ridfmt() != ridfmt_expected {
+        if self.requested_ridfmt().as_ref() != ridfmt_expected {
             let e = ResourceProductionError::UnexpectedResourceIdFormatRequested {
                 ridfmt_expected: ridfmt_expected.clone(),
-                ridfmt_requested: self.requested_ridfmt().clone(),
+                ridfmt_requested: self.requested_ridfmt().into_owned(),
             };
             Err(e)
         } else {
@@ -251,7 +251,7 @@ pub(crate) fn produce_resource_impl_<'a>(
         .unwrap_or_else(Span::current);
 
     async move {
-        let ridfmt = rp_op.requested_ridfmt().clone();
+        let ridfmt = rp_op.requested_ridfmt().into_owned();
 
         // If we already have this resource result cached, simply return that.
         let opt_result = rp_op
@@ -261,12 +261,14 @@ pub(crate) fn produce_resource_impl_<'a>(
 
         let production_budget = *rp_op.prod_budget();
 
-        if production_budget == ProductionBudget::Zero {
+        if production_budget.check_cache_only() {
+            // A production_budget of zero indicates we should just check the cache test,
+            // so the absence of the requested resource in the cache is not really an error.
             let e = ResourceProductionError::ProductionBudgetInsufficient {
                 requested: ridfmt,
                 production_budget,
             };
-            error!(rf = rp_op.trace_field_rf(), "Resource production: {e}");
+            trace!(rf = rp_op.trace_field_rf(), "Resource production: {e}");
             Err(e)
         } else if let Some(resource_production_result) = opt_result {
             resource_production_result
@@ -288,7 +290,7 @@ pub(crate) fn produce_resource_impl_<'a>(
             } else {
                 // The providers did not yield any result.
                 let e = ResourceProductionError::NoProducerFound {
-                    ridfmt: rp_op.requested_ridfmt().clone(),
+                    ridfmt: rp_op.requested_ridfmt().into_owned(),
                 };
                 debug!(rf = rp_op.trace_field_rf(), "Resource production: {e}");
                 Err(e)
@@ -364,7 +366,7 @@ fn produce_resource_detect_recursion(rp_op: &Arc<RpOp>) -> Result<(), ResourcePr
     );
 
     Err(ResourceProductionError::RecursionDetected {
-        ridfmt_request: rp_op.requested_ridfmt().clone(),
+        ridfmt_request: rp_op.requested_ridfmt().into_owned(),
         chain,
     })
 }

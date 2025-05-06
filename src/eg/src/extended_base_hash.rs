@@ -12,10 +12,12 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    algebra_utils::to_be_bytes_left_pad,
     eg::Eg,
     errors::EgResult,
-    guardian::GuardianKeyPurpose,
+    fixed_parameters::FixedParametersTraitExt,
     hash::{HValue, SpecificHValue},
+    key::KeyPurpose,
     resource::{
         ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, Resource,
         ResourceFormat, ResourceId, ResourceIdFormat,
@@ -27,6 +29,7 @@ use crate::{
     resource_production::RpOp,
     resourceproducer_specific::GatherRPFnRegistrationsFnWrapper,
     serializable::SerializableCanonical,
+    standard_parameters::EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_P_LEN_BYTES,
 };
 
 //=================================================================================================|
@@ -68,30 +71,44 @@ impl ExtendedBaseHash {
     ) -> EgResult<ExtendedBaseHash> {
         let fixed_parameters = produce_resource.fixed_parameters().await?;
         let fixed_parameters = &fixed_parameters;
+
         let hashes = produce_resource.hashes().await?;
+        let h_b = hashes.h_b();
+
         let jvepk_k = produce_resource
             .joint_vote_encryption_public_key_k()
             .await?;
+        let jvepk_k = jvepk_k.as_ref();
+
         let jbdepk_k_hat = produce_resource
             .joint_ballot_data_encryption_public_key_k_hat()
             .await?;
+        let jbdepk_k_hat = jbdepk_k_hat.as_ref();
 
         // Computation of the extended base hash H_E.
         // EGDS 2.1.0 sec. 3.2.3 eq. 30 pg. 28
 
-        let mut v = vec![0x14];
-        v.extend_from_slice(jvepk_k.to_be_bytes_left_pad(fixed_parameters).as_slice());
-        v.extend_from_slice(
-            jbdepk_k_hat
-                .to_be_bytes_left_pad(fixed_parameters)
-                .as_slice(),
-        );
+        let (p_len_bytes, expected_len) = if fixed_parameters
+            .is_not_explicitly_egds_released_specification_standard_parameters()
+        {
+            let p_len_bytes = fixed_parameters.p_len_bytes();
+            let expected_len = 1 + p_len_bytes * 2;
+            (p_len_bytes, expected_len)
+        } else {
+            let p_len_bytes = EGDS_V2_1_0_RELEASED_STANDARD_PARAMS_P_LEN_BYTES;
+            let expected_len = 1 + 512 + 512; // EGDS 2.1.0 pg. 74 (30)
+            (p_len_bytes, expected_len)
+        };
 
-        let expected_len = 1 + 512 + 512; // EGDS 2.1.0 pg. 74 (30)
+        let mut v = Vec::with_capacity(expected_len);
+        v.push(0x14);
+        v.extend_from_slice(to_be_bytes_left_pad(jvepk_k, p_len_bytes).as_slice());
+        v.extend_from_slice(to_be_bytes_left_pad(jbdepk_k_hat, p_len_bytes).as_slice());
+
         assert_eq!(v.len(), expected_len);
 
         let self_ = ExtendedBaseHash {
-            h_e: ExtendedBaseHash_H_E::compute_from_eg_h(&hashes.h_b, &v),
+            h_e: ExtendedBaseHash_H_E::compute_from_eg_h(h_b, &v),
         };
 
         Ok(self_)
@@ -185,8 +202,9 @@ mod t {
 
         let extended_base_hash = ExtendedBaseHash::compute(eg).await.unwrap();
 
-        // This has to be modified every time the example data election manifest is changed even a little bit.
+        // This hash value has not been computed externally and will need to be modified
+        // whenever the example data ElectionManifest changes.
         assert_snapshot!(extended_base_hash.h_e,
-            @"2DFC9973241A9A6CA98268F4F167E98C65BBAA87DEF24C4835C63FE820990C8E");
+            @"1AF7B7F385D43E12C9912DF16EB809A3E29225CA7EC771D6E7FA1133EA39D811");
     }
 }

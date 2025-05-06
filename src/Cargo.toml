@@ -10,6 +10,7 @@ members = [
   # "preencrypted",
   "util",
   "test-electionguard",
+  "test-data-generation",
 ]
 
 [workspace.dependencies]
@@ -20,24 +21,27 @@ eg = { path = "./eg", default-features = false }
 eg-resourceproducer-filesystem = { path = "./eg-resourceproducer-filesystem", default-features = false }
 # electionguard = { path = "./electionguard", default-features = false }
 # preencrypted = { path = "./preencrypted", default-features = false }
+test-data-generation = { path = "./test-data-generation", default-features = false }
 util = { path = "./util", default-features = false }
 
 #--- From crates.io
 
 allocator-api2 = { version = "0.2.21", default-features = false, features = ["alloc"] }
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 arbitrary = { version = "1.4.1", features = ["derive"] }
 derive_arbitrary  = "1.4.1"
+base16ct = { version = "0.2.0", default-features = false, features = [] }
 #bimap = "0.6.3"
 bitflags = { version = "2.9.0", features = ["std"] }
 #bumpalo = { version = "3.17.0", default-features = false, features = ["allocator-api2", "boxed", "collections"] }
-clap = { version = "4.5.35", features = ["derive", "env"] }
+clap = { version = "4.5.37", features = ["derive", "env"] }
 cfg-if = "1.0.0"
 downcast-rs = "2.0.1"
 derive_more = { version = "2.0.1", default-features = false }
 either = { version = "1.15.0", features = ["serde"] }
 equivalent  = "1.0.2"
 faster-hex = { version = "0.10.0" }
+fnv = { version = "1.0.7", default-features = false, features = ["std"] }
 hashbrown = { version = "0.15.2", default-features = false, features = [
     "allocator-api2",
     "equivalent",
@@ -47,18 +51,12 @@ hashbrown = { version = "0.15.2", default-features = false, features = [
     "serde"
 ] }
 hex-literal = { version = "1.0.0", default-features = false, features = [] }
-indexmap = { version = "2.8.0", default-features = false, features = [] }
 indoc = "2.0.5"
+insta = { version = "1.43.1", features = ["json", "ron"] }
 inventory = "0.3.20"
 itertools = "0.14.0"
 lazy_static = "1.4"
-num-bigint = { version = "0.4.6", features = ["serde"] }
-num-integer = "0.1.46"
-num-traits = { version = "0.2.19", features = ["libm"] }
 nutype = { version = "0.6.1", default-features = false, features = ["new_unchecked", "serde", "std"] }
-
-#generic-array = { version = "1.2.0", default-features = false, features = ["const-default", "faster-hex", "serde", "typenum", "zeroize"] }
-#typenum = { version = "1.18.0", default-features = false, features = [] }
 
 # proptest = { version = "1.6.0", features = [] }
 # proptest-arbitrary-interop = "0.1.0"
@@ -67,6 +65,7 @@ smallbitvec = "2.6.0"
 static_assertions = "1.1.0"
 strum = { version = "0.27.1", features = ["derive", "std"] }
 strum_macros = "0.27.1"
+textwrap = { version = "0.16.2", default-features = false, features = ["unicode-width"] }
 thiserror = "2.0.12"
 
 tempfile = { version = "3.17.1", default-features = false, features = [] }
@@ -87,6 +86,8 @@ futures-io = { version = "0.3.31", default-features = false }
 # pin-project-lite <- futures-lite
 pin-project-lite = "0.2.16"
 
+async-executor = { version = "1.13.2", default-features = false, features = [] }
+
 async-global-executor = { version = "3.1.0", default-features = false, features = [
     "async-io",
     # "tokio",
@@ -105,17 +106,47 @@ async-lock = "3.4.0"
 
 async-trait = { version = "0.1.88", default-features = false, features = [] }
 
-#--- proc_macro2, quote, syn, unicode-ident
+#--- Num-*, typenum, generic-array, hybrid-array
 
-# proc-macro2 = "1.0.94"
-# quote = "1.0.40"
-# syn = { version = "2.0.100", features = ["parsing"] }
-unicode-ident = "1.0.18"
+const-default = "1.0.0"
+generic-array = { version = "1.2.0", default-features = false, features = [
+    # "alloc",
+    # "internals",
+    "const-default",
+    # "faster-hex",
+    # "serde",
+    # "typenum",
+    # "zeroize",
+] }
+
+# https://github.com/RustCrypto/hybrid-array/releases/tag/v0.3.1
+# https://github.com/RustCrypto/hybrid-array/tree/v0.3.1
+# https://github.com/RustCrypto/hybrid-array/blob/v0.3.1/Cargo.toml
+hybrid-array = { version = "0.3.1", default-features = false, features = [
+    # "extra-sizes",
+    # "bytemuck",
+    # "serde",
+    # "subtle",
+    "zeroize",
+] }
+
+num-bigint = { version = "0.4.6", features = ["serde"] }
+num-integer = "0.1.46"
+num-traits = { version = "0.2.19", features = ["libm"] }
+
+typenum = { version = "1.18.0", default-features = false, features = ["const-generics"] }
+
+#--- Ractor
+
+ractor = { version = "0.15", default-features = false, features = [
+    "async-std",
+    "async-trait",
+    ] }
 
 #--- Rand
 
 getrandom = { version = "0.3.2", default-features = false }
-rand = { version = "0.9.0", default-features = false, features = [
+rand = { version = "0.9.1", default-features = false, features = [
     "alloc",
 ] }
 rand_core = { version = "0.9.3", default-features = false, features = ["std"] }
@@ -124,39 +155,6 @@ rand_xorshift = { version = "0.4.0", default-features = false }
 rustc-stable-hash = "0.1.1"
 # zerocopy = "0.8.21"  # from rand 0.9
 # zerocopy-derive = "0.8.21"  # from zerocopy 0.8.20
-
-#--- Serde
-
-erased-serde = { version = "0.4.6" }
-serde = { version = "1.0.219", features = ["derive", "rc", "std"] }
-serde_json = { version = "1.0.140", features = ["preserve_order", "std"] }
-serde_tokenstream = "0.2.2"
-serde_with = { version = "3.12.0", features = ["alloc", "macros"] } #default-features = false,
-
-#--- Tracing
-
-tracing = { version = "0.1.41", default-features = false, features = [
-    "std",
-    "attributes",
-] }
-
-tracing-subscriber = { version = "0.3.19", default-features = false, features = [
-    "fmt",
-    "smallvec",
-    "std",
-] }
-
-# valuable = { version = "0.1.0", features = ["derive", "std"] }
-
-test-log = { version = "0.2.17", default-features = false, features = [
-    "color",
-    "trace",
-]}
-
-test-log = { version = "0.2.17", default-features = false, features = [
-    #"color",
-    "trace",
-]}
 
 #--- RustCrypto
 
@@ -216,3 +214,45 @@ zeroize = { version = "1.8.1", default-features = false, features = [
     "std", "alloc",
     "simd",
 ] }
+
+#--- Serde
+
+erased-serde = { version = "0.4.6" }
+serde = { version = "1.0.219", features = ["derive", "rc", "std"] }
+serde_json = { version = "1.0.140", features = ["preserve_order", "std"] }
+serde_tokenstream = "0.2.2"
+serde_with = { version = "3.12.0", features = ["alloc", "macros"] } #default-features = false,
+
+#--- Tracing
+
+tracing = { version = "0.1.41", default-features = false, features = [
+    "std",
+    "attributes",
+] }
+
+tracing-futures = { version = "0.2.5", default-features = false, features = [
+    "std",
+    "std-future",
+] }
+
+tracing-subscriber = { version = "0.3.19", default-features = false, features = [
+    "fmt",
+    "smallvec",
+    "std",
+] }
+
+# valuable = { version = "0.1.0", features = ["derive", "std"] }
+
+test-log = { version = "0.2.17", default-features = false, features = [
+    "color",
+    "trace",
+]}
+
+#--- Unicode, ICU
+
+unicode-ident = "1.0.18"
+unicode-properties = { version = "0.1.3", default-features = false, features = ["general-category"] }
+unicode-normalization = { version = "0.1.24", default-features = false, features = [] }
+
+icu_collator = { version = "1.5.0", default-features = false, features = ["compiled_data"] }
+icu_locid = { version = "1.5.0", default-features = false, features = [] }

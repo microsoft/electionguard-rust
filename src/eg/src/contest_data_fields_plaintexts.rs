@@ -15,23 +15,53 @@ use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
+
+//
 use util::{
     uint31::Uint31,
     vec1::{HasIndexType, Vec1},
 };
 
 use crate::{
-    ballot_style::BallotStyle,
+    ballot_style::{BallotStyle, BallotStyleTrait},
     ciphertext::{Ciphertext, CiphertextIndex},
+    contest::ContestIndex,
+    contest_data_fields::ContestDataFieldIndex,
     contest_option_fields::ContestOptionFieldsPlaintexts,
     eg::Eg,
-    election_manifest::{ContestIndex, ElectionManifest},
+    election_manifest::ElectionManifest,
     errors::{EgError, EgResult},
     pre_voting_data::PreVotingData,
     resource::{ProduceResource, ProduceResourceExt},
 };
 
-/// Value (plaintext) of a contest data fields, which could be a selectable option or additional data.
+//=================================================================================================|
+
+/// A 1-based index of a [`ContestDataFieldPlaintext`] in
+/// the order that the data field is allocated based on the
+/// [`Contest`](crate::contest::Contest)s configuration in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type ContestDataFieldPlaintextIndex = CiphertextIndex;
+
+impl HasIndexType for ContestDataFieldPlaintext {
+    type IndexTypeParam = Ciphertext;
+}
+
+//-------------------------------------------------------------------------------------------------|
+
+/// Value (plaintext) of a contest data field, which could be a selectable option or additional data.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ContestDataFieldPlaintext(Uint31);
 
@@ -85,14 +115,7 @@ impl From<ContestDataFieldPlaintext> for BigUint {
     }
 }
 
-impl HasIndexType for ContestDataFieldPlaintext {
-    type IndexTypeParam = Ciphertext;
-}
-
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex), [`ContestDataFieldIndex`], etc.
-pub type ContestDataFieldIndex = CiphertextIndex;
-
-//-------------------------------------------------------------------------------------------------|
+//=================================================================================================|
 
 /// Values (plaintext) of the data fields, which could be a selectable option or additional data, of a single contest.
 ///
@@ -118,13 +141,13 @@ impl ContestDataFieldsPlaintexts {
         let contest = ballot_style.get_contest(election_manifest, contest_ix)?;
         let qty_contest_option_data_fields = contest.qty_contest_option_data_fields();
 
-        if option_fields_plaintexts.len() != qty_contest_option_data_fields + 1 {
+        if option_fields_plaintexts.len() != qty_contest_option_data_fields {
             let e = EgError::IncorrectQtyOfContestOptionFieldsPlaintexts {
                 contest_ix,
                 qty_expected: qty_contest_option_data_fields,
                 qty_supplied: option_fields_plaintexts.len(),
             };
-            error!("{e}");
+            trace!("{e}");
             return Err(e);
         }
 
@@ -152,7 +175,7 @@ impl ContestDataFieldsPlaintexts {
     }
 
     pub fn as_slice(&self) -> &[ContestDataFieldPlaintext] {
-        self.0.as_slice()
+        self.0.as_zero_based_slice()
     }
 
     #[allow(non_snake_case)]

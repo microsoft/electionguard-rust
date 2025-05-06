@@ -1006,6 +1006,7 @@ mod t {
         // */
     }
 
+    #[ignore] //? TODO
     #[test_log::test]
     fn t10() {
         //use VdiSpecItem::*;

@@ -6,13 +6,15 @@
 #![deny(clippy::manual_assert)]
 
 use eg::{
-    election_manifest::ContestIndex,
+    contest::ContestIndex,
     pre_voting_data::PreVotingData,
     hash::{eg_h, HValue},
     vec1::Vec1,
 };
 
 use crate::contest_selection::ContestSelectionPreEncrypted;
+
+//=================================================================================================|
 
 /// Contest hash for pre-encrypted ballots (Equation 95) [TODO fix ref]
 ///

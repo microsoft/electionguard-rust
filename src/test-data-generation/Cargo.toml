@@ -1,0 +1,73 @@
+[package]
+name = "test-data-generation"
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/microsoft/electionguard-rust"
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[features]
+default = [
+    "eg-forbid-test-data-generation",
+]
+
+eg-allow-test-data-generation           = [ ]
+eg-forbid-test-data-generation          = [ ]
+
+[dependencies]
+
+#--- Defined in this workspace
+
+util.workspace = true
+
+#--- From crates.io
+
+anyhow.workspace = true
+base16ct = { workspace = true, features = ["alloc"] }
+fnv.workspace = true
+indoc.workspace = true
+itertools.workspace = true
+static_assertions.workspace = true
+sha2.workspace = true
+textwrap.workspace = true
+
+#--- Num-*, typenum, generic-array, hybrid-array
+
+const-default.workspace = true
+generic-array.workspace = true
+hybrid-array.workspace = true
+# num-bigint.workspace = true
+# num-integer.workspace = true
+# num-traits.workspace = true
+typenum.workspace = true
+
+#--- Rand
+
+rand.workspace = true
+rand_core.workspace = true
+rand_distr.workspace = true
+rand_xorshift.workspace = true
+
+#--- Futures
+
+# futures-lite.workspace = true
+# futures-core.workspace = true
+# futures-io.workspace = true
+# pin-project-lite.workspace = true
+# async-process.workspace = true
+# async-global-executor.workspace = true
+# async-io.workspace = true
+
+#--- Tracing
+
+# tracing.workspace = true
+# tracing-subscriber = { workspace = true, features = [] } # "ansi"
+
+[dev-dependencies] #=============================================================== dev-dependencies
+
+insta.workspace = true
+test-log.workspace = true
+
+unicode-normalization.workspace = true
+icu_collator.workspace = true
+icu_locid.workspace = true

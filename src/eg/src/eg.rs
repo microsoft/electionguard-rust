@@ -42,10 +42,11 @@ use util::{
 pub use crate::eg_config::EgConfig;
 use crate::{
     errors::{EgError, EgResult},
-    guardian::{AsymmetricKeyPart, GuardianKeyPartId, GuardianKeyPurpose},
+    guardian::GuardianKeyPartId,
     guardian_public_key::GuardianPublicKey,
     guardian_secret_key::GuardianIndex,
     joint_public_key::JointPublicKey,
+    key::{AsymmetricKeyPart, KeyPurpose},
     resource::{
         ElectionDataObjectId as EdoId, ProduceResource, ProduceResourceExt, ProductionBudget,
         Resource, ResourceFormat, ResourceId, ResourceIdFormat,

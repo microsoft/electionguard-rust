@@ -25,7 +25,8 @@ pub enum BallotChaining {
     Required,
 }
 
-/// The parameters for a specific election.
+/// Per-election varying parameters (`n`, `k`, etc.) and values specific to the election
+/// which are input to the `ParameterBaseHash`.
 #[derive(Debug, Clone, Serialize)]
 pub struct VaryingParametersInfo {
     /// Number of guardians.
@@ -203,8 +204,8 @@ impl From<VaryingParameters> for VaryingParametersInfo {
         }
     }
 }
-
-/// The election manifest.
+/// Per-election varying parameters (`n`, `k`, etc.) and values specific to the election
+/// which are input to the `ParameterBaseHash`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VaryingParameters {
     n: GuardianIndex,
@@ -215,12 +216,12 @@ pub struct VaryingParameters {
 }
 
 impl VaryingParameters {
-    /// Number of guardians.
+    /// Election parameter `n` - Total number of guardians.
     pub fn n(&self) -> GuardianIndex {
         self.n
     }
 
-    /// Decryption quorum threshold value.
+    /// Election parameter `k` - Decryption quorum threshold value.
     pub fn k(&self) -> GuardianIndex {
         self.k
     }

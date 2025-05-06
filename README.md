@@ -1,4 +1,4 @@
-# ElectionGuard 2.0 Reference Implementation in Rust
+# ElectionGuard 2.1.0 Reference Implementation in Rust
 
 [![Repository](https://img.shields.io/badge/repository-GitHub-brightgreen.svg)](
 https://github.com/microsoft/electionguard-rust)
@@ -23,7 +23,7 @@ tallying could be beneficial.
 
 ## What is this project in particular and where does it fit in?
 
-This project is an open source Rust implementation of ElectionGuard 2.0,
+This project is an open source Rust implementation of ElectionGuard 2.1.0,
 intended to serve as a reference or as production software for those wishing to incorporate
 ElectionGuard into their systems.
 
@@ -83,9 +83,12 @@ Independent projects are independent.*
 
 This list is known to be incomplete. Suggestions are welcome.
 
+### ElectionGuard 2.1.0
+
+- [ElectionGuard 2.1.0 Reference Implementation in Rust](https://github.com/microsoft/electionguard-rust) This project
+
 ### ElectionGuard 2.0
 
-- [ElectionGuard 2.0 Reference Implementation in Rust](https://github.com/microsoft/electionguard-rust) This project
 - [ElectionGuard 2.0 in Kotlin](https://github.com/danwallach/electionguard-kotlin-multiplatform) from Dan Wallach of Rice University
 
 ### ElectionGuard 1.x

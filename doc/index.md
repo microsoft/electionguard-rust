@@ -1,4 +1,4 @@
-# Table of Contents - ElectionGuard 2.0 Reference Implementation in Rust
+# Table of Contents - ElectionGuard 2.1 Reference Implementation in Rust
 
 ## Documentation
 
@@ -9,16 +9,16 @@
 - [TODO.txt](TODO.txt) A fine-grained snapshot of the current status of the implementation.
 
 - [Specifications](specs)/
-    - [ElectionGuard Design Specification v2.0.0 2023-08-18](specs/ElectionGuard%20Design%20Specification%20v2.0.0%202023-08-18.pdf)
+    - [ElectionGuard Design Specification v2.1.0 2024-08-12](specs/ElectionGuard%20Design%20Specification%20v2.1.0%202024-08-12.pdf)
       The primary specification.
-    - [ElectionGuard 2.0 Serialization Specification](specs/ElectionGuard_2.0_Serialization_Specification.html)
+    - [ElectionGuard 2.1.0 Serialization Specification](specs/ElectionGuard_2.1.0_Serialization_Specification.html)
       Specifies the format of ElectionGuard structures used for persistence and transfer.
 
 + [Implementation Guide](implementation_guide/implementation_guide.html) Using this reference implementation to build production systems
 
 ## API Reference
 
-- [`eg`](crates/eg/index.html) The core ElectionGuard 2.0 library crate.
+- [`eg`](crates/eg/index.html) The core ElectionGuard 2.1.0 library crate.
 
 - [`util`](crates/util/index.html) Library crate of common utilities used by [`eg`](crates/eg/index.html) and other crates and applications.
 

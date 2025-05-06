@@ -11,9 +11,7 @@ use std::{ops::DerefMut, path::PathBuf};
 use anyhow::{Context, Result, bail};
 
 use eg::{
-    eg::Eg,
-    guardian::{GuardianIndex, GuardianKeyPurpose},
-    guardian_secret_key::GuardianSecretKey,
+    eg::Eg, guardian::GuardianIndex, guardian_secret_key::GuardianSecretKey, key::KeyPurpose,
     serializable::SerializablePretty,
 };
 

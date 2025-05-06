@@ -14,20 +14,23 @@ Usage: $this_script [OPTIONS]
     -v --verbose Be verbose.
 
     --rm-rf-target-subdir    Remove the target subdir.
-    --no-rm-rf-target-subdir Do not remove the target subdir. (the default)
+    --no-rm-rf-target-subdir Do not remove the target subdir. (default)
 
-    --code-stats     Compute code stats using 'tokei' (cargo install).
-    --no-code-stats  Do not compute code stats. (the default)
+    --code-stats     Compute code stats using 'tokei' (cargo install). (default)
+    --no-code-stats  Do not compute code stats.
 
-    --release        Supply the --release flag to cargo. (the default)
+    --cargo-license    Run 'cargo license' to detect licenses of dependencies. (default)
+    --no-cargo-license Do not run 'cargo license'.
+
+    --release        Supply the --release flag to cargo. (default)
     --no-release     Do not supply the --release flag to cargo.
                      Uses the 'test' profile instead.
 
-    --run-ignored-tests     Run the tests marked #[ignore]. (the default)
+    --run-ignored-tests     Run the tests marked #[ignore]. (default)
     --no-run-ignored-tests  Do not run the tests marked #[ignore].
 
     --multithread-tests     Run tests multi-threaded.
-    --no-multithread-tests  Run tests single-threaded. (the default)
+    --no-multithread-tests  Run tests single-threaded. (default)
 
     --help      Just display this help and exit.
 
@@ -39,7 +42,8 @@ release=1
 run_ignored_tests=1
 multithread_tests=0
 rm_rf_target=0
-code_stats=0
+code_stats=1
+cargo_license=1
 while [ $# -gt 0 ]; do
     case "$1" in
         -v | --verbose)
@@ -71,6 +75,12 @@ while [ $# -gt 0 ]; do
             ;;
         --no-code-stats)
             code_stats=0
+            ;;
+        --cargo-license)
+            cargo_license=1
+            ;;
+        --no-cargo-license)
+            cargo_license=0
             ;;
         --help)
             do_help
@@ -181,12 +191,12 @@ else
 fi
 printf '\nusing "time" prefix: %s\n' "$time" | cat -t | tee -a "$build_info_txt"
 
-cargo_features_flags='--no-default-features --features'
-cargo_features_flags="$cargo_features_flags eg-allow-unsafe-code"
-cargo_features_flags="$cargo_features_flags,eg-allow-insecure-deterministic-csprng"
-cargo_features_flags="$cargo_features_flags,eg-allow-test-data-generation"
-cargo_features_flags="$cargo_features_flags,eg-allow-toy-parameters"
-cargo_features_flags="$cargo_features_flags,eg-allow-nonstandard-egds-version"
+cargo_features_flags='--no-default-features --features '
+cargo_features_flags="$cargo_features_flags eg-allow-insecure-deterministic-csprng"
+cargo_features_flags=$cargo_features_flags,eg-allow-nonstandard-egds-version
+cargo_features_flags=$cargo_features_flags,eg-allow-test-data-generation
+cargo_features_flags=$cargo_features_flags,eg-forbid-reduced-params
+cargo_features_flags=$cargo_features_flags,eg-allow-unsafe-code
 
 export CARGO_TERM_COLOR=never
 export RUST_LOG=off
@@ -228,7 +238,9 @@ fi
 
 if [ "$code_stats" != 0 ]; then
     f="$build_dir/code-stats.txt"
-    printf '\n======================== code stats %s\n\n' "$f" | tee -a "$build_info_txt" >"$f"
+    [ -f "$f" ] && (set -x; rm "$f") 2>&1 | tee -a "$build_info_txt"
+
+    printf '\n======================== code stats %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
     (
         cd ..
         tokei=$(which tokei)
@@ -240,8 +252,8 @@ if [ "$code_stats" != 0 ]; then
         { printf 'tokei'
           printf ' %s' "$@"
           printf '\n'
-        } | cat -t | tee -a "$f" "$build_info_txt"
-         "$tokei" "$@" | cat -t | tee -a "$f" "$build_info_txt"
+        } | cat -t | tee -a "$build_info_txt" "$f"
+        "$tokei" "$@" | cat -t | tee -a "$f" "$build_info_txt"
     )
     tokei_exit_code=$?
     if [ "$tokei_exit_code" != 0 ]; then
@@ -253,6 +265,27 @@ fi
 printf '\n======================== cargo version -vv\n' | tee -a "$build_info_txt"
 echo >>"$build_info_txt"
 cargo version -vv >>"$build_info_txt" 2>&1
+
+printf '\n======================== cargo license\n' | tee -a "$build_info_txt"
+echo >>"$build_info_txt"
+
+if [ "$cargo_license" = 0 ]; then
+    printf 'Not running '%s'\n' "cargo-license" | tee -a "$build_info_txt"
+else
+    f="$build_dir/cargo-license.txt"
+    [ -f "$f" ] && (set -x; rm "$f") 2>&1 | tee -a "$build_info_txt"
+    {
+        printf '\n======================== cargo license %s\n\n'
+
+        set -- cargo license --color never $cargo_features_flags
+        cargo_exit_code=$( (set -x; "$@" >&2); echo $?) 2>&1
+
+        if [ "$cargo_exit_code" != 0 ]; then
+            printf \''cargo license'\'' exited with code: %d\n' "$cargo_exit_code"
+            exit 94
+        fi
+    } 2>&1 | cat -t | tee -a "$build_info_txt" "$f"
+fi
 
 printf '\n======================== rustc --version -v\n' | tee -a "$build_info_txt"
 echo >>"$build_info_txt"
@@ -266,29 +299,29 @@ printf '\n======================== cargo tree ...\n' | tee -a "$build_info_txt"
 cargo_tree_fmt="{p} {f}"
 
 f="$build_dir/${profile}-cargo-tree-normal.txt"
-printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
-[ -f "$f" ] && rm "$f"
+{ echo; [ -f "$f" ] && (set -x; rm "$f") } 2>&1 | tee -a "$build_info_txt"
+printf '-------- %s\n\n' "$f" | tee -a "$build_info_txt" "$f"
 printf 'cargo tree --offline %s -e normal -f "%s"\n' "$cargo_features_flags" "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
 echo >>"$f"
 cargo tree --offline $cargo_features_flags -e normal -f "$cargo_tree_fmt" >>"$f" 2>&1
 
 f="$build_dir/${profile}-cargo-tree-normal-dups.txt"
-printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
-[ -f "$f" ] && rm "$f"
+{ echo; [ -f "$f" ] && (set -x; rm "$f") } 2>&1 | tee -a "$build_info_txt"
+printf '-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 printf 'cargo tree --offline %s -e normal -f "%s" --duplicates\n' "$cargo_features_flags" "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
 echo >>"$f"
 cargo tree --offline $cargo_features_flags -e normal -f "$cargo_tree_fmt" --duplicates >>"$f" 2>&1
 
 f="$build_dir/${profile}-cargo-tree-normal-list.txt"
-printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
-[ -f "$f" ] && rm "$f"
+{ echo; [ -f "$f" ] && (set -x; rm "$f") } 2>&1 | tee -a "$build_info_txt"
+printf '-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 printf 'cargo tree --offline %s -e normal -f "%s" --prefix none --no-dedupe | sort --unique\n' "$cargo_features_flags" "$cargo_tree_fmt" | tee -a "$build_info_txt" "$f"
 echo >>"$f"
 ( cargo tree --offline $cargo_features_flags -e normal -f "$cargo_tree_fmt" --prefix none --no-dedupe | sort --unique ) >>"$f" 2>&1
 
 f="$build_dir/${profile}-cargo-tree-features.txt"
-printf '\n-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
-[ -f "$f" ] && rm "$f"
+{ echo; [ -f "$f" ] && (set -x; rm "$f") } 2>&1 | tee -a "$build_info_txt"
+printf '-------- %s\n\n' "$f" | cat -t | tee -a "$build_info_txt" "$f"
 printf 'cargo tree --offline %s -e features -f "%s"\n' "$cargo_features_flags" "$cargo_tree_fmt" | cat -t | tee -a "$build_info_txt" "$f"
 echo >>"$f"
 cargo tree --offline $cargo_features_flags -e features -f "$cargo_tree_fmt" >>"$f" 2>&1
@@ -315,7 +348,7 @@ printf '\n[done]\n' | tee -a "$build_info_txt"
 #=============================================================== test
 
 f="$build_dir/${profile}-cargo-test.txt"
-[ -f "$f" ] && rm "$f"
+[ -f "$f" ] && rm "$f" | tee -a "$build_info_txt"
 
 cargo_test3() {
     if [ $multithread_tests -gt 0 ]; then

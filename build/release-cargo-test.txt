@@ -1,15 +1,25 @@
 
-+ /usr/bin/time cargo test --release --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -- --test-threads=1
-    Finished `release` profile [optimized] target(s) in 0.09s
-     Running unittests src/main.rs (target/release/deps/demo_eg-10675a263961f10b)
++ /usr/bin/time cargo test --release --no-default-features --features eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -- --test-threads=1
+    Finished `release` profile [optimized] target(s) in 0.15s
+     Running unittests src/main.rs (target/release/deps/demo_eg-4a0b013b3bf67140)
 
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running unittests src/lib.rs (target/release/deps/eg-6ea9b2b63f476e26)
+     Running unittests src/lib.rs (target/release/deps/eg-c6c507421e87eba4)
 
-running 71 tests
+running 106 tests
+test algebra::test::test_field_conversions ... ok
+test algebra::test::test_field_group_validity ... ok
+test algebra::test::test_field_operations ... ok
+test algebra::test::test_group_operations ... ok
+test algebra_utils::tests::test_cnt_bits_repr_usize ... ok
+test algebra_utils::tests::test_group_dlog ... ok
+test algebra_utils::tests::test_lagrange_interpolation ... ok
+test algebra_utils::tests::test_mod_inverse ... ok
+test algebra_utils::tests::test_single_lagrange_coefficient ... ok
+test algebra_utils::tests::test_to_be_bytes_left_pad ... ok
 test ballot::t::ballotstyle1_contest1_votes_0_0 ... ignored
 test ballot::t::ballotstyle1_contest1_votes_0_1 ... ignored
 test ballot::t::ballotstyle1_contest1_votes_1_0 ... ignored
@@ -26,32 +36,55 @@ test ballot::t::ballotstyle6_contest6_votes_0_0 ... ignored
 test ballot::t::ballotstyle6_contest6_votes_0_1 ... ignored
 test ballot::t::ballotstyle6_contest6_votes_1_0 ... ignored
 test ballot::t::ballotstyle6_contest6_votes_1_1_range_proof_error ... ignored
+test ballot_style::t::t1 ... ok
+test ballot_style::t::t2 ... ok
+test ballot_style::t::t3 ... ok
+test ballot_style::t::t4 ... ok
+test ballot_style::t::t5 ... ok
 test chaining_mode::t::t1 ... ok
 test chaining_mode::t::t2 ... ok
 test chaining_mode::t::t3 ... ok
+test contest::t::t1 ... ok
+test contest::t::t2 ... ok
 test contest_data_fields_tallies::t::t10 ... ok
+test contest_option::t::t1 ... ok
+test contest_option::t::t2 ... ok
+test edo_template::t::t1 ... ok
 test eg::t::t1 ... ok
 test eg_config::t::t1 ... ok
 test egds_version::t::t1 ... ok
 test egds_version::t::t2 ... ok
 test egds_version::t::t3 ... ok
 test election_manifest::t::t1 ... ok
-test election_tallies::t::t1 ... FAILED
+test election_manifest::t::t2 ... ok
+test election_manifest::t::t3 ... ok
+test election_manifest::t::t4 ... ok
+test election_manifest::t::t5 ... ok
+test election_manifest::t::t6 ... ok
+test election_tallies::t::t1 ... ok
 test extended_base_hash::t::t1 ... ok
 test fixed_parameters::t::t1 ... ok
-test guardian_public_key::test::test_key_generation ... ok
-test guardian_share::test::test_encryption_decryption ... FAILED
-test guardian_share::test::test_key_sharing ... FAILED
-test guardian_share::test::test_public_validation ... FAILED
-test guardian_share::test::test_text_encoding ... ok
+test guardian::t::t1 ... ok
+test guardian::t::t2 ... ok
+test guardian_public_key::t::t1_key_generation ... ok
 test hash::test_eg_h::test_evaluate_h ... ok
 test hash::test_eg_h::test_hvalue_serde_json ... ok
 test hash::test_eg_h::test_hvalue_std_fmt ... ok
 test hashes::t::t1 ... ok
 test ident::t::t0 ... ok
-test joint_public_key::t::jvepk_k_scaling ... ignored
-test resource::t::edoid ... ok
-test resource::t::rid ... ok
+test interguardian_share::t::test_encryption_decryption ... ignored
+test joint_public_key::t::t1_generate_jvepk_k ... ok
+test joint_public_key::t::t2_generate_jbdepk_k_hat ... ok
+test joint_public_key::t::t3_jvepk_k_scaling ... ignored
+test label::t::t1 ... ok
+test label::t::t2 ... ok
+test label::t::t3 ... ok
+test label::t::t4 ... ok
+test label::t::t5 ... ok
+test label::t::t6 ... ok
+test preencrypted_ballots::t::t1 ... ok
+test resource::t::t1_edoid ... ok
+test resource::t::t2_rid ... ok
 test resource_category::t::t1 ... ok
 test resource_category::t::t2 ... ok
 test resource_path::t::dr_ns_path ... ok
@@ -61,12 +94,14 @@ test resourceproducer_exampledata::t::t1 ... ok
 test resourceproducer_exampledata::t::t2 ... FAILED
 test resourceproducer_specific::t::t1 ... ok
 test resourceproducer_validatetoedo::t::t1 ... FAILED
-test standard_parameters::t::make_standard_parameters ... ok
-test standard_parameters::t::make_standard_parameters_egds_v2_1 ... ok
-test tally_ballots::t::test_tally_ballots ... ignored
-test verifiable_decryption::t1::test_decryption_share_combination ... FAILED
-test verifiable_decryption::t2::test_decryption_overall ... FAILED
-test voting_device::t::t10 ... FAILED
+test secret_coefficient::t::t1 ... ok
+test secret_coefficients::t::t1 ... ok
+test standard_parameters::t::t_buildcfg_fixedparametersinfo ... ok
+test standard_parameters::t::t_make_standard_parameters_egds_v2_1 ... ok
+test tally_ballots::t::t1_tally_ballots ... ignored
+test verifiable_decryption::t1::test_decryption_share_combination ... ignored
+test verifiable_decryption::t2::test_decryption_overall ... ignored
+test voting_device::t::t10 ... ignored
 test voting_device::t::t11 ... ok
 test voting_device::t::t12 ... ok
 test voting_device::t::t1_VdiSpecItem_1_VotingDeviceUniqueIdentifier ... ok
@@ -84,86 +119,44 @@ test voting_device::t::t9 ... ok
 
 failures:
 
----- election_tallies::t::t1 stdout ----
-
-thread 'election_tallies::t::t1' panicked at eg/src/election_tallies.rs:230:13:
-assertion failed: false
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
----- guardian_share::test::test_encryption_decryption stdout ----
-
-thread 'guardian_share::test::test_encryption_decryption' panicked at eg/src/guardian_share.rs:821:10:
-called `Result::unwrap()` on an `Err` value: Str("TODO rework for EGDS 2.1.0")
-
----- guardian_share::test::test_key_sharing stdout ----
-
-thread 'guardian_share::test::test_key_sharing' panicked at eg/src/guardian_share.rs:872:26:
-called `Result::unwrap()` on an `Err` value: Str("TODO rework for EGDS 2.1.0")
-
----- guardian_share::test::test_public_validation stdout ----
-
-thread 'guardian_share::test::test_public_validation' panicked at eg/src/guardian_share.rs:954:22:
-called `Result::unwrap()` on an `Err` value: Str("TODO rework for EGDS 2.1.0")
-
 ---- resourceproducer_exampledata::t::t2 stdout ----
 
-thread 'resourceproducer_exampledata::t::t2' panicked at eg/src/resourceproducer_exampledata.rs:453:22:
+thread 'resourceproducer_exampledata::t::t2' panicked at eg/src/resourceproducer_exampledata.rs:446:22:
 called `Result::unwrap()` on an `Err` value: NoProducerFound { ridfmt: (ElectionParameters,SliceBytes) }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
 ---- resourceproducer_validatetoedo::t::t1 stdout ----
 
-thread 'resourceproducer_validatetoedo::t::t1' panicked at eg/src/resourceproducer_validatetoedo.rs:371:22:
+thread 'resourceproducer_validatetoedo::t::t1' panicked at eg/src/resourceproducer_validatetoedo.rs:385:22:
 called `Result::unwrap()` on an `Err` value: NoProducerFound { ridfmt: (ElectionManifest,SliceBytes) }
-
----- verifiable_decryption::t1::test_decryption_share_combination stdout ----
-
-thread 'verifiable_decryption::t1::test_decryption_share_combination' panicked at eg/src/standard_parameters.rs:193:71:
-called `Result::unwrap()` on an `Err` value: FixedParametersDoNotMatchStatedElectionGuardDesignSpecificationVersion { egds_version_from_fp_info: ElectionGuard_DesignSpecification_Version { version_number: [2, 1], qualifier: Released_Specification_Version, fixed_parameters_kind: Toy_Parameters, display: ElectionGuard Design Specification v2.1 with TOY parameters FOR TESTING ONLY }, egds_version_from_standard_params: ElectionGuard_DesignSpecification_Version { version_number: [2, 1], qualifier: Released_Specification_Version, fixed_parameters_kind: Standard_Parameters, display: ElectionGuard Design Specification v2.1 with standard parameters } }
-
----- verifiable_decryption::t2::test_decryption_overall stdout ----
-
-thread 'verifiable_decryption::t2::test_decryption_overall' panicked at eg/src/verifiable_decryption.rs:1046:30:
-called `Result::unwrap()` on an `Err` value: Str("TODO rework for EGDS 2.1.0")
-
----- voting_device::t::t10 stdout ----
-
-thread 'voting_device::t::t10' panicked at eg/src/voting_device.rs:1031:62:
-called `Result::unwrap()` on an `Err` value: Error("key must be a string", line: 0, column: 0)
 
 
 failures:
-    election_tallies::t::t1
-    guardian_share::test::test_encryption_decryption
-    guardian_share::test::test_key_sharing
-    guardian_share::test::test_public_validation
     resourceproducer_exampledata::t::t2
     resourceproducer_validatetoedo::t::t1
-    verifiable_decryption::t1::test_decryption_share_combination
-    verifiable_decryption::t2::test_decryption_overall
-    voting_device::t::t10
 
-test result: FAILED. 44 passed; 9 failed; 18 ignored; 0 measured; 0 filtered out; finished in 0.70s
+test result: FAILED. 82 passed; 2 failed; 22 ignored; 0 measured; 0 filtered out; finished in 1.62s
 
 error: test failed, to rerun pass `-p eg --lib`
 Command exited with non-zero status 101
 
 exit status: 101
 
-elapsed real: 0.84 s
-max resident: 53116 KiB
-page faults:  12088
+elapsed real: 1.83 s
+max resident: 135128 KiB
+page faults:  57186
 
-+ /usr/bin/time cargo test --release --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -- --test-threads=1 --ignored
-    Finished `release` profile [optimized] target(s) in 0.11s
-     Running unittests src/main.rs (target/release/deps/demo_eg-10675a263961f10b)
++ /usr/bin/time cargo test --release --no-default-features --features eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -- --test-threads=1 --ignored
+    Finished `release` profile [optimized] target(s) in 0.16s
+     Running unittests src/main.rs (target/release/deps/demo_eg-4a0b013b3bf67140)
 
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running unittests src/lib.rs (target/release/deps/eg-6ea9b2b63f476e26)
+     Running unittests src/lib.rs (target/release/deps/eg-c6c507421e87eba4)
 
-running 18 tests
+running 22 tests
 test ballot::t::ballotstyle1_contest1_votes_0_0 ... ok
 test ballot::t::ballotstyle1_contest1_votes_0_1 ... ok
 test ballot::t::ballotstyle1_contest1_votes_1_0 ... ok
@@ -180,390 +173,420 @@ test ballot::t::ballotstyle6_contest6_votes_0_0 ... ok
 test ballot::t::ballotstyle6_contest6_votes_0_1 ... ok
 test ballot::t::ballotstyle6_contest6_votes_1_0 ... ok
 test ballot::t::ballotstyle6_contest6_votes_1_1_range_proof_error ... ok
-test joint_public_key::t::jvepk_k_scaling ... ok
-test tally_ballots::t::test_tally_ballots ... FAILED
+test interguardian_share::t::test_encryption_decryption ... FAILED
+test joint_public_key::t::t3_jvepk_k_scaling ... ok
+test tally_ballots::t::t1_tally_ballots ... FAILED
+test verifiable_decryption::t1::test_decryption_share_combination ... FAILED
+test verifiable_decryption::t2::test_decryption_overall ... FAILED
+test voting_device::t::t10 ... FAILED
 
 failures:
 
----- tally_ballots::t::test_tally_ballots stdout ----
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 1,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 1,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 1,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 1,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 1,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 1,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 2,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 2,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 2,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 2,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 2,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 2,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 3,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 3,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 3,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 3,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 3,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 3,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 4,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 4,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 4,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 4,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 4,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 4,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 5,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 5,
-                key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 5,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 5,
-                key_purpose: Encrypt_Ballot_AdditionalFreeFormData,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 5,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Secret,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
-ridfmt: ResourceIdFormat {
-    rid: ElectionDataObject(
-        GuardianKeyPart(
-            GuardianKeyPartId {
-                guardian_ix: 5,
-                key_purpose: Encrypt_InterGuardianCommunication,
-                asymmetric_key_part: Public,
-            },
-        ),
-    ),
-    fmt: ValidElectionDataObject,
-}
+---- interguardian_share::t::test_encryption_decryption stdout ----
 
-
-
-thread 'tally_ballots::t::test_tally_ballots' panicked at eg/src/tally_ballots.rs:790:30:
-called `Result::unwrap()` on an `Err` value: Str("TODO rework for EGDS 2.1.0")
+thread 'interguardian_share::t::test_encryption_decryption' panicked at eg/src/interguardian_share.rs:839:13:
+TODO rework for EGDS 2.1.0
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 
+---- tally_ballots::t::t1_tally_ballots stdout ----
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 1,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 1,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 1,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 1,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 1,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 1,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 2,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 2,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 2,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 2,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 2,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 2,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 3,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 3,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 3,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 3,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 3,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 3,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 4,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 4,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 4,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 4,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 4,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 4,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 5,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 5,
+                key_purpose: Ballot_Votes,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 5,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 5,
+                key_purpose: Ballot_OtherData,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 5,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Secret,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+ridfmt: ResourceIdFormat {
+    rid: ElectionDataObject(
+        GuardianKeyPart(
+            GuardianKeyPartId {
+                guardian_ix: 5,
+                key_purpose: InterGuardianCommunication,
+                asymmetric_key_part: Public,
+            },
+        ),
+    ),
+    fmt: ValidElectionDataObject,
+}
+
+
+
+thread 'tally_ballots::t::t1_tally_ballots' panicked at eg/src/tally_ballots.rs:777:13:
+TODO rework for EGDS 2.1.0
+
+---- verifiable_decryption::t1::test_decryption_share_combination stdout ----
+
+thread 'verifiable_decryption::t1::test_decryption_share_combination' panicked at eg/src/verifiable_decryption.rs:910:13:
+assertion `left == right` failed
+  left: GroupElement(..)
+ right: GroupElement(..)
+
+---- verifiable_decryption::t2::test_decryption_overall stdout ----
+
+thread 'verifiable_decryption::t2::test_decryption_overall' panicked at eg/src/verifiable_decryption.rs:1033:17:
+TODO rework for EGDS 2.1.0
+
+---- voting_device::t::t10 stdout ----
+
+thread 'voting_device::t::t10' panicked at eg/src/voting_device.rs:1032:62:
+called `Result::unwrap()` on an `Err` value: Error("key must be a string", line: 0, column: 0)
+
 
 failures:
-    tally_ballots::t::test_tally_ballots
+    interguardian_share::t::test_encryption_decryption
+    tally_ballots::t::t1_tally_ballots
+    verifiable_decryption::t1::test_decryption_share_combination
+    verifiable_decryption::t2::test_decryption_overall
+    voting_device::t::t10
 
-test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 53 filtered out; finished in 24.84s
+test result: FAILED. 17 passed; 5 failed; 0 ignored; 0 measured; 84 filtered out; finished in 25.93s
 
 error: test failed, to rerun pass `-p eg --lib`
 Command exited with non-zero status 101
 
 exit status: 101
 
-elapsed real: 24.99 s
-max resident: 616232 KiB
-page faults:  179925
+elapsed real: 26.13 s
+max resident: 617716 KiB
+page faults:  184729

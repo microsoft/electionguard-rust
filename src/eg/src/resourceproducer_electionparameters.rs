@@ -39,7 +39,7 @@ use std::{
     //process::ExitCode,
     sync::Arc,
     //str::FromStr,
-    //sync::{,
+    //sync::{
         //Arc,
         //OnceLock,
     //},
@@ -64,7 +64,9 @@ use crate::{
     eg::Eg,
     election_parameters::{ElectionParameters, ElectionParametersInfo},
     errors::ResourceProductionError,
-    fixed_parameters::{FixedParameters, FixedParametersInfo},
+    fixed_parameters::{
+        FixedParameters, FixedParametersInfo, FixedParametersTrait, FixedParametersTraitExt,
+    },
     loadable::KnowsFriendlyTypeName,
     resource::{
         ElectionDataObjectId as EdoId, HasStaticResourceIdFormat, ProduceResource,
@@ -118,11 +120,11 @@ async fn maybe_produce_ElectionParameters_ConcreteType_async(
 
     let ridfmt_requested = rp_op.requested_ridfmt();
 
-    if ridfmt_requested != &ridfmt {
+    if ridfmt_requested.as_ref() != &ridfmt {
         return Some(Err(
             ResourceProductionError::UnexpectedResourceIdFormatRequested {
                 ridfmt_expected: ridfmt,
-                ridfmt_requested: ridfmt_requested.clone(),
+                ridfmt_requested: ridfmt_requested.into_owned(),
             },
         ));
     }

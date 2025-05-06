@@ -39,10 +39,9 @@ use std::{
 //use tracing::{debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span, warn};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use util::{
-    algebra::{FieldElement, Group, GroupElement, ScalarField},
-    csrng::Csrng,
-};
+use util::csrng::Csrng;
+
+use crate::algebra::{FieldElement, Group, GroupElement, ScalarField};
 
 //=================================================================================================|
 

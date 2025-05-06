@@ -40,6 +40,9 @@ use tracing::{
     warn,
 };
 
+//
+use util::abbreviation::Abbreviation;
+
 use crate::{
     eg::Eg,
     loadable::KnowsFriendlyTypeName,
@@ -106,14 +109,13 @@ impl ResourceProducer for ResourceProducer_Specific {
         Self::arc_new
     }
 
-    /*
     #[instrument(
-        name = "ResourceProducer_Specific::maybe_produce",
-        fields(rf = trace_display(&rp_op.target_ridfmt)),
-        skip(self, eg, rp_op),
+        name = "RP_Specific::maybe_produce",
+        level = "debug",
+        fields(rf = trace_display(rp_op.requested_ridfmt().abbreviation())),
+        skip(self, rp_op),
         ret
     )]
-    // */
     fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
         for rpspecific_registration in &self.v {
             if rpspecific_registration.ridfmt() == rp_op.requested_ridfmt() {

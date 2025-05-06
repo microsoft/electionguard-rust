@@ -38,28 +38,25 @@ use tracing::{
     debug, debug_span, error, field::display as trace_display, info, info_span, instrument, trace,
     trace_span, warn,
 };
-//use proc_macro2::{Ident,Literal,TokenStream};
-//use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 //use rand::{distr::Uniform, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use static_assertions::{assert_impl_all, assert_obj_safe}; // assert_cfg, const_assert
 use util::{abbreviation::Abbreviation, vec1::Vec1};
 
-use crate::errors::ResourceProductionError;
-use crate::guardian::{AsymmetricKeyPart, GuardianIndex};
-use crate::guardian_public_key::GuardianPublicKey;
-/// Re-export [`ResourceId`] and related names because they're so essential.
-pub use crate::resource_id::{ElectionDataObjectId, ResourceFormat, ResourceId, ResourceIdFormat};
-use crate::resource_producer::ResourceSource;
 use crate::{
     eg::Eg,
-    errors::{EgError, EgResult},
-    guardian::{GuardianKeyPartId, GuardianKeyPurpose},
+    errors::{EgError, EgResult, ResourceProductionError},
+    guardian::{GuardianIndex, GuardianKeyPartId},
+    guardian_public_key::GuardianPublicKey,
+    key::{AsymmetricKeyPart, KeyPurpose},
     resource_path::ResourceNamespacePath,
-    resource_producer::ResourceProductionResult,
+    resource_producer::{ResourceProductionResult, ResourceSource},
     serializable::{SerializableCanonical, SerializablePretty},
     validatable::{MayBeValidatableUnsized, ValidatableUnsized, ValidatedUnsized},
 };
+
+/// Re-export [`ResourceId`] and related names because they're so essential.
+pub use crate::resource_id::{ElectionDataObjectId, ResourceFormat, ResourceId, ResourceIdFormat};
 
 //=================================================================================================|
 
@@ -84,25 +81,37 @@ pub trait Resource:
     + SerializablePretty //+ MayBeValidatableUnsized
 {
     /// Returns the [`ResourceIdFormat`] of this resource.
-    fn ridfmt(&self) -> &ResourceIdFormat;
+    fn ridfmt(&self) -> Cow<'_, ResourceIdFormat>;
 
     /// Returns the [`ResourceId`] of this resource.
-    fn rid(&self) -> &ResourceId {
-        &self.ridfmt().rid
+    fn rid(&self) -> Cow<'_, ResourceId> {
+        match self.ridfmt() {
+            Cow::Borrowed(ridfmt) => Cow::Borrowed(&ridfmt.rid),
+            Cow::Owned(ridfmt) => Cow::Owned(ridfmt.rid),
+        }
     }
 
     /// Returns the [`ResourceFormat`] of this resource.
-    fn format(&self) -> &ResourceFormat {
-        &self.ridfmt().fmt
+    fn format(&self) -> Cow<'_, ResourceFormat> {
+        match self.ridfmt() {
+            Cow::Borrowed(ridfmt) => Cow::Borrowed(&ridfmt.fmt),
+            Cow::Owned(ridfmt) => Cow::Owned(ridfmt.fmt),
+        }
     }
 
     /// Returns the [`ElectionDataObjectId`] of this resource, if it happens to represent
     /// an [`ElectionDataObject`].
-    fn edoid_opt(&self) -> Option<&ElectionDataObjectId> {
+    fn edoid_opt(&self) -> Option<Cow<'_, ElectionDataObjectId>> {
         use ResourceId::*;
         match self.rid() {
-            ElectionDataObject(edoid) => Some(edoid),
-            _ => None,
+            Cow::Borrowed(ridfmt) => match ridfmt {
+                ElectionDataObject(edoid) => Some(Cow::Borrowed(edoid)),
+                _ => None,
+            },
+            Cow::Owned(ridfmt) => match ridfmt {
+                ElectionDataObject(edoid) => Some(Cow::Owned(edoid)),
+                _ => None,
+            },
         }
     }
 
@@ -146,8 +155,8 @@ where
         + AsSerializableCanonical
         + SerializablePretty, //+ MayBeValidatableUnsized,
 {
-    fn ridfmt(&self) -> &ResourceIdFormat {
-        Self::static_ridfmt(self)
+    fn ridfmt(&self) -> Cow<'_, ResourceIdFormat> {
+        Cow::Borrowed(Self::static_ridfmt(self))
     }
 }
 
@@ -207,11 +216,20 @@ where
     strum_macros::Display
 )]
 pub enum ProductionBudget {
+    /// Just check the cache for the resource without performing any work.
     #[strum(to_string = "zero")]
     Zero,
 
+    /// Perform as much work as needed to produce the resource.
     #[strum(to_string = "unlimited")]
     Unlimited,
+}
+
+impl ProductionBudget {
+    /// Returns `true` iff
+    pub fn check_cache_only(&self) -> bool {
+        matches!(self, ProductionBudget::Zero)
+    }
 }
 
 //=================================================================================================|
@@ -440,7 +458,7 @@ pub trait ProduceResourceExt: ProduceResource + Send + Sync + 'static {
     #[allow(async_fn_in_trait)]
     async fn guardian_public_keys(
         &self,
-        key_purpose: GuardianKeyPurpose,
+        key_purpose: KeyPurpose,
     ) -> EgResult<Vec1<Arc<GuardianPublicKey>>> {
         use crate::resource_id::ElectionDataObjectId as EdoId;
 
@@ -473,10 +491,7 @@ pub trait ProduceResourceExt: ProduceResource + Send + Sync + 'static {
     async fn joint_vote_encryption_public_key_k(
         &self,
     ) -> EgResult<Arc<crate::joint_public_key::JointPublicKey>> {
-        self.joint_public_key(
-            GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-        )
-        .await
+        self.joint_public_key(KeyPurpose::Ballot_Votes).await
     }
 
     /// Convenience method to obtain the "joint ballot data encryption public key ̂K" (K hat).
@@ -484,8 +499,7 @@ pub trait ProduceResourceExt: ProduceResource + Send + Sync + 'static {
     async fn joint_ballot_data_encryption_public_key_k_hat(
         &self,
     ) -> EgResult<Arc<crate::joint_public_key::JointPublicKey>> {
-        self.joint_public_key(GuardianKeyPurpose::Encrypt_Ballot_AdditionalFreeFormData)
-            .await
+        self.joint_public_key(KeyPurpose::Ballot_OtherData).await
     }
 
     /// Convenience method to obtain a [`JointPublicKey`] for the specified key purpose.
@@ -495,7 +509,7 @@ pub trait ProduceResourceExt: ProduceResource + Send + Sync + 'static {
     #[allow(async_fn_in_trait)]
     async fn joint_public_key(
         &self,
-        key_purpose: GuardianKeyPurpose,
+        key_purpose: KeyPurpose,
     ) -> EgResult<Arc<crate::joint_public_key::JointPublicKey>> {
         use crate::resource_id::ElectionDataObjectId as EdoId;
 
@@ -532,7 +546,7 @@ pub trait ProduceResourceExt: ProduceResource + Send + Sync + 'static {
     #[allow(async_fn_in_trait)]
     async fn guardians_secret_keys(
         &self,
-        key_purpose: GuardianKeyPurpose,
+        key_purpose: KeyPurpose,
     ) -> EgResult<Vec1<Arc<crate::guardian_secret_key::GuardianSecretKey>>> {
         use crate::resource_id::ElectionDataObjectId as EdoId;
 
@@ -579,12 +593,12 @@ mod t {
     use insta::assert_ron_snapshot;
 
     use super::*;
-    use crate::guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPurpose};
+    use crate::{guardian::GuardianIndex, key::KeyPurpose};
 
     #[test_log::test]
-    fn edoid() {
+    fn t1_edoid() {
         use ElectionDataObjectId::*;
-        use GuardianKeyPurpose::*;
+        use KeyPurpose::*;
         assert_ron_snapshot!(FixedParameters, @"FixedParameters");
         assert_ron_snapshot!(VaryingParameters, @"VaryingParameters");
         assert_ron_snapshot!(ElectionParameters, @"ElectionParameters");
@@ -592,16 +606,16 @@ mod t {
         assert_ron_snapshot!(Hashes, @"Hashes");
         assert_ron_snapshot!(GuardianKeyPart(GuardianKeyPartId {
             guardian_ix: GuardianIndex::one(),
-            key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
+            key_purpose: Ballot_Votes,
             asymmetric_key_part: AsymmetricKeyPart::Secret,
         }), @r#"
         GuardianKeyPart(GuardianKeyPartId(
           guardian_ix: 1,
-          key_purpose: Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
+          key_purpose: Ballot_Votes,
           asymmetric_key_part: Secret,
         ))
         "#);
-        assert_ron_snapshot!(JointPublicKey(Encrypt_Ballot_AdditionalFreeFormData), @"JointPublicKey(Encrypt_Ballot_AdditionalFreeFormData)");
+        assert_ron_snapshot!(JointPublicKey(Ballot_OtherData), @"JointPublicKey(Ballot_OtherData)");
         assert_ron_snapshot!(ExtendedBaseHash, @"ExtendedBaseHash");
         assert_ron_snapshot!(PreVotingData, @"PreVotingData");
 
@@ -612,7 +626,7 @@ mod t {
     }
 
     #[test_log::test]
-    fn rid() {
+    fn t2_rid() {
         use ElectionDataObjectId::*;
         use ResourceId::*;
 

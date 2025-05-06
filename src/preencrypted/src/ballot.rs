@@ -13,15 +13,20 @@ use eg::{
     ballot::{Ballot, BallotError, BallotState},
     ballot_style::BallotStyleIndex,
     contest_option_fields::ContestOptionFieldsPlaintexts,
-    election_manifest::{ContestIndex, ElectionManifest},
+    contest::ContestIndex,
+    election_manifest::ElectionManifest,
     pre_voting_data::PreVotingData,
     hash::HValue,
     serializable::SerializablePretty,
     vec1::Vec1,
 };
 use serde::{Deserialize, Serialize};
+
+//
 use util::{csrng::Csrng, logging::Logging};
 // use voter::ballot::BallotSelections;
+
+//=================================================================================================|
 
 /// A pre-encrypted ballot.
 #[derive(Debug, Serialize, Deserialize)]

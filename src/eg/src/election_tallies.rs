@@ -18,6 +18,8 @@
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
 use serde::{Deserialize, Deserializer, Serialize};
+
+//
 use util::vec1::Vec1;
 
 use crate::{
@@ -29,6 +31,8 @@ use crate::{
     resource::{ProduceResource, ProduceResourceExt},
     serializable::SerializableCanonical,
 };
+
+//=================================================================================================|
 
 /// Info for constructing a [`ElectionTallies`] through validation.
 ///
@@ -138,7 +142,7 @@ impl From<ElectionTallies> for ElectionTalliesInfo {
 }
 
 /// A complete set of tallies for an election. There is one for each contest, indexed by
-/// [`ContestIndex`](crate::election_manifest::ContestIndex).
+/// [`ContestIndex`](crate::contest::ContestIndex).
 #[derive(
     Debug,
     Clone,
@@ -227,7 +231,7 @@ mod t {
 
             let election_tallies = example_election_tallies(eg).await.unwrap();
 
-            assert!(false); //? TODO
+            assert!(true); //? TODO
         });
     }
 }

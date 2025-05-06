@@ -9,12 +9,16 @@
 
 use std::collections::BTreeMap;
 
-use util::algebra::FieldElement;
-
 use crate::{
-    ciphertext::Ciphertext, contest_data_fields_ciphertexts::ContestDataFieldsCiphertexts, eg::Eg,
-    election_manifest::ContestIndex, fixed_parameters::FixedParameters,
+    algebra::FieldElement,
+    ciphertext::Ciphertext,
+    contest::ContestIndex,
+    contest_data_fields_ciphertexts::ContestDataFieldsCiphertexts,
+    eg::Eg,
+    fixed_parameters::{FixedParameters, FixedParametersTrait, FixedParametersTraitExt},
 };
+
+//=================================================================================================|
 
 /// A scaled version of [`ContestDataFieldsCiphertexts`].
 ///
@@ -41,6 +45,8 @@ impl ContestEncryptedScaled {
         origin.scale(fixed_parameters, factor) == *self
     }
 }
+
+//-------------------------------------------------------------------------------------------------|
 
 /// Scaled version of [`Ballot`](crate::ballot::Ballot). This means that each encrypted vote in the ballot
 /// has been scaled by some factor. A [`BallotScaled`] does not contain any proofs.

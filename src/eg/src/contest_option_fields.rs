@@ -8,6 +8,8 @@
 #![allow(unused_imports)] //? TODO: Remove temp development code
 
 use serde::{Deserialize, Serialize};
+
+//
 use util::{
     uint31::Uint31,
     vec1::{HasIndexType, Vec1},
@@ -18,6 +20,29 @@ use crate::{
     eg::Eg,
     errors::{EgError, EgResult},
 };
+
+//=================================================================================================|
+
+/// A 1-based index of a [`ContestOptionFieldPlaintext`] in the order it is defined within its
+/// [`Contest`](crate::contest::Contest) in the
+/// [`ElectionManifest`](crate::election_manifest::ElectionManifest).
+///
+/// Same type as:
+///
+/// - [`CiphertextIndex`](crate::ciphertext::CiphertextIndex)
+/// - [`ContestOptionIndex`](crate::contest_option::ContestOptionIndex)
+/// - [`ContestOptionFieldPlaintextIndex`](crate::contest_option_fields::ContestOptionFieldPlaintextIndex)
+/// - [`ContestDataFieldIndex` (`contest_data_fields::`)](crate::contest_data_fields::ContestDataFieldIndex)
+/// - [`ContestDataFieldCiphertextIndex` (`contest_data_fields_ciphertexts::`)](crate::contest_data_fields_ciphertexts::ContestDataFieldCiphertextIndex)
+/// - [`ContestDataFieldPlaintextIndex` (`contest_data_fields_plaintexts::`)](crate::contest_data_fields_plaintexts::ContestDataFieldPlaintextIndex)
+/// - [`ContestDataFieldTallyIndex`](crate::contest_data_fields_tallies::ContestDataFieldTallyIndex)
+/// - [`EffectiveOptionSelectionLimit`](crate::selection_limits::EffectiveOptionSelectionLimit)
+/// - [`ProofRangeIndex`](crate::zk::ProofRangeIndex)
+pub type ContestOptionFieldPlaintextIndex = CiphertextIndex;
+
+impl HasIndexType for ContestOptionFieldPlaintext {
+    type IndexTypeParam = Ciphertext;
+}
 
 //-------------------------------------------------------------------------------------------------|
 
@@ -47,13 +72,6 @@ impl ContestOptionFieldPlaintext {
         TryInto::<Uint31>::try_into(t).map_err(Into::into).map(Self)
     }
 }
-
-impl HasIndexType for ContestOptionFieldPlaintext {
-    type IndexTypeParam = Ciphertext;
-}
-
-/// Same type as [`CiphertextIndex`], [`ContestOptionIndex`](crate::election_manifest::ContestOptionIndex), [`ContestDataFieldIndex`](crate::contest_data_fields_plaintexts::ContestDataFieldIndex), etc.
-pub type ContestOptionFieldPlaintextIndex = CiphertextIndex;
 
 /// A [`ContestOptionFieldPlaintext`] can be made from a [`u8`].
 impl From<u8> for ContestOptionFieldPlaintext {
@@ -151,7 +169,7 @@ impl ContestOptionFieldsPlaintexts {
     }
 
     pub fn as_slice(&self) -> &[ContestOptionFieldPlaintext] {
-        self.0.as_slice()
+        self.0.as_zero_based_slice()
     }
 }
 

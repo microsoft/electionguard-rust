@@ -36,7 +36,7 @@ use std::{
     //process::ExitCode,
     sync::Arc,
     //str::FromStr,
-    //sync::{,
+    //sync::{
         //Arc,
         //OnceLock,
     //},
@@ -106,7 +106,7 @@ impl ResourceProducer for ResourceProducer_SlicebytesFromValidated {
 
     fn maybe_produce(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
         // We only handle the case of requesting a serialized object from a validated object.
-        if rp_op.requested_fmt() != &ResourceFormat::SliceBytes {
+        if rp_op.requested_fmt().as_ref() != &ResourceFormat::SliceBytes {
             return None;
         }
 
@@ -116,8 +116,9 @@ impl ResourceProducer for ResourceProducer_SlicebytesFromValidated {
 
 impl ResourceProducer_SlicebytesFromValidated {
     #[instrument(
-        name = "ResourceProducer_SlicebytesFromValidated::maybe_produce_slicebytes",
-        fields(rf = trace_display(rp_op.requested_ridfmt())),
+        name = "RP_SlicebytesFromValidated::maybe_produce_slicebytes",
+        level = "debug",
+        fields(rf = trace_display(rp_op.requested_ridfmt().abbreviation())),
         skip(self, rp_op),
         ret
     )]
@@ -127,7 +128,7 @@ impl ResourceProducer_SlicebytesFromValidated {
 
         // See if we can produce a Validated version of the requested resource
         let ridfmt_validated = ResourceIdFormat {
-            rid: rp_op.requested_rid().clone(),
+            rid: rp_op.requested_rid().into_owned(),
             fmt: ResourceFormat::ValidElectionDataObject,
         };
         let resource_production_result =
@@ -147,7 +148,7 @@ impl ResourceProducer_SlicebytesFromValidated {
         arc_dyn_validated: Arc<(dyn Resource + 'static)>,
         resource_source: ResourceSource,
     ) -> ResourceProductionResult {
-        let ridfmt_src = arc_dyn_validated.ridfmt().clone();
+        let ridfmt_src = arc_dyn_validated.ridfmt().into_owned();
         debug!("Using {ridfmt_src} source {resource_source}");
 
         debug_assert_eq!(ridfmt_src.fmt, ResourceFormat::ValidElectionDataObject);

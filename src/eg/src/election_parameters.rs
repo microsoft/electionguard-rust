@@ -27,9 +27,14 @@ use serde::{Deserialize, Serialize};
 use crate::{
     eg::Eg,
     errors::EgResult,
-    fixed_parameters::{self, FixedParameters, FixedParametersInfo},
-    resource::{ElectionDataObjectId, HasStaticResourceIdFormat, Resource, ResourceIdFormat},
-    resource::{ProduceResource, ProduceResourceExt},
+    fixed_parameters::{
+        FixedParameters, FixedParametersInfo, FixedParametersTrait, FixedParametersTraitExt,
+    },
+    guardian::GuardianIndex,
+    resource::{
+        ElectionDataObjectId, HasStaticResourceIdFormat, ProduceResource, ProduceResourceExt,
+        Resource, ResourceIdFormat,
+    },
     serializable::SerializableCanonical,
     validatable::{Validatable, Validated},
     varying_parameters::{VaryingParameters, VaryingParametersInfo},
@@ -167,12 +172,24 @@ pub struct ElectionParameters {
 }
 
 impl ElectionParameters {
+    /// Election fixed parameters: `p`, `q`, `g`, etc.
     pub fn fixed_parameters(&self) -> &FixedParameters {
         self.fixed_parameters.as_ref()
     }
 
+    /// Per-election varying parameters: `n`, `k`, etc.
     pub fn varying_parameters(&self) -> &VaryingParameters {
         self.varying_parameters.as_ref()
+    }
+
+    /// Election parameter `n` - Total number of guardians.
+    pub fn n(&self) -> GuardianIndex {
+        self.varying_parameters.n()
+    }
+
+    /// Election parameter `k` - Decryption quorum threshold value.
+    pub fn k(&self) -> GuardianIndex {
+        self.varying_parameters.k()
     }
 }
 

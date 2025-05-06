@@ -9,6 +9,7 @@
 use std::{fs::File, io::Read, path::Path, sync::Arc};
 
 use anyhow::{Context, Result, bail, ensure};
+use cfg_if::cfg_if;
 
 use eg::eg::Eg;
 use util::{
@@ -32,6 +33,7 @@ pub(crate) struct SubcommandHelper {
 
     pub artifacts_dir: ArtifactsDir,
 
+    #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
     opt_insecure_deterministic_seed_data: Option<Vec<u8>>,
 
     opt_eg: Option<Arc<Eg>>,
@@ -42,7 +44,10 @@ impl SubcommandHelper {
         Ok(Self {
             clargs,
             artifacts_dir,
+
+            #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))]
             opt_insecure_deterministic_seed_data: None,
+
             opt_eg: None,
         })
     }
@@ -50,7 +55,7 @@ impl SubcommandHelper {
     /// Gets the [`Eg`] instance.
     /// In insecure deterministic mode, if called multiple times with the same customization_data,
     /// the same initialized csprng will be returned.
-    pub fn get_eg(&mut self, subcommand_str: &str) -> Result<Arc<Eg>> {
+    pub fn get_eg(&mut self, _subcommand_str: &str) -> Result<Arc<Eg>> {
         let arc_eg = if let Some(arc_eg) = self.opt_eg.as_ref() {
             arc_eg.clone()
         } else {
@@ -64,34 +69,36 @@ impl SubcommandHelper {
                     .unwrap_or_default();
 
             let eg = if self.clargs.insecure_deterministic {
-                if !cfg!(feature = "eg-allow-insecure-deterministic-csprng") {
-                    anyhow::bail!(
-                        "The --insecure-deterministic arg requires building with the {:?} feature.",
-                        "eg-allow-insecure-deterministic-csprng"
-                    );
-                } else {
-                    let subcommand_str_bytes = subcommand_str.as_bytes();
-                    let subcommand_str_bytes_len = subcommand_str_bytes.len() as u64;
+                cfg_if! {
+                    if #[cfg(any(feature = "eg-allow-insecure-deterministic-csprng", test))] {
+                        let subcommand_str_bytes = _subcommand_str.as_bytes();
+                        let subcommand_str_bytes_len = subcommand_str_bytes.len() as u64;
 
-                    let seed_data_from_file = self
-                        .get_insecure_deterministic_pseudorandom_seed_data(
-                            &insecure_deterministic_pseudorandom_seed_data_file_path,
-                        )?;
-                    let seed_data_from_file_len = seed_data_from_file.len() as u64;
+                        let seed_data_from_file = self
+                            .get_insecure_deterministic_pseudorandom_seed_data(
+                                &insecure_deterministic_pseudorandom_seed_data_file_path,
+                            )?;
+                        let seed_data_from_file_len = seed_data_from_file.len() as u64;
 
-                    let capacity = 8
-                        + (seed_data_from_file_len as usize)
-                        + 8
-                        + (subcommand_str_bytes_len as usize);
-                    let seed_data_len_be_bytes = seed_data_from_file_len.to_be_bytes();
-                    let mut seed_data = Vec::with_capacity(capacity);
-                    seed_data.extend_from_slice(&seed_data_len_be_bytes);
-                    seed_data.extend_from_slice(seed_data_from_file);
-                    seed_data.extend_from_slice(&subcommand_str_bytes_len.to_be_bytes());
-                    seed_data.extend_from_slice(subcommand_str_bytes);
-                    debug_assert_eq!(seed_data.len(), capacity);
+                        let capacity = 8
+                            + (seed_data_from_file_len as usize)
+                            + 8
+                            + (subcommand_str_bytes_len as usize);
+                        let seed_data_len_be_bytes = seed_data_from_file_len.to_be_bytes();
+                        let mut seed_data = Vec::with_capacity(capacity);
+                        seed_data.extend_from_slice(&seed_data_len_be_bytes);
+                        seed_data.extend_from_slice(seed_data_from_file);
+                        seed_data.extend_from_slice(&subcommand_str_bytes_len.to_be_bytes());
+                        seed_data.extend_from_slice(subcommand_str_bytes);
+                        debug_assert_eq!(seed_data.len(), capacity);
 
-                    Eg::new_with_insecure_deterministic_csprng_seed_data(&seed_data)
+                        Eg::new_with_insecure_deterministic_csprng_seed_data(&seed_data)
+                        } else {
+                        anyhow::bail!(
+                            "The --insecure-deterministic arg requires building with the {:?} feature.",
+                            "eg-allow-insecure-deterministic-csprng"
+                        );
+                    }
                 }
             } else {
                 if insecure_deterministic_pseudorandom_seed_data_file_exists {

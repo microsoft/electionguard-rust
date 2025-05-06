@@ -1,4 +1,4 @@
-# ElectionGuard 2.0 - Reference Implementation in Rust - Implementation Guide
+# ElectionGuard 2.1.0 - Reference Implementation in Rust - Implementation Guide
 
 ## What Is This Document and Why Is It Important?
 
@@ -25,7 +25,7 @@ package does not supply them.
 ### Config values
 
 * `allow_nonstandard_fixed_parameter_values` allow the use of values for p and q other than
-  the standard values specified in the ElectionGuard 2.0 Reference Specification.
+  the standard values specified in the ElectionGuard 2.1.0 Design Specification.
   When the standard values are used, some expensive primality checks can be avoided.
 
 ## Limits
@@ -117,26 +117,35 @@ This cross-checking also serves as a back-up scheme allowing a quorum (k of n) o
 
 #### Election Guardians
 
-Guardians have an essential role in fulfilling the privacy assurances
+Guardians have an essential role in guaranteeing the voter privacy assurances
 of ElectionGuard.
 
 As a Guardian, the voters' privacy relies on you:
 
-1. ***To REFUSE*** to reveal your Guardian secret key to ***anyone***, not even to the
-Election Administrator. Using your secret key should not involve revealing it.
+1. ***To REFUSE*** to reveal your Guardian Secret to ***anyone***, not even to the
+Election Administrator. This means that you must generate and store your Guardian Secret
+on hardware that only you physically control and that no one else has access to.
+For example, if your Guardian Secret is protected by a password, you must refuse to type
+that password into any system that anyone else has access to.
 
 1. ***To REFUSE*** to use your Guardian secret key to decrypt any ballots other than those
 that were intentionally challenged by the actual voter.
 
+1. You ***MUST***, after the final tally, securely erase or destroy any hardware or storage
+media on which your Guardian Secret ever existed. Gardian Secrets are *not* part of the
+Election Record and the ElectionGuard is designed around the principle that the Guardians'
+Secrets are not needed to verify any part of it.
+
 1. To be alert for the tactics that scammers, both traditional
-and cyber-, use to trick people into enabling fraudulent actions unwittingly.
+and high-tech, use to trick people into enabling fraudulent actions unwittingly.
 
 [County Password Inspector](https://www.smbc-comics.com/comic/2012-02-20)
 
-1. To be present for the rehearsal and the formal Key and Tally Ceremonies with
-your Guardian secret key.
+1. To be present for the rehearsal and the formal Key and Tally Ceremonies with your
+Guardian secret key.
 
 1. To call a "time out" whenever something doesn't seem right.
+
 Red flags:
 
 * Unrehearsed, last-minute changes in plans or venue.
@@ -151,8 +160,6 @@ The ceremonies should be deliberate, rehearsed, almost boring, procedures.
 The right decision in almost every unclear situation is to pause to think,
 express your concerns, gather more information,
 re-state and question your assumptions.
-
-1. To destroy your Guardian secret key at the appointed time after the election is over.
 
 #### Voters
 
@@ -172,7 +179,6 @@ re-state and question your assumptions.
 
 ### Key ceremony
 
-TODO come up with language that
 TODO avoid mental model of guardians posessing a fraction of a key
 
 ### Tally ceremony
@@ -185,10 +191,10 @@ TODO avoid mental model of guardians posessing a fraction of a key
 
 ## References
 
-***Note*** Neither the ElectionGuard 2.0 Reference Specification nor this
+***Note*** Neither the ElectionGuard 2.1.0 Design Specification nor this
 Reference Implementation claims conformance to any official standards.
-But it attempts to avoid gratuitous incompatibilities in the hope that it
-will be straightforward to integrate within or interoperate with conformant
+But this implementation attempts to avoid gratuitous incompatibilities in the hope
+that it will be straightforward to integrate within or interoperate with conforming
 election systems.
 
 [ElectionGuard Glossary](

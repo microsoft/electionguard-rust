@@ -2,29 +2,40 @@
 name = "test-electionguard"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/microsoft/electionguard-rust"
+license = "Apache-2.0 OR MIT"
 publish = false
 
 [features]
-
 default = [
-    "eg-forbid-unsafe-code",
     "eg-forbid-insecure-deterministic-csprng",
-    "eg-forbid-test-data-generation",
-    "eg-forbid-toy-parameters",
     "eg-forbid-nonstandard-egds-version",
+    "eg-forbid-test-data-generation",
+    "eg-forbid-reduced-params",
+    "eg-forbid-unsafe-code",
 ]
 
-eg-allow-unsafe-code                    = [ "eg/eg-allow-unsafe-code",                      "util/eg-allow-unsafe-code" ]
-eg-allow-insecure-deterministic-csprng  = [ "eg/eg-allow-insecure-deterministic-csprng",    "util/eg-allow-insecure-deterministic-csprng" ]
-eg-allow-test-data-generation           = [ "eg/eg-allow-test-data-generation",             "util/eg-allow-test-data-generation" ]
-eg-allow-toy-parameters                 = [ "eg/eg-allow-toy-parameters",                   "util/eg-allow-toy-parameters" ]
-eg-allow-nonstandard-egds-version       = [ "eg/eg-allow-nonstandard-egds-version",         "util/eg-allow-nonstandard-egds-version" ]
+eg-allow-insecure-deterministic-csprng  = [ "eg/eg-allow-insecure-deterministic-csprng" ]
+eg-forbid-insecure-deterministic-csprng = [ "eg/eg-forbid-insecure-deterministic-csprng" ]
 
-eg-forbid-unsafe-code                   = [ "eg/eg-forbid-unsafe-code",                     "util/eg-forbid-unsafe-code" ]
-eg-forbid-insecure-deterministic-csprng = [ "eg/eg-forbid-insecure-deterministic-csprng",   "util/eg-forbid-insecure-deterministic-csprng" ]
-eg-forbid-test-data-generation          = [ "eg/eg-forbid-test-data-generation",            "util/eg-forbid-test-data-generation" ]
-eg-forbid-toy-parameters                = [ "eg/eg-forbid-toy-parameters",                  "util/eg-forbid-toy-parameters" ]
-eg-forbid-nonstandard-egds-version      = [ "eg/eg-forbid-nonstandard-egds-version",        "util/eg-forbid-nonstandard-egds-version" ]
+eg-allow-nonstandard-egds-version       = [ "eg/eg-allow-nonstandard-egds-version" ]
+eg-forbid-nonstandard-egds-version      = [ "eg/eg-forbid-nonstandard-egds-version" ]
+
+eg-allow-test-data-generation           = [ "eg/eg-allow-test-data-generation" ]
+eg-forbid-test-data-generation          = [ "eg/eg-forbid-test-data-generation" ]
+
+eg-use-toy-params-q7p16                 = [ "eg/eg-use-toy-params-q7p16" ]
+eg-use-toy-params-q16p32                = [ "eg/eg-use-toy-params-q16p32" ]
+eg-use-toy-params-q16p48                = [ "eg/eg-use-toy-params-q16p48" ]
+eg-use-toy-params-q24p64                = [ "eg/eg-use-toy-params-q24p64" ]
+eg-use-toy-params-q32p96                = [ "eg/eg-use-toy-params-q32p96" ]
+eg-use-toy-params-q32p128               = [ "eg/eg-use-toy-params-q32p128" ]
+eg-use-toy-params-q48p192               = [ "eg/eg-use-toy-params-q48p192" ]
+eg-use-toy-params-q64p256               = [ "eg/eg-use-toy-params-q64p256" ]
+eg-forbid-reduced-params                = [ "eg/eg-forbid-reduced-params" ]
+
+eg-allow-unsafe-code                    = [ "eg/eg-allow-unsafe-code",  "util/eg-allow-unsafe-code" ]
+eg-forbid-unsafe-code                   = [ "eg/eg-forbid-unsafe-code", "util/eg-forbid-unsafe-code" ]
 
 [dependencies]
 
@@ -41,13 +52,14 @@ itertools.workspace = true
 static_assertions.workspace = true
 
 #--- Rand
+
 rand_core.workspace = true
 rand_distr.workspace = true
 
 #--- Futures
 
 futures-lite.workspace = true
-futures-core.workspace = true
+#futures-core.workspace = true
 futures-io.workspace = true
 pin-project-lite.workspace = true
 async-process.workspace = true
@@ -55,5 +67,6 @@ async-global-executor.workspace = true
 async-io.workspace = true
 
 #--- Tracing
+
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = [] } # "ansi"

@@ -11,7 +11,6 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
@@ -23,12 +22,15 @@ use util::vec1::HasIndexType;
 /// Same type as [`GuardianSecretKeyIndex`].
 pub use crate::guardian::GuardianIndex;
 use crate::{
-    guardian::{AsymmetricKeyPart, GuardianKeyPartId},
+    guardian::GuardianKeyPartId,
     guardian_coeff_proof::CoefficientsProof,
     guardian_public_key_trait::GuardianKeyInfoTrait,
     guardian_secret_key::CoefficientCommitments,
-    resource::{ElectionDataObjectId, Resource, ResourceFormat, ResourceIdFormat},
-    resource::{ProduceResource, ProduceResourceExt},
+    key::{AsymmetricKeyPart, KeyPurpose},
+    resource::{
+        ElectionDataObjectId, ProduceResource, ProduceResourceExt, Resource, ResourceFormat,
+        ResourceIdFormat,
+    },
     serializable::SerializableCanonical,
 };
 
@@ -84,7 +86,7 @@ impl GuardianKeyInfoTrait for GuardianPublicKeyInfo {
 crate::impl_knows_friendly_type_name! { GuardianPublicKeyInfo }
 
 impl Resource for GuardianPublicKeyInfo {
-    fn ridfmt(&self) -> &ResourceIdFormat {
+    fn ridfmt(&self) -> std::borrow::Cow<'_, ResourceIdFormat> {
         #[cfg(debug_assertions)]
         {
             let key_id_expected = GuardianKeyPartId {
@@ -95,7 +97,7 @@ impl Resource for GuardianPublicKeyInfo {
             let ridfmt_expected = edoid_expected.info_type_ridfmt();
             debug_assert_eq!(self.ridfmt, ridfmt_expected);
         }
-        &self.ridfmt
+        std::borrow::Cow::Borrowed(&self.ridfmt)
     }
 }
 
@@ -312,7 +314,7 @@ impl SerializableCanonical for GuardianPublicKey {}
 crate::impl_knows_friendly_type_name! { GuardianPublicKey }
 
 impl Resource for GuardianPublicKey {
-    fn ridfmt(&self) -> &ResourceIdFormat {
+    fn ridfmt(&self) -> std::borrow::Cow<'_, ResourceIdFormat> {
         #[cfg(debug_assertions)]
         {
             let key_id_expected = GuardianKeyPartId {
@@ -330,7 +332,7 @@ impl Resource for GuardianPublicKey {
                 assert_eq!(self.ridfmt, ridfmt_expected);
             }
         }
-        &self.ridfmt
+        std::borrow::Cow::Borrowed(&self.ridfmt)
     }
 }
 
@@ -409,92 +411,101 @@ inventory::submit! {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod test {
+mod t {
     use crate::{
         eg::Eg,
         errors::EgResult,
-        guardian::GuardianKeyPurpose,
+        fixed_parameters::{FixedParametersTrait, FixedParametersTraitExt},
         guardian_public_key_trait::GuardianKeyInfoTrait,
         guardian_secret_key::GuardianSecretKey,
+        key::KeyPurpose,
         resource::{ProduceResourceExt, Resource},
+        secret_coefficients::SecretCoefficientsTrait,
     };
 
     #[test_log::test]
-    fn test_key_generation() {
-        async_global_executor::block_on(test_key_generation_async());
-    }
+    fn t1_key_generation() {
+        async_global_executor::block_on(async {
+            let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
+                "eg::guardian_public_key::test_key_generation",
+            );
+            let eg = eg.as_ref();
 
-    async fn test_key_generation_async() {
-        let eg = Eg::new_with_test_data_generation_and_insecure_deterministic_csprng_seed(
-            "eg::guardian_public_key::test_key_generation",
-        );
-        let eg = eg.as_ref();
+            let election_parameters = eg.election_parameters().await.unwrap();
+            let election_parameters = election_parameters.as_ref();
+            let fixed_parameters = election_parameters.fixed_parameters();
+            let varying_parameters = election_parameters.varying_parameters();
+            let group = fixed_parameters.group();
+            let field = fixed_parameters.field();
+            let k = election_parameters.k();
 
-        let election_parameters = eg.election_parameters().await.unwrap();
-        let election_parameters = election_parameters.as_ref();
-        let fixed_parameters = election_parameters.fixed_parameters();
-        let group = fixed_parameters.group();
-        let field = fixed_parameters.field();
-        let varying_parameters = election_parameters.varying_parameters();
-
-        let k = varying_parameters.k().as_quantity();
-
-        let mut guardians_secret_keys = vec![];
-        for guardian_ix in varying_parameters.each_guardian_ix() {
-            let gsk_votes = GuardianSecretKey::generate(
-                eg,
-                guardian_ix,
-                format!("Guardian {guardian_ix}"),
-                GuardianKeyPurpose::Encrypt_Ballot_NumericalVotesAndAdditionalDataFields,
-            )
-            .await
-            .unwrap();
-            guardians_secret_keys.push(gsk_votes);
-        }
-
-        let guardian_public_keys = guardians_secret_keys
-            .iter()
-            .map(|sk| sk.make_public_key())
-            .collect::<Vec<_>>();
-
-        for guardian_secret_key in guardians_secret_keys.iter() {
-            // This is useful because it does an internal check of `ridfmt`.
-            let _ = guardian_secret_key.ridfmt();
-
-            assert_eq!(guardian_secret_key.secret_coefficients().0.len(), k);
-            assert_eq!(guardian_secret_key.coefficient_commitments().0.len(), k);
-
-            for secret_coefficient in guardian_secret_key.secret_coefficients().0.iter() {
-                assert!(&secret_coefficient.0.is_valid(field));
+            let mut guardians_secret_keys = vec![];
+            for guardian_ix in varying_parameters.each_guardian_ix() {
+                let gsk_votes = GuardianSecretKey::generate(
+                    eg,
+                    guardian_ix,
+                    format!("Guardian {guardian_ix}"),
+                    KeyPurpose::Ballot_Votes,
+                )
+                .await
+                .unwrap();
+                guardians_secret_keys.push(gsk_votes);
             }
 
-            for coefficient_commitment in guardian_secret_key.coefficient_commitments().0.iter() {
-                assert!(&coefficient_commitment.0.is_valid(group));
-            }
-        }
-
-        for (i, guardian_public_key) in guardian_public_keys.iter().enumerate() {
-            // This is useful because it does an internal check of `ridfmt`.
-            let _ = guardian_public_key.ridfmt();
-
-            assert_eq!(guardian_public_key.coefficient_commitments.0.len(), k);
-
-            for (j, coefficient_commitment) in guardian_public_key
-                .coefficient_commitments
-                .0
+            let guardian_public_keys = guardians_secret_keys
                 .iter()
-                .enumerate()
-            {
+                .map(|sk| sk.make_public_key())
+                .collect::<Vec<_>>();
+
+            for guardian_secret_key in guardians_secret_keys.iter() {
+                // This is useful because it does an internal check of `ridfmt`.
+                let _ = guardian_secret_key.ridfmt();
+
                 assert_eq!(
-                    &coefficient_commitment.0,
-                    &guardians_secret_keys[i].coefficient_commitments().0[j].0
+                    guardian_secret_key.secret_coefficients().len(),
+                    k.as_quantity()
+                );
+                assert_eq!(
+                    guardian_secret_key.coefficient_commitments().0.len(),
+                    k.as_quantity()
+                );
+
+                for secret_coefficient in guardian_secret_key.secret_coefficients().iter() {
+                    assert!(&secret_coefficient.0.is_valid(field));
+                }
+
+                for coefficient_commitment in guardian_secret_key.coefficient_commitments().0.iter()
+                {
+                    assert!(&coefficient_commitment.0.is_valid(group));
+                }
+            }
+
+            for (i, guardian_public_key) in guardian_public_keys.iter().enumerate() {
+                // This is useful because it does an internal check of `ridfmt`.
+                let _ = guardian_public_key.ridfmt();
+
+                assert_eq!(
+                    guardian_public_key.coefficient_commitments.0.len(),
+                    k.as_quantity()
+                );
+
+                for (j, coefficient_commitment) in guardian_public_key
+                    .coefficient_commitments
+                    .0
+                    .iter()
+                    .enumerate()
+                {
+                    assert_eq!(
+                        &coefficient_commitment.0,
+                        &guardians_secret_keys[i].coefficient_commitments().0[j].0
+                    );
+                }
+
+                assert_eq!(
+                    guardian_public_key.public_key_k_i_0().unwrap(),
+                    &guardian_public_key.coefficient_commitments().0[0].0
                 );
             }
-
-            assert_eq!(
-                guardian_public_key.public_key_k_i_0().unwrap(),
-                &guardian_public_key.coefficient_commitments().0[0].0
-            );
-        }
+        });
     }
 }

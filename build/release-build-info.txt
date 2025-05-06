@@ -1,6 +1,7 @@
 build_info_txt: build/release-build-info.txt
 
 pwd: src
+code_stats: 1
 profile: release
 target_subdir: target/release
 cargo_profile_flag: --release
@@ -20,6 +21,30 @@ target_subdir=target/release
 ======================== [ -f Cargo.lock ] && rm Cargo.lock
 
 rm Cargo.lock
++ rm build/code-stats.txt
+
+======================== code stats build/code-stats.txt
+
+tokei -e build -e src/target
+===============================================================================
+ Language            Files        Lines         Code     Comments       Blanks
+===============================================================================
+ Batch                   1          159          115            0           44
+ JSON                   25         1321         1312            0            9
+ Shell                   1          212          172            4           36
+ Plain Text              1         2617            0         2071          546
+ TOML                   10          911          503          205          203
+-------------------------------------------------------------------------------
+ Markdown               12         1808            0         1297          511
+ |- JSON                 1          326          325            0            1
+ (Total)                           2134          325         1297          512
+-------------------------------------------------------------------------------
+ Rust                  145        37515        25958         6173         5384
+ |- Markdown           125         3093            0         2665          428
+ (Total)                          40608        25958         8838         5812
+===============================================================================
+ Total                 195        44543        28060         9750         6733
+===============================================================================
 
 ======================== cargo version -vv
 
@@ -33,6 +58,26 @@ libcurl: 8.12.0-DEV (sys:0.4.79+curl-8.12.0 vendored ssl:OpenSSL/1.1.1w)
 ssl: OpenSSL 1.1.1w  11 Sep 2023
 os: Ubuntu 24.4.0 (noble) [64-bit]
 
+======================== cargo license
+
++ rm build/cargo-license.txt
+
+======================== cargo license
+
++ cargo license --color never --no-default-features --features eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code
+(MIT OR Apache-2.0) AND Unicode-3.0 (1): unicode-ident
+0BSD OR Apache-2.0 OR MIT (1): adler2
+Apache-2.0 (3): insta, serde_tokenstream, similar
+Apache-2.0 OR Apache-2.0 WITH LLVM-exception OR MIT (4): linux-raw-sys, rustix, wasi, wit-bindgen-rt
+Apache-2.0 OR BSL-1.0 (1): ryu
+Apache-2.0 OR LGPL-2.1-or-later OR MIT (1): r-efi
+Apache-2.0 OR MIT (210): addr2line, allocator-api2, android-tzdata, android_system_properties, anstream, anstyle, anstyle-parse, anstyle-query, anstyle-wincon, anyhow, async-attributes, async-channel, async-channel, async-executor, async-fs, async-global-executor, async-global-executor, async-io, async-lock, async-process, async-signal, async-std, async-task, async-trait, atomic-waker, autocfg, backtrace, base16ct, base64, base64, bitflags, bitflags, block-buffer, blocking, bon, bon-macros, bumpalo, cc, cfg-if, chrono, clap, clap_builder, clap_derive, clap_lex, colorchoice, concurrent-queue, core-foundation-sys, cpufeatures, crossbeam-utils, crypto-common, demo-eg, deranged, digest, displaydoc, downcast-rs, eg, eg-dataproducer-filesystem, either, electionguard, encode_unicode, env_filter, env_logger, equivalent, erased-serde, errno, event-listener, event-listener, event-listener-strategy, fastrand, fnv, futures, futures-channel, futures-core, futures-executor, futures-io, futures-lite, futures-macro, futures-sink, futures-task, futures-util, getrandom, gimli, gloo-timers, hash32, hashbrown, hashbrown, hashbrown, heapless, heck, hermit-abi, hex, hex-literal, hmac, hybrid-array, iana-time-zone, iana-time-zone-haiku, ident_case, indexmap, indexmap, indoc, inventory, is_terminal_polyfill, itertools, itoa, js-sys, keccak, kv-log-macro, lazy_static, libc, lock_api, log, num-bigint, num-conv, num-integer, num-traits, object, once_cell, parking, parking_lot_core, pin-project, pin-project-internal, pin-project-lite, pin-utils, piper, polling, powerfmt, proc-macro2, quote, rand, rand_core, rand_core, rand_distr, rand_xorshift, regex, regex-automata, regex-syntax, regex-syntax, ron, rustc-demangle, rustc_version, rustversion, scopeguard, semver, serde, serde_derive, serde_json, serde_with, serde_with_macros, sha2, sha3, shlex, signal-hook-registry, smallvec, stable_deref_trait, static_assertions, syn, syn, test-data-generation, test-electionguard, test-log, test-log-macros, thiserror, thiserror-impl, thread_local, time, time-core, time-macros, typeid, typenum, unicode-normalization, unicode-properties, unicode-segmentation, unicode-width, unicode-xid, utf16_iter, utf8_iter, utf8parse, util, value-bag, version_check, wasm-bindgen, wasm-bindgen-backend, wasm-bindgen-futures, wasm-bindgen-macro, wasm-bindgen-macro-support, wasm-bindgen-shared, web-sys, web-time, winapi, winapi-i686-pc-windows-gnu, winapi-x86_64-pc-windows-gnu, windows-core, windows-implement, windows-interface, windows-link, windows-result, windows-strings, windows-sys, windows-targets, windows_aarch64_gnullvm, windows_aarch64_msvc, windows_i686_gnu, windows_i686_gnullvm, windows_i686_msvc, windows_x86_64_gnu, windows_x86_64_gnullvm, windows_x86_64_msvc, write16, zeroize, zeroize_derive
+Apache-2.0 OR MIT OR Zlib (3): miniz_oxide, tinyvec, tinyvec_macros
+BSD-3-Clause (1): subtle
+MIT (41): console, const-default, convert_case, darling, darling_core, darling_macro, dashmap, derive_more, derive_more-impl, faster-hex, generic-array, generic-array, kinded, kinded_macros, libm, matchers, nu-ansi-term, nutype, nutype_macros, overload, ractor, redox_syscall, sharded-slab, slab, strsim, strum, strum, strum_macros, strum_macros, synstructure, textwrap, tokio, tokio-macros, tokio_with_wasm, tokio_with_wasm_proc, tracing, tracing-attributes, tracing-core, tracing-futures, tracing-subscriber, urlencoding
+MIT OR Unlicense (4): aho-corasick, byteorder, memchr, regex-automata
+Unicode-3.0 (21): icu_collator, icu_collator_data, icu_collections, icu_locid, icu_locid_transform, icu_locid_transform_data, icu_normalizer, icu_normalizer_data, icu_properties, icu_properties_data, icu_provider, icu_provider_macros, litemap, tinystr, writeable, yoke, yoke-derive, zerofrom, zerofrom-derive, zerovec, zerovec-derive
+
 ======================== rustc --version -v
 
 rustc 1.86.0 (05f9846f8 2025-03-31)
@@ -43,293 +88,387 @@ host: x86_64-unknown-linux-gnu
 release: 1.86.0
 LLVM version: 19.1.7
 
-======================== cargo build --release --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version --all-targets
+======================== cargo build --release --no-default-features --features  eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code --all-targets
 
-    Updating crates.io index
-     Locking 207 packages to latest compatible versions
-   Compiling proc-macro2 v1.0.94
+   Compiling proc-macro2 v1.0.95
    Compiling unicode-ident v1.0.18
-   Compiling pin-project-lite v0.2.16
-   Compiling serde v1.0.219
    Compiling autocfg v1.4.0
-   Compiling crossbeam-utils v0.8.21
+   Compiling pin-project-lite v0.2.16
    Compiling once_cell v1.21.3
-   Compiling parking v2.2.1
+   Compiling serde v1.0.219
+   Compiling crossbeam-utils v0.8.21
    Compiling cfg-if v1.0.0
-   Compiling version_check v0.9.5
-   Compiling typenum v1.18.0
-   Compiling libc v0.2.171
-   Compiling semver v1.0.26
-   Compiling fastrand v2.3.0
-   Compiling futures-io v0.3.31
    Compiling futures-core v0.3.31
-   Compiling libm v0.2.11
+   Compiling stable_deref_trait v1.2.0
+   Compiling parking v2.2.1
+   Compiling libc v0.2.172
+   Compiling typenum v1.18.0
+   Compiling futures-io v0.3.31
+   Compiling version_check v0.9.5
+   Compiling strsim v0.11.1
+   Compiling fnv v1.0.7
+   Compiling fastrand v2.3.0
+   Compiling ident_case v1.0.1
+   Compiling semver v1.0.26
+   Compiling libm v0.2.14
+   Compiling memchr v2.7.4
    Compiling rustix v0.38.44
+   Compiling linux-raw-sys v0.4.15
    Compiling rand_core v0.6.4
    Compiling unicode-segmentation v1.12.0
-   Compiling strsim v0.11.1
-   Compiling ident_case v1.0.1
-   Compiling fnv v1.0.7
-   Compiling zerocopy v0.8.24
-   Compiling generic-array v0.14.7
-   Compiling linux-raw-sys v0.4.15
-   Compiling subtle v2.6.1
    Compiling bitflags v2.9.0
-   Compiling tracing-core v0.1.33
-   Compiling slab v0.4.9
-   Compiling num-traits v0.2.19
-   Compiling futures-lite v2.6.0
-   Compiling heapless v0.8.0
-   Compiling convert_case v0.6.0
-   Compiling byteorder v1.5.0
-   Compiling equivalent v1.0.2
-   Compiling allocator-api2 v0.2.21
-   Compiling rand_core v0.9.3
-   Compiling concurrent-queue v2.5.0
-   Compiling rustc_version v0.4.1
    Compiling async-task v4.7.1
-   Compiling stable_deref_trait v1.2.0
-   Compiling urlencoding v2.1.3
+   Compiling subtle v2.6.1
+   Compiling slab v0.4.9
+   Compiling generic-array v0.14.7
+   Compiling num-traits v0.2.19
    Compiling rustversion v1.0.20
-   Compiling hash32 v0.3.1
-   Compiling atomic-waker v1.1.2
-   Compiling anyhow v1.0.97
-   Compiling thiserror v2.0.12
+   Compiling tracing-core v0.1.33
+   Compiling concurrent-queue v2.5.0
+   Compiling futures-lite v2.6.0
+   Compiling rand_core v0.9.3
+   Compiling equivalent v1.0.2
    Compiling heck v0.5.0
-   Compiling nutype_macros v0.6.1
-   Compiling serde_json v1.0.140
+   Compiling byteorder v1.5.0
+   Compiling heapless v0.8.0
+   Compiling atomic-waker v1.1.2
+   Compiling rustc_version v0.4.1
+   Compiling allocator-api2 v0.2.21
+   Compiling convert_case v0.6.0
+   Compiling getrandom v0.3.2
+   Compiling thiserror v2.0.12
+   Compiling urlencoding v2.1.3
    Compiling quote v1.0.40
    Compiling event-listener v5.4.0
-   Compiling getrandom v0.3.2
-   Compiling keccak v0.1.5
-   Compiling itoa v1.0.15
-   Compiling memchr v2.7.4
+   Compiling anyhow v1.0.98
    Compiling piper v0.2.4
+   Compiling serde_json v1.0.140
+   Compiling rand v0.9.1
+   Compiling itoa v1.0.15
+   Compiling keccak v0.1.5
+   Compiling hash32 v0.3.1
    Compiling ryu v1.0.20
-   Compiling lazy_static v1.5.0
-   Compiling crypto-common v0.1.6
    Compiling block-buffer v0.10.4
-   Compiling typeid v1.0.3
-   Compiling rand v0.9.0
-   Compiling syn v2.0.100
-   Compiling event-listener-strategy v0.5.4
-   Compiling num-integer v0.1.46
+   Compiling crypto-common v0.1.6
+   Compiling nutype_macros v0.6.1
+   Compiling async-executor v1.13.2
    Compiling rand_xorshift v0.4.0
-   Compiling unicode-xid v0.2.6
+   Compiling smallvec v1.15.0
    Compiling static_assertions v1.1.0
-   Compiling async-executor v1.13.1
+   Compiling lazy_static v1.5.0
    Compiling cpufeatures v0.2.17
+   Compiling typeid v1.0.3
+   Compiling syn v2.0.101
+   Compiling event-listener-strategy v0.5.4
+   Compiling unicode-xid v0.2.6
+   Compiling regex-syntax v0.8.5
    Compiling regex-syntax v0.6.29
    Compiling digest v0.10.7
+   Compiling overload v0.1.1
    Compiling hex-literal v1.0.0
    Compiling downcast-rs v2.0.1
+   Compiling unicode-properties v0.1.3
+   Compiling inventory v0.3.20
+   Compiling thread_local v1.1.8
    Compiling async-lock v3.4.0
    Compiling async-channel v2.3.1
-   Compiling regex-syntax v0.8.5
-   Compiling inventory v0.3.20
-   Compiling overload v0.1.1
    Compiling sharded-slab v0.1.7
-   Compiling thread_local v1.1.8
-   Compiling rand_distr v0.5.1
    Compiling utf8parse v0.2.2
-   Compiling smallvec v1.14.0
-   Compiling anstyle-query v1.1.2
-   Compiling is_terminal_polyfill v1.70.1
-   Compiling sha3 v0.10.8
-   Compiling sha2 v0.10.8
-   Compiling hmac v0.12.1
+   Compiling pin-utils v0.1.0
+   Compiling syn v1.0.109
+   Compiling regex-automata v0.4.9
+   Compiling futures-sink v0.3.31
    Compiling anstyle v1.0.10
-   Compiling colorchoice v1.0.3
-   Compiling blocking v1.6.1
-   Compiling darling_core v0.20.11
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling litemap v0.7.5
+   Compiling sha3 v0.10.8
+   Compiling sha2 v0.10.9
    Compiling regex-automata v0.1.10
+   Compiling hmac v0.12.1
+   Compiling nu-ansi-term v0.46.0
+   Compiling anstyle-query v1.1.2
+   Compiling writeable v0.5.5
    Compiling serde_derive v1.0.219
    Compiling tracing-attributes v0.1.28
+   Compiling darling_core v0.20.11
    Compiling kinded_macros v0.3.0
    Compiling zeroize_derive v1.4.2
+   Compiling blocking v1.6.1
    Compiling thiserror-impl v2.0.12
-   Compiling strum_macros v0.27.1
-   Compiling derive_more-impl v2.0.1
+   Compiling synstructure v0.13.2
    Compiling async-trait v0.1.88
-   Compiling nu-ansi-term v0.46.0
-   Compiling anstyle-parse v0.2.6
-   Compiling clap_lex v0.7.4
-   Compiling pin-project-internal v1.1.10
-   Compiling clap_derive v4.5.32
-   Compiling bitflags v1.3.2
-   Compiling base64 v0.13.1
-   Compiling regex-automata v0.4.9
+   Compiling derive_more-impl v2.0.1
+   Compiling strum_macros v0.27.1
+   Compiling zerovec-derive v0.10.3
    Compiling matchers v0.1.0
-   Compiling anstream v0.6.18
-   Compiling console v0.15.11
-   Compiling signal-hook-registry v1.4.2
-   Compiling similar v2.7.0
-   Compiling linked-hash-map v0.5.6
-   Compiling test-log-macros v0.2.17
-   Compiling async-fs v2.1.2
-   Compiling darling_macro v0.20.11
-   Compiling kinded v0.3.0
-   Compiling clap_builder v4.5.35
+   Compiling displaydoc v0.2.5
+   Compiling anstyle-parse v0.2.6
+   Compiling is_terminal_polyfill v1.70.1
+   Compiling colorchoice v1.0.3
    Compiling regex v1.11.1
+   Compiling futures-channel v0.3.31
+   Compiling icu_provider_macros v1.5.0
+   Compiling futures-macro v0.3.31
+   Compiling kinded v0.3.0
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.7.5
+   Compiling lock_api v0.4.12
+   Compiling anstream v0.6.18
+   Compiling bitflags v1.3.2
+   Compiling darling_macro v0.20.11
+   Compiling icu_properties_data v1.5.1
+   Compiling futures-task v0.3.31
+   Compiling clap_lex v0.7.4
+   Compiling parking_lot_core v0.9.10
+   Compiling value-bag v1.11.1
+   Compiling base64 v0.13.1
    Compiling tracing v0.1.41
-   Compiling pin-project v1.1.10
+   Compiling num-integer v0.1.46
+   Compiling rand_distr v0.5.1
+   Compiling darling v0.20.11
+   Compiling clap_derive v4.5.32
+   Compiling futures-util v0.3.31
+   Compiling console v0.15.11
+   Compiling strum v0.27.1
+   Compiling log v0.4.27
+   Compiling unicode-width v0.2.0
+   Compiling icu_normalizer_data v1.5.1
+   Compiling zerofrom v0.1.6
+   Compiling clap_builder v4.5.37
+   Compiling const-default v1.0.0
+   Compiling similar v2.7.0
+   Compiling serde_with_macros v3.12.0
+   Compiling event-listener v2.5.3
    Compiling polling v3.7.4
    Compiling tracing-subscriber v0.3.19
-   Compiling darling v0.20.11
-   Compiling async-io v2.4.0
-   Compiling serde_with_macros v3.12.0
-   Compiling test-log v0.2.17
-   Compiling async-global-executor v3.1.0
-   Compiling async-signal v0.2.10
-   Compiling clap v4.5.35
-   Compiling async-process v2.3.0
-   Compiling strum v0.27.1
    Compiling derive_more v2.0.1
-   Compiling hashbrown v0.15.2
+   Compiling scopeguard v1.2.0
+   Compiling textwrap v0.16.2
+   Compiling kv-log-macro v1.0.7
+   Compiling bon-macros v2.3.0
+   Compiling async-attributes v1.1.2
+   Compiling yoke v0.7.5
+   Compiling async-channel v1.9.0
+   Compiling generic-array v1.2.0
+   Compiling async-io v2.4.0
+   Compiling pin-project-internal v1.1.10
+   Compiling clap v4.5.37
+   Compiling test-log-macros v0.2.17
+   Compiling strum_macros v0.26.4
+   Compiling signal-hook-registry v1.4.5
+   Compiling indoc v2.0.6
+   Compiling hashbrown v0.14.5
+   Compiling base16ct v0.2.0
+   Compiling hashbrown v0.15.3
    Compiling either v1.15.0
    Compiling zeroize v1.8.1
-   Compiling serde_with v3.12.0
    Compiling num-bigint v0.4.6
    Compiling faster-hex v0.10.0
-   Compiling serde_tokenstream v0.2.2
+   Compiling serde_with v3.12.0
    Compiling erased-serde v0.4.6
+   Compiling serde_tokenstream v0.2.2
+   Compiling async-global-executor v3.1.0
+   Compiling zerovec v0.10.4
    Compiling ron v0.7.1
+   Compiling hybrid-array v0.3.1
+   Compiling async-global-executor v2.4.1
+   Compiling futures-executor v0.3.31
+   Compiling icu_collator_data v1.5.1
+   Compiling async-signal v0.2.10
+   Compiling pin-project v1.1.10
+   Compiling test-log v0.2.17
    Compiling itertools v0.14.0
-   Compiling insta v1.42.2
-   Compiling indexmap v2.8.0
+   Compiling dashmap v6.1.0
+   Compiling tokio v1.44.2
    Compiling nutype v0.6.1
+   Compiling bon v2.3.0
+   Compiling strum v0.26.3
+   Compiling write16 v1.0.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinystr v0.7.6
+   Compiling icu_collections v1.5.0
+   Compiling indexmap v2.9.0
+   Compiling insta v1.43.1
+   Compiling utf8_iter v1.0.4
+   Compiling futures v0.3.31
+   Compiling utf16_iter v1.0.5
+   Compiling async-process v2.3.0
+   Compiling tracing-futures v0.2.5
+   Compiling async-std v1.13.1
+   Compiling async-fs v2.1.2
+   Compiling icu_locid v1.5.0
+   Compiling tinyvec v1.9.0
+   Compiling icu_provider v1.5.0
+   Compiling ractor v0.15.5
+   Compiling unicode-normalization v0.1.24
+   Compiling icu_locid_transform v1.5.0
+   Compiling icu_properties v1.5.1
    Compiling util v0.1.0 (src/util)
+   Compiling icu_normalizer v1.5.0
+   Compiling icu_collator v1.5.0
    Compiling eg v0.1.0 (src/eg)
+   Compiling test-data-generation v0.1.0 (src/test-data-generation)
    Compiling eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem)
    Compiling test-electionguard v0.1.0 (src/test-electionguard)
-   Compiling electionguard v0.1.0 (src/electionguard)
    Compiling demo-eg v0.1.0 (src/demo-eg)
-    Finished `release` profile [optimized] target(s) in 19.45s
+   Compiling electionguard v0.1.0 (src/electionguard)
+    Finished `release` profile [optimized] target(s) in 29.77s
 
 exit status: 0
 
-elapsed real: 19.53 s
-max resident: 853816 KiB
-page faults:  2261241
+elapsed real: 29.83 s
+max resident: 934272 KiB
+page faults:  3013521
 
 ======================== cargo tree ...
 
--------- build/release-cargo-tree-normal.txt
++ rm build/release-cargo-tree-normal.txt
+cargo tree --offline --no-default-features --features  eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -e normal -f "{p} {f}"
 
-cargo tree --offline --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -e normal -f "{p} {f}"
++ rm build/release-cargo-tree-normal-dups.txt
+cargo tree --offline --no-default-features --features  eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -e normal -f "{p} {f}" --duplicates
 
--------- build/release-cargo-tree-normal-dups.txt
++ rm build/release-cargo-tree-normal-list.txt
+cargo tree --offline --no-default-features --features  eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -e normal -f "{p} {f}" --prefix none --no-dedupe | sort --unique
 
-cargo tree --offline --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -e normal -f "{p} {f}" --duplicates
-
--------- build/release-cargo-tree-normal-list.txt
-
-cargo tree --offline --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -e normal -f "{p} {f}" --prefix none --no-dedupe | sort --unique
-
--------- build/release-cargo-tree-features.txt
-
-cargo tree --offline --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -e features -f "{p} {f}"
++ rm build/release-cargo-tree-features.txt
+cargo tree --offline --no-default-features --features  eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -e features -f "{p} {f}"
 
 ======================== du -sh "target/release"
 
-356M    target/release
+496M    target/release
 
 ======================== ls -Aq1 -s --kibibytes "target/release"
 
-total 23132
+total 25456
     4 build
     0 .cargo-lock
- 3040 demo-eg
+ 3676 demo-eg
     4 demo-eg.d
-   48 deps
- 3384 electionguard
+   64 deps
+ 3564 electionguard
     8 electionguard.d
     4 examples
-   12 .fingerprint
+   20 .fingerprint
     4 incremental
     4 libeg.d
     4 libeg_dataproducer_filesystem.d
    20 libeg_dataproducer_filesystem.rlib
-11620 libeg.rlib
+13160 libeg.rlib
+    4 libtest_data_generation.d
+   92 libtest_data_generation.rlib
     4 libutil.d
- 1224 libutil.rlib
- 3744 test-electionguard
+  896 libutil.rlib
+ 3920 test-electionguard
     4 test-electionguard.d
 
 ======================== du -sh "target/release/*"
 
-13M     target/release/build
-3.0M    target/release/demo-eg
+16M     target/release/build
+3.6M    target/release/demo-eg
 4.0K    target/release/demo-eg.d
-336M    target/release/deps
+471M    target/release/deps
 8.0K    target/release/electionguard.d
 4.0K    target/release/examples
 4.0K    target/release/incremental
 4.0K    target/release/libeg.d
 4.0K    target/release/libeg_dataproducer_filesystem.d
+4.0K    target/release/libtest_data_generation.d
 4.0K    target/release/libutil.d
 4.0K    target/release/test-electionguard.d
 
 ======================== du -sh "target/release/deps"
 
-339M    target/release/deps
+475M    target/release/deps
 
 ======================== ls -SAq1 -s --kibibytes "target/release/deps" | head -n 20
 
-total 347008
-11620 libeg-0e40e4dd33d759dd.rlib
-11608 libsyn-873f5a8fbf4c17d7.rlib
+total 485772
+13160 libeg-e0f7ed14b023c726.rlib
+11976 libsyn-af2df7bb4fe47ad2.rlib
 10220 librustix-592ef862bb40f43c.rlib
  9284 librustix-592ef862bb40f43c.rmeta
- 9108 libnutype_macros-32e075e87c280c97.so
- 8240 eg-6ea9b2b63f476e26
- 7360 libsyn-596c053abee98c0c.rlib
+ 9108 libnutype_macros-699d471623b62595.so
+ 8792 eg-c6c507421e87eba4
+ 8724 libsyn-9588a08800f14f66.rlib
+ 7372 libsyn-d56a9dbf9d99b69b.rlib
+ 7316 libeg-e0f7ed14b023c726.rmeta
  6280 libregex_syntax-278fc833d6e378c8.rlib
- 6056 libeg-0e40e4dd33d759dd.rmeta
- 5860 eg_dataproducer_filesystem-d859ae3f6b74b233
- 5632 libdarling_core-730196f3618b6572.rlib
- 5624 libserde-5f2177fc15839bbf.rlib
- 5528 libserde-5f2177fc15839bbf.rmeta
- 5460 libderive_more_impl-01337171e408dc0b.so
- 4500 libsyn-873f5a8fbf4c17d7.rmeta
- 4472 libregex_syntax-9c0764dd3734bc10.rlib
- 4468 libserde_derive-5e5443fd27dd10a7.so
- 4332 libzerocopy-11a29f73088c2e70.rlib
- 4328 libzerocopy-11a29f73088c2e70.rmeta
+ 6076 libfutures_util-72e3bce924e085b8.rlib
+ 6044 eg_dataproducer_filesystem-4b5ea8d517987243
+ 6024 libfutures_util-72e3bce924e085b8.rmeta
+ 5796 libbon_macros-8c80d134521e3a26.so
+ 5628 libdarling_core-8c8108ff1f7e8520.rlib
+ 5624 libserde-b77b71501cf99b6f.rlib
+ 5528 libserde-b77b71501cf99b6f.rmeta
+ 5460 libderive_more_impl-da22876768ae6aea.so
+ 4872 libsyn-af2df7bb4fe47ad2.rmeta
 
 [done]
 
 ======================== cargo test  [build/release-cargo-test.txt]
 
-+ /usr/bin/time cargo test --release --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -- --test-threads=1
-     Running unittests src/main.rs (target/release/deps/demo_eg-10675a263961f10b)
++ /usr/bin/time cargo test --release --no-default-features --features eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -- --test-threads=1
+     Running unittests src/main.rs (target/release/deps/demo_eg-4a0b013b3bf67140)
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-     Running unittests src/lib.rs (target/release/deps/eg-6ea9b2b63f476e26)
+     Running unittests src/lib.rs (target/release/deps/eg-c6c507421e87eba4)
+test algebra::test::test_field_conversions ... ok
+test algebra::test::test_field_group_validity ... ok
+test algebra::test::test_field_operations ... ok
+test algebra::test::test_group_operations ... ok
+test algebra_utils::tests::test_cnt_bits_repr_usize ... ok
+test algebra_utils::tests::test_group_dlog ... ok
+test algebra_utils::tests::test_lagrange_interpolation ... ok
+test algebra_utils::tests::test_mod_inverse ... ok
+test algebra_utils::tests::test_single_lagrange_coefficient ... ok
+test algebra_utils::tests::test_to_be_bytes_left_pad ... ok
+test ballot_style::t::t1 ... ok
+test ballot_style::t::t2 ... ok
+test ballot_style::t::t3 ... ok
+test ballot_style::t::t4 ... ok
+test ballot_style::t::t5 ... ok
 test chaining_mode::t::t1 ... ok
 test chaining_mode::t::t2 ... ok
 test chaining_mode::t::t3 ... ok
+test contest::t::t1 ... ok
+test contest::t::t2 ... ok
 test contest_data_fields_tallies::t::t10 ... ok
+test contest_option::t::t1 ... ok
+test contest_option::t::t2 ... ok
+test edo_template::t::t1 ... ok
 test eg::t::t1 ... ok
 test eg_config::t::t1 ... ok
 test egds_version::t::t1 ... ok
 test egds_version::t::t2 ... ok
 test egds_version::t::t3 ... ok
 test election_manifest::t::t1 ... ok
-test election_tallies::t::t1 ... FAILED
+test election_manifest::t::t2 ... ok
+test election_manifest::t::t3 ... ok
+test election_manifest::t::t4 ... ok
+test election_manifest::t::t5 ... ok
+test election_manifest::t::t6 ... ok
+test election_tallies::t::t1 ... ok
 test extended_base_hash::t::t1 ... ok
 test fixed_parameters::t::t1 ... ok
-test guardian_public_key::test::test_key_generation ... ok
-test guardian_share::test::test_encryption_decryption ... FAILED
-test guardian_share::test::test_key_sharing ... FAILED
-test guardian_share::test::test_public_validation ... FAILED
-test guardian_share::test::test_text_encoding ... ok
+test guardian::t::t1 ... ok
+test guardian::t::t2 ... ok
+test guardian_public_key::t::t1_key_generation ... ok
 test hash::test_eg_h::test_evaluate_h ... ok
 test hash::test_eg_h::test_hvalue_serde_json ... ok
 test hash::test_eg_h::test_hvalue_std_fmt ... ok
 test hashes::t::t1 ... ok
 test ident::t::t0 ... ok
-test resource::t::edoid ... ok
-test resource::t::rid ... ok
+test joint_public_key::t::t1_generate_jvepk_k ... ok
+test joint_public_key::t::t2_generate_jbdepk_k_hat ... ok
+test label::t::t1 ... ok
+test label::t::t2 ... ok
+test label::t::t3 ... ok
+test label::t::t4 ... ok
+test label::t::t5 ... ok
+test label::t::t6 ... ok
+test preencrypted_ballots::t::t1 ... ok
+test resource::t::t1_edoid ... ok
+test resource::t::t2_rid ... ok
 test resource_category::t::t1 ... ok
 test resource_category::t::t2 ... ok
 test resource_path::t::dr_ns_path ... ok
@@ -339,11 +478,10 @@ test resourceproducer_exampledata::t::t1 ... ok
 test resourceproducer_exampledata::t::t2 ... FAILED
 test resourceproducer_specific::t::t1 ... ok
 test resourceproducer_validatetoedo::t::t1 ... FAILED
-test standard_parameters::t::make_standard_parameters ... ok
-test standard_parameters::t::make_standard_parameters_egds_v2_1 ... ok
-test verifiable_decryption::t1::test_decryption_share_combination ... FAILED
-test verifiable_decryption::t2::test_decryption_overall ... FAILED
-test voting_device::t::t10 ... FAILED
+test secret_coefficient::t::t1 ... ok
+test secret_coefficients::t::t1 ... ok
+test standard_parameters::t::t_buildcfg_fixedparametersinfo ... ok
+test standard_parameters::t::t_make_standard_parameters_egds_v2_1 ... ok
 test voting_device::t::t11 ... ok
 test voting_device::t::t12 ... ok
 test voting_device::t::t1_VdiSpecItem_1_VotingDeviceUniqueIdentifier ... ok
@@ -358,17 +496,17 @@ test voting_device::t::t6 ... ok
 test voting_device::t::t7 ... ok
 test voting_device::t::t8 ... ok
 test voting_device::t::t9 ... ok
-test result: FAILED. 44 passed; 9 failed; 18 ignored; 0 measured; 0 filtered out; finished in 0.70s
-elapsed real: 0.84 s
-max resident: 53116 KiB
-page faults:  12088
+test result: FAILED. 82 passed; 2 failed; 22 ignored; 0 measured; 0 filtered out; finished in 1.62s
+elapsed real: 1.83 s
+max resident: 135128 KiB
+page faults:  57186
 
 ======================== cargo test --ignored  [build/release-cargo-test.txt]
 
-+ /usr/bin/time cargo test --release --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -- --test-threads=1 --ignored
-     Running unittests src/main.rs (target/release/deps/demo_eg-10675a263961f10b)
++ /usr/bin/time cargo test --release --no-default-features --features eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -- --test-threads=1 --ignored
+     Running unittests src/main.rs (target/release/deps/demo_eg-4a0b013b3bf67140)
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-     Running unittests src/lib.rs (target/release/deps/eg-6ea9b2b63f476e26)
+     Running unittests src/lib.rs (target/release/deps/eg-c6c507421e87eba4)
 test ballot::t::ballotstyle1_contest1_votes_0_0 ... ok
 test ballot::t::ballotstyle1_contest1_votes_0_1 ... ok
 test ballot::t::ballotstyle1_contest1_votes_1_0 ... ok
@@ -385,16 +523,20 @@ test ballot::t::ballotstyle6_contest6_votes_0_0 ... ok
 test ballot::t::ballotstyle6_contest6_votes_0_1 ... ok
 test ballot::t::ballotstyle6_contest6_votes_1_0 ... ok
 test ballot::t::ballotstyle6_contest6_votes_1_1_range_proof_error ... ok
-test joint_public_key::t::jvepk_k_scaling ... ok
-test tally_ballots::t::test_tally_ballots ... FAILED
-test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 53 filtered out; finished in 24.84s
-elapsed real: 24.99 s
-max resident: 616232 KiB
-page faults:  179925
+test interguardian_share::t::test_encryption_decryption ... FAILED
+test joint_public_key::t::t3_jvepk_k_scaling ... ok
+test tally_ballots::t::t1_tally_ballots ... FAILED
+test verifiable_decryption::t1::test_decryption_share_combination ... FAILED
+test verifiable_decryption::t2::test_decryption_overall ... FAILED
+test voting_device::t::t10 ... FAILED
+test result: FAILED. 17 passed; 5 failed; 0 ignored; 0 measured; 84 filtered out; finished in 25.93s
+elapsed real: 26.13 s
+max resident: 617716 KiB
+page faults:  184729
 
 Overall...
-test result: FAILED. 44 passed; 9 failed; 18 ignored; 0 measured; 0 filtered out; finished in 0.70s
-test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 53 filtered out; finished in 24.84s
+test result: FAILED. 82 passed; 2 failed; 22 ignored; 0 measured; 0 filtered out; finished in 1.62s
+test result: FAILED. 17 passed; 5 failed; 0 ignored; 0 measured; 84 filtered out; finished in 25.93s
 
 ======================== fixing whitespace
 

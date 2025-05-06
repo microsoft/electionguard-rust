@@ -2,29 +2,18 @@
 name = "util"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/microsoft/electionguard-rust"
+license = "Apache-2.0 OR MIT"
 publish = false
 
 [features]
 
 default = [
     "eg-forbid-unsafe-code",
-    "eg-forbid-insecure-deterministic-csprng",
-    "eg-forbid-test-data-generation",
-    "eg-forbid-toy-parameters",
-    "eg-forbid-nonstandard-egds-version",
 ]
 
 eg-allow-unsafe-code                    = [ ]
-eg-allow-insecure-deterministic-csprng  = [ ]
-eg-allow-test-data-generation           = [ ]
-eg-allow-toy-parameters                 = [ ]
-eg-allow-nonstandard-egds-version       = [ ]
-
 eg-forbid-unsafe-code                   = [ ]
-eg-forbid-insecure-deterministic-csprng = [ ]
-eg-forbid-test-data-generation          = [ ]
-eg-forbid-toy-parameters                = [ ]
-eg-forbid-nonstandard-egds-version      = [ ]
 
 [dependencies]
 
@@ -33,17 +22,25 @@ eg-forbid-nonstandard-egds-version      = [ ]
 #--- From crates.io
 
 anyhow.workspace = true
+either.workspace = true
 faster-hex.workspace = true
 getrandom.workspace = true
 itertools.workspace = true
-num-bigint.workspace = true
-num-integer.workspace = true
-num-traits.workspace = true
 nutype.workspace = true
 static_assertions.workspace = true
 thiserror.workspace = true
 
+#--- Num-*, typenum, generic-array, hybrid-array
+
+# generic-array.workspace = true
+# hybrid-array.workspace = true
+num-bigint.workspace = true
+num-integer.workspace = true
+num-traits.workspace = true
+typenum.workspace = true
+
 #--- Rand
+
 rand.workspace = true
 rand_core.workspace = true
 rand_distr.workspace = true
@@ -59,13 +56,16 @@ sha3.workspace = true
 zeroize.workspace = true
 
 #--- Serde
+
 serde.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
 
 #--- Tracing
+
 tracing.workspace = true
 #valuable.workspace = true
 
-[dev-dependencies]
-insta = { version = "1.42.2", features = ["ron"] }
+[dev-dependencies] #=============================================================== dev-dependencies
+
+insta = { version = "1.43.1", features = ["ron"] }

@@ -36,6 +36,18 @@ impl<T: HasIndexType + ?Sized> HasIndexType for std::sync::Arc<T> {
     type IndexTypeParam = <T as HasIndexType>::IndexTypeParam;
 }
 
+impl<T, U> HasIndexType for either::Either<T, U>
+where
+    T: HasIndexType,
+    U: HasIndexType,
+    <T as HasIndexType>::IndexTypeParam: std::cmp::PartialEq<<U as HasIndexType>::IndexTypeParam>,
+{
+    //? TODO would prefer to use some kind of 'same Index type' constraint on T and U,
+    // but PartialEq seems logical enough.
+
+    type IndexTypeParam = <T as HasIndexType>::IndexTypeParam;
+}
+
 /// The [`std::error::Error`] type returned by the `Vec1` type.
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]
 pub enum Vec1Error {
@@ -246,27 +258,45 @@ impl<T: HasIndexType> Vec1<T> {
             .ok_or(IndexError::IndexOutOfRange(index.into()).into())
     }
 
-    /// Returns a ref to the underlying `Vec<T>`.
-    pub fn as_vec(&self) -> &Vec<T> {
+    /// Returns a ref to the underlying [`Vec<T>`].
+    ///
+    /// Note that the indices into the regular [`Vec`] will be zero-based.
+    pub fn as_zero_based_vec(&self) -> &Vec<T> {
         &self.0
     }
 
-    /// Returns a slice ref `&[T]`.
-    pub fn as_slice(&self) -> &[T] {
-        self.as_vec().as_slice()
-    }
-
-    /// Converts the Vec1 into `Vec<T>`.
-    pub fn into_vec(self) -> Vec<T> {
+    /// Converts the Vec1 into [`Vec<T>`].
+    ///
+    /// Note that the indices into the regular [`Vec`] will be zero-based.
+    pub fn into_zero_based_vec(self) -> Vec<T> {
         self.0
     }
 
-    /// Returns a plain array of `&T`, if this `Vec1` contains at least N elements.
-    /// If `N < self.len()`, the additional elements are not included.
+    /// Returns a slice ref [`&[T]`](std::slice).
+    ///
+    /// Note that the indices into the regular `slice` will be zero-based.
+    pub fn as_zero_based_slice(&self) -> &[T] {
+        self.0.as_slice()
+    }
+
+    /// Returns a slice ref [`&[T]`](std::slice).
+    ///
+    /// Note that the indices into the regular `slice` will be zero-based.
+    pub fn as_zero_based_mut_slice(&mut self) -> &mut [T] {
+        self.0.as_mut_slice()
+    }
+
+    /// Returns a [`Vec1<&mut T>`].
+    pub fn vec1_refs_mut(&mut self) -> Vec1<&mut T> {
+        Vec1::<&mut T>(self.0.iter_mut().collect())
+    }
+
+    /// Returns a plain array of [`[&T; N]`](std::array), if this [`Vec1`] contains at least `N` elements.
+    /// If `N` is less than [`len()`](Self::len) the additional elements are not included.
     ///
     /// Note that the resulting regular array is 0-based indexed.
     pub fn arr_refs<const N: usize>(&self) -> Vec1Result<[&T; N]> {
-        let v = self.as_vec();
+        let v = self.as_zero_based_vec();
 
         if v.len() < N {
             let nn: u32 = { N }.try_into().unwrap_or(u32::MAX - 1).saturating_add(1);
@@ -331,6 +361,15 @@ impl<T: HasIndexType> Vec1<T> {
         })
     }
 
+    /// Converts `self` into an iterator over pairs of indices and `T` of no-longer contained elements.
+    pub fn enumerate_into(self) -> impl Iterator<Item = (Index<T::IndexTypeParam>, T)> {
+        self.0.into_iter().enumerate().map(|(ix0, val)| {
+            // Unwrap() is justified here because we are retrieving these indices directly from a Vec1.
+            let ix1 = Index::<T::IndexTypeParam>::from_zero_based_index_unchecked_usize(ix0);
+            (ix1, val)
+        })
+    }
+
     /// Returns an iterator over refs to any contained elements.
     /// Compare to: [`slice::iter`].
     pub fn iter(&self) -> impl Iterator<Item = &T> {
@@ -344,7 +383,6 @@ impl<T: HasIndexType> Vec1<T> {
     }
 
     /// Returns the index of a randomly selected element, or `None` if the collection is empty.
-    #[cfg(feature = "eg-allow-test-data-generation")]
     pub fn random_index<R: rand::Rng + ?Sized>(
         &self,
         rng: &mut R,
@@ -358,14 +396,28 @@ impl<T: HasIndexType> Vec1<T> {
         }
     }
 
-    /// Builds a new Vec1<U> using the supplied function `&T -> U` on each element.
-    pub fn map_into<'u, 's: 'u, F, U>(&'s self, mut f: F) -> Vec1<U>
+    /// Builds a new Vec1<U> by applying the supplied function `&T -> U` to each element.
+    pub fn iter_map_into<'u, 's: 'u, U, F>(&'s self, mut f: F) -> Vec1<U>
     where
         U: HasIndexType + 'u,
         F: FnMut(&'s T) -> U,
     {
         let mut v: Vec<U> = Vec::with_capacity(self.len());
         for elem_t in self.0.iter() {
+            let elem_u: U = f(elem_t);
+            v.push(elem_u);
+        }
+        Vec1(v)
+    }
+
+    /// Consumes `self` to build a new Vec1<U> by applying the supplied function `T -> U` to each element.
+    pub fn map_into<U, F>(self, mut f: F) -> Vec1<U>
+    where
+        U: HasIndexType,
+        F: FnMut(T) -> U,
+    {
+        let mut v: Vec<U> = Vec::with_capacity(self.len());
+        for elem_t in self.0 {
             let elem_u: U = f(elem_t);
             v.push(elem_u);
         }
@@ -533,7 +585,6 @@ where
 }
 // */
 
-/*
 impl<S, T> TryFrom<&[S]> for Vec1<T>
 where
     S: TryInto<T> + Clone,
@@ -548,9 +599,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use util::vec1::HasIndexType;
-    /// impl HasIndexType for char { type IndexTypeParam = char; }
-    /// assert_eq!(Vec1::from(['a', 'b', 'c'].as_slice()).get(2), Some('b'));
+    /// # use util::vec1::{self, Vec1, Vec1Error};
+    /// struct Ch(pub char);
+    /// impl vec1::HasIndexType for Ch { type IndexTypeParam = Ch; }
+    /// impl From<char> for Ch { fn from(c: char) -> Ch { Ch(c) } }
+    /// assert_eq!(Vec1::<Ch>::try_from(['a', 'b', 'c'].as_slice())?.len(), 3);
+    /// # Ok::<(), Vec1Error>(())
     /// ```
     #[inline]
     fn try_from(s: &[S]) -> Vec1Result<Self> {
@@ -559,16 +613,13 @@ where
         }
         let mut v = Vec::with_capacity(s.len());
         for elem_s in s {
-            let elem_t: T = elem_s.clone().try_into()
-                .map_err(Into::<Vec1Error>::into)?;
+            let elem_t: T = elem_s.clone().try_into().map_err(Into::<Vec1Error>::into)?;
             v.push(elem_t);
         }
         Ok(Self(v))
     }
 }
-// */
 
-// /*
 impl<S, T, const N: usize> TryFrom<&[S; N]> for Vec1<T>
 where
     S: TryInto<T> + Clone,
@@ -743,9 +794,17 @@ mod test_vec1 {
         type IndexTypeParam = char;
     }
     type CharIndex = Index<char>;
+    static IX_1: CharIndex = CharIndex::one();
+    static IX_2: CharIndex = IX_1.successor().unwrap();
+    //static IX_3: CharIndex = IX_2.successor().unwrap();
+
+    impl HasIndexType for u8 {
+        type IndexTypeParam = u8;
+    }
+    //type U8Index = Index<u8>;
 
     #[test]
-    fn test() {
+    fn t1() {
         let mut vec1: Vec1<char> = Vec1::new();
         assert_eq!(vec1.len(), 0);
         {
@@ -792,5 +851,52 @@ mod test_vec1 {
             );
             assert_eq!(iter.next(), None);
         }
+    }
+
+    #[test]
+    fn t2() {
+        let mut v1: Vec1<char> = "abc".chars().collect::<Vec<_>>().try_into().unwrap();
+        insta::assert_ron_snapshot!(v1, @r#"
+        [
+          'a',
+          'b',
+          'c',
+        ]"#);
+
+        let mut v1mr: Vec1<&mut char> = v1.vec1_refs_mut();
+
+        **v1mr.get_mut(IX_2).unwrap() = '2';
+
+        insta::assert_ron_snapshot!(v1, @r#"
+        [
+          'a',
+          '2',
+          'c',
+        ]"#);
+    }
+
+    #[test]
+    fn t3() {
+        // Test Vec1::map()
+        let v1: Vec1<char> = "abc".chars().collect::<Vec<_>>().try_into().unwrap();
+        let v2 = v1.map_into(|ch: char| ch as u8);
+        insta::assert_ron_snapshot!(v2, @r#"
+        [
+          97,
+          98,
+          99,
+        ]"#);
+    }
+
+    #[test]
+    fn t4() {
+        // Test Vec1::into_enumerate()
+        let v1: Vec1<char> = "abc".chars().collect::<Vec<_>>().try_into().unwrap();
+        insta::assert_ron_snapshot!(v1.enumerate_into().collect::<Vec<_>>(), @r#"
+        [
+          (1, 'a'),
+          (2, 'b'),
+          (3, 'c'),
+        ]"#);
     }
 }

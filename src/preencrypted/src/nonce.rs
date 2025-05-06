@@ -10,7 +10,8 @@ use eg::{
     pre_voting_data::PreVotingData,
     hash::eg_h,
 };
-use util::algebra::FieldElement;
+
+use crate::algebra::FieldElement;
 
 // impl Nonce {
 /// Generates a nonce for pre-encrypted ballots (Equation 97) [TODO fix ref]

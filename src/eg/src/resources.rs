@@ -112,7 +112,7 @@ impl Resources {
         &self,
         arc_dr: Arc<dyn Resource>,
     ) -> Result<(), ResourceProductionError> {
-        let ridfmt = arc_dr.ridfmt().clone();
+        let ridfmt = arc_dr.ridfmt().into_owned();
         let provided_result_ok: ResourceProductionOk = (arc_dr, ResourceSource::Provided);
         let provided_result: ResourceProductionResult = Ok(provided_result_ok);
 
@@ -266,10 +266,10 @@ impl Resources {
         // If the provided result contains a resource, check that it matches the resource ID provided by the caller.
         if let Ok((rpr_ok_arc, _rpr_ok_resource_source)) = &resource_production_result {
             let rpr_ok_resource_ridfmt = rpr_ok_arc.ridfmt();
-            if ridfmt != rpr_ok_resource_ridfmt {
+            if ridfmt != rpr_ok_resource_ridfmt.as_ref() {
                 let e = ResourceProductionError::UnexpectedResourceIdFormatProvided {
                     ridfmt_provided: ridfmt.clone(),
-                    ridfmt_internal: rpr_ok_resource_ridfmt.clone(),
+                    ridfmt_internal: rpr_ok_resource_ridfmt.into_owned(),
                 };
                 error!(rf = trace_field_rf, "{e:?}");
                 Err(e)?

@@ -19,34 +19,22 @@
 #![allow(non_upper_case_globals)] //? TODO: Remove temp development code
 #![allow(noop_method_call)] //? TODO: Remove temp development code
 
-use std::{
-    borrow::Cow,
-    //collections::{BTreeSet, BTreeMap},
-    //collections::{HashSet, HashMap},
-    //io::{BufRead, Cursor},
-    sync::Arc,
-    //str::FromStr,
-    //sync::OnceLock,
-};
+use std::{borrow::Cow, sync::Arc};
 
-//use anyhow::{anyhow, bail, ensure, Context, Result};
-//use either::Either;
-//use proc_macro2::{Ident,Literal,TokenStream};
-//use quote::{format_ident, quote, ToTokens, TokenStreamExt};
-//use rand::{distr::Uniform, Rng, RngCore};
 use serde::Serialize;
-//use static_assertions::assert_obj_safe;
 use tracing::{
     debug, error, field::display as trace_display, info, info_span, instrument, trace, trace_span,
     warn,
 };
+use util::abbreviation::Abbreviation;
 
 use crate::{
     eg::Eg,
     election_manifest::ElectionManifestInfo,
     errors::{EgError, EgResult},
-    guardian::{AsymmetricKeyPart, GuardianKeyPartId},
+    guardian::GuardianKeyPartId,
     guardian_secret_key::{GuardianIndex, GuardianSecretKey},
+    key::AsymmetricKeyPart,
     loadable::LoadableFromStdIoReadValidatable,
     resource::{ProduceResource, ProduceResourceExt, Resource},
     resource_id::{ElectionDataObjectId as EdoId, ResourceFormat, ResourceId, ResourceIdFormat},
@@ -135,7 +123,8 @@ impl ResourceProducer for ResourceProducer_ExampleData {
 impl ResourceProducer_ExampleData {
     #[instrument(
         name = "RP_ExampleData",
-        fields(rf = trace_display(&rp_op.requested_ridfmt())),
+        level = "debug",
+        fields(rf = trace_display(&rp_op.requested_ridfmt().abbreviation())),
         skip(self, rp_op)
     )]
     async fn maybe_produce_async(&self, rp_op: &Arc<RpOp>) -> Option<ResourceProductionResult> {
@@ -146,7 +135,7 @@ impl ResourceProducer_ExampleData {
         let ResourceIdFormat {
             rid: requested_rid,
             fmt: requested_fmt,
-        } = rp_op.requested_ridfmt().clone();
+        } = rp_op.requested_ridfmt().into_owned();
 
         #[allow(clippy::collapsible_match)]
         let opt_result: Opt_Result_ArcDynResource_ProductionErr =
@@ -175,7 +164,7 @@ impl ResourceProducer_ExampleData {
 
         opt_result.map(|result| {
             result.map(|arc_resource| {
-                let &fmt = arc_resource.format();
+                let fmt = arc_resource.format().into_owned();
                 let resource_source = ResourceSource::ExampleData(fmt);
                 (arc_resource, resource_source)
             })
@@ -186,12 +175,7 @@ impl ResourceProducer_ExampleData {
     fn make_fixed_parameters_info(
         produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     ) -> Result_ArcDynResource_ProductionErr {
-        // Unwrap() is justified here because this is test code
-        #[allow(clippy::unwrap_used)]
-        let fixed_parameters =
-            crate::standard_parameters::make_standard_parameters(produce_resource).unwrap();
-        let fixed_parameters_info = fixed_parameters.un_validate();
-        Ok(Arc::new(fixed_parameters_info))
+        Ok(crate::standard_parameters::buildcfg_fixed_parameters_info_arc())
     }
 
     #[instrument(name = "make_varying_parameters_info")]
@@ -274,44 +258,53 @@ GatherResourceProducerRegistrationsFnWrapper(gather_resourceproducer_registratio
 
 //=================================================================================================|
 
+// "preencrypted_ballots": { "hash_trimming_fn_omega": "two hex characters" },
+
 static ELECTION_MANIFEST_PRETTY: &str = r#"{
   "label": "General Election - The United Realms of Imaginaria",
+  "record_undervoted_contest_condition": false,
+  "record_undervote_difference": true,
+  "preencrypted_ballots": null,
   "contests": [
     {
       "label": "For President and Vice President of The United Realms of Imaginaria",
       "options": [
-          { "label": "Thündéroak, Vâlêriana D.\nËverbright, Ålistair R. Jr.\n(Ætherwïng)" },
-          { "label": "Stârførge, Cássánder A.\nMøonfire, Célestïa L.\n(Crystâlheärt)" } ]
+          { "label": "Thündéroak, Vâlêriana D. (Ëverbright), Ålistair R. Jr. (Ætherwïng)" },
+          { "label": "Stârførge, Cássánder A. (Møonfire), Célestïa L. (Crystâlheärt)" } ]
     }, {
       "label": "Minister of Elemental Resources",
-      "options": [
-          { "label": "Tïtus Stormforge\n(Ætherwïng)" },
-          { "label": "Fæ Willowgrove\n(Crystâlheärt)" },
-          { "label": "Tèrra Stonebinder\n(Independent)" } ]
+        "record_undervoted_contest_condition": false,
+        "options": [
+          { "label": "Tïtus Stormforge (Ætherwïng)" },
+          { "label": "Fæ Willowgrove (Crystâlheärt)" },
+          { "label": "Tèrra Stonebinder (Independent)" } ]
     }, {
       "label": "Minister of Arcane Sciences",
+      "record_undervoted_contest_condition": true,
       "options": [
-          { "label": "Élyria Moonshadow\n(Crystâlheärt)", "selection_limit": "CONTEST_LIMIT" },
-          { "label": "Archímedes Darkstone\n(Ætherwïng)" },
-          { "label": "Seraphína Stormbinder\n(Independent)" },
-          { "label": "Gávrïel Runëbørne\n(Stärsky)" } ]
+          { "label": "Élyria Moonshadow (Crystâlheärt)", "selection_limit": "CONTEST_LIMIT" },
+          { "label": "Archímedes Darkstone (Ætherwïng)" },
+          { "label": "Seraphína Stormbinder (Independent)" },
+          { "label": "Gávrïel Runëbørne (Stärsky)" } ]
     }, {
       "label": "Minister of Dance",
+      "record_undervote_difference": true,
       "options": [
-          { "label": "Äeliana Sunsong\n(Crystâlheärt)" },
-          { "label": "Thâlia Shadowdance\n(Ætherwïng)" },
-          { "label": "Jasper Moonstep\n(Stärsky)" } ]
+          { "label": "Äeliana Sunsong (Crystâlheärt)" },
+          { "label": "Thâlia Shadowdance (Ætherwïng)" },
+          { "label": "Jasper Moonstep (Stärsky)" } ]
     }, {
       "label": "Gränd Cøuncil of Arcáne and Technomägical Affairs",
+      "record_undervote_difference": false,
       "options": [
-          { "label": "Ìgnatius Gearsøul\n(Crystâlheärt)" },
-          { "label": "Èlena Wîndwhisper\n(Technocrat)", "selection_limit": 3 },
-          { "label": "Bërnard Månesworn\n(Ætherwïng)", "selection_limit": "CONTEST_LIMIT" },
-          { "label": "Séraphine Lùmenwing\n(Stärsky)", "selection_limit": 2 },
-          { "label": "Nikólai Thunderstrîde\n(Independent)" },
-          { "label": "Lïliana Fîrestone\n(Pęacemaker)", "selection_limit": "CONTEST_LIMIT" } ]
+          { "label": "Ìgnatius Gearsøul (Crystâlheärt)" },
+          { "label": "Èlena Wîndwhisper (Technocrat)", "selection_limit": 3 },
+          { "label": "Bërnard Månesworn (Ætherwïng)", "selection_limit": "CONTEST_LIMIT" },
+          { "label": "Séraphine Lùmenwing (Stärsky)", "selection_limit": 2 },
+          { "label": "Nikólai Thunderstrîde (Independent)" },
+          { "label": "Lïliana Fîrestone (Pęacemaker)", "selection_limit": "CONTEST_LIMIT" } ]
     }, {
-      "label": "Proposed Amendment No. 1\nEqual Representation for Technological and Magical Profeſsions",
+      "label": "Proposed Amendment No. 1 - Equal Representation for Technological and Magical Profeſsions",
       "options": [
           { "label": "For", "selection_limit": "CONTEST_LIMIT" },
           { "label": "Against" } ]

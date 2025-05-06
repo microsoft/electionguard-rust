@@ -35,7 +35,7 @@ pub trait KnowsFriendlyTypeName {
     /// E.g., "ElectionManifest".
     ///
     /// This is used in various messages.
-    fn friendly_type_name() -> std::borrow::Cow<'static, str>;
+    fn friendly_type_name() -> Cow<'static, str>;
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq, Eq, serde::Serialize)]

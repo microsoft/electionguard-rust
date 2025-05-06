@@ -10,16 +10,20 @@
 
 use std::sync::Arc;
 
-use util::algebra::GroupElement;
+use crate::algebra::GroupElement;
 
 use crate::{
     errors::EgError,
     fixed_parameters::FixedParameters,
-    guardian::{AsymmetricKeyPart, GuardianIndex, GuardianKeyPartId, GuardianKeyPurpose},
+    guardian::{GuardianIndex, GuardianKeyPartId},
     guardian_coeff_proof::CoefficientsProof,
     guardian_secret_key::{CoefficientCommitment, CoefficientCommitments},
+    key::{AsymmetricKeyPart, KeyPurpose},
     resource::{ProduceResource, ProduceResourceExt},
 };
+
+#[allow(unused_imports)]
+use crate::fixed_parameters::{FixedParametersTrait, FixedParametersTraitExt};
 
 /// Trait providing access to data common to both
 /// [`GuardianPublicKey`](crate::guardian_public_key::GuardianPublicKey) and
@@ -43,7 +47,7 @@ pub trait GuardianKeyInfoTrait {
     }
 
     /// [Key purpose](crate::guardian::GuardianKeyPurpose)
-    fn key_purpose(&self) -> GuardianKeyPurpose {
+    fn key_purpose(&self) -> KeyPurpose {
         self.guardian_key_id().key_purpose
     }
 
@@ -82,7 +86,7 @@ pub trait GuardianKeyInfoTrait {
     }
 
     /// Returns the actual public key as a big-endian byte vector
-    /// of length [`Group::p_len_bytes`](util::algebra::Group::p_len_bytes).
+    /// of length [`Group::p_len_bytes`](crate::algebra::Group::p_len_bytes).
     fn to_be_bytes_left_pad(
         &self,
         fixed_parameters: &FixedParameters,

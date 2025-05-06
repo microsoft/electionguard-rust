@@ -1,110 +1,112 @@
-cargo tree --offline --no-default-features --features eg-allow-unsafe-code,eg-allow-insecure-deterministic-csprng,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-nonstandard-egds-version -e normal -f "{p} {f}"
+cargo tree --offline --no-default-features --features  eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-forbid-reduced-params,eg-allow-unsafe-code -e normal -f "{p} {f}"
 
-demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
-├── anyhow v1.0.97 default,std
-├── async-global-executor v3.1.0 async-io
-│   ├── async-channel v2.3.1 default,std
-│   │   ├── concurrent-queue v2.5.0 default,std
-│   │   │   └── crossbeam-utils v0.8.21
-│   │   ├── event-listener-strategy v0.5.4 std
-│   │   │   ├── event-listener v5.4.0 default,parking,std
-│   │   │   │   ├── concurrent-queue v2.5.0 default,std (*)
-│   │   │   │   ├── parking v2.2.1
-│   │   │   │   └── pin-project-lite v0.2.16
-│   │   │   └── pin-project-lite v0.2.16
-│   │   ├── futures-core v0.3.31 alloc,default,std
-│   │   └── pin-project-lite v0.2.16
-│   ├── async-executor v1.13.1 static
-│   │   ├── async-task v4.7.1 default,std
-│   │   ├── concurrent-queue v2.5.0 default,std (*)
+demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params
+├── anyhow v1.0.98 default,std
+├── async-executor v1.13.2 static
+│   ├── async-task v4.7.1 default,std
+│   ├── concurrent-queue v2.5.0 default,std
+│   │   └── crossbeam-utils v0.8.21 default,std
+│   ├── fastrand v2.3.0 alloc,default,std
+│   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std
 │   │   ├── fastrand v2.3.0 alloc,default,std
-│   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std
-│   │   │   ├── fastrand v2.3.0 alloc,default,std
-│   │   │   ├── futures-core v0.3.31 alloc,default,std
-│   │   │   ├── futures-io v0.3.31 default,std
-│   │   │   ├── parking v2.2.1
-│   │   │   └── pin-project-lite v0.2.16
-│   │   └── slab v0.4.9 default,std
-│   ├── async-io v2.4.0
-│   │   ├── async-lock v3.4.0 default,std
-│   │   │   ├── event-listener v5.4.0 default,parking,std (*)
-│   │   │   ├── event-listener-strategy v0.5.4 std (*)
-│   │   │   └── pin-project-lite v0.2.16
-│   │   ├── cfg-if v1.0.0
-│   │   ├── concurrent-queue v2.5.0 default,std (*)
+│   │   ├── futures-core v0.3.31 alloc,default,std
 │   │   ├── futures-io v0.3.31 default,std
-│   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
 │   │   ├── parking v2.2.1
-│   │   ├── polling v3.7.4
+│   │   └── pin-project-lite v0.2.16
+│   ├── pin-project-lite v0.2.16
+│   └── slab v0.4.9 default,std
+├── async-trait v0.1.88 (proc-macro)
+│   ├── proc-macro2 v1.0.95 default,proc-macro
+│   │   └── unicode-ident v1.0.18
+│   ├── quote v1.0.40 default,proc-macro
+│   │   └── proc-macro2 v1.0.95 default,proc-macro (*)
+│   └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut
+│       ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│       ├── quote v1.0.40 default,proc-macro (*)
+│       └── unicode-ident v1.0.18
+├── cfg-if v1.0.0
+├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params
+│   ├── anyhow v1.0.98 default,std
+│   ├── async-global-executor v3.1.0 async-io
+│   │   ├── async-channel v2.3.1 default,std
+│   │   │   ├── concurrent-queue v2.5.0 default,std (*)
+│   │   │   ├── event-listener-strategy v0.5.4 std
+│   │   │   │   ├── event-listener v5.4.0 default,parking,std
+│   │   │   │   │   ├── concurrent-queue v2.5.0 default,std (*)
+│   │   │   │   │   ├── parking v2.2.1
+│   │   │   │   │   └── pin-project-lite v0.2.16
+│   │   │   │   └── pin-project-lite v0.2.16
+│   │   │   ├── futures-core v0.3.31 alloc,default,std
+│   │   │   └── pin-project-lite v0.2.16
+│   │   ├── async-executor v1.13.2 static (*)
+│   │   ├── async-io v2.4.0
+│   │   │   ├── async-lock v3.4.0 default,std
+│   │   │   │   ├── event-listener v5.4.0 default,parking,std (*)
+│   │   │   │   ├── event-listener-strategy v0.5.4 std (*)
+│   │   │   │   └── pin-project-lite v0.2.16
 │   │   │   ├── cfg-if v1.0.0
-│   │   │   ├── rustix v0.38.44 alloc,event,fs,libc-extra-traits,net,pipe,process,std,time
-│   │   │   │   ├── bitflags v2.9.0 std
-│   │   │   │   └── linux-raw-sys v0.4.15 elf,errno,general,if_ether,ioctl,net,netlink,no_std,prctl,xdp
-│   │   │   └── tracing v0.1.41 attributes,std,tracing-attributes
-│   │   │       ├── pin-project-lite v0.2.16
-│   │   │       ├── tracing-attributes v0.1.28 (proc-macro)
-│   │   │       │   ├── proc-macro2 v1.0.94 default,proc-macro
-│   │   │       │   │   └── unicode-ident v1.0.18
-│   │   │       │   ├── quote v1.0.40 default,proc-macro
-│   │   │       │   │   └── proc-macro2 v1.0.94 default,proc-macro (*)
-│   │   │       │   └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut
-│   │   │       │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
-│   │   │       │       ├── quote v1.0.40 default,proc-macro (*)
-│   │   │       │       └── unicode-ident v1.0.18
-│   │   │       └── tracing-core v0.1.33 once_cell,std
-│   │   │           └── once_cell v1.21.3 alloc,default,race,std
-│   │   ├── rustix v0.38.44 alloc,event,fs,libc-extra-traits,net,pipe,process,std,time (*)
-│   │   ├── slab v0.4.9 default,std
-│   │   └── tracing v0.1.41 attributes,std,tracing-attributes (*)
+│   │   │   ├── concurrent-queue v2.5.0 default,std (*)
+│   │   │   ├── futures-io v0.3.31 default,std
+│   │   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
+│   │   │   ├── parking v2.2.1
+│   │   │   ├── polling v3.7.4
+│   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   ├── rustix v0.38.44 alloc,event,fs,libc-extra-traits,net,pipe,process,std,time
+│   │   │   │   │   ├── bitflags v2.9.0 std
+│   │   │   │   │   └── linux-raw-sys v0.4.15 elf,errno,general,if_ether,ioctl,net,netlink,no_std,prctl,xdp
+│   │   │   │   └── tracing v0.1.41 attributes,default,std,tracing-attributes
+│   │   │   │       ├── pin-project-lite v0.2.16
+│   │   │   │       ├── tracing-attributes v0.1.28 (proc-macro)
+│   │   │   │       │   ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│   │   │   │       │   ├── quote v1.0.40 default,proc-macro (*)
+│   │   │   │       │   └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │   │   │       └── tracing-core v0.1.33 once_cell,std
+│   │   │   │           └── once_cell v1.21.3 alloc,default,race,std
+│   │   │   ├── rustix v0.38.44 alloc,event,fs,libc-extra-traits,net,pipe,process,std,time (*)
+│   │   │   ├── slab v0.4.9 default,std
+│   │   │   └── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+│   │   ├── async-lock v3.4.0 default,std (*)
+│   │   ├── blocking v1.6.1
+│   │   │   ├── async-channel v2.3.1 default,std (*)
+│   │   │   ├── async-task v4.7.1 default,std
+│   │   │   ├── futures-io v0.3.31 default,std
+│   │   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
+│   │   │   └── piper v0.2.4 default,futures-io,std
+│   │   │       ├── atomic-waker v1.1.2
+│   │   │       ├── fastrand v2.3.0 alloc,default,std
+│   │   │       └── futures-io v0.3.31 default,std
+│   │   └── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
 │   ├── async-lock v3.4.0 default,std (*)
-│   ├── blocking v1.6.1
-│   │   ├── async-channel v2.3.1 default,std (*)
-│   │   ├── async-task v4.7.1 default,std
-│   │   ├── futures-io v0.3.31 default,std
-│   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
-│   │   └── piper v0.2.4 default,futures-io,std
-│   │       ├── atomic-waker v1.1.2
-│   │       ├── fastrand v2.3.0 alloc,default,std
-│   │       └── futures-io v0.3.31 default,std
-│   └── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
-├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
-│   ├── anyhow v1.0.97 default,std
-│   ├── async-global-executor v3.1.0 async-io (*)
-│   ├── async-lock v3.4.0 default,std (*)
-│   ├── async-trait v0.1.88 (proc-macro)
-│   │   ├── proc-macro2 v1.0.94 default,proc-macro (*)
-│   │   ├── quote v1.0.40 default,proc-macro (*)
-│   │   └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   ├── async-trait v0.1.88 (proc-macro)  (*)
 │   ├── bitflags v2.9.0 std
 │   ├── cfg-if v1.0.0
 │   ├── derive_more v2.0.1 debug,deref,deref_mut,display,from,into
 │   │   └── derive_more-impl v2.0.1 (proc-macro) debug,default,deref,deref_mut,display,from,into
-│   │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │       ├── quote v1.0.40 default,proc-macro (*)
-│   │       ├── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │       ├── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
 │   │       └── unicode-xid v0.2.6 default
 │   ├── digest v0.10.7 alloc,block-buffer,core-api,default,mac,rand_core,std,subtle
 │   │   ├── block-buffer v0.10.4
 │   │   │   └── generic-array v0.14.7 more_lengths
-│   │   │       └── typenum v1.18.0
+│   │   │       └── typenum v1.18.0 const-generics
 │   │   ├── crypto-common v0.1.6 rand_core,std
 │   │   │   ├── generic-array v0.14.7 more_lengths (*)
 │   │   │   ├── rand_core v0.6.4
-│   │   │   └── typenum v1.18.0
+│   │   │   └── typenum v1.18.0 const-generics
 │   │   └── subtle v2.6.1
 │   ├── downcast-rs v2.0.1 default,std,sync
 │   ├── either v1.15.0 default,serde,std,use_std
 │   │   └── serde v1.0.219 alloc,default,derive,rc,serde_derive,std
 │   │       └── serde_derive v1.0.219 (proc-macro) default
-│   │           ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │           ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │           ├── quote v1.0.40 default,proc-macro (*)
-│   │           └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │           └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
 │   ├── erased-serde v0.4.6 alloc,default,std
 │   │   ├── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
 │   │   └── typeid v1.0.3
-│   ├── futures-core v0.3.31 alloc,default,std
 │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
-│   ├── hashbrown v0.15.2 allocator-api2,equivalent,inline-more,raw-entry,serde
+│   ├── hashbrown v0.15.3 allocator-api2,equivalent,inline-more,raw-entry,serde
 │   │   ├── allocator-api2 v0.2.21 alloc
 │   │   ├── equivalent v1.0.2
 │   │   └── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
@@ -118,28 +120,28 @@ demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-non
 │   ├── num-bigint v0.4.6 default,serde,std
 │   │   ├── num-integer v0.1.46 default,i128,std
 │   │   │   └── num-traits v0.2.19 default,i128,libm,std
-│   │   │       └── libm v0.2.11 default
+│   │   │       └── libm v0.2.14 arch,default
 │   │   ├── num-traits v0.2.19 default,i128,libm,std (*)
 │   │   └── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
+│   ├── num-integer v0.1.46 default,i128,std (*)
 │   ├── num-traits v0.2.19 default,i128,libm,std (*)
-│   ├── rand v0.9.0 alloc
-│   │   ├── rand_core v0.9.3 std
-│   │   └── zerocopy v0.8.24 simd
+│   ├── rand v0.9.1 alloc
+│   │   └── rand_core v0.9.3 std
 │   ├── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
 │   ├── serde_json v1.0.140 default,indexmap,preserve_order,std
-│   │   ├── indexmap v2.8.0 default,std
+│   │   ├── indexmap v2.9.0 default,std
 │   │   │   ├── equivalent v1.0.2
-│   │   │   └── hashbrown v0.15.2 allocator-api2,equivalent,inline-more,raw-entry,serde (*)
+│   │   │   └── hashbrown v0.15.3 allocator-api2,equivalent,inline-more,raw-entry,serde (*)
 │   │   ├── itoa v1.0.15
-│   │   ├── memchr v2.7.4 alloc,std
+│   │   ├── memchr v2.7.4 alloc,default,std
 │   │   ├── ryu v1.0.20
 │   │   └── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
 │   ├── serde_tokenstream v0.2.2
-│   │   ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │   ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │   ├── quote v1.0.40 default,proc-macro (*)
 │   │   ├── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
-│   │   └── syn v2.0.100 clone-impls,default,derive,full,parsing,printing,proc-macro
-│   │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │   └── syn v2.0.101 clone-impls,default,derive,full,parsing,printing,proc-macro
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │       ├── quote v1.0.40 default,proc-macro (*)
 │   │       └── unicode-ident v1.0.18
 │   ├── serde_with v3.12.0 alloc,default,macros,std
@@ -150,18 +152,18 @@ demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-non
 │   │       │   ├── darling_core v0.20.11 strsim,suggestions
 │   │       │   │   ├── fnv v1.0.7 default,std
 │   │       │   │   ├── ident_case v1.0.1
-│   │       │   │   ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │       │   │   ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │       │   │   ├── quote v1.0.40 default,proc-macro (*)
 │   │       │   │   ├── strsim v0.11.1
-│   │       │   │   └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │       │   │   └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
 │   │       │   └── darling_macro v0.20.11 (proc-macro)
 │   │       │       ├── darling_core v0.20.11 strsim,suggestions (*)
 │   │       │       ├── quote v1.0.40 default,proc-macro (*)
-│   │       │       └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
-│   │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │       │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │       ├── quote v1.0.40 default,proc-macro (*)
-│   │       └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
-│   ├── sha2 v0.10.8 compress,std
+│   │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   ├── sha2 v0.10.9 compress,std
 │   │   ├── cfg-if v1.0.0
 │   │   ├── cpufeatures v0.2.17
 │   │   └── digest v0.10.7 alloc,block-buffer,core-api,default,mac,rand_core,std,subtle (*)
@@ -169,20 +171,22 @@ demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-non
 │   ├── strum v0.27.1 default,derive,std,strum_macros
 │   │   └── strum_macros v0.27.1 (proc-macro)
 │   │       ├── heck v0.5.0
-│   │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │       ├── quote v1.0.40 default,proc-macro (*)
 │   │       ├── rustversion v1.0.20 (proc-macro)
-│   │       └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
 │   ├── strum_macros v0.27.1 (proc-macro)  (*)
 │   ├── thiserror v2.0.12 default,std
 │   │   └── thiserror-impl v2.0.12 (proc-macro)
-│   │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │       ├── quote v1.0.40 default,proc-macro (*)
-│   │       └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
-│   ├── tracing v0.1.41 attributes,std,tracing-attributes (*)
+│   │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   ├── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
 │   ├── unicode-ident v1.0.18
-│   ├── util v0.1.0 (src/util) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
-│   │   ├── anyhow v1.0.97 default,std
+│   ├── unicode-properties v0.1.3 general-category
+│   ├── util v0.1.0 (src/util) eg-allow-unsafe-code
+│   │   ├── anyhow v1.0.98 default,std
+│   │   ├── either v1.15.0 default,serde,std,use_std (*)
 │   │   ├── faster-hex v0.10.0 alloc,default,serde,std
 │   │   │   ├── heapless v0.8.0
 │   │   │   │   ├── hash32 v0.3.1
@@ -191,7 +195,7 @@ demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-non
 │   │   │   └── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
 │   │   ├── getrandom v0.3.2
 │   │   │   ├── cfg-if v1.0.0
-│   │   │   └── libc v0.2.171 default,std
+│   │   │   └── libc v0.2.172 default,std
 │   │   ├── itertools v0.14.0 default,use_alloc,use_std (*)
 │   │   ├── num-bigint v0.4.6 default,serde,std (*)
 │   │   ├── num-integer v0.1.46 default,i128,std (*)
@@ -203,18 +207,18 @@ demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-non
 │   │   │       │   └── kinded_macros v0.3.0 (proc-macro)
 │   │   │       │       ├── convert_case v0.6.0
 │   │   │       │       │   └── unicode-segmentation v1.12.0
-│   │   │       │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │   │       │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │   │       │       ├── quote v1.0.40 default,proc-macro (*)
-│   │   │       │       └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
-│   │   │       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │   │       │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │   │       ├── quote v1.0.40 default,proc-macro (*)
-│   │   │       ├── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │   │       ├── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
 │   │   │       └── urlencoding v2.1.3
-│   │   ├── rand v0.9.0 alloc (*)
+│   │   ├── rand v0.9.1 alloc (*)
 │   │   ├── rand_core v0.9.3 std
 │   │   ├── rand_distr v0.5.1 std_math
 │   │   │   ├── num-traits v0.2.19 default,i128,libm,std (*)
-│   │   │   └── rand v0.9.0 alloc (*)
+│   │   │   └── rand v0.9.1 alloc (*)
 │   │   ├── rand_xorshift v0.4.0
 │   │   │   └── rand_core v0.9.3 std
 │   │   ├── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
@@ -225,35 +229,156 @@ demo-eg v0.1.0 (src/demo-eg) eg-allow-insecure-deterministic-csprng,eg-allow-non
 │   │   │   └── keccak v0.1.5
 │   │   ├── static_assertions v1.1.0
 │   │   ├── thiserror v2.0.12 default,std (*)
-│   │   ├── tracing v0.1.41 attributes,std,tracing-attributes (*)
+│   │   ├── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+│   │   ├── typenum v1.18.0 const-generics
 │   │   └── zeroize v1.8.1 alloc,derive,serde,simd,std,zeroize_derive
 │   │       ├── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
 │   │       └── zeroize_derive v1.4.2 (proc-macro)
-│   │           ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│   │           ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │   │           ├── quote v1.0.40 default,proc-macro (*)
-│   │           └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │           └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
 │   └── zeroize v1.8.1 alloc,derive,serde,simd,std,zeroize_derive (*)
-├── futures-core v0.3.31 alloc,default,std
 ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
 ├── itertools v0.14.0 default,use_alloc,use_std (*)
-├── num-bigint v0.4.6 default,serde,std (*)
-├── num-integer v0.1.46 default,i128,std (*)
-├── num-traits v0.2.19 default,i128,libm,std (*)
+├── ractor v0.15.5 async-std,async-trait
+│   ├── async-std v1.13.1 alloc,async-attributes,async-channel,async-global-executor,async-io,async-lock,attributes,crossbeam-utils,default,futures-channel,futures-core,futures-io,futures-lite,gloo-timers,kv-log-macro,log,memchr,once_cell,pin-project-lite,pin-utils,slab,std,wasm-bindgen-futures
+│   │   ├── async-attributes v1.1.2 (proc-macro)
+│   │   │   ├── quote v1.0.40 default,proc-macro (*)
+│   │   │   └── syn v1.0.109 clone-impls,default,derive,full,parsing,printing,proc-macro,quote
+│   │   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│   │   │       ├── quote v1.0.40 default,proc-macro (*)
+│   │   │       └── unicode-ident v1.0.18
+│   │   ├── async-channel v1.9.0
+│   │   │   ├── concurrent-queue v2.5.0 default,std (*)
+│   │   │   ├── event-listener v2.5.3
+│   │   │   └── futures-core v0.3.31 alloc,default,std
+│   │   ├── async-global-executor v2.4.1 async-io,default
+│   │   │   ├── async-channel v2.3.1 default,std (*)
+│   │   │   ├── async-executor v1.13.2 static (*)
+│   │   │   ├── async-io v2.4.0  (*)
+│   │   │   ├── async-lock v3.4.0 default,std (*)
+│   │   │   ├── blocking v1.6.1  (*)
+│   │   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
+│   │   │   └── once_cell v1.21.3 alloc,default,race,std
+│   │   ├── async-io v2.4.0  (*)
+│   │   ├── async-lock v3.4.0 default,std (*)
+│   │   ├── crossbeam-utils v0.8.21 default,std
+│   │   ├── futures-core v0.3.31 alloc,default,std
+│   │   ├── futures-io v0.3.31 default,std
+│   │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
+│   │   ├── kv-log-macro v1.0.7
+│   │   │   └── log v0.4.27 kv,kv_unstable,value-bag
+│   │   │       └── value-bag v1.11.1 inline-i128
+│   │   ├── log v0.4.27 kv,kv_unstable,value-bag (*)
+│   │   ├── memchr v2.7.4 alloc,default,std
+│   │   ├── once_cell v1.21.3 alloc,default,race,std
+│   │   ├── pin-project-lite v0.2.16
+│   │   ├── pin-utils v0.1.0
+│   │   └── slab v0.4.9 default,std
+│   ├── async-trait v0.1.88 (proc-macro)  (*)
+│   ├── bon v2.3.0 alloc,default,std
+│   │   ├── bon-macros v2.3.0 (proc-macro)
+│   │   │   ├── darling v0.20.11 default,suggestions (*)
+│   │   │   ├── ident_case v1.0.1
+│   │   │   ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│   │   │   ├── quote v1.0.40 default,proc-macro (*)
+│   │   │   └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │   └── rustversion v1.0.20 (proc-macro)
+│   ├── dashmap v6.1.0
+│   │   ├── cfg-if v1.0.0
+│   │   ├── crossbeam-utils v0.8.21 default,std
+│   │   ├── hashbrown v0.14.5 raw
+│   │   ├── lock_api v0.4.12 atomic_usize,default
+│   │   │   └── scopeguard v1.2.0
+│   │   ├── once_cell v1.21.3 alloc,default,race,std
+│   │   └── parking_lot_core v0.9.10
+│   │       ├── cfg-if v1.0.0
+│   │       ├── libc v0.2.172 default,std
+│   │       └── smallvec v1.15.0
+│   ├── futures v0.3.31 alloc,async-await,default,executor,futures-executor,std
+│   │   ├── futures-channel v0.3.31 alloc,futures-sink,sink,std
+│   │   │   ├── futures-core v0.3.31 alloc,default,std
+│   │   │   └── futures-sink v0.3.31 alloc,std
+│   │   ├── futures-core v0.3.31 alloc,default,std
+│   │   ├── futures-executor v0.3.31 std
+│   │   │   ├── futures-core v0.3.31 alloc,default,std
+│   │   │   ├── futures-task v0.3.31 alloc,std
+│   │   │   └── futures-util v0.3.31 alloc,async-await,async-await-macro,channel,futures-channel,futures-io,futures-macro,futures-sink,io,memchr,sink,slab,std
+│   │   │       ├── futures-channel v0.3.31 alloc,futures-sink,sink,std (*)
+│   │   │       ├── futures-core v0.3.31 alloc,default,std
+│   │   │       ├── futures-io v0.3.31 default,std
+│   │   │       ├── futures-macro v0.3.31 (proc-macro)
+│   │   │       │   ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│   │   │       │   ├── quote v1.0.40 default,proc-macro (*)
+│   │   │       │   └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   │   │       ├── futures-sink v0.3.31 alloc,std
+│   │   │       ├── futures-task v0.3.31 alloc,std
+│   │   │       ├── memchr v2.7.4 alloc,default,std
+│   │   │       ├── pin-project-lite v0.2.16
+│   │   │       ├── pin-utils v0.1.0
+│   │   │       └── slab v0.4.9 default,std
+│   │   ├── futures-io v0.3.31 default,std
+│   │   ├── futures-sink v0.3.31 alloc,std
+│   │   ├── futures-task v0.3.31 alloc,std
+│   │   └── futures-util v0.3.31 alloc,async-await,async-await-macro,channel,futures-channel,futures-io,futures-macro,futures-sink,io,memchr,sink,slab,std (*)
+│   ├── once_cell v1.21.3 alloc,default,race,std
+│   ├── strum v0.26.3 default,derive,std,strum_macros
+│   │   └── strum_macros v0.26.4 (proc-macro)
+│   │       ├── heck v0.5.0
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│   │       ├── quote v1.0.40 default,proc-macro (*)
+│   │       ├── rustversion v1.0.20 (proc-macro)
+│   │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   ├── tokio v1.44.2 default,sync
+│   │   └── pin-project-lite v0.2.16
+│   └── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
 ├── serde v1.0.219 alloc,default,derive,rc,serde_derive,std (*)
-├── tracing v0.1.41 attributes,std,tracing-attributes (*)
-├── tracing-subscriber v0.3.19 alloc,fmt,registry,sharded-slab,smallvec,std,thread_local
+├── test-data-generation v0.1.0 (src/test-data-generation) eg-allow-test-data-generation
+│   ├── anyhow v1.0.98 default,std
+│   ├── base16ct v0.2.0 alloc
+│   ├── const-default v1.0.0 default,enable-atomics
+│   ├── fnv v1.0.7 std
+│   ├── generic-array v1.2.0 const-default
+│   │   ├── const-default v1.0.0 default,enable-atomics
+│   │   └── typenum v1.18.0 const-generics
+│   ├── hybrid-array v0.3.1 zeroize
+│   │   ├── typenum v1.18.0 const-generics
+│   │   └── zeroize v1.8.1 alloc,derive,serde,simd,std,zeroize_derive (*)
+│   ├── indoc v2.0.6 (proc-macro)
+│   ├── itertools v0.14.0 default,use_alloc,use_std (*)
+│   ├── rand v0.9.1 alloc (*)
+│   ├── rand_core v0.9.3 std
+│   ├── rand_distr v0.5.1 std_math (*)
+│   ├── rand_xorshift v0.4.0  (*)
+│   ├── sha2 v0.10.9 compress,std (*)
+│   ├── static_assertions v1.1.0
+│   ├── textwrap v0.16.2 unicode-width
+│   │   └── unicode-width v0.2.0 cjk,default
+│   ├── typenum v1.18.0 const-generics
+│   └── util v0.1.0 (src/util) eg-allow-unsafe-code (*)
+├── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+├── tracing-futures v0.2.5 pin-project,std,std-future
+│   ├── pin-project v1.1.10
+│   │   └── pin-project-internal v1.1.10 (proc-macro)
+│   │       ├── proc-macro2 v1.0.95 default,proc-macro (*)
+│   │       ├── quote v1.0.40 default,proc-macro (*)
+│   │       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+│   └── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+├── tracing-subscriber v0.3.19 alloc,ansi,fmt,nu-ansi-term,registry,sharded-slab,smallvec,std,thread_local
+│   ├── nu-ansi-term v0.46.0
+│   │   └── overload v0.1.1
 │   ├── sharded-slab v0.1.7
 │   │   └── lazy_static v1.5.0
-│   ├── smallvec v1.14.0
+│   ├── smallvec v1.15.0
 │   ├── thread_local v1.1.8
 │   │   ├── cfg-if v1.0.0
 │   │   └── once_cell v1.21.3 alloc,default,race,std
 │   └── tracing-core v0.1.33 once_cell,std (*)
-└── util v0.1.0 (src/util) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+└── util v0.1.0 (src/util) eg-allow-unsafe-code (*)
 
-eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params (*)
 
-eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
+eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem) eg-allow-unsafe-code
 ├── async-fs v2.1.2
 │   ├── async-lock v3.4.0 default,std (*)
 │   ├── blocking v1.6.1  (*)
@@ -262,9 +387,8 @@ eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem) eg-allow-
 ├── async-io v2.4.0  (*)
 ├── async-lock v3.4.0 default,std (*)
 ├── async-trait v0.1.88 (proc-macro)  (*)
-├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params (*)
 ├── erased-serde v0.4.6 alloc,default,std (*)
-├── futures-core v0.3.31 alloc,default,std
 ├── futures-io v0.3.31 default,std
 ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
 ├── inventory v0.3.20
@@ -274,13 +398,14 @@ eg-dataproducer-filesystem v0.1.0 (src/eg-resourceproducer-filesystem) eg-allow-
 ├── serde_tokenstream v0.2.2  (*)
 ├── serde_with v3.12.0 alloc,default,macros,std (*)
 ├── static_assertions v1.1.0
-├── tracing v0.1.41 attributes,std,tracing-attributes (*)
-└── util v0.1.0 (src/util) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+├── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+└── util v0.1.0 (src/util) eg-allow-unsafe-code (*)
 
-electionguard v0.1.0 (src/electionguard) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
-├── anyhow v1.0.97 default,std
-├── clap v4.5.35 color,default,derive,env,error-context,help,std,suggestions,usage
-│   ├── clap_builder v4.5.35 color,env,error-context,help,std,suggestions,usage
+electionguard v0.1.0 (src/electionguard) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params
+├── anyhow v1.0.98 default,std
+├── cfg-if v1.0.0
+├── clap v4.5.37 color,default,derive,env,error-context,help,std,suggestions,usage
+│   ├── clap_builder v4.5.37 color,env,error-context,help,std,suggestions,usage
 │   │   ├── anstream v0.6.18 auto,default,wincon
 │   │   │   ├── anstyle v1.0.10 default,std
 │   │   │   ├── anstyle-parse v0.2.6 default,utf8
@@ -294,15 +419,17 @@ electionguard v0.1.0 (src/electionguard) eg-allow-insecure-deterministic-csprng,
 │   │   └── strsim v0.11.1
 │   └── clap_derive v4.5.32 (proc-macro) default
 │       ├── heck v0.5.0
-│       ├── proc-macro2 v1.0.94 default,proc-macro (*)
+│       ├── proc-macro2 v1.0.95 default,proc-macro (*)
 │       ├── quote v1.0.40 default,proc-macro (*)
-│       └── syn v2.0.100 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
-├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
-├── util v0.1.0 (src/util) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+│       └── syn v2.0.101 clone-impls,default,derive,extra-traits,full,parsing,printing,proc-macro,visit,visit-mut (*)
+├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params (*)
+├── util v0.1.0 (src/util) eg-allow-unsafe-code (*)
 └── zeroize v1.8.1 alloc,derive,serde,simd,std,zeroize_derive (*)
 
-test-electionguard v0.1.0 (src/test-electionguard) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code
-├── anyhow v1.0.97 default,std
+test-data-generation v0.1.0 (src/test-data-generation) eg-allow-test-data-generation (*)
+
+test-electionguard v0.1.0 (src/test-electionguard) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params
+├── anyhow v1.0.98 default,std
 ├── async-global-executor v3.1.0 async-io (*)
 ├── async-io v2.4.0  (*)
 ├── async-process v2.3.0
@@ -315,17 +442,16 @@ test-electionguard v0.1.0 (src/test-electionguard) eg-allow-insecure-determinist
 │   │   ├── futures-core v0.3.31 alloc,default,std
 │   │   ├── futures-io v0.3.31 default,std
 │   │   ├── rustix v0.38.44 alloc,event,fs,libc-extra-traits,net,pipe,process,std,time (*)
-│   │   └── signal-hook-registry v1.4.2
-│   │       └── libc v0.2.171 default,std
+│   │   └── signal-hook-registry v1.4.5
+│   │       └── libc v0.2.172 default,std
 │   ├── async-task v4.7.1 default,std
 │   ├── cfg-if v1.0.0
 │   ├── event-listener v5.4.0 default,parking,std (*)
 │   ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
 │   ├── rustix v0.38.44 alloc,event,fs,libc-extra-traits,net,pipe,process,std,time (*)
-│   └── tracing v0.1.41 attributes,std,tracing-attributes (*)
-├── clap v4.5.35 color,default,derive,env,error-context,help,std,suggestions,usage (*)
-├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
-├── futures-core v0.3.31 alloc,default,std
+│   └── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+├── clap v4.5.37 color,default,derive,env,error-context,help,std,suggestions,usage (*)
+├── eg v0.1.0 (src/eg) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-unsafe-code,eg-forbid-reduced-params (*)
 ├── futures-io v0.3.31 default,std
 ├── futures-lite v2.6.0 alloc,default,fastrand,futures-io,parking,race,std (*)
 ├── itertools v0.14.0 default,use_alloc,use_std (*)
@@ -333,8 +459,8 @@ test-electionguard v0.1.0 (src/test-electionguard) eg-allow-insecure-determinist
 ├── rand_core v0.9.3 std
 ├── rand_distr v0.5.1 std_math (*)
 ├── static_assertions v1.1.0
-├── tracing v0.1.41 attributes,std,tracing-attributes (*)
-├── tracing-subscriber v0.3.19 alloc,fmt,registry,sharded-slab,smallvec,std,thread_local (*)
-└── util v0.1.0 (src/util) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+├── tracing v0.1.41 attributes,default,std,tracing-attributes (*)
+├── tracing-subscriber v0.3.19 alloc,ansi,fmt,nu-ansi-term,registry,sharded-slab,smallvec,std,thread_local (*)
+└── util v0.1.0 (src/util) eg-allow-unsafe-code (*)
 
-util v0.1.0 (src/util) eg-allow-insecure-deterministic-csprng,eg-allow-nonstandard-egds-version,eg-allow-test-data-generation,eg-allow-toy-parameters,eg-allow-unsafe-code (*)
+util v0.1.0 (src/util) eg-allow-unsafe-code (*)

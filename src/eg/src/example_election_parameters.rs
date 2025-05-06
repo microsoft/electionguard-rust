@@ -34,14 +34,14 @@ pub fn example_election_parameters(
     example_election_parameters2(produce_resource, n, k).unwrap()
 }
 
-/// An example ElectionParameters object, based on the standard parameters.
+/// An example ElectionParameters object, based on the build configured parameters.
 pub fn example_election_parameters2(
     produce_resource: &(dyn ProduceResource + Send + Sync + 'static),
     varying_parameter_n: u32,
     varying_parameter_k: u32,
 ) -> EgResult<ElectionParameters> {
     let fixed_parameters =
-        crate::standard_parameters::make_standard_parameters(produce_resource).unwrap();
+        crate::standard_parameters::buildcfg_fixed_parameters(produce_resource).unwrap();
 
     let n = GuardianIndex::try_from_one_based_index(varying_parameter_n)?;
     let k = GuardianIndex::try_from_one_based_index(varying_parameter_k)?;

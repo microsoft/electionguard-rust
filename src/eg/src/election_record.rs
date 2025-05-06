@@ -14,10 +14,12 @@ use serde::Serialize;
 use util::vec1::Vec1;
 
 use crate::{
-    ballot::Ballot, ciphertext::Ciphertext, eg::Eg, election_manifest::ContestIndex,
+    ballot::Ballot, ciphertext::Ciphertext, contest::ContestIndex, eg::Eg,
     guardian_public_key::GuardianPublicKey, pre_voting_data::PreVotingData,
     serializable::SerializableCanonical, verifiable_decryption::VerifiableDecryption,
 };
+
+//=================================================================================================|
 
 /// The election record, generated after the tally.
 #[derive(Debug, Serialize)] // Deserialize
