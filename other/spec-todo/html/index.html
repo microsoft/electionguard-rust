@@ -1,0 +1,53 @@
+
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>EGDS 2.1.0 Functional requirements and EGRI statuses</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --light-bg: white;
+            --light-color: black;
+            --light-link-color: blue;
+            --light-table-border-color: black;
+            --light-table-header-color: black;
+            --dark-bg: #353535;
+            --dark-color: white;
+            --dark-link-color: #d2991d;
+            --dark-table-border-color: #666666;
+            --dark-table-header-color: #dddddd;
+        }
+        * {
+            background-color: light-dark(var(--light-bg), var(--dark-bg));
+            color: light-dark(var(--light-color), var(--dark-color));
+        }
+        html {
+            line-height: 1.15;              /* from github.com/necolas/normalize.css */
+            -webkit-text-size-adjust: 100%; /* from github.com/necolas/normalize.css */
+        }
+        a {
+            background-color: transparent;
+            color: light-dark(var(--light-link-color), var(--dark-link-color)); }
+        table {
+            border-collapse: collapse;
+            border: 2px solid light-dark(var(--light-table-border-color), var(--dark-table-border-color)); }
+        td, th {
+            border: 1px solid light-dark(var(--light-table-border-color), var(--dark-table-border-color));
+            padding: 1px 1px; }
+        th {
+            color: light-dark(var(--light-table-header-color), var(--dark-table-header-color));
+            text-align: center;
+        }
+        td {
+            /* text-align: center; */
+            }
+    </style>
+</head>
+<body>
+    <h1>EGDS 2.1.0</h1>
+    <p><a href="functional_reqs.html">Functional requirements and EGRI statuses</a>&nbsp;[plain: <a href="xreqs.html">xreqs.html</a>]
+    <p><a href="other_items.html">Other items</a>&nbsp;[plain: <a href="xtodos.html">xtodos.html</a>]
+</body>
+</html>

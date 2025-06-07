@@ -1,0 +1,90 @@
+#!/usr/bin/sh
+
+set -o errexit
+set -x
+this_script_fullpath=$(readlink -f -- "$0")
+this_script=$(basename -- "$this_script_fullpath")
+this_script_dir=$(dirname -- "$this_script_fullpath")
+set +x
+set +o errexit
+
+verbose=0
+
+do_exit() {
+    exit_status=$( printf '%d' "${1:-fail}" 2>>/dev/null )
+    if [ $? != 0 ]; then exit_status=127; fi
+
+    if [ $exit_status != 0 ]; then
+        printf '%s: Exiting with status: %d\n' "$this_script" "$exit_status" | cat -t >&2
+    elif [ 0 -lt "$verbose" ]; then
+        printf '%s: Exiting with status: %d\n' "$this_script" "$exit_status" | cat -t
+    fi
+    exit $exit_status
+}
+
+sqlite3_db_file=${1:-}
+if [ ! -f "$sqlite3_db_file" ]; then
+    printf 'No db file at: %s\n' "$sqlite3_db_file" >&2
+    do_exit 91
+fi
+
+yyyymmdd=$(date +%Y-%m-%d)
+printf 'Date is: %s\n' "$yyyymmdd"
+
+csv_out_file="${sqlite3_db_file}.totals.${yyyymmdd}.csv"
+if [ -f "$csv_out_file" ]; then
+    printf 'Removing existing out file at: %s\n' "$csv_out_file"
+    (set +x; rm "$csv_out_file")
+    if [ $? != 0  ]; then
+        printf 'Couldnt rm existing out file at: %s\n' "$csv_out_file" >&2
+        do_exit 92
+    fi
+fi
+
+printf 'Writing: %s\n' "$csv_out_file"
+(set -x; umask 077; touch "$csv_out_file")
+if [ $? != 0  ]; then
+    printf 'Couldnt create out file at: %s\n' "$csv_out_file" >&2
+    do_exit 93
+fi
+
+sqlite3 "$sqlite3_db_file" >>"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+  CREATE TEMP TABLE t1(          date, nsya, na, nfd, ace, nyi, ics, ute, utep, uts, utsp, its, itsp );
+  INSERT INTO t1 VALUES( '2025-04-01',  323,  4,  16,  47, 160,  14,  10,    1,   5,   45,   0,    0 );
+  INSERT INTO t1 VALUES( '2025-04-15',  324,  4,  16,  47, 156,  14,  10,    1,   5,   49,   0,    0 );
+  INSERT INTO t1 VALUES( '2025-04-22',  323,  4,  16,  47, 145,  17,  10,    1,   6,   74,   0,    0 );
+  INSERT INTO t1 VALUES( '2025-04-29',  274, 24,  16,  55, 164,  30,  10,    1,   6,   91,   0,    0 );
+--INSERT INTO t1 VALUES( '2025-05-06',  272, 24,16,55,164,31,10,10,6,91,0,0,681 );
+    SELECT
+        date, nsya,  na,  nfd,  ace,  nyi,  ics,  ute,  utep,  uts,  utsp,  its,  itsp,
+              nsya + na + nfd + ace + nyi + ics + ute + utep + uts + utsp + its + itsp as total
+    FROM t1
+UNION ALL
+    SELECT
+        '${yyyymmdd}'                                                      as date,
+        sum(case when coalesce(status_code,'') = ''     then 1 else 0 end) as nsya,
+        sum(case when          status_code     = 'na'   then 1 else 0 end) as na,
+        sum(case when          status_code     = 'nfd'  then 1 else 0 end) as nfd,
+        sum(case when          status_code     = 'ace'  then 1 else 0 end) as ace,
+        sum(case when          status_code     = 'nyi'  then 1 else 0 end) as nyi,
+        sum(case when          status_code     = 'ics'  then 1 else 0 end) as ics,
+        sum(case when          status_code     = 'ute'  then 1 else 0 end) as ute,
+        sum(case when          status_code     = 'utep' then 1 else 0 end) as utep,
+        sum(case when          status_code     = 'uts'  then 1 else 0 end) as uts,
+        sum(case when          status_code     = 'utsp' then 1 else 0 end) as utsp,
+        sum(case when          status_code     = 'its'  then 1 else 0 end) as its,
+        sum(case when          status_code     = 'itsp' then 1 else 0 end) as itsp,
+        count(*) as total
+    FROM xreqs;
+EOSQLITE3
+
+(set -x; ls -l "$csv_out_file")
+
+printf '\nvvvvvvvvvvvvvvvvvvvvvvvv %s vvvvvvvvvvvvvvvvvvvvvvvv\n' "$csv_out_file"
+cat "$csv_out_file"
+printf '^^^^^^^^^^^^^^^^^^^^^^^^ %s ^^^^^^^^^^^^^^^^^^^^^^^^\n' "$csv_out_file"
+
+printf '\n[done] %s\n' "$this_script"
+do_exit 0

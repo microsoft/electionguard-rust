@@ -1,0 +1,68 @@
+
+
+S3.1 Parameter Requirements
+S3.2 Key Generation eq. 6 - 30
+S3.3.1 Selection Encryption, eq. 31..
+S3.3.2 Selection Encryption Identifiers and Identifier Hash
+S3.3.3 Generation of the Ballot Nonce and Encryption Nonces
+S3.3.4 Encryption of Ballot Nonces
+S3.3.5 Ballot Well-Formedness
+S3.3.6 Outline for Proofs of Ballot Correctness
+S3.3.7 Details for Proofs of Ballot Correctness
+S3.3.8 Proof of Satisfying the Contest Selection Limit, eq. ..62
+S3.4.1 Contest Hash eq. 70
+S3.4.2 Confirmation Code eq. 71
+    "Critical"
+
+S3.5, S3.6.1 - S3.6.5 eq. 79 - 95
+    "Essential"
+
+S3.6.7 Decryption of Challenged Ballots, eq. 107 - 111
+S5 Hash Computation
+    "Critical"
+
+S4 Pre-Encrypted Ballots, eq. 112 - 121
+    "Secondary",
+    "NOT a priority",
+    "above S3.3.9 - S3.3.10 Supplemental and contest data"
+    "above S3.4.3 - S3.4.4 ballot chaining"
+
+S3.4.3 Voting Device Information Hash, eq. 72
+S3.4.4 Ballot Chaining, eq. 73 - 78
+    "Not critical may be deferred"
+
+S3.3.9 Supplemental Verifiable Fields
+S3.3.10 Contest Data
+    "Optional"
+
+S3.6.6 Decryption of Contest Data
+    "Not top priority"
+    "Only necessary if S3.3.9 - S3.3.10 Supplemental and contest data"
+
+S3.7 Election Record
+    "Just a recapitulation"
+
+ [This section generates no unique or specific requirements]
+ 
+% xreq S3.1.4.b.verif1 TODO: Verification 1
+
+
+% xreq S3.a.f.d (Ref: S2.b) Key Ceremony
+
+
+% xreq S3.2.c (Ref: S3.a.f.c) "EGRI enables a Guardian to compute a verifiable partial decryption of the tally of every Contest Option Field and additional Contest Data Field."
+
+% xreq S3.2.c (Ref: S3.a.f.c) "EGRI enables a quorum of `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys to form full verifiable decryptions of the election tallies by combining the verifiable partial decryptions of the tallies of every Contest Option Field and additional Contest Data Field."
+
+% xreq S3.2.c (Ref: S3.a.f.d) "Fewer than `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys can not produce a full decryption of any tally"
+
+% xreq S3.a.g EGRI encrypts other (non-vote) Ballot Data to the Joint Ballot Data Encryption Public Key
+
+
+Joint (Vote|Ballot Data) Encryption Public Keys
+
+Contest (Option or Additional) Data Field
+
+
+% xreq S3.2.3.j EGRI computes H_E from H_B and the Joint (Vote|Ballot Data) Encryption Public Keys as specified in EG DS v2.1.0 eq. 30.
+ 

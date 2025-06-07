@@ -1,0 +1,211 @@
+
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>xreqs.html</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --light-bg: white;
+            --light-color: black;
+            --light-link-color: blue;
+            --light-table-border-color: black;
+            --light-table-header-color: black;
+            --dark-bg: #353535;
+            --dark-color: white;
+            --dark-link-color: #d2991d;
+            --dark-table-border-color: #666666;
+            --dark-table-header-color: #dddddd;
+        }
+        * {
+            background-color: light-dark(var(--light-bg), var(--dark-bg));
+            color: light-dark(var(--light-color), var(--dark-color));
+        }
+        html {
+            line-height: 1.15;              /* from github.com/necolas/normalize.css */
+            -webkit-text-size-adjust: 100%; /* from github.com/necolas/normalize.css */
+        }
+        a {
+            background-color: transparent;
+            color: light-dark(var(--light-link-color), var(--dark-link-color)); }
+        table {
+            border-collapse: collapse;
+            border: 2px solid light-dark(var(--light-table-border-color), var(--dark-table-border-color)); }
+        td, th {
+            border: 1px solid light-dark(var(--light-table-border-color), var(--dark-table-border-color));
+            padding: 1px 1px; }
+        th {
+            color: light-dark(var(--light-table-header-color), var(--dark-table-header-color));
+            text-align: center;
+        }
+        td {
+            /* text-align: center; */
+            }
+    </style>
+</head>
+<body>
+    <h2>xreqs</h2>
+    <table>
+        <tr>
+            <th>query row n</th>
+            <th>doc line n</th>
+            <th>section</th>
+            <th>status</th>
+            <th>text</th>
+        </tr>
+        <tr><td>1</td><td>19</td><td>S0</td><td>todo</td><td>Fix references to EGDS in the source code to always include section and page number</td></tr>
+        <tr><td>2</td><td>20</td><td>S0</td><td>todo</td><td>Fix references to EGDS in the source docs to always include section and page number</td></tr>
+        <tr><td>3</td><td>22</td><td>S0</td><td>todo</td><td>Set panic behavior to abort. See https:&#x2f;&#x2f;gitlab.torproject.org&#x2f;legacy&#x2f;trac&#x2f;-&#x2f;issues&#x2f;27199</td></tr>
+        <tr><td>4</td><td>23</td><td>S0</td><td>todo</td><td>Remove eg&#x2f;src&#x2f;example*.rs files, migrate to resource_producer</td></tr>
+        <tr><td>5</td><td>24</td><td>S0</td><td>todo</td><td>Migrate away from &#x27;anyhow&#x27; in library code</td></tr>
+        <tr><td>6</td><td>27</td><td>S0</td><td>todo</td><td>Q|UG left pad as necessary to ensure length is correct</td></tr>
+        <tr><td>7</td><td>28</td><td>S0</td><td>todo</td><td>MAYB|serialize format wrapped in version</td></tr>
+        <tr><td>8</td><td>30</td><td>S0</td><td>todo</td><td>crate feature for guardian secret operations.</td></tr>
+        <tr><td>9</td><td>32</td><td>S0</td><td>todo</td><td>ensure SecretCoefficient is serialized in a fixed-length format</td></tr>
+        <tr><td>10</td><td>34</td><td>S0</td><td>todo</td><td>rewrite build-docs script in sh</td></tr>
+        <tr><td>11</td><td>36</td><td>S0</td><td>todo</td><td>Build on Linux32</td></tr>
+        <tr><td>12</td><td>37</td><td>S0</td><td>todo</td><td>Test on Linux32</td></tr>
+        <tr><td>13</td><td>38</td><td>S0</td><td>todo</td><td>Build on Linux64</td></tr>
+        <tr><td>14</td><td>39</td><td>S0</td><td>todo</td><td>Test on Linux64</td></tr>
+        <tr><td>15</td><td>40</td><td>S0</td><td>todo</td><td>Build on Win64</td></tr>
+        <tr><td>16</td><td>41</td><td>S0</td><td>todo</td><td>Test on Win64</td></tr>
+        <tr><td>17</td><td>42</td><td>S0</td><td>todo</td><td>Test library components for Wasm32</td></tr>
+        <tr><td>18</td><td>44</td><td>S0</td><td>todo</td><td>docs&#x2f;general: style sheet for markdown, ideally match API docs</td></tr>
+        <tr><td>19</td><td>46</td><td>S0</td><td>todo</td><td>If an overvote occurs, the overvote must be captured, encrypted, and never decrypted.</td></tr>
+        <tr><td>20</td><td>48</td><td>S0</td><td>todo</td><td>docs&#x2f;specs&#x2f;serialization: data formats section</td></tr>
+        <tr><td>21</td><td>49</td><td>S0</td><td>todo</td><td>docs&#x2f;specs&#x2f;serialization: standards and references section</td></tr>
+        <tr><td>22</td><td>50</td><td>S0</td><td>todo</td><td>docs&#x2f;specs&#x2f;serialization: election manifest section</td></tr>
+        <tr><td>23</td><td>51</td><td>S0</td><td>todo</td><td>docs&#x2f;specs&#x2f;serialization: election record section</td></tr>
+        <tr><td>24</td><td>52</td><td>S0</td><td>todo</td><td>docs&#x2f;specs&#x2f;serialization: vendor data section</td></tr>
+        <tr><td>25</td><td>54</td><td>S0</td><td>todo</td><td>docs&#x2f;api: reference NIST CDF where types clearly correspond. E.g., BallotStyle https:&#x2f;&#x2f;github.com&#x2f;usnistgov&#x2f;ElectionResultsReporting&#x2f;blob&#x2f;nist-pages&#x2f;index.md#17_0_2_4_78e0236_1389366224561_797289_2360</td></tr>
+        <tr><td>26</td><td>56</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;Requirements for election systems vendors: complete</td></tr>
+        <tr><td>27</td><td>57</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;Requirements for verifier app authors: complete</td></tr>
+        <tr><td>28</td><td>58</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;roles: consider splitting into separate pages: complete</td></tr>
+        <tr><td>29</td><td>59</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;roles&#x2f;Election Administrator: complete</td></tr>
+        <tr><td>30</td><td>60</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;roles&#x2f;Election Guardians: complete</td></tr>
+        <tr><td>31</td><td>61</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;roles&#x2f;Voters: complete</td></tr>
+        <tr><td>32</td><td>62</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;roles&#x2f;Political parties and voter-interest organizations: complete</td></tr>
+        <tr><td>33</td><td>63</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;roles&#x2f;Journalists and other media: complete</td></tr>
+        <tr><td>34</td><td>64</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;Hardware requirements&#x2f;Gurardian secret key storage: complete</td></tr>
+        <tr><td>35</td><td>65</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;Hardware requirements&#x2f;Gurardian secret key operations: complete</td></tr>
+        <tr><td>36</td><td>66</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;step-by-step&#x2f;Advance preparation: complete</td></tr>
+        <tr><td>37</td><td>67</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;step-by-step&#x2f;Key ceremony: complete</td></tr>
+        <tr><td>38</td><td>68</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;step-by-step&#x2f;Tally ceremony: complete</td></tr>
+        <tr><td>39</td><td>69</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;step-by-step&#x2f;Publishing: complete</td></tr>
+        <tr><td>40</td><td>70</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;step-by-step&#x2f;Verification: complete</td></tr>
+        <tr><td>41</td><td>71</td><td>S0</td><td>todo</td><td>docs&#x2f;implementation guide&#x2f;step-by-step&#x2f;Reporting: complete</td></tr>
+        <tr><td>42</td><td>73</td><td>S0</td><td>todo</td><td>docs&#x2f;api: use correct logo</td></tr>
+        <tr><td>43</td><td>74</td><td>S0</td><td>todo</td><td>docs&#x2f;api: complete</td></tr>
+        <tr><td>44</td><td>76</td><td>S0</td><td>todo</td><td>docs: complete, #![warn(missing_docs)]</td></tr>
+        <tr><td>45</td><td>78</td><td>S0</td><td>todo</td><td>docs: upload docs to github pages (see compliance notes)</td></tr>
+        <tr><td>46</td><td>80</td><td>S0</td><td>todo</td><td>security review: ensure that no file leaks info through filesize</td></tr>
+        <tr><td>47</td><td>82</td><td>S0</td><td>todo</td><td>distinguish between PartySelection, BallotMeasureSelection, CandidateSelection</td></tr>
+        <tr><td>48</td><td>83</td><td>S0</td><td>todo</td><td>BallotDefinition doc for write-in option</td></tr>
+        <tr><td>49</td><td>84</td><td>S0</td><td>todo</td><td>would be nice to support a PartySelection type vote, rather than rely on the vendor to give us the correct selections explicitly</td></tr>
+        <tr><td>50</td><td>86</td><td>S0</td><td>todo</td><td>a trait for types that have pub fn validate(&amp;Self, &amp;ElectionParameters)</td></tr>
+        <tr><td>51</td><td>88</td><td>S0</td><td>todo</td><td>docs: more investigation into using rust modules to build documentation along with api, observe how cargo_crev does it with the include_str! macro: https:&#x2f;&#x2f;github.com&#x2f;crev-dev&#x2f;cargo-crev&#x2f;blob&#x2f;master&#x2f;cargo-crev&#x2f;src&#x2f;doc&#x2f;mod.rs</td></tr>
+        <tr><td>52</td><td>89</td><td>S0</td><td>todo</td><td>docs: more investigation into using mdbook for all project documentation https:&#x2f;&#x2f;github.com&#x2f;rust-lang&#x2f;rust&#x2f;issues&#x2f;66249</td></tr>
+        <tr><td>53</td><td>90</td><td>S0</td><td>todo</td><td>docs: cargo-external-doc is nice but doesn&#x27;t support virtual manifests https:&#x2f;&#x2f;github.com&#x2f;Geal&#x2f;cargo-external-doc</td></tr>
+        <tr><td>54</td><td>92</td><td>S0</td><td>todo</td><td>VaryingParameters (n, k) This isn&#x27;t really an &#x27;index&#x27; (ordinal), it&#x27;s a cardinal number. Maybe we need a general purpose ranged number type.</td></tr>
+        <tr><td>55</td><td>94</td><td>S0</td><td>todo</td><td>exe: common parameter: election filesystem directory to look for files (%ELECTIONGUARD_ARTIFACTS_DIR%)</td></tr>
+        <tr><td>56</td><td>95</td><td>S0</td><td>todo</td><td>exe: common parameter: manifest file</td></tr>
+        <tr><td>57</td><td>96</td><td>S0</td><td>todo</td><td>exe: common parameter: others</td></tr>
+        <tr><td>58</td><td>98</td><td>S0</td><td>todo</td><td>persist&#x2f;file: create artifact directories if they don&#x27;t exist. q: what about permissions on guardian secret directories?</td></tr>
+        <tr><td>59</td><td>100</td><td>S0</td><td>todo</td><td>perisist: encryption or password protection for guaridan secret key files</td></tr>
+        <tr><td>60</td><td>101</td><td>S0</td><td>todo</td><td>util: read guardian secret key, print info, suppressing secrets</td></tr>
+        <tr><td>61</td><td>102</td><td>S0</td><td>todo</td><td>util: read guardian public key, print info</td></tr>
+        <tr><td>62</td><td>104</td><td>S0</td><td>todo</td><td>persist: define standard election directory layout - look at other implementers and users</td></tr>
+        <tr><td>63</td><td>105</td><td>S0</td><td>todo</td><td>design: key file represents its kind: guardian, ..., ?</td></tr>
+        <tr><td>64</td><td>107</td><td>S0</td><td>todo</td><td>Consider structures defined in JSON schema https:&#x2f;&#x2f;github.com&#x2f;usnistgov&#x2f;ElectionResultsReporting&#x2f;blob&#x2f;version2&#x2f;NIST_V2_election_results_reporting.json</td></tr>
+        <tr><td>65</td><td>109</td><td>S0</td><td>todo</td><td>if electionguard.exe fails to read or write a file, check the path to see if it has a leading ~. If so, print a good error message.</td></tr>
+        <tr><td>66</td><td>111</td><td>S0</td><td>todo</td><td>test on 32-bit target such as x86 or wasm32</td></tr>
+        <tr><td>67</td><td>112</td><td>S0</td><td>todo</td><td>test on big-endian target such as powerpc64-unknown-linux-gnu, s390x-unknown-linux-gnu, riscv64gc-unknown-linux-gnu, or loongarch64-unknown-linux-gnu</td></tr>
+        <tr><td>68</td><td>114</td><td>S0</td><td>todo</td><td>electionguard-test script: incorporate ballots</td></tr>
+        <tr><td>69</td><td>115</td><td>S0</td><td>todo</td><td>electionguard-test script: incorporate tally</td></tr>
+        <tr><td>70</td><td>119</td><td>S0</td><td>done</td><td>move types for numbers mod p and mod q back into &#x27;eg&#x27; lib so they can be known at compile time</td></tr>
+        <tr><td>71</td><td>120</td><td>S0</td><td>done</td><td>change obtain_resource_production_result_from_cache_downcast</td></tr>
+        <tr><td>72</td><td>121</td><td>S0</td><td>done</td><td>electionguard.exe: common parameter: election filesystem directory to look for files (%ELECTIONGUARD_ARTIFACTS_DIR%)</td></tr>
+        <tr><td>73</td><td>122</td><td>S0</td><td>done</td><td>electionguard.exe: seed: write random seed to artifact file</td></tr>
+        <tr><td>74</td><td>123</td><td>S0</td><td>done</td><td>electionguard.exe manifest: write ElectionManifest to pretty json file</td></tr>
+        <tr><td>75</td><td>124</td><td>S0</td><td>done</td><td>electionguard.exe manifest: write ElectionManifest to canonical bytes file</td></tr>
+        <tr><td>76</td><td>125</td><td>S0</td><td>done</td><td>electionguard.exe parameters: write ElectionParameters to json file</td></tr>
+        <tr><td>77</td><td>126</td><td>S0</td><td>done</td><td>H_V, H_P, H_M, and H_B updated for 2.0 calculation</td></tr>
+        <tr><td>78</td><td>127</td><td>S0</td><td>done</td><td>Generate joint election public key</td></tr>
+        <tr><td>79</td><td>128</td><td>S0</td><td>done</td><td>Extended base hash H_E</td></tr>
+        <tr><td>80</td><td>129</td><td>S0</td><td>done</td><td>electionguard-test script: implementation in cmd started</td></tr>
+        <tr><td>81</td><td>130</td><td>S0</td><td>done</td><td>electionguard-test script: implementation in cmd exercises all (current) functionality</td></tr>
+        <tr><td>82</td><td>131</td><td>S0</td><td>done</td><td>BigUint values (mod p or q) now left-padded as necessary to avoid leaking value via serialized file size</td></tr>
+        <tr><td>83</td><td>132</td><td>S0</td><td>done</td><td>Hash values now serialized with &#x27;H(upper hex)&#x27; format to match spec</td></tr>
+        <tr><td>84</td><td>133</td><td>S0</td><td>done</td><td>exe: Csprng now seeded with more entropy from the operating system RNG</td></tr>
+        <tr><td>85</td><td>134</td><td>S0</td><td>done</td><td>Election-varying parameters (n and k) now checked for validity</td></tr>
+        <tr><td>86</td><td>135</td><td>S0</td><td>done</td><td>Serialization of BigUints now uses base64 encoding</td></tr>
+        <tr><td>87</td><td>136</td><td>S0</td><td>done</td><td>Rename guardian private key to secret key</td></tr>
+        <tr><td>88</td><td>137</td><td>S0</td><td>done</td><td>electionguard.exe: generate guardian secret key</td></tr>
+        <tr><td>89</td><td>138</td><td>S0</td><td>done</td><td>electionguard.exe: write guardian secret key</td></tr>
+        <tr><td>90</td><td>139</td><td>S0</td><td>done</td><td>electionguard.exe: derive guardian public key from secret key</td></tr>
+        <tr><td>91</td><td>140</td><td>S0</td><td>done</td><td>electionguard.exe: write guardian public key</td></tr>
+        <tr><td>92</td><td>141</td><td>S0</td><td>done</td><td>Guardian i uses 1-based indexing</td></tr>
+        <tr><td>93</td><td>142</td><td>S0</td><td>done</td><td>compute H_E extended base hash</td></tr>
+        <tr><td>94</td><td>143</td><td>S0</td><td>done</td><td>compute joint election public key</td></tr>
+        <tr><td>95</td><td>144</td><td>S0</td><td>done</td><td>electionguard.exe: write joint election public key to json file</td></tr>
+        <tr><td>96</td><td>145</td><td>S0</td><td>done</td><td>standardize on &#x27;validate&#x27; instead of &#x27;verify&#x27; when checking deserialized structures</td></tr>
+        <tr><td>97</td><td>146</td><td>S0</td><td>done</td><td>instead of from_json and to_json implement from_stdioread and to_stdiowrite</td></tr>
+        <tr><td>98</td><td>147</td><td>S0</td><td>done</td><td>every struct that has Self::from_stdioread*() should prefer Self::from_stdioread_validated() and have a self.validate()</td></tr>
+        <tr><td>99</td><td>148</td><td>S0</td><td>done</td><td>electionguard.exe: write H_E extended base hash to json file</td></tr>
+        <tr><td>100</td><td>149</td><td>S0</td><td>done</td><td>convert many uses of if !() { bail!() } to ensure!()</td></tr>
+        <tr><td>101</td><td>150</td><td>S0</td><td>done</td><td>Generate data structure docs from the Reference Implementation in Rust</td></tr>
+        <tr><td>102</td><td>151</td><td>S0</td><td>done</td><td>eg: New constrained numeric type for indices. Convert n, k, and other indices to this type.</td></tr>
+        <tr><td>103</td><td>152</td><td>S0</td><td>done</td><td>build-docs script: initial implementation in cmd</td></tr>
+        <tr><td>104</td><td>153</td><td>S0</td><td>done</td><td>evaluate scripting language &#x27;nu&#x27; https:&#x2f;&#x2f;www.nushell.sh&#x2f;</td></tr>
+        <tr><td>105</td><td>154</td><td>S0</td><td>done</td><td>electionguard-test script: begin rewrite in nu</td></tr>
+        <tr><td>106</td><td>155</td><td>S0</td><td>done</td><td>doc&#x2f;LICENSE: checked</td></tr>
+        <tr><td>107</td><td>156</td><td>S0</td><td>done</td><td>doc&#x2f;SECURITY.md: complete</td></tr>
+        <tr><td>108</td><td>157</td><td>S0</td><td>done</td><td>docs&#x2f;general: begin writing</td></tr>
+        <tr><td>109</td><td>158</td><td>S0</td><td>done</td><td>docs&#x2f;api: begin writing</td></tr>
+        <tr><td>110</td><td>159</td><td>S0</td><td>done</td><td>Remove link to internal site</td></tr>
+        <tr><td>111</td><td>160</td><td>S0</td><td>done</td><td>VaryingParameters: enum BallotChaining { Prohibited, Allowed, Required, }</td></tr>
+        <tr><td>112</td><td>161</td><td>S0</td><td>done</td><td>remove old EG 1.54 constants</td></tr>
+        <tr><td>113</td><td>162</td><td>S0</td><td>done</td><td>exe: Under artifacts dir, first level dirs are specific to secrecy requirements</td></tr>
+        <tr><td>114</td><td>163</td><td>S0</td><td>done</td><td>Ballot define data type</td></tr>
+        <tr><td>115</td><td>164</td><td>S0</td><td>done</td><td>get fixeduint stuff out of bunna branch</td></tr>
+        <tr><td>116</td><td>165</td><td>S0</td><td>done</td><td>Merge code from Anunay</td></tr>
+        <tr><td>117</td><td>166</td><td>S0</td><td>done</td><td>doc&#x2f;SUPPORT.md: complete</td></tr>
+        <tr><td>118</td><td>167</td><td>S0</td><td>done</td><td>doc&#x2f;README.md: complete</td></tr>
+        <tr><td>119</td><td>168</td><td>S0</td><td>done</td><td>doc&#x2f;CODE_OF_CONDUCT.md: complete</td></tr>
+        <tr><td>120</td><td>169</td><td>S0</td><td>done</td><td>doc&#x2f;BUILDING.md: complete</td></tr>
+        <tr><td>121</td><td>170</td><td>S0</td><td>done</td><td>Complete all planned code reorganization&#x2f;renaming</td></tr>
+        <tr><td>122</td><td>171</td><td>S0</td><td>done</td><td>docs&#x2f;implementation guide&#x2f;References: complete</td></tr>
+        <tr><td>123</td><td>172</td><td>S0</td><td>done</td><td>a trait for fn to_canonical_json()</td></tr>
+        <tr><td>124</td><td>173</td><td>S0</td><td>done</td><td>many to_stdiowrite() methods have common code that could be factored into a common function</td></tr>
+        <tr><td>125</td><td>174</td><td>S0</td><td>done</td><td>a trait for types that have to_stdiowrite()</td></tr>
+        <tr><td>126</td><td>175</td><td>S0</td><td>done</td><td>a trait for types that have to_stdiowrite() and perhaps _pretty() and _canonical() variants</td></tr>
+        <tr><td>127</td><td>177</td><td>S0</td><td>done</td><td>serialize bignums only all as uppercase hex</td></tr>
+        <tr><td>128</td><td>187</td><td>S0</td><td>todo</td><td>What is a Preencrypted Ballot called after Voter Selections have been applied?</td></tr>
+        <tr><td>129</td><td>1404</td><td>S3.a.g</td><td>todo</td><td>TODO: Do we need separate Administrative (Public|Secret) Key pairs for encryption and signing operations?</td></tr>
+        <tr><td>130</td><td>1405</td><td>S3.a.g</td><td>todo</td><td>TODO: How is it configured which specific other data is to be encrypted with which of the Joint Ballot Data Encryption Public Key and&#x2f;or Administrative Public Key?</td></tr>
+        <tr><td>131</td><td>2456</td><td>S3.1.3n</td><td>todo</td><td>If the effective Contest Selection Limit is &gt; 1, could someone evade the Option Selection Limit by both selecting and writing-in the same candidate? Similarly if multiple write-in fields are allowed, couldn&#x27;t they write-in the same choice multiple times?</td></tr>
+        <tr><td>132</td><td>2642</td><td>S3.2.c</td><td>todo</td><td>(Ref: S3.a.a.b) &quot;EGRI enables the same set of Guardians to re-use their keys from previous elections (TODO: Don&#x27;t n, k, p, q, g, etc have to remain the same?)&quot;</td></tr>
+        <tr><td>133</td><td>2915</td><td>S3.2.2.a</td><td>todo</td><td>eq8 pg22 refers to &quot;the secret key for guardian $G_i$&quot; &quot;the public key for guardian $G_i$&quot; Are these keys ever really used as such in v2.1.0 ?</td></tr>
+        <tr><td>134</td><td>3488</td><td>S3.2.2.o</td><td>todo</td><td>EGRI supports a Guardian `l` in complaining to the Election Administrator and all other Guardians. TODO: In practice this likely implies providing a set of data TBD.</td></tr>
+        <tr><td>135</td><td>5215</td><td>S3.5.b.verif9</td><td>todo</td><td>TODO: Verification 9</td></tr>
+        <tr><td>136</td><td>5340</td><td>S3.6.1</td><td>todo</td><td>TODO: Presumably this (&quot;enables a Guardian to review the set of Ciphertexts marked for decryption&quot;) requirement applies to any use of the Guardian Ballot Data Encryption Secret Key as well? -&gt; xreq S3.6.1 EGRS enables a Guardian to review the set of Ciphertexts marked for decryption prior to use of their Guardian Ballot Data Encryption Secret Key.</td></tr>
+        <tr><td>137</td><td>5341</td><td>S3.6.1</td><td>todo</td><td>Does EGRI need to determine whether write-in fields may actually be relevant to an outcome, or just always decrypt all write-in fields with every Tally?</td></tr>
+        <tr><td>138</td><td>5342</td><td>S3.6.1</td><td>todo</td><td>Presumably, many Ballots will not have any write-in fields actually written-in. Does each Ballot record whether it has a write-in field written-in in a way that avoids the need to decrypt the ballot nonce during the Tally if write-in values are needed?</td></tr>
+        <tr><td>139</td><td>5780</td><td>S3.6.6.a</td><td>todo</td><td>&quot;[write-in] data may need to be decrypted if the tallies record a significant number</td></tr>
+        <tr><td>140</td><td>6362</td><td>S3.7</td><td>todo</td><td>The Election Record records for every Ballot Decryption Operation: for every participating Guardian: for every Ballot in the `Challenged` state: the partial decryption of the Ballot Nonce</td></tr>
+        <tr><td>141</td><td>6363</td><td>S3.7</td><td>todo</td><td>The Election Record records for every Ballot Decryption Operation: for every participating Guardian: for every Ballot in the `Challenged` state: for every Contest, for every Option Field, the partial decryption</td></tr>
+        <tr><td>142</td><td>6405</td><td>S3.7The</td><td>todo</td><td>Election Record records for every Tally: for every Contest: for every (Option or Additional) homomorphically-tallied Data Field: the partial decryption from each available Guardian?</td></tr>
+        <tr><td>143</td><td>6587</td><td>S4.1</td><td>todo</td><td>pg. 58 &quot;in a contest where a voter is allowed to make multiple selections, multiple pre-encryption vectors can be combined to form a single contest encryption vector with multiple encryptions of one that precisely matches the standard \EG format.&quot;</td></tr>
+        <tr><td>144</td><td>6588</td><td>S4.1</td><td>todo</td><td>pg. 58 QUESTION: How are they &quot;combined&quot;? E.g., are these multiple encryptions combined such that there is still a single vector `Psi_{i,m}` for Option `i`, or are there additional Option vectors? Note: [S4.1.4 pg. 63] says &quot;For contests with selection limit greater than 1, the selection vectors published in the election record match the product of the pre-encryptions associated with the short codes listed as selected&quot;, which seems to imply they are multiplied.</td></tr>
+        <tr><td>145</td><td>6589</td><td>S4.1</td><td>todo</td><td>pg. 58 QUESTION: What about when the effective Option Selection Limit is greater than `1`? Do all possible assignments within the effective (Option and Contest) Selection Limits require distinct Selection Vectors and Selection Hashes? E.g. say a Contest has two options and the Contest and Option Selection Limits are all `5`. How is the selection vector constructed which allows the voter to apply a value of `3` to Option 1 and `2` to Option 2?</td></tr>
+        <tr><td>146</td><td>6590</td><td>S4.1</td><td>todo</td><td>pg. 58 QUESTION:  How to these &quot;multiple pre-encryption vectors&quot; map to &quot;the j-th selection vector&quot; and &quot;the k-th encryption&quot; referred to in [S4.2.1 eq. 121 pg. 61] to derive xi_{i,j,k}?</td></tr>
+        <tr><td>147</td><td>6639</td><td>S4.1.1</td><td>todo</td><td>pg. 58 QUESTION: S4.1 pg. 57 designates the &quot;null form&quot; explicitly as `Psi_{0,m}`, but (eq. 114 pg. 58) refers to them as `psi_{m+l}` where `1 &lt;= l &lt;= L`. How to these multiple pre-encryption vectors map to &quot;the j-th selection vector&quot; and &quot;the k-th encryption&quot; referred to in [S4.2.1 eq. 121 pg. 61] to derive xi_{i,j,k}?</td></tr>
+        <tr><td>148</td><td>6755</td><td>S4.1.4</td><td>todo</td><td>pg. 59 EGRS says &quot;A pre-encrypted ballot’s hash will typically be printed directly on the ballot. Ideally, two copies of the ballot hash will be included on each ballot with one remaining permanently with the ballot and the other in an immediately adjacent location on a removable tab. These removable ballot codes are intended to be retained by voters and can be used as an identifier to allow voters to look up their (encrypted) ballots in the election record and confirm that they include the proper short codes as described below.&quot;</td></tr>
+        <tr><td>149</td><td>6996</td><td>S4.4</td><td>todo</td><td>pg. 62 refers to &quot;every pre-encrypted ballot listed in the election record as uncast&quot;. QUESTION: Does this imply that every `PreencryptedBallot` generated is recorded in the Election Record?</td></tr>
+        <tr><td>150</td><td>6997</td><td>S4.4</td><td>todo</td><td>pg. 63 states that &quot;For each uncast ballot, the ballot nonce for that ballot is published in the encryption record.&quot; and [S4.5 pg. 64] refers to &quot;every pre-encrypted ballot listed in the election record as uncast&quot;. QUESTION: Does this imply that there is a point during the tally process at which generated-but-not-cast `PreencryptedBallots` are no longer accepted? If there are multiple Tallys taken, then it seems really important that this only happen at the final Tally. Someone who submitted a PreencryptedBallot that was somehow delayed in the mail probably does not want their Voter Selections made public.</td></tr>
+        <tr><td>151</td><td>9095</td><td>S7</td><td>todo</td><td>TODO: Consider any special features which may be needed for RLAs</td></tr>
+    </table>
+</body>
+</html>

@@ -1,0 +1,100 @@
+[workspace]
+resolver = "2"
+
+members = [
+  "bench-util",
+  "fixed-width-nn-bench",
+  "fixed-width-nn-bench-db",
+  "test-eg",
+  "test-fixed-width-nonnegative",
+]
+
+[workspace.dependencies]
+eg = { path = "../src/eg", features = [ "bench" ] }
+eg-artifacts-dir = { path = "../src/eg-artifacts-dir" }
+preencrypted = { path = "../src/preencrypted" }
+util = { path = "../src/util" }
+logging = { path = "../src/logging" }
+
+bench-util = { path = "bench-util" }
+fixed-width-nn-bench-db = { path = "fixed-width-nn-bench-db" }
+
+
+anyhow = { version = "1.0.79", default-features = false, features = ["std"] }
+base16ct = { version = "0.2.0", default-features = false, features = [] }
+base64 = { version = "0.21.2", default-features = false, features = ["std"] }
+cfg-if = { version = "1.0.0", default-features = false, features = [] }
+chrono = { version = "0.4.35", default-features = false, features = [] }
+criterion = { version = "0.5.1", features = ["rayon"] }
+diesel = { version = "2.1.4", default-features = false, features = [
+    "sqlite",
+    "returning_clauses_for_sqlite_3_35",
+    "32-column-tables",
+    "serde_json",
+    "chrono",
+    # "numeric", # uses bigdecimal
+    "without-deprecated",
+] }
+dotenvy = { version = "0.15.7", default-features = false, features = [] }
+env_logger = { version = "0.11.2", default-features = false, features = [] }
+hex-literal = { version = "0.4.1", default-features = false, features = [] }
+indexmap = { version = "2.2.2", default-features = false, features = [] } # Used by serde_json
+lazy_static = { version = "1.4.0", default-features = false, features = [] }
+log = { version = "0.4.21", default-features = false, features = ["std"] }
+num-bigint = { version = "0.4.4", default-features = false, features = ["serde", "std"] }
+num-derive = { version = "0.4.2", default-features = false, features = [] }
+num-traits = { version = "0.2.18", default-features = false, features = ["std"] }
+num-integer = { version = "0.1.46", default-features = false, features = ["std"] }
+os-id = { version = "3.0.1", default-features = false, features = [] }
+paste = { version = "1.0.14", default-features = false, features = [] }
+rand = { version = "0.8.5", default-features = false, features = [ ] }
+rand_core = { version = "0.6.4", default-features = false, features = ["getrandom"] }
+rand_pcg = { version = "0.3.1", default-features = false, features = [ ] }
+rayon = "1.8.1"
+serde = { version = "1.0.196", default-features = false, features = ["std", "derive"] }
+serde_json = { version = "1.0.113", default-features = false, features = ["std", "preserve_order"] }
+sha2 = { version = "0.10.8", default-features = false, features = [ ]}
+sha3 = { version = "0.10.8", default-features = false, features = [ ]}
+static_assertions = { version = "1.1.0", default-features = false }
+strum = { version = "0.26.1", default-features = false, features = ["std", "derive"]}
+syn = { version = "2.0.48", default-features = false, features = [] }
+
+[workspace.dependencies.crypto-bigint]
+version = "0.5.5"
+default-features = false
+features = [
+  # "default", # ["rand"]
+  # "alloc",
+  # "rand",
+  "serde",
+  # "extra-sizes",
+  # "der",
+  # "generic",
+  # "rand_core",
+  # "rlp",
+  "zeroize",
+]
+
+[workspace.dependencies.hacl-rs]
+git = "https://github.com/hacl-star/hacl-star.git"
+rev = "5180845d78b2be36a34381d921f916186801585a"
+# path = "../../../hacl-star/hacl-star/dist/rs"
+default-features = false
+features = []
+
+[workspace.dependencies.fixed-width-nonnegative]
+path = "../src/fixed-width-nonnegative"
+default-features = false
+features = [
+    "crypto-bigint",
+    "num-bigint",
+    "bits-256",
+    "bits-4096",
+    "basic-array",
+	"basic-array-u64",
+    "crypto-bigint",
+    "hacl-rs",
+    "montgomery",
+    "num-bigint",
+    "zeroize"
+]

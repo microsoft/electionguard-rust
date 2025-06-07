@@ -1,0 +1,37 @@
+[package]
+name = "fixed-width-nn-bench-db"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata.vcpkg]
+git = "https://github.com/microsoft/vcpkg"
+branch = "master"
+dependencies = [
+    "sqlite3",                       # sqlite3                  3.43.2           SQLite is a software library that implements a self-contained, serverless,...
+    # "sqlite3[dbstat]",               # Enable the DBSTAT virtual table
+    # "sqlite3[fts3]",                 # Enable the FTS3 extension
+    # "sqlite3[fts4]",                 # Enable the FTS4 extension
+    # "sqlite3[fts5]",                 # Enable the FTS5 extension
+    # "sqlite3[geopoly]",              # Enable geopoly functionality for sqlite3
+    # "sqlite3[json1]",                # Enable JSON functionality for sqlite3
+    # "sqlite3[limit]",                # Enable the UPDATE/DELETE LIMIT clause
+    "sqlite3[math]",                 # Enable math functions
+    # "sqlite3[memsys3]",              # Enable MEMSYS3
+    # "sqlite3[memsys5]",              # Enable MEMSYS5
+    # "sqlite3[omit-load-extension]",  # Enable loading of external extensions
+    # "sqlite3[rtree]",                # Enable the RTREE extension
+    # "sqlite3[session]",              # Enable the SESSION extension
+    "sqlite3[tool]",                 # Build sqlite3 executable
+    # "sqlite3[zlib]",                 # Build sqlite3 command line tool with zlib support; has no effect on the li...
+]
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+diesel.workspace = true
+log.workspace = true
+logging.workspace = true
+
+[build-dependencies]
+anyhow.workspace = true
+vcpkg = { version = "0.2.15", default-features = false, features = []}

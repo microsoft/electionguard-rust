@@ -1,0 +1,232 @@
+
+#------------- Only if not using vcpkg
+
+# Cd to the project
+cd C:\w\snc\eg\electionguard-rust_bunna\test\fixed-width-nn-bench
+
+vcpkg new --application
+vcpkg add port sqlite3
+vcpkg install
+
+vcpkg install sqlite3[core,json1,tool] --recurse
+
+#------------- If using carg-vcpkg
+
+#   https://crates.io/crates/cargo-vcpkg
+cargo install cargo-vcpkg
+
+$env.VCPKGRS_DYNAMIC = 1
+
+vcpkg_cli probe -l static sqlite3
+
+# In projects
+cargo add cargo-vcpkg
+
+
+cargo vcpkg build
+
+
+C:\w\snc\eg\electionguard-rust_bunna\test\fixed-width-nn-bench> cargo vcpkg -v build                      03/14/24 22:29:03 PM
+vcpkg root is C:\w\vcpkg
+    Fetching vcpkg
+POST git-upload-pack (198 bytes)
+From https://github.com/microsoft/vcpkg
+ = [up to date]          master     -> origin/master
+    Checkout rev 000d1bda1ffa95a73e0b40334fa4103d6f4d3d48
+Updating files: 100% (2910/2910), done.
+Note: switching to '000d1bda1ffa95a73e0b40334fa4103d6f4d3d48'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 000d1bda1 [glslang] update to 13.1.1, opt feature [shaderc] update to 2023.7 (#35219)
+-- stdout --
+Using local portfile versions. To update the local portfiles, use `git pull`.
+The following packages differ from their port versions:
+        sqlite3:x64-windows              3.45.2 -> 3.43.2
+To update these packages and all dependencies, run
+.\vcpkg upgrade'
+To only remove outdated packages, run
+.\vcpkg remove --outdated
+
+-- stderr --
+
+ExitStatus(ExitStatus(0))
+  Installing sqlite3
+warning: In the September 2023 release, the default triplet for vcpkg libraries changed from x86-windows to the detected host triplet (x64-windows). For the old behavior, add --triplet x86-windows . To suppress this message, add --triplet x64-windows .
+Computing installation plan...
+The following packages are already installed:
+    sqlite3[core,json1]:x64-windows@3.45.2
+sqlite3:x64-windows is already installed
+Total install time: 26.9 us
+sqlite3 provides pkgconfig bindings.
+sqlite3 provides CMake targets:
+
+    find_package(unofficial-sqlite3 CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE unofficial::sqlite3::sqlite3)
+
+    Finished in 2.26s
+
+C:\w\snc\eg\electionguard-rust_bunna\test\fixed-width-nn-bench
+=================================================================================
+C:\w\snc\eg\electionguard-rust_bunna\test\fixed-width-nn-bench-db> diesel --help
+Usage: diesel [OPTIONS] <COMMAND>
+
+Commands:
+  migration     A group of commands for generating, running, and reverting migrations.
+  setup         Creates the migrations directory, creates the database specified in your DATABASE_URL, and runs existing migrations.
+  database      A group of commands for setting up and resetting your database.
+  completions   Generate shell completion scripts for the diesel command.
+  print-schema  Print table definitions for database schema.
+  help          Print this message or the help of the given subcommand(s)
+
+Options:
+      --database-url <DATABASE_URL>
+          Specifies the database URL to connect to. Falls back to the DATABASE_URL environment variable if unspecified.
+      --config-file <CONFIG_FILE>
+          The location of the configuration file to use. Falls back to the `DIESEL_CONFIG_FILE` environment variable if unspecified. Defaults to `diesel.toml` in your project root. See diesel.rs/guides/configuring-diesel-cli for documentation on this file.
+      --locked-schema
+          When `print_schema.file` is specified in your config file, this flag will cause Diesel CLI to error if any command would result in changes to that file. It is recommended that you use this flag when running migrations in CI or production.
+  -h, --help
+          Print help (see a summary with '-h')
+  -V, --version
+          Print version
+=================================================================================
+C:\w\snc\eg\electionguard-rust_bunna\test\fixed-width-nn-bench-db> diesel setup --help                    03/15/24 17:37:46 PM
+Creates the migrations directory, creates the database specified in your DATABASE_URL, and runs existing migrations.
+
+Usage: diesel setup [OPTIONS]
+
+Options:
+      --database-url <DATABASE_URL>
+      --migration-dir <MIGRATION_DIRECTORY>
+      --config-file <CONFIG_FILE>
+      --locked-schema
+=================================================================================
+A group of commands for setting up and resetting your database.
+Usage: diesel database [OPTIONS] <COMMAND>
+Commands:
+  setup  Creates the database specified in your DATABASE_URL, and then runs any existing migrations.
+  reset  Resets your database by dropping the database specified in your DATABASE_URL and then running `diesel database setup`.
+  help   Print this message or the help of the given subcommand(s)
+Options:
+      --database-url <DATABASE_URL>
+      --migration-dir <MIGRATION_DIRECTORY>
+      --config-file <CONFIG_FILE>
+      --locked-schema
+----------------------------------------------------------          
+Creates the database specified in your DATABASE_URL, and then runs any existing migrations.
+Usage: diesel database setup [OPTIONS]
+      --database-url <DATABASE_URL>
+      --migration-dir <MIGRATION_DIRECTORY>
+      --config-file <CONFIG_FILE>
+      --locked-schema
+----------------------------------------------------------          
+Resets your database by dropping the database specified in your DATABASE_URL and then running `diesel database setup`.
+Usage: diesel database reset [OPTIONS]
+      --database-url <DATABASE_URL>
+      --migration-dir <MIGRATION_DIRECTORY>
+      --config-file <CONFIG_FILE>
+      --locked-schema
+
+----------------------------------------------------------          
+----------------------------------------------------------          
+
+
+=================================================================================
+A group of commands for generating, running, and reverting migrations.
+
+Usage: diesel migration [OPTIONS] <COMMAND>
+
+Commands:
+  run       Runs all pending migrations.
+  revert    Reverts the specified migrations.
+  redo      Reverts and re-runs the latest migration. Useful for testing that a migration can in fact be reverted.
+  list      Lists all available migrations, marking those that have been applied.
+  pending   Returns true if there are any pending migrations.
+  generate  Generate a new migration with the given name, and the current timestamp as the version.
+  help      Print this message or the help of the given subcommand(s)
+
+Options:
+      --database-url <DATABASE_URL>
+      --migration-dir <MIGRATION_DIRECTORY>
+      --config-file <CONFIG_FILE>
+      --locked-schema
+=================================================================================
+Generate a new migration with the given name, and the current timestamp as the version.
+
+Usage: diesel migration generate [OPTIONS] <MIGRATION_NAME> [table-name]...
+  <MIGRATION_NAME>
+          The name of the migration to create.
+  [table-name]...
+          Table names to filter.
+      --database-url <DATABASE_URL>
+      --migration-dir <MIGRATION_DIRECTORY>
+      --version <MIGRATION_VERSION>
+      --config-file <CONFIG_FILE>
+  -u, --no-down
+          Don't generate a down.sql file. You won't be able to run migration `revert` or `redo`.
+  --format <MIGRATION_FORMAT> The format of the migration to be generated.
+      [default: sql] [possible values: sql]
+  --locked-schema
+      When `print_schema.file` is specified in your config file, this flag will cause Diesel CLI to error if any command would result in changes to that file. It is recommended that you use this flag when running  migrations in CI or production.
+  --diff-schema[=<SCHEMA_RS>]
+      Populate the generated migrations based on the current difference between your `schema.rs` file and the     specified database. The generated migrations are not expected to be perfect. Be sure to check whether they meet your expectations. Adjust the generated output if that's not the case.
+  -o, --only-tables
+          Only include tables from table-name that matches regexp.
+  -e, --except-tables
+          Exclude tables from table-name that matches regex.
+=================================================================================
+
+$env.DATABASE_URL = 'C:/w/snc/eg/artifacts/fixed-width-nn-bench-test.sqlite3'
+
+
+diesel database --locked-schema
+diesel migration generate --diff-schema create_table_exes
+
+diesel migration list
+diesel migration --locked-schema run
+
+C:\w\snc\eg\electionguard-rust_bunna\test\fixed-width-nn-bench-db>
+diesel database reset
+Dropping database: C:/w/snc/eg/artifacts/fixed-width-nn-bench-test.sqlite3
+Creating database: C:/w/snc/eg/artifacts/fixed-width-nn-bench-test.sqlite3
+Running migration 2024-03-16-005804_create_table_exes
+
+C:\w\snc\eg>sqlite3 artifacts\fixed-width-nn-bench-test.sqlite3
+SQLite version 3.43.2 2023-10-10 12:14:04
+Enter ".help" for usage hints.
+sqlite> .tables
+__diesel_schema_migrations  exes
+sqlite>
+sqlite> .schema
+CREATE TABLE __diesel_schema_migrations (
+       version VARCHAR(50) PRIMARY KEY NOT NULL,
+       run_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE `exes`(
+        `id` INTEGER NOT NULL PRIMARY KEY,
+        `file_name` TEXT NOT NULL,
+        `file_path` TEXT NOT NULL,
+        `file_type` TEXT NOT NULL,
+        `file_modified_time` TIMESTAMPTZSQLITE NOT NULL,
+        `sha_2_256_uchex` TEXT NOT NULL
+);
+
+
+
+
+
+

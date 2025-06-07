@@ -1,0 +1,684 @@
+section,xtext,status_code,status_note,ordinal,xtext
+S1.a,"EGRI can be used to enable end-to-end (E2E) verifiability.",na,,1,"Not directly applicable to implementation code"
+S1.a,"EGRI can be used to enable privacy-enhanced risk-limiting audits (RLAs).",na,,1,"Not directly applicable to implementation code"
+S1.a,"EGRI components can be used to empower individual voters to independently verify the accuracy of election results.",na,,1,"Not directly applicable to implementation code"
+S1.b,"EGRI allows individual voters to verify that their votes have been accurately recorded.","",,,
+S1.b,"EGRI allows voters to verify that all recorded votes have been accurately counted.","",,,
+S1.b,"EGRI allows observers to verify that all recorded votes have been accurately counted.","",,,
+S1.b,"EGRI provides an E2E-verifiable tally which can be used as the primary tally in an election.","",,,
+S1.b,"EGRI provides an E2E-verifiable tally which can be used as a verifiable secondary tally alongside traditional methods.","",,,
+S1.b,"EGRI is compatible with in-person voting using an electronic ballot-marking device.",na,,1,"Not directly applicable to implementation code"
+S1.b,"EGRI is compatible with in-person voting using an optical scanner capable of reading hand-marked ballots.",na,,1,"Not directly applicable to implementation code"
+S1.b,"EGRI is compatible with in-person voting using an optical scanner capable of reading machine-marked ballots.",na,,1,"Not directly applicable to implementation code"
+S1.b,"EGRI is compatible with voting by mail.",na,,1,"Not directly applicable to implementation code"
+S1.b,"EGRI is compatible with Internet voting.",na,,1,"Not directly applicable to implementation code"
+S1.c,"EGRI enables public disclosure of encrypted ballots that can be matched directly to physical ballots selected for RLA auditing.","",,,
+S1.c,"EGRI can prove (or fail to prove) that publicly disclosed EG ballots match reported tallies",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S1.c,"EGRI can prove (or fail to prove) that physical ballot records used in an RLA are those produced by the voters",na,,1,"Not directly applicable to implementation code"
+S1.d,"EGRI provides a ""detailed implementation specification"" and/or qualifies as a ""well-documented ElectionGuard implementation""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S1.d,"EGRI can be used by independent parties to write ElectionGuard verifiers to confirm the consistency of election artifacts with announced election results.",na,,1,"Not directly applicable to implementation code"
+S1.d,"EGRI can be used by independent parties to write verifiers to confirm (or refute) the consistency of election artifacts with announced election results",na,,1,"Not directly applicable to implementation code"
+S2.a,"A 'Guardian' role exists with certain duties.",na,,1,"Not directly applicable to implementation code"
+S2.a,"EGRI enables a Guardian to protect confidentiality of votes.",na,,1,"Not directly applicable to implementation code"
+S2.a,"EGRI enables members of a canvassing board to serve as Guardians.",na,,1,"Not directly applicable to implementation code"
+S2.a,"EGRI enables Guardians to manage cryptographic keys.","",,,
+S2.a,"Compromised human Guardians cannot compromise the integrity of the election tallies.","",,,
+S2.a,"Compromised ""hardware Guardians"" cannot compromise the integrity of the election tallies.","",,,
+S2.a,"EGRI enables Guardians to work together to form a public encryption key for homomorphically-tallied vote encryption.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S2.a,"EGRI enables Guardians to work together to form a public encryption key for non-homomorphically-tallied ballot data.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S2.a[x],"EGRI uses a Joint Vote Encryption Public Key and a Joint Ballot Data Encryption Public Key formed by the Guardians working together to encrypt individual ballots.","",,,
+S2.a,"EGRI allows a quorum of guardians to produce all artifacts required to enable public verification of the tally.","",,,
+S2.a,"No set of guardians fewer than a quorum are able to produce the artifacts required to enable public verification of the tally.",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S2.a,"% xnote S3.7 Josh 2025-02-25, 2025-03-18: Out of scope for EGRI: An 'Election Administrator' role exists",na,,1,"Not directly applicable to implementation code"
+S2.a,"Note: EG defines protocols",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S2.a,"Note: EG defines procedures",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S2.b,"EGRI enables a Guardian to generate its own Vote Encryption (Public|Secret) Key pair prior to the start of voting or RLA.","",,,
+S2.b,"EGRI enables a Guardian to generate its own Ballot Data Encryption (Public|Secret) Key pair prior to the start of voting or RLA.","",,,
+S2.b,"EGRI enables a Guardian to generate its own Guardian Communication (Public|Secret) Key pair pair prior to the start of voting or RLA.","",,,
+S2.b,"EGRI enables Guardians to employ their Guardian Communication Key pairs to communicate privately with other guardians to exchange information about secret keys.","",,,
+S2.b,"EGRI enables Guardians to keep their (Vote Encryption|Ballot Data Encryption|Guardian Communication) Secret Keys and Key Shares secret.","",,,
+S2.b,"EGRI enables Guardians to perform operations using their (Vote Encryption|Ballot Data Encryption|Guardian Communication) Secret Keys and Key Shares without leaking or exposing them, to the extent practical within the constraints of hardware/os platform.","",,,
+S2.b,"EGRI enables potential integration of dedicated hardware tokens or devices with which Guardians could  to perform operations using their (Vote Encryption|Ballot Data Encryption|Guardian Communication) Secret Keys.","",,,
+S2.b,"EGRI enables production of an 'Election Record' even if not all guardians are available at that time with","",,,
+S2.b,"(=~ S2.a[x]): EGRI uses a Joint Vote Encryption Public Key and a Joint Ballot Data Encryption Public Key formed by the Guardians working together to encrypt individual ballots.","",,,
+S2.b,"Guardians participate in a 'Key Generation Ceremony'.",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S2.b,"At the beginning of the Key Generation Ceremony, EGRI enables each guardian to publish its public keys and proofs of knowledge of the associated secret keys.",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S2.b,"At the beginning of the Key Generation Ceremony, EGRI enables each Guardian to receive the published keys and proofs of knowledge of the associated secret keys from the other Guardians.",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S2.b,"EGRI enables a Guardian to determine that they have received the public keys and proofs of knowledge of the associated secret keys from all other Guardians, or identify those which have not yet been received.",nyi,,4,"Not yet implemented"
+S2.b,"EGRI enables a Guardian to encrypt to another guardian's Guardian Communication Public Key an InterGuardianShare for the Vote Encryption key.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S2.b,"EGRI enables a Guardian to encrypt to another guardian's Guardian Communication Public Key an InterGuardianShare for the Ballot Data Encryption key.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S2.b,"EGRI enables a Guardian to send the encrypted shares of each of its own (two, non-Communication) secret keys to the other Guardian corresponding to the Guardian Communication Public Key to which it was encrypted.","",,,
+S2.b,"EGRI enables a Guardian to use its own Guardian Communication Secret Key to decrypt any shares of other guardians secret keys that it has received.","",,,
+S2.b,"EGRI enables a Guardian to check for consistency any shares of other guardians secret keys it has received.",nyi,,4,"Not yet implemented"
+S2.b,"EGRI enables a Guardian to query or observe which particular shares from all other Guardians it has recieved, decrypted, checked for consistency, and verified, and which are missing, inconsistent, or failed.",nyi,,4,"Not yet implemented"
+S2.b,"EGRI enables a Guardian to determine that it has received, decrypted, checked for consistency, and verified shares from all other Guardians.","",,,
+S2.b,"Josh 2025-03-18: ""The code should emit a success or failure indicator that a human can use to verify that the [received key shares] have the required properties."".",nyi,,4,"Not yet implemented"
+S2.b,"EGRI can emit information sufficicient to enable an ""all greens on a dashboard""-type display for a Guardian to observe the (received, decrypted, checked for consistency, and verified) state of shares from the other Guardians.","",,,
+S2.b,"EGRI can emit a formatted message to enable a Guardian to ""announce its completion"" once it it has received, checked for consistency, and verified shares from all other Guardians.","",,,
+S2.b,"At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian Vote Encryption Public keys to form the Joint Vote Encryption Public Key.","",,,
+S2.b,"At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian Ballot Data Encryption Public keys to form the Joint Ballot Data Encryption Public Key.","",,,
+S2.b,"EGRI enables a Guardian to notice the irregularity of a failed share verification.","",,,
+S2.b,"EGRI enables a Guardian to notice the irregularity of a failed proof verification.","",,,
+S2.b,"EGRI enables a Guardian to notice the irregularity of an inconsistent set of keys.","",,,
+S2.b,"EGRI enables a Guardian to ""complain and halt the protocol"" subsequent to noticing a failed share verification, a failed proof verification, or an inconsistent set of keys. (Is this published? A communications key message?)","",,,
+S2.b,"EGRI enables, supports, or facilitates the initiation of a 'Key Ceremony Irregularity Investigation' subsequent to a Guardian complaint of irregularity.","",,,
+S2.b,"Sufficient data, documentation, tools, and/or other resources are available to enable a Key Ceremony Irregularity Investigation to distinguish between an 'Actively Misbehaving Guardian' and any other type of error.","",,,
+S2.b,"Sufficient data, documentation, tools, and/or other resources are available to enable a Key Ceremony Irregularity Investigation to identify an Actively Misbehaving Guardian.","",,,
+S2.b,"Sufficient data, documentation, tools, and/or other resources are available to enable a Key Ceremony Irregularity Investigation to effectively troubleshoot errors other than an Actively Misbehaving Guardian.","",,,
+S2.b,"Sufficient data, documentation, tools, and/or other resources are available to enable the Key Ceremony Irregularity Investigation to effectively troubleshoot multiple simultaneous errors, potentially of different types.","",,,
+S2.b,"EGRI allows to remove a Guardian subsequent to a Key Ceremony Irregularity Investigation which has identified it as an 'Actively Misbehaving Guardian'.","",,,
+S2.b,"EGRI allows to restart the Key Generation Ceremony protocol from scratch subsequent to an Investigation which has identified and removed an Actively Misbehaving Guardian.","",,,
+S2.b,"TODO? what if its another type of error? Can you just restart whenever? Any of this published?","",,,
+S2.b,"TODO? EGRI enables a Guardian to publish the ciphertext of any encrypted secret key shares that it sent.","",,,
+S2.b,"TODO? EGRI enables a Guardian to publish the ciphertext of any encrypted secret key shares that it received.","",,,
+S2.b,"TODO? EGRI enables a Guardian to publish the plaintext corresponding to the ciphertext of any encrypted secret key shares that it sent? Only subsequent to the initiation of Key Ceremony Irregularity Investigation?","",,,
+S2.b,"TODO? EGRI enables a Guardian to publish the plaintext decrypted from the ciphertext of any encrypted shares that it received? Only subsequent to the initiation of Key Ceremony Irregularity Investigation?","",,,
+S2.b,"Note: The Guardians and Election Administrator together have a duty to successfully complete key generation and conclude the Key Generation Ceremony.","",,,
+S2.c.a[i],"After a voter completes the process of making selections, the election system can make a single call to the EGRI API with the voter selections to encrypt and record the EG Ballot and return a confirmation code for the voter.","",,,
+S2.c.a,"Other than the single call to the EGRI API described in (S2.c.a[i]), there is no other point at which an existing election system must interface with EGRI.","",,,
+S2.c.a,"An RLA system can make the single call to the EGRI API described in (S2.c.a[i]), but any confirmation code returned may be discarded.","",,,
+S2.c.b,"EGRI can accept can accept voter selections in batches directly. This is to support certain vote-by-mail scenarios and RLA.","",,,
+S2.c.b,"EGRI records which Ballots have been decrypted ensures that they can never be ""cast"" or participate in any future Tally. Note that this only applies to homomorphically tallied fields and not, say, decrypting the Ciphertext of a non-homomorphically tallied write-in text field.","",,,
+S2.c.b,"A decrypted ballot should never be 'Cast'. Josh 2025-03-19: Univeral knowledge of all challenged ballots is not required, just checking whatever local store is available is sufficient.","",,,
+S2.c.b,"Implementation Note: After obtaining their confirmation code, voters should have an opportunity to 'challenge' their ballots in order to view the decrypted selections of their EG Ballot to verify that the encryptions were correct. The voter must be informed that the challenged ballot and decrypted selections will eventually be published as part of the public Election Record.","",,,
+S2.c.b,"Implementation note: In an RLA, presumably the non-EG ballots were already cast. Some of the resulting EG Ballots may be anonymized, challenged, and decrypted.","",,,
+S2.c.c,"EGRI produces EG Ballots that contain encrypted voter selections.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S2.c.c,"EGRI produces EG Ballots that may contain encrypted additional data fields for some or all Contests.","",,,
+S2.c.c,"EGRI produces EG Ballots that contain a Ballot Nonce, encrypted to the Joint Ballot Data Encryption Public Key.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S2.c.c,"EGRI records the EG Ballots for later publication as part of the Election Record.","",,,
+S2.c.c,"EGRI produces EG Ballots that non-interactive zero-knowledge (NIZK) proofs of their well-formedness.","",,,
+S2.c.c,"There can exist no well-formed ballot which is not legitimate, by definition.","",,,
+S2.c.c,"EGRI produces EG Ballots with NIZK proofs proving that, for each contest option, no more than the allowed number of votes were recorded. (Option Selection Limit)","",,,
+S2.c.c,"EGRI produces EG Ballots with NIZK proofs proving that, for each contest, no more than the total allowed number of votes were recorded. (Contest Selection Limit)","",,,
+S2.c.c,"EGRI produces EG Ballots with Contests having additional data fields may contain NIZK proofs similar to those of voter selectable options or other properties.","",,,
+S2.c.c,"EGRI allows to combine EG Ballots into an Aggregate Ballot.","",,,
+S2.c.c,"EGRI allows to combine EG Ballots into a single Aggregate Ballot.","",,,
+S2.c.c,"An Aggregate Ballot formed by combining EG Ballots contains, for every option in every contest, the tally for that option encrypted to the Joint Vote Public Key.","",,,
+S2.d,"Each guardian can compute from the previously shared secret key fragments a share of the secret decryption key","",,,
+S2.d,"Guardians can independently use their share of the secret decryption key to jointly decrypt the election tallies","",,,
+S2.d,"Guardians can independently use their share of the secret decryption key to generate associated verification data","",,,
+S2.d,"Only a quorum of guardians is sufficient to complete decryption","",,,
+S2.d,"Only a quorum of guardians is sufficient to generate the verification data","",,,
+S2.e.a,"An observer can use EGRS, EGRI, and/or accompanying materials to independently  implement an election verifier that can confirm the well-formedness of every EG Ballot.","",,,
+S2.e.a,"An observer can use EGRS, EGRI, and/or accompanying materials to independently  implement an election verifier that can confirm the well-formedness the correct aggregation of EG Ballots.","",,,
+S2.e.a,"An observer can use EGRS, EGRI, and/or accompanying materials to independently  implement an election verifier that can confirm the accurate decryption of election tallies.","",,,
+S2.e.b,"A verifier can be independently implemented which performs the Guardian Key verification steps S6.2.2.verif2 and S6.2.2.verif3 .","",,,
+S2.e.b,"A verifier can be independently implemented that fully verifies the integrity of an Election Record without performing either of the Guardian Key verification steps S6.2.2.verif2 and S6.2.2.verif3 .","",,,
+S2.e.c,"A verifier can be independently implemented which performs the EG Ballot correctness verification steps S6.2.7.verif13, S6.2.7.verif14, S6.2.8.verif17, S6.2.8.verif18, and S6.2.8.verif19","",,,
+S2.e.d,"A verifier can be independently implemented which performs the Election Record verification steps S6.2.1.verif1, S6.2.3.verif4, S6.2.4.verif5, S6.2.4.verif6, S6.2.4.verif7, S6.2.4.verif8, S6.2.5.verif9, S6.2.5.verif10, S6.2.5.verif11, S6.2.6.verif12","",,,
+S3.a.a.a,"EGRI enables selecting Fixed Parameters in advance of an election",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.a.a,"EGRI enables using the same Fixed Parameters across multiple elections",na,,1,"Not directly applicable to implementation code"
+S3.a.a.a,"EGRI supplies a standard set of Fixed Parameters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.a.a,"EGRI enables defining Contests",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.a.a,"EGRI enables defining selectable Contest Options",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.a.a,"EGRI enables defining Ballot Styles",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.a.b,"(ref: S2.b) EGRI enables Guardians to generate individual public-secret key pairs",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.a.a.b,"(ref: S2.b) EGRI enables Guardians to exchange shares of secret keys",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.a.a.b,"EGRI enables the same set of Guardians to re-use their keys from previous elections (TODO: Don't n, k, p, q, g, etc have to remain the same?)","",,,
+S3.a.a.b,"EGRI requires that a complete new set of keys must be generated if even a single guardian is replaced (TODO: How?)","",,,
+S3.a.a.b,"EGRI enables Guardians to destroy their secret keys.",nyi,,4,"Not yet implemented"
+S3.a.a.b,"Josh 2025-03-18: ""There is a point where the rejection of the keys can happen""","",,,
+S3.a.a.c,"[No specific requirement]",na,,1,"Not directly applicable to implementation code"
+S3.a.a.d,"(ref: S2.c.c) Guardians can use their secret key shares to jointly produce election tallies together with verifiable artifacts that prove that the tallies are correct.","",,,
+S3.a.c.a,"Encryption of votes in ElectionGuard is performed using the DPP vote encryption method of Devillez, Pereira, and Peters (2022)","",,,
+S3.a.c.b,"EGRI ensures that P is fixed before the (ref: S.2.b) Key Generation Ceremony. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.b,"EGRI ensures that Q is fixed before the (ref: S.2.b) Key Generation Ceremony. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.b,"EGRI ensures that G is fixed before the (ref: S.2.b) Key Generation Ceremony. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.b,"EGRI verifies that P is prime before any processing. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.b,"EGRI verifies that Q is prime before any processing. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.b,"EGRI verifies that Q is is not a divisor of r=(p-1)/q before any processing. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.b,"EGRI verifies that G is a generator $g$ of the order $q$ subgroup $\Z_p^r$ before any processing. Note that this may be a simple comparison with the standard parameter value.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.a.c.c,"EGRI enables a Guardian to (ref: S.2.b) generate its own Vote or Ballot Data Encryption Secret Key by selecting a random $s\in\Z_q$.","",,,
+S3.a.c.c,"EGRI enables a Guardian to (ref: S.2.b) derive its Vote or Ballot Data Encryption Public Key as $K=g^s \bmod p$.","",,,
+S3.a.c.c,"EGRI enables a Guardian to (ref: S.2.b) publish its Vote or Ballot Data Encryption Public Key.","",,,
+S3.a.c.c,"No entity is ever in possession of a secret key that can be used to decrypt votes","",,,
+S3.a.c.d,"Values are encrypted to a Vote or Ballot Data Encryption Public Key by selecting a random nonce $\xi\in\Z_q$ and forming the pair $(\alpha, \beta) = (g^\xi \bmod p, K^m\cdot K^\xi \bmod p) = (g^\xi \bmod p, K^{m+\xi} \bmod p)$ .","",,,
+S3.a.c.e,"Ciphertexts encrypted to a Vote or Ballot Data Encryption Public Key can be decrypted using the corresponding Secret Key $s$ as $\beta/\alpha^s\bmod p = K^m \bmod p$ using exhaustive search, a pre-computed table, or Shanks's baby-step giant-step method.","",,,
+S3.a.c.e,"The value of $K^m$ can be computed from the encryption nonce $\xi$","",,,
+S3.a.c.e,"The value of $m$ can be computed from the encryption nonce $\xi$","",,,
+S3.a.c.e,"An encryption of one is used to indicate that an option is selected","",,,
+S3.a.c.e,"An encryption of zero is used to indicate that an option is not selected","",,,
+S3.a.d,"All the encryptions of a single option across ballots can be multiplied to form an encryption of the sum of the individual values","",,,
+S3.a.d,"An encryption of some integer other than `0` or `1` is used for certain voting methods","",,,
+S3.a.d,"The product of the encryptions of a single contest option across ballots is an encryption of the tally (S2.c.c)","",,,
+S3.a.d,"Every option can be demonstrated to be an encryption of either `0` or `1` (for typical voting methods)","",,,
+S3.a.d,"Every option can be demonstrated to be an encryption of some integer other than `0` or `1` (for certain voting methods)","",,,
+S3.a.d,"The product of the encrypted options of a single ballot can be used to show that no more options were selected than permitted","",,,
+S3.a.d,"When an option can receive multiple or weighted votes, the product of the encrypted options of a single ballot can be used to show that only the permitted number of votes or permitted sum of weights were used","",,,
+S3.a.d,"A holder of a nonce $\xi$ can prove to a third party that a pair $(\alpha, \beta)$ is an encryption of $m$ without access to the secret $s$ or revealing the nonce $\xi$","",,,
+S3.a.e,"EGRI enables the use of NIZK proofs to demonstrate that keys are properly chosen.","",,,
+S3.a.e,"EGRI enables the use of NIZK proofs to demonstrate that ballots are well-formed.","",,,
+S3.a.e,"EGRI enables the use of NIZK proofs to demonstrate that decryptions match claimed values.","",,,
+S3.a.f.a,"EGRI enables the use of threshold encryption for encryption of ballots and other data.","",,,
+S3.a.f.a,"(ref S2.b) Combining individual Guardian (Vote|Ballot Data) Public Keys into a single Joint (Vote|Ballot Data) Public Key.","",,,
+S3.a.f.a,"Threshold encryption offers a homomorphic property that allows individual encrypted votes to be combined to form encrypted tallies.","",,,
+S3.a.f.b,"Ref S2.b: ""EGRI enables a Guardian to generate its own public-secret (Vote|Ballot Data) Encryption Key pair...""","",,,
+S3.a.f.b,"Ref S2.b: ""At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian (Vote|Ballot Data) Encryption Public keys to form the Joint (Vote|Ballot Data) Encryption Public Key.""","",,,
+S3.a.f.b,"(=~ S2.a[x]): EGRI uses a Joint Vote Encryption Public Key and a Joint Ballot Data Encryption Public Key formed by the Guardians working together to encrypt individual ballots.","",,,
+S3.a.f.c,"EGRI enables a Guardian to compute a verifiable partial decryption of the tally of every Contest Option Field and additional Contest Data Field.","",,,
+S3.a.f.c,"EGRI enables a quorum of `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys to form full verifiable decryptions of the election tallies by combining the verifiable partial decryptions of the tallies of every Contest Option Field and additional Contest Data Field.","",,,
+S3.a.f.d,"(Ref: S2.b) Key Ceremony","",,,
+S3.a.f.d,"(Ref: S3.a.f.c) ""EGRI enables a Guardian to compute a verifiable partial decryption of the tally of every Contest Option Field and additional Contest Data Field.""","",,,
+S3.a.f.d,"(Ref: S3.a.f.c) ""EGRI enables a quorum of `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys to form full verifiable decryptions of the election tallies by combining the verifiable partial decryptions of the tallies of every Contest Option Field and additional Contest Data Field.""","",,,
+S3.a.g,"EGRI provides a non-homomorphic encryption method known as ""Hashed ElGamal"" for encrypting data other than votes","",,,
+S3.a.g,"EGRI provides a signature method known as ""Signed Hashed ElGamal"" for encrypting data other than votes","",,,
+S3.a.g,"EGRI enables a user to generate a Hashed ElGamal (Public|Secret) Key pair for Hashed ElGamal encryption","",,,
+S3.a.g,"EGRI enables a user to encrypt data to a Hashed ElGamal Public Key","",,,
+S3.a.g,"Any data encrypted to a Hashed ElGamal Public Key cannot be decrypted without the Hashed ElGamal Secret Key","",,,
+S3.a.g,"EGRI enables using a Hashed ElGamal Secret Key to decrypt data encrypted to the corresponding Hashed ElGamal Public Key","",,,
+S3.a.g,"Hashed ElGamal encryption does not have the data size restrictions imposed by the vote encryption","",,,
+S3.a.g,"Hashed ElGamal encryption uses a KDF based on HMAC-SHA-2-256 to generate a key stream XORed with the data","",,,
+S3.a.g,"EGRI enables a user to generate a Signing Hashed ElGamal (Public|Secret) Key pair for Signing data encrypted with Hashed ElGamal","",,,
+S3.a.g,"EGRI enables using a Signing Hashed ElGamal Secret Key to sign data that has been encrypted with Hashed ElGamal","",,,
+S3.a.g,"EGRI enables using a Signing Hashed ElGamal Public Key to verify or refute a signature made with Signed Hashed ElGamal","",,,
+S3.a.g,"(Ref: S2.b) ""EGRI enables a Guardian to encrypt to another guardian's Guardian Communication Public Key a share of each of its  own (two, non-Communication) secret keys.""","",,,
+S3.a.g,"EGRI allows to encrypt other (non-homomorphically-tallied) Ballot data to the Joint Ballot Data Encryption Public Key","",,,
+S3.a.g,"EGRI allows to encrypt voter selection contest write-in Ballot data to the Joint Ballot Data Encryption Public Key","",,,
+S3.a.g,"EGRI allows to encrypt other auxiliary data attached to an encrypted Ballot to the Joint Ballot Data Encryption Public Key","",,,
+S3.a.g,"EGRI allows to encrypt voter selection contest write-in Ballot data to the Administrative Public Key.","",,,
+S3.a.g,"EGRI allows to encrypt other auxiliary data attached to an encrypted Ballot to the Administrative Public Key.","",,,
+S3.a.g,"EGRI allows to encrypt other (non-homomorphically-tallied) Ballot data to the Administrative Public Key.","",,,
+S3.1,"EGRI uses integer-based encryption","",,,
+S3.1,"EGRI does not use elliptic curves","",,,
+S3.1,"The encryption scheme used to encrypt votes is defined by primes p and q.","",,,
+S3.1,"ref:S3.a.c.b ""EGRI verifies that (P|Q|G) is prime before any processing...""","",,,
+S3.1.1.a,"The value of p matches the specific value given in EG DS v2.1.0 S3.1.1","",,,
+S3.1.1.a,"The value of q matches the specific value given in EG DS v2.1.0 S3.1.1","",,,
+S3.1.1.a,"The value of r matches the specific value given in EG DS v2.1.0 S3.1.1","",,,
+S3.1.1.a,"The value of g matches the specific value given in EG DS v2.1.0 S3.1.1","",,,
+S3.1.1.b.n3_1,"Nonstandard parameters are outside the scope of these requirements and thus not permitted.","",,,
+S3.1.1.b.n3_1,"EGDS must reject any data bearing non-standard parameters.","",,,
+S3.1.2,"Varying Parameter n is the number of Guardians","",,,
+S3.1.2,"Varying Parameter k is the number of Guardians required to form a quorum for decryption.","",,,
+S3.1.2,"EGRI computes H_P from Fixed Parameters p, q, and g, and Varying Parameters n and k as specified in EG DS v2.1.0 eq. 4","",,,
+S3.1.3.a,"EGRI accepts an Election Manifest",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"The Election Manifest is a single file",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"The Election Manifest describes the modalities of the election and specifies a wide range of data about it",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"The Election Manifest contains data that makes it unique for each election",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"EGRI rejects any Election Manifest that does not contain data that makes it unique for each election",nfd,"Ref: S3.1.3.a: ""The manifest file must contain data that makes it unique for each election."" QUESTION: How could this possibly be implemented?",2,"Needs further discussion"
+S3.1.3.a,"The Election Manifest lists all contests in an election",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"The Election Manifest for each Contest, specifies the Selectable Options (e.g., candiates)",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"The Election Manifest for each Contest, specifies a label unique across all contests in the election",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"EGRI rejects any Election Manifest containing duplicate labels for Contests",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"The Election Manifest for each ContestOption in each Contest, specifies a label unique across all Selectable Options in that contest",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.a,"EGRI rejects any Election Manifest containing duplicate labels for ContestOptions in any Contest",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI accepts ElectionManifest labels composed of printable characters and (internal, non-contiguous) 0x20 space characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ElectionManifest labels that contain line break characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ElectionManifest labels that have leading or trailing whitespace",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ElectionManifest labels that contain contiguous sequences of whitespace other than a single 0x20 space",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ElectionManifest labels that contain special characters (Unicode Category Cc, Cf, Zs, Zl, Zp, or Cs)",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ElectionManifest labels having no printable characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ElectionManifest labels that decode to a Unicode malformed surrogate pair (Unicode Category Cs). See [JSON RFC Errata 7603](https://www.rfc-editor.org/errata/eid7603)",ics,"difficult to test because the Rust std lib rejects malformed UTF-8",50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.b,"EGRI accepts Contest labels composed of printable characters and (internal, non-contiguous) 0x20 space characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects Contest labels that contain line break characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects Contest labels that have leading or trailing whitespace",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects Contest labels that contain contiguous sequences of whitespace other than a single 0x20 space",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects Contest labels that contain special characters (Unicode Category Cc, Cf, Zs, Zl, Zp, or Cs)",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects Contest labels having no printable characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects Contest labels that decode to a Unicode malformed surrogate pair (Unicode Category Cs). See [JSON RFC Errata 7603](https://www.rfc-editor.org/errata/eid7603)",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.b,"EGRI accepts ContestOption labels composed of printable characters and (internal, non-contiguous) 0x20 space characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ContestOption labels that contain line break characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ContestOption labels that have leading or trailing whitespace",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ContestOption labels that contain contiguous sequences of whitespace other than a single 0x20 space",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ContestOption labels that contain special characters (Unicode Category Cc, Cf, Zs, Zl, Zp, or Cs)",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ContestOption labels having no printable characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects ContestOption labels that decode to a Unicode malformed surrogate pair (Unicode Category Cs). See [JSON RFC Errata 7603](https://www.rfc-editor.org/errata/eid7603)",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.b,"EGRI accepts BallotStyle labels composed of printable characters and (internal, non-contiguous) 0x20 space characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects BallotStyle labels that contain line break characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects BallotStyle labels that have leading or trailing whitespace",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects BallotStyle labels that contain contiguous sequences of whitespace other than a single 0x20 space",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects BallotStyle labels that contain special characters (Unicode Category Cc, Cf, Zs, Zl, Zp, or Cs)",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects BallotStyle labels having no printable characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.b,"EGRI rejects BallotStyle labels that decode to a Unicode malformed surrogate pair (Unicode Category Cs). See [JSON RFC Errata 7603](https://www.rfc-editor.org/errata/eid7603)",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.c,"Index values are integers in the range 1 <= i < 2^31",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.d,"Every Contest in the Election Manifest is uniquely identified by a Contest Index value assigned starting at 1 and continuing in the order defined in the Election Manifest.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.e,"Every Selectable Option in every Contest is identified uniquely (within the Contest) by an Option Index value assigned starting at 1 (anew for each Contest) and continuing in the order defined in the in the Election Manifest.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.e,"If additional data fields are present for a Contest, they are assigned Indices continuing after the Selectable Options.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.f,"The Election Manifest defines a single ordered list of all Ballot Styles in the election.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.f,"Every Ballot Style in the Election Manifest is uniquely identified by a Ballot Style Index value assigned starting at 1 and continuing in the order defined in the Election Manifest.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.f,"The first Ballot Style within the election manifest has index value 1.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.f,"Every Ballot Style defines a label unique across all Ballot Styles in the manifest",nyi,,4,"Not yet implemented"
+S3.1.3.f,"Every Ballot Style defines a single list of Contest Indices.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.f,"Order of occurence is not significant within a Ballot Style Contest Index list.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.f,"EGRI rejects any Election Manifest having a Ballot Style with a Contest Index list containing a Contest Index that does not refer to a contest in the Election Manifest.",uts,,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+S3.1.3.f,"EGRI rejects any Election Manifest listing the same Contest Index more than once within the same Ballot Style. (It is common for a Contest Index to be listed in multiple Ballot Styles.)",sci,,,
+S3.1.3.g,"The Election Manifest, for each Contest, may specify a nonnegative integer Contest Selection Limit.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.g,"For any Contest for which a Contest Selection Limit is not specfied, an effective value of 1 is used as the default.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.g,"The effective Contest Selection Limit limits the maximum total value (i.e., number of votes or voter selections) that can be assigned over all Selectable Options in that contest.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.g,"EGRI may warn if any effective Contest Selection Limit is zero",nyi,,4,"Not yet implemented"
+S3.1.3.g,"The Election Manifest, for each Selectable Option in each Contest, may specify a nonnegative integer Option Selection Limit.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.g,"For any Selectable Option for which a Option Selection Limit is not specfied, an effective value of 1 is used as the default.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.g,"EGRI may warn if any effective Option Selection Limit is zero",nyi,,4,"Not yet implemented"
+S3.1.3.g,"The effective Option Selection Limit limits the maximum value (i.e., number of votes) that can be assigned to that particular Selectable Option.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.g,"The effective Selection Limit limits the maximum value that can be assigned to that Selectable Option",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.g,"If an effective (specified or defaulted) Option Selection Limit exceeds the effective (specified or defaulted) Contest Selection Limit, EGRI applies the smaller value. EGRI may emit a diagnostic message in this case.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.g,"If the sum of all effective (specified or defaulted) Option Selection Limits for a Contest exceeds that Contest's effective (specified or defaulted) Contest Selection Limit, EGRI applies the smaller value. This is an ordinary case for which EGRI should not emit a specific diagnostic message.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.3.h,"Election Manifest offers optional data fields for accompanying data.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest allows Accompanying Data Fields to be applied at the top level.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest allows Accompanying Data Fields to be applied to Contests. Note: These are different from Additional Contest Data Fields which may be recorded after the Selectable Option Fields on a Ballot.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest allows Accompanying Data Fields to be applied to Selectable Options.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest allows Accompanying Data Fields to be applied to Ballot Styles.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may go beyond short labels.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may be non-unique.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may describe general information about the election.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may describe general information about the jurisdiction.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may describe general information about the election device manufacturers.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may describe general information about software versions.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may describe general information about the election date.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"Election Manifest Accompanying Data Fields may describe general information about the election location.",nfd,"",2,"Needs further discussion"
+S3.1.3.h,"EGRI allows an Election Manifest to specify many other things, including things not listed here.",nfd,"",2,"Needs further discussion"
+S3.1.3.j,"'Undervoted Contest Condition' is a per-contest state in which the sum of the voter selections is strictly less than the contest selection limit",nyi,,4,"Not yet implemented"
+S3.1.3.j,"Election Manifest allows to specify whether to record Undervoted Contest Conditions (unless the Contest specifies otherwise).",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.j,"Election Manifest allows to specify, for each Contest, whether to record the Undervoted Contest Condition for that Contest.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.j,"If a Contest is specified to record Undervoted Contest Conditions, an additional Contest Data Field is recorded, on every Ballot having that Contest in its Ballot Style, after the Contest Option Fields and any other additional Contest Data Fields described earlier in this specification (None currently). The value of this additional Contest Data Field is `1` to record the Undervoted Contest Condition and `0` otherwise.",nyi,,4,"Not yet implemented"
+S3.1.3.j,"If a Contest is specified to record Undervoted Contest Conditions, any value assigned to the additional Contest Data Field does not count against the voter's Contest Selection Limit.",nyi,,4,"Not yet implemented"
+S3.1.3.j,"If a Contest is specified to record Undervoted Contest Conditions, an additional Range Proof is recorded that the encrypted value of the additional Contest Data Field is either `0` or `1`.",nyi,,4,"Not yet implemented"
+S3.1.3.k,"Election Manifest allows to specify whether to record the Undervote Difference Count for that Contest.",utsutspp,,,
+S3.1.3.k,"Election Manifest allows to specify, for each Contest, whether to record the Undervote Difference Count for that Contest.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.k,"If a Contest is specified to record Undervote Difference Count, an additional Contest Data Field is recorded, on every Ballot having that Contest in its Ballot Style, after the Contest Option Fields and any other additional Contest Data Fields described earlier in this specification. The value of this additional Contest Data Field is the (saturating) difference (i.e., nonnegative) between the effective Contest Selection Limit and the the sum of the voter selections for that Contest. This value will not exceed the effective Contest Selection Limit.",nyi,,4,"Not yet implemented"
+S3.1.3.k,"If a Contest is specified to record Undervote Difference Count, an additional Range Proof is recorded that the encrypted value of the additional Contest Data Field is `0` through the effective Contest Selection Limit, inclusive.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"An 'Overvoted Contest Condition' is considered to have occurred for a specific Contest on a specific Ballot when the the sum of the selections is strictly greater than the contest Selection Limit.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"Election Manifest allows to specify, for each Contest, whether to record the Overvoted Contest Condition for that contest.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"If not specified, EGRI does not record the Overvoted Contest Condition.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"If a Contest is specified to record Overvoted Contest Conditions, an additional Contest Data Field is recorded, on every Ballot having that Contest in its Ballot Style, after the Contest Option Fields and any other additional Contest Data Fields described earlier in this specification. The value of this additional Contest Data Field is `1` to record the Overvoted Contest Condition and `0` otherwise.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"If a Contest is specified to record Overvoted Contest Conditions, an additional Range Proof is recorded that the encrypted value of the additional Contest Data Field is either `0` or `1`.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"'Overvoted Option Condition' is a per-contest-option state in which the selection count is strictly greater than the option selection limit",nyi,,4,"Not yet implemented"
+S3.1.3.l,"Election Manifest allows to specify, for each Contest Option, whether to record the Overvoted Option Condition for that Option.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"If not specified, EGRI does not record the Overvoted Option Condition.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"If a Contest Option is specified to record Overvoted Option Conditions, an additional Contest Data Field is recorded, on every Ballot having that Contest in its Ballot Style, after the Contest Option Fields, any other Contest Data Fields recording Overvoted Option Condition for lower-index Options, and any other additional Contest Data Fields described earlier in this specification. The value of this additional Contest Data Field is `1` to record the Overvoted Option Condition and `0` otherwise.",nyi,,4,"Not yet implemented"
+S3.1.3.l,"If a Contest is specified to record Overvoted Option Conditions, an additional Range Proof is recorded that the encrypted value of the additional Contest Data Field is either `0` or `1`.",nyi,,4,"Not yet implemented"
+S3.1.3.m,"'Null Voted Contest Condition' is a per-contest state in which the sum of the voter selections is strictly less than the contest selection limit",nyi,,4,"Not yet implemented"
+S3.1.3.m,"Election Manifest allows to specify, for each Contest, whether to record the Null Voted Contest Condition for that Contest.",nyi,,4,"Not yet implemented"
+S3.1.3.m,"If not specified, EGRI does not record the Null Voted Contest Condition.",nyi,,4,"Not yet implemented"
+S3.1.3.m,"If a Contest is specified to record Null Voted Contest Conditions, an additional Contest Data Field is recorded, on every Ballot having that Contest in its Ballot Style, after the Contest Option Fields and any other additional Contest Data Fields described earlier in this specification. The value of this additional Contest Data Field is `1` to record the Null Voted Contest Condition and `0` otherwise.",nyi,,4,"Not yet implemented"
+S3.1.3.m,"If a Contest is specified to record Null Voted Contest Conditions, any value assigned to the additional Contest Data Field does not count against the voter's Contest Selection Limit.",nyi,,4,"Not yet implemented"
+S3.1.3.m,"If a Contest is specified to record Null Voted Contest Conditions, an additional Range Proof is recorded that the encrypted value of the additional Contest Data Field is either `0` or `1`.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"Election Manifest allows to specify, for each Contest, whether to record the Total Number Of Write-ins selected for that Contest.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"If not specified, EGRI does not record the Total Number Of Write-ins.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"If a Contest is specified to record Total Number Of Write-ins, an additional Contest Data Field is recorded, on every Ballot having that Contest in its Ballot Style, after the Contest Option Fields and any other additional Contest Data Fields described earlier in this specification. The value of this additional Contest Data Field is the (nonnegative integer) total number of write-ins the voter selected for that Contest. This value must not exceed the effective Contest Selection Limit.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"If a Contest is specified to record Total Number Of Write-ins, any value assigned to the additional Contest Data Field does not count against the voter's Contest Selection Limit.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"If a Contest is specified to record Total Number Of Write-ins, an additional Range Proof is recorded that the encrypted value of the additional Contest Data Field is `0` through the effective Contest Selection Limit, inclusive.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"EGRI may emit a diagnostic message if any contest specifies a number of write-in fields greater than the contest selection limit",nyi,,4,"Not yet implemented"
+S3.1.3.n,"Election Manifest allows to specify, for each Contest, the number of write-in fields available to the voter.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"If a Contest is specified to supply a nonzero number of write-in fields, the Contest has that number of additional 'write-in N' voter-selectable Contest Options.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"Any such write-in fields are to be labeled by the system as ""write-in N"", where 'N' is the 1-based index value of the write-in field. (This will be greater than the Contest Option Field Index value by the number of non-write-in voter-Selectable Options.)",nyi,,4,"Not yet implemented"
+S3.1.3.g,"The Election Manifest, for each additional 'write-in N' voter-selectable Contest Option, may specify a nonnegative integer Option Selection Limit with the same defaults and other semantics as non-write-in Contest Options. (ref: S3.1.3.g)",nyi,,4,"Not yet implemented"
+S3.1.3.n,"""Written-in"" means that the election system has recorded some voter-supplied, non-empty, non-blank data associated with a contest and write-in field index value",nyi,,4,"Not yet implemented"
+S3.1.3.n,"Every write-in field that *was not* written-in MUST be assigned a value of `0`.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"Every write-in field that *was* written-in MUST be assigned a value of `1` or greater, and subject to the same rules for Effective Option Selection Limit as other voter-Selectable Options.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"The value of a write-in field counts against the effective Contest Selection Limit",nyi,,4,"Not yet implemented"
+S3.1.3.n,"For every Write-in field, an additional Range Proof is recorded that the encrypted value is either `0` or `1`.",nyi,,4,"Not yet implemented"
+S3.1.3.n,"Josh 2025-03-18: A write-in field can not have an effective Option Selection Limit greater than `1`.",nyi,,4,"Not yet implemented"
+S3.1.3.o,"A canonical byte representation is defined for the Election Manifest.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.3.o,"EGRI allows to write the Election Manifest canonical representation to a file.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.1.4.a,"EGRI computes H_B from H_P and the Election Manifest canonical representation as specified in EG DS v2.1.0 eq. 5.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.1.4.b.verif1,"TODO: Verification 1","",,,
+S3.2.a,"EGRI allows to specify the number of Guardians `n` prior to a Key Ceremony.",uts,,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+S3.2.a,"EGRI allows to specify the quorum value `k` prior to a Key Ceremony.",uts,,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+S3.2.a,"EGRI rejects values of `n` less than `1`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.a,"EGRI rejects values of `n` greater than `2^31 - 1`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.a,"EGRI rejects values of `k` less than `1`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.a,"EGRI rejects values of `k` greater than `n`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.2.c,"(Ref: S2.b) Guardians can generate individual public-secret key pairs",utep,,60,"At least one unit test exercising a relevant code path is passing"
+S3.2.c,"(Ref: S2.b) Guardians can exchange shares of secret keys",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S3.a.a.b) ""EGRI requires that a complete new set of keys must be generated if even a single guardian is replaced""",na,,1,"Not directly applicable to implementation code"
+S3.2.c,"EGRI rejects any election data unless 1 <= k <= n < 2^31",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.2.c,"Each Guardian is associated with a human readable identifier referred to as the 'Guardian Name'.",utep,,60,"At least one unit test exercising a relevant code path is passing"
+S3.2.c,"EGRI accepts Guardian labels composed of printable characters and (internal, non-contiguous) 0x20 space characters.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.c,"EGRI rejects Guardian labels that contain line break characters.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.c,"EGRI rejects Guardian labels that have leading or trailing whitespace.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.c,"EGRI rejects Guardian labels that contain contiguous sequences of whitespace other than a single 0x20 space.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.c,"EGRI rejects Guardian labels that contain special characters (Unicode Category Cc, Cf, Zs, Zl, Zp, or Cs).",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.c,"EGRI rejects Guardian labels having no printable characters",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.c,"EGRI rejects Guardian labels that decode to a Unicode malformed surrogate pair (Unicode Category Cs). See [JSON RFC Errata 7603](https://www.rfc-editor.org/errata/eid7603)",ics,"difficult to test because the Rust std lib rejects malformed UTF-8",50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.2.c,"Ballots are encrypted using threshold encryption",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S2.b) ""At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian Vote Encryption Public keys to form the Joint Vote Encryption Public Key.""",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S2.b) ""At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian Ballot Data Encryption Public keys to form the Joint Ballot Data Encryption Public Key.""",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S2.b) Every guardian can Shamir-share their secret keys during key generation",uts,,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+S3.2.c,"(Ref: S2.c.c) Voter Selections can be encrypted to the Joint (Vote|Ballot Data) Encryption Public Keys.",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S3.a.f.c) ""EGRI enables a Guardian to compute a verifiable partial decryption of the tally of every Contest Option Field and additional Contest Data Field.""",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S3.a.f.c) ""EGRI enables a quorum of `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys to form full verifiable decryptions of the election tallies by combining the verifiable partial decryptions of the tallies of every Contest Option Field and additional Contest Data Field.""",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.c,"(Ref: S3.a.f.d) ""Fewer than `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys can not produce a full decryption of any tally""",na,,1,"Not directly applicable to implementation code"
+S3.2.1,"(Ref: S2.b) Guardians can exchange shares of secret keys",uts,,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+S3.2.1,"Receiving Guardians can confirm that the key shares they receive are correct",uts,,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+S3.2.1,"Every Guardian can generate an independent public-secret key pair by generating a random integer secret s_i in Z_q",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.1,"Every Guardian can form their Guardian public key as K_i = g^{s_i} mod p",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.1,"The Election Record contains every Guardian's public key",nyi,,4,"Not yet implemented"
+S3.2.1,"The Election Record contains, for every Guardian public key, a non-interactive zero-knowledge Schnorr proof of knowledge of the associated secret key",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.2.1,"The Joint Vote Encryption Public Key `K` is computed as \prod_{i=1}^n K_i mod p",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.1,"Every guardian G_i can generate k - 1 random polynomial coefficients a_{i,j} such that 0 < j < k and 0 <= a_{i,j} < q",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.1,"Every guardian G_i can generate and publish commitments K_{i,j} = g^{a_{i,j}} mod p to each of its polynomial coefficients",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.1,"Guardian polynomial coefficients are generated and managed in precisely the same fashion as secret keys",na,,1,"Not directly applicable to implementation code"
+S3.2.1,"Individual Ballots can be homomorphically combined into a single Aggregate Ballot",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.1,"The single Aggregate Ballot consists of an encryption of the tally for each contest (e.g. selection option) field",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.1,"Any set of k guardians' private keys is sufficient to complete decryption of the tally for each contest (e.g. selection option) field",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S3.2.1,"EGRI enables any set of `k` distinct Guardian Vote Encryption Secret Keys to complete the decryption of the tally for each Contest Option and additional Contest Data Fields. (Ref: S3.a.f.c)",ute,,55,"At least one unit test exercising a relevant code path exists"
+S3.2.1,"No set of fewer than `k` distinct Guardian Vote Encryption Secret Keys is sufficient to complete the the decryption of the tally for any Contest Option or additional Contest Data Field.",na,,1,"Not directly applicable to implementation code"
+S3.2.2.a,"(Ref: S2.b) Key Ceremony",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.a,"(Ref: S2.b) ""EGRI enables a Guardian to generate its own Vote Encryption (Public|Secret) Key pair prior to the start of voting or RLA.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.a,"EGRI enables a Guardian `i` to generate and store `k` secret polynomial coefficients (indexed as `0 <= j < k`) by sampling a CSRNG uniformly as `0 < a_{i,j} < q` for their Guardian Vote Encryption Key pair.","",,,
+S3.2.2.a,"EGRI enables a Guardian `i` to generate, store, and publish a Schnorr proof of knowledge for each of its k secret polynomial coefficients (indexed as `0 <= j < k`) for their Guardian Vote Encryption Key pair.","",,,
+S3.2.2.b,"(Ref: S2.b) Key Ceremony",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.b,"(Ref: S2.b) ""EGRI enables a Guardian to generate its own Ballot Data Encryption (Public|Secret) Key pair prior to the start of voting or RLA.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.b,"EGRI enables a Guardian `i` to generate and store `k` secret polynomial coefficients (indexed as `0 <= j < k`) by sampling a CSRNG uniformly as `0 < a_{i,j} < q` for their Guardian Ballot Data Encryption Key pair.","",,,
+S3.2.2.b,"EGRI enables a Guardian `i` to generate, store, and publish a Schnorr proof of knowledge for each of its k secret polynomial coefficients (indexed as `0 <= j < k`) for their Guardian Vote Encryption Key pair.","",,,
+S3.2.2.c,"(Ref: S2.b) Key Ceremony",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.c,"(Ref: S2.b) ""EGRI enables a Guardian to generate its own Guardian Communication (Public|Secret) Key pair prior to the start of voting or RLA.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.c,"EGRI enables a Guardian `i` to generate and store a uniformly random value $\zeta_i \in \Z_q$ as its Guardian Communication Secret Key","",,,
+S3.2.2.c,"EGRI enables a Guardian `i` to derive and store Guardian Communication Public Key as \kappa_i = g^{\zeta_i} \bmod p. eq. 9","",,,
+S3.2.2.d,"After having generated its own Vote Encryption Secret Key and Guardian Communication Secret Key, EGRI enables a Guardian `i` to generate an NIZK proof of knowledge of secrets $a_{i,j}$ and of $\zeta_i$ as specified in EG DS v2.1.0 eq. 10 - 11","",,,
+S3.2.2.d,"EGRI enables a Guardian to publish its NIZK proof of knowledge of secrets $a_{i,j}$ and of $\zeta_i$.","",,,
+S3.2.2.e,"After having generated its own Ballot Data Encryption Secret Key and Guardian Communication Secret Key, EGRI enables a Guardian `i` to generate and publish an NIZK proof of knowledge of secrets $\hat{a}_{i,j}$ and of $\zeta_i$ as specified in EG DS v2.1.0 eq. 10 - 11","",,,
+S3.2.2.e,"EGRI enables a Guardian to publish its NIZK proof of knowledge of secrets $\hat{a}_{i,j}$ and of $\zeta_i$.","",,,
+S3.2.2.f.verif2,"TODO: Verification 2 Note: Required for (Ref: S3.2.2.o Details of Key Generation - Share verification and the guardian record)",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.i,"(Ref: S2.b) Key Ceremony",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.i,"(Ref: S2.b) EGRI enables a Guardian `i` to encrypt to another Guardian `l` Guardian Communication Public Key a share of each of its own (Vote|Ballot Data) Encryption Secret Keys, $P_i(\ell)$ and $\hat{P}_i(\ell)$, as specified in EG DS v2.1.0 eq. 15 - 22",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.i,"(Ref: S2.b) EGRI enables a Guardian to publish the encryption $E_\ell(P_i(\ell), \hat{P}_i(\ell))$ of its secret key shares $P_i(\ell)$ and $\hat{P}_i(\ell)$ for every other guardian $G_\ell$",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.j,"(Ref: S3.2.2.i) EGRI enables a receiving Guardian `l` to verify or refute the Schnorr proof $C_{i,\ell,2} = (\bar c_{i,\ell},\bar v_{i,\ell})$ from sending Guardian `i` as part of the share of each of Guardian `i`'s (Vote|Ballot Data) Encryption Secret Keys as specified in EG DS v2.1.0 eq. 22.",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.j,"If the Schnorr proof successfully verifies, EGRI enables receiving Guardian `l` to decrypt the ciphertext as specified in EG DS v2.1.0 eq. 23.","",,,
+S3.2.2.k,"EGRI enables a Guardian `i` to compute its share $z_i = P(i)$ of the Joint Vote Encryption Secret key as specified in EG DS v2.1.0 eq. 24.","",,,
+S3.2.2.k,"EGRI enables a Guardian `i` to compute its share $z_i = P(i)$ of the Joint Ballot Data Encryption Secret key as specified in EG DS v2.1.0 eq. 24.","",,,
+S3.2.2.l,"(Ref: S2.b) ""At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian Vote Encryption Public keys to form the Joint Vote Encryption Public Key.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.l,"EGRI enables the computation of the Joint Vote Encryption Public Key specified in eq. 25.",utep,,60,"At least one unit test exercising a relevant code path is passing"
+S3.2.2.m,"(Ref: S2.b) ""At the successful completion of the Key Generation Ceremony, EGRI enables the combination of Guardian Ballot Data Encryption Public keys to form the Joint Ballot Data Encryption Public Key.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.m,"EGRI enables the computation of the Joint Ballot Data Encryption Public Key specified in eq. 26.",utep,,60,"At least one unit test exercising a relevant code path is passing"
+S3.2.2.n.verif3,"TODO: Verification 3 Note: Required for (Ref: S3.2.2.o Details of Key Generation - Share verification and the guardian record)","",,,
+S3.2.2.o,"There is a defined Election Data Object called the 'Preliminary Guardian Record'.","",,,
+S3.2.2.o,"EGRI enables an Election Administrator to produce the Preliminary Guardian Record from data generated during the Key Ceremony.","",,,
+S3.2.2.o,"The Preliminary Guardian Record contains the Election Parameters $p$, $q$, $g$, $n$, and $k$; the Joint (Vote|Ballot Data) Encryption Public Keys $K$ and $\hat K$; all $K_{i,j}$ and $\hat{K}_{i,j}$ values from all Guardians (for $1\leq i \leq n$ and $0 \leq j < k$), the Guardian Communication Public Keys $\kappa_i$, together with all Schnorr proofs $(c_{i}, v_{i,0}, v_{i,1}, \dots, v_{i, k})$ and $(\hat{c}_{i}, \hat{v}_{i,0}, \hat{v}_{i,1}, \dots, \hat{v}_{i, k})$.","",,,
+S3.2.2.o,"EGRI enables a Guardian `l` to verify the Preliminary Guardian Record as specified in EG DS v2.1.0 eq. 27 - 29. Note: This includes (Ref: S3.2.2.f.verif2 Verification 2) and (Ref: S3.2.2.n.verif3 Verification 3).","",,,
+S3.2.2.o,"(Ref: S2.b) ""EGRI enables a Guardian to ""complain and halt the protocol""""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.o,"(Ref: S2.b) ""EGRI enables, supports, or facilitates the initiation of a 'Key Ceremony Irregularity Investigation' subsequent to a Guardian complaint of irregularity.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.2.2.o,"EGRI enables to deterimine that all Guardians have confirmed that all verification steps have passed successfully.","",,,
+S3.2.2.o,"There is a defined Election Data Object called the 'Guardian Record'.","",,,
+S3.2.2.o,"EGRI enable publishing the Guardian Record as part of the Election Record.","",,,
+S3.2.2.o,"EGRI enables a Guardian to retain its own indepent copy of the Preliminary Guardian Record for later comparison with the Guardian Record as published in the Election Record.","",,,
+S3.2.2.o,"EGRI enables a Guardian to verify that the Guardian Record as published in the Election Record contain the same values for $K$ and $\hat{K}$, the Joint (Vote|Ballot Data) Encryption Public Key as that they verified in the Preliminary Guardian Record.","",,,
+S3.2.2.o,"EGRI enables a Guardian to retain only its secret values $z_i = P(i)$ and $\hat{z}_i = \hat{P}(i)$ for later use in the decryption process and to destroy all other secret values.","",,,
+S3.2.2.o,"EGRI enables a Guardian to destroy its initial (Vote|Ballot Data) Encryption Secret Keys $s_i$ and $\hat{s}_i$.","",,,
+S3.2.3.a,"EGRI computes H_E from H_B and the Joint (Vote|Ballot Data) Encryption Public Keys as specified in EGDS v2.1.0 eq. 30.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.2.3.b.verif4,"TODO: Verification 4","",,,
+????,"EGRI rejects any set of Guardians having any CoefficientCommitment the same.","",,,
+????,"EGRI rejects any Guardian having any CoefficientCommitment the same.","",,,
+S3.3,"An ElectionGuard `Ballot` is an Election Data Object that is created encrypted. The term `encrypted Ballot` is technicaly redundant.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.3,"The concept of a traditional, e.g. paper, ""ballot"" is referred to as `Voter Selections`.","",,,
+S3.3,"In specific cases, such as a challenged, an ElectionGuard `Ballot` may be decrypted and the plaintext of the constest data fields published. But the term `Ballot` still as always refers to the encrypted form.","",,,
+S3.3,"Election systems may assign a Ballot an ID label for reference and retrival purposes. This ID may be randomly generated or derived from a combination of information guaranteed unique. In no case will this ID label encode or be derived from data that wouldn't be recorded in the Ballot in-the-clear anyway.","",,,
+S3.3.1.j,"EGRI encrypts a Contest (Option or Additional) Data Field value as specified in EGDS v2.1.0 eq. 31 pg. 28.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S3.3.1.j,"EGRI may pre-compute the encryption of a Contest (Option or Additional) Data Field value of '0', and then convert it to an encryption of `1` if needed.","",,,
+S3.3.2.a,"EGRI computes for each Ballot a Selection Encryption Identifier `id_B`.","",,,
+S3.3.2.a,"EGRI computes `H_I` from `H_E` and the Selection Encryption Identifier `id_B` as specified in EG DS v2.1.0 eq. 32.","",,,
+S3.3.2.b.verif5,"TODO: Verification 5","",,,
+S3.3.3,"EGRI selects for each Ballot a Ballot Nonce by sampling a CSRNG uniformly as `0 < id_B < 2^256`.","",,,
+S3.3.3,"EGRI computes for each Contest appearing on the Ballot, for each Contest (Option or Additional) Data Field, a Contest Data Field Nonce as specified in EG DS v2.1.0 eq. 33. Note: This uses the ""mod q"" version of H.","",,,
+S3.3.4,"EGRI for each Ballot encrypts (with a Schnorr proof of knowledge) the Ballot Nonce `id_B` to the Joint Ballot Data Encryption Public Key as specified in EG DS v2.1.0 eq. 34 - 38.","",,,
+S3.3.4,"EGRI attempts, to the greatest extent practical, to erase from hardware memory the Ballot Nonce `id_B` (and any information which could reconstruct it e.g., RNG state) immediately after use.","",,,
+S3.3.5.b,"Ref: S3.1.3.g","",,,
+S3.3.5.c,"Ref: S3.1.3.i Election Parameters and the Election Manifest - Undervotes","",,,
+S3.3.5.c,"Ref: S3.1.3.j Election Parameters and the Election Manifest - Counting undervoted contests","",,,
+S3.3.5.c,"Ref: S3.1.3.k Election Parameters and the Election Manifest - Undervote difference count","",,,
+S3.3.5.c,"Ref: S3.1.3.m Election Parameters and the Election Manifest - Null votes","",,,
+S3.3.5.d,"(Ref: S3.1.3.l) ""An 'Overvoted Contest Condition' is considered to have occurred for a specific Contest on a specific Ballot when the the sum of the selections is strictly greater than the contest Selection Limit.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.3.5.d,"When an Overvoted Contest Condition has occurred, all Contest Option Data Fields for that Contest are system-assigned the value of `0`.","",,,
+S3.3.5.d,"When an Overvoted Contest Condition has occurred, this fact MAY be encoded into a (non-tallied) data field and encrypted to the Joint Ballot Data Encryption Public Keys.","",,,
+S3.3.5.d,"When an Overvoted Contest Condition has occurred, the specific voter selections for this contest MAY be encoded into a (non-tallied) Contest Data Field and encrypted to the Joint Ballot Data Encryption Public Keys, much like write-in data.","",,,
+S3.3.5.d,"Ref: S3.1.3.l Election Parameters and the Election Manifest - Overvotes","",,,
+S3.3.5.e,"For every Ballot, EGRI allows, for every Contest Option Data Field, to prove that the Ciphertext is an encryption of a nonnegative value less than or equal to the effective Option Selection Limit (e.g., an encryption of `0` or `1`).","",,,
+S3.3.5.e,"For every Ballot, EGRI allows, for every Contest Additional Data Field, to prove that the Ciphertext is an encryption of a legitimate value (as specified for that particular Contest Additional Data Field).","",,,
+S3.3.5.e,"For every Ballot, EGRI allows, for every Contest, to prove that the sum of all Contest Option values is an encryption of a nonnegative value less than or equal to the effective Contest Selection Limit.","",,,
+S3.3.5.f,"EGRI uses range proofs to prove well-formedness of an individual selection when it is allowed for a Contest Option on a Ballot to be assigned values greater than `1`","",,,
+S3.3.5.f,"EGRI uses range proofs for individual Contest Options","",,,
+S3.3.5.f,"EGRI uses range proofs for the Contest selection sum","",,,
+S3.3.5.f,"EGRI can use range proofs to enable cumulative voting","",,,
+S3.3.5.f,"EGRI can use range proofs to enable score voting","",,,
+S3.3.5.f,"EGRI can use range proofs to enable STAR-voting","",,,
+S3.3.5.f,"EGRI can use range proofs to enable Borda count","",,,
+S3.3.7.c,"(Ref: S3.2.3.j) ""EGRI encrypts a Contest (Option or Additional) Data Field value as specified in EG DS v2.1.0 eq. 31.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.3.7.c,"EGRI encrypts a Contest (Option or Additional) Data Field having a value of `0` as $(\alpha,\beta)=(g^\xi \bmod p,\ K^\xi \bmod p)$.","",,,
+S3.3.7.c,"EGRI computes an NIZK proof that (\alpha,\beta) is an encryption of `0` or `1` as specified in EG DS v2.1.0 eq. 39 - 47.","",,,
+S3.3.7.d,"(Ref: S3.2.3.j) ""EGRI may pre-compute the encryption of a Contest (Option or Additional) Data Field value of '0', and then convert it to an encryption of `1` if needed.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.3.7.d,"(Ref: S3.2.3.j) ""EGRI encrypts a Contest (Option or Additional) Data Field value as specified in EG DS v2.1.0 eq. 31.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.3.7.d,"EGRI encrypts a Contest (Option or Additional) Data Field having a value of `1` as $(\alpha,\beta) = (g^\xi \bmod p,\ K^{\xi+1} \bmod p)$.","",,,
+S3.3.7.e,"When the effective Option Selection Limit is a value other than `1`, EGRI computes an NIZK proof that (\alpha,\beta) is an encryption of `0` or `1` as specified in EG DS v2.1.0 eq. 48 - 56.","",,,
+S3.3.7.g,"When the effective Option Selection Limit is a value other than `0` or `1`, EGRI computes an NIZK range proof as specified in EG DS v2.1.0 eq. 57 - 61.","",,,
+S3.3.7.j.verif6,"TODO: Verification 6","",,,
+S3.3.8.b,"EGRI computes an NIZK range proof that the homomorphic combination (i.e., sum) of all Contest Options Fields represents the encryption of a nonnegative integer value not greater than the effective Contest Selection Limit as specified in EG DS v2.1.0 eq. 62.","",,,
+S3.3.8.c.verif7,"TODO: Verification 7","",,,
+S3.3.9.b,"Ref: S3.1.3.j ""Undervoted Contest Condition""","",,,
+S3.3.9.b,"Ref: S3.1.3.j ""Undervote Difference Count""","",,,
+S3.3.9.c,"Ref: S3.1.3.l ""Overvoted Contest Condition""","",,,
+S3.3.9.c,"Ref: S3.1.3.l ""Overvoted Option Condition""","",,,
+S3.3.9.d,"Ref: S3.1.3.m 'Null Voted Contest Condition'","",,,
+S3.3.9.e,"Ref: S3.1.3.n Write-ins","",,,
+S3.3.10.c,"If the Election Manifest specifies that Ballots record for a Contest any non-homomorphically tallied additional or supplemental Contest Data Fields, EGRI encodes their values using an unambiguous fixed-length encoding and encrypts it as specified in EG DS v2.1.0 eq. 63 - 69.","",,,
+S3.4.1,"EGRI computes the Contest Hash value $\chi_l$ as specified in EG DS v2.1.0 eq. 70.","",,,
+S3.4.2,"EGRI computes the Confirmation Code `H_C` as specified in EG DS v2.1.0 eq. 71.","",,,
+S3.4.3,"EGRI computes the Voting Device Information Hash value `H_DI` as specified in EG DS v2.1.0 eq. 72.","",,,
+S3.4.4.b,"In the case of 'No chaining', EGRI computes the Chaining Field `B_C` as specified in EG DS v2.1.0 eq. 73.","",,,
+S3.4.4.c,"In the case of 'Simple chaining', EGRI computes the Chaining Fields and Chaining Value as specified in EG DS v2.1.0 eq. 74 - 78.","",,,
+S3.4.4.d,"EGRI enables a method of recording the state of a Ballot as one of `VoterSelectionsEncrypted`, `Cast`, `Spoiled`, `Challenged`, or `ChallengedDecrypted`.","",,,
+S3.4.4.d,"EGRI refuses to decrypt a ballot in the `Cast` state.","",,,
+S3.4.4.d,"EGRI refuses to decrypt a ballot in the `Spoiled` state.","",,,
+S3.4.4.d,"EGRI includes in any tally operation only Ballots in the `Cast` state.","",,,
+S3.4.4.d,"EGRI enables decrypting a ballot in the `Challenged` state.","",,,
+S3.4.4.d,"EGRI refuses to change the state of a Ballot from the `Cast` state.","",,,
+S3.4.4.d,"EGRI refuses to change the state of a Ballot from the `Spoiled` state.","",,,
+S3.4.4.d,"EGRI refuses to change the state of a Ballot from the `ChallengedDecrypted` state.","",,,
+S3.4.4.e.verif8,"TODO: Verification 8","",,,
+S3.5.a,"EGRI enables publishing all Ballots (with proofs) in the Election Record at the conclusion of voting.","",,,
+S3.5.a,"EGRI enables computing an Aggregate Ballot as specified in EG DS v2.1.0 eq. 79.","",,,
+S3.5.b.verif9,"Every Ballot that fails to specify a Ballot Weight that is an integer inclusively between 1 and the maximum specified in the Election Manifest is considered invalid.","",,,
+S3.5.c,"The Election Manifest specifies a maximum Ballot Weight as a small positive integer.","",,,
+S3.5.c,"The condition ""If weights are used"" means the Election Manifest specifies a maximum Ballot Weight greater than `1`.","",,,
+S3.5.c,"Every EGRI API receiving voter selections for encryption receives a value for the corresponding Ballot Weight and rejects the voter selections if the supplied Ballot Weight is not an integer inclusively between 1 and the maximum specified in the Election Manifest.","",,,
+S3.5.c,"Every Ballot records its associated Ballot Weight.","",,,
+S3.5.c,"Despite the language ""explicitly associated with an identified voter"", EGRI does not represent the concept of ""voter"". If an external system is used to track an association between Ballots and actual voters, the impact on voter privacy and coersion resistance must be considered extremely carefully.","",,,
+S3.5.c,"EGRI enables computing an Aggregate Ballot from Weighted Ballots as specified in EG DS v2.1.0 eq. 80.","",,,
+S3.5.c,"When computing an Aggregate Ballot, the aggregation function must, using access to the full and complete Election Record information to that point in time, verify that every Ballot to be aggregated has never been decrypted, is not in a 'Challeged' or 'Spoiled' state, etc.","",,,
+S3.5.c,"If such a (decrypted, challenged, spoiled, etc) Ballot were somehow to be supplied to the aggregation function, it MUST be excluded from the tally, a diagnostic message emitted, and the offending Ballot identifier(s) returned separately.","",,,
+S3.6.1,"EGRS enables a Guardian to review the set of Ciphertexts marked for decryption prior to use of their Guardian Vote Encryption Secret Key. Josh 2025-03-19: This will only ever include the set of `Challenged` Ballots and the aggregate encrypted tallies.","",,,
+S3.6.1,"EGRI enables to communicate to the Guardians the set of Ciphertexts marked for decryption (i.e., challenged Ballots and aggregate encrypted tallies).","",,,
+S3.6.1,"Josh 2025-03-19: Multiple Tallies may be conducted for a single election.","",,,
+S3.6.1,"Whenever multiple Tallies are conducted for a single election, subsequent tallies should extend the current Election Record. This does not introduce a requirement for EGRI to implement any form of rollback protection.","",,,
+S3.6.1,"EGRS enables a Guardian to verify or refute that all Ciphertexts are correct prior to decryption. Ref: S6.2.3.verif4, S6.2.4.verif5, S6.2.4.verif6, S6.2.4.verif7, S6.2.4.verif8, S6.2.5.verif9","",,,
+S3.6.1,"EGRS enables a Guardian to participate in the decryption of a set of Ciphertexts that both 1. belong to a set that has been marked for decryption and 2. have all been verified correct by that Guardian.","",,,
+S3.6.1,"EGRS does not assist a Guardian to participate in the decryption of any Ciphertexts which does not both 1. belong to a set that has been marked for decryption and 2. been verified correct by that Guardian.","",,,
+S3.6.2,"(Ref: S3.6.1) ""EGRS enables a Guardian to participate in the decryption of a set of Ciphertexts that have both 1. belong to a set that has been marked for decryption and 2. have all been verified correct by that Guardian.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.6.2,"(Ref: S3.6.1) ""EGRS refusues to assist a Guardian to participate in the decryption of any Ciphertexts unless they both 1. belong to a set that has been marked for decryption and 2. have all been verified correct by that Guardian.""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.6.2,"(Ref: S3.a.f.c) ""EGRI enables a Guardian to compute a verifiable partial decryption...""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.6.2,"(Ref: S3.a.f.c) ""EGRI enables a quorum of `k` distinct Guardian (Vote|Ballot Data) Encryption Secret Keys to form full verifiable decryptions of the election tallies...""",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S3.6.2,"EGRI enables a quorum of `k` distinct Guardians to compute `T = K^t`, for every Contest (Option or Additional) Data Field in the election. as specified in EG DS v2.1.0 eq. 81 - 82.","",,,
+S3.6.2,"EGRI enables a quorum of `k` distinct Guardians to publish `T` in the Tallies of the Election Record, for every Contest (Option or Additional) Data Field in the election. Note: This is to handle scenarios in which the discrete log of `T` ends up needing more computation than the Guardian quorum has on hand at the time.","",,,
+S3.6.2,"EGRI enables the practical determination of the tally `t` from `T = K^t`, for every Contest (Option or Additional) Data Field in the election.","",,,
+S3.6.2,"EGRI enables the publication of the tally `t`, for every Contest (Option or Additional) Data Field in the election, in the Tallies of the Election Record.","",,,
+S3.6.3,"EGRI enables a quorum of `k` distinct Guardians to compute `T = K^t`, for every Contest (Option or Additional) Data Field in the election. as specified in EG DS v2.1.0 eq. 81 - 82.","",,,
+S3.6.3,"EGRI enables a quorum of `k` distinct Guardians to publish `T` in the Tallies of the Election Record, for every Contest (Option or Additional) Data Field in the election. Note: This is to handle scenarios in which the discrete log of `T` ends up needing more computation than the Guardian quorum has on hand at the time.","",,,
+S3.6.3,"EGRI enables the practical determination of the tally `t` from `T = K^t`, for every Contest (Option or Additional) Data Field in the election.","",,,
+S3.6.3,"EGRI enables the publication of the tally `t`, for every Contest (Option or Additional) Data Field in the election, in the Tallies of the Election Record.","",,,
+S3.6.4.a,"EGRI enables the combination of partial decryptions as specified in EG DS v2.1.0 eq. 85 - 86.","",,,
+S3.6.5.b,"EGRI enables available Guardians to jointly prove that they have shared knowledge of $s\in \Z_q$ such that $M = A^{s} \bmod p$ and $K = g^{s} \bmod p$ as specified in EG DS v2.1.0 eq. 87 - 93.","",,,
+S3.6.5.d.verif10,"(Ref: S6.2.5.verif10) Verification 10",nyi,,4,"Not yet implemented"
+S3.6.5.f.verif11,"(Ref: S6.2.5.verif11) Verification 11",nyi,,4,"Not yet implemented"
+S3.6.6.a,"EGRI decrypts optional contest data as specified in EG DS v2.1.0 eq. 96 - 97.","",,,
+S3.6.6.b,"EGRI computes NIZK proof of Decryption of Contest Data as specified in EG DS v2.1.0 eq. 98 - 106.","",,,
+S3.6.6.c.verif12,"TODO: Verification 12","",,,
+S3.6.7.b,"EGRI decrypts challenged Ballots Ballot Nonces as specified in EG DS v2.1.0 eq. 107 - 108.","",,,
+S3.6.7.c,"EGRI decrypts challenged Ballots from encryption nonces as specified in EG DS v2.1.0 eq. 109 - 111.","",,,
+S3.6.7.d,"TODO: Decryption of Challenged Ballots - Verifying decryption with nonces.","",,,
+S3.6.7.e.verif13,"TODO: Verification 13","",,,
+S3.6.7.f.verif14,"TODO: Verification 14","",,,
+S3.7,"(Ref: S2.b) ""EGRI enables production of an 'Election Record'""",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record is not a static fixed format. Different information is added and modified at different times.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record format must support appending new and updated information without invalidating signatures made previously.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record format must support inclusion-by-reference (eg a Ballot ID and hash value) of batches of Ballots. Rationale: For all but very small elections, it will not be practical to hold all Ballots in a single file. Neither will it be practical to place every Ballot in a separate file in a single directory.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records any information necessary and sufficient to uniquely identify and describe the election, such as date, location, election type, etc. that is not otherwise present in the Election Manifest.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records the Election Manifest",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records the Fixed Parameters `p`, `q`, `g`, and `r`.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records the Varying Parameters `n` and `k`.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records `H_P`",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records `H_B`",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Guardian `1..n`: a name or label",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Guardian `1..n`: the polynomial coefficients commitments",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Guardian `1..n`: the polynomial coefficients the proofs of knowledge",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Guardian `1..n`: the Guardian Communication Public Key",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records the Joint Vote Encryption Public Key",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records the Joint Ballot Data Encryption Public Key",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records `H_E`",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the selection encryption identifier $\id_B$,",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the selection encryption identifier hash $\HH_I$,",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: all of the encrypted selections on each ballot,",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the proofs that each such value is an encryption of either zero or one (or more generally, the proofs that these values satisfy the respective option selection limits),",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: for every Contest, the effective Contest Selection Limit",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: for every Contest, for every Option Field, the effective Option Selection Limit",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: for every Contest, the stated and effective selection limits applied to each contest,",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: for every Contest, the proof that the number of selections made does not exceed the selection limit,",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the Ballot Weight as originally submitted with the Voter Selections",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the Ballot Weight already applied to the Ciphertexts",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the Ballot Style index,",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: device information uniquely identifying the device used for encrypting of voter selections to produce the Ballot",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the date and time of the ballot encryption (as reported by the encrypting device) with no more than 1 second granularity",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the confirmation code produced for the Ballot",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `Cast` or `Challenged` state: the state of the ballot `Cast` or `Challenged`",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `ChallengedDecrypted` state: all the information included for the Ballot in its `Challenged` state",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `ChallengedDecrypted` state: the selections made for every Contest Option",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `ChallengedDecrypted` state: the decrypted plaintext values of every Contest (Option or Additional) Data Field",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `ChallengedDecrypted` state: the proofs of correct decryption for every Contest (Option or Additional) Data Field and/or the Contest Data Field nonce.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot in the `ChallengedDecrypted` state: the date and time of the overall ballot decryption (as reported by the decrypting device)",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: some identifier uniquely identifying the Ballot Decryption Operation",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: the set of Ballots ""marked for decryption""",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: the hash of the ElectionRecord at the point the Ballot Decryption Operation was initiated",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: for every participating Guardian: the Guardian Index",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: for every participating Guardian: the date and time their participation was initiated",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: for every participating Guardian: the hash of their view of the ElectionRecord at the instant this operation was initiated",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: for every participating Guardian: device information uniquely identifying the device used for their secret key operation",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: for every participating Guardian:",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation: for every participating Guardian:",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation:",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Ballot Decryption Operation:",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every set of Ballots in the `ChallengedDecrypted` state:",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every set of Ballots in the `ChallengedDecrypted` state: for each Guardian participating in the Decryption: the Guardian Index",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every set of Ballots in the `ChallengedDecrypted` state: for each Guardian participating in the Decryption: the date and time of the partial decryption",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every set of Ballots in the `ChallengedDecrypted` state: for each Guardian participating in the Decryption: their partial decryptions",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Tally: for every Contest: identifiers of the set of Ballots in the `Cast` state",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Tally: for every Contest: for every (Option or Additional) homomorphically-tallied Data Field: the encrypted tally (eq. 79 pg 44)",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Tally: for every Contest: for every (Option or Additional) homomorphically-tallied Data Field: the full verifiable decryption of the encrypted tally",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Tally: for every Contest: for every (Option or Additional) homomorphically-tallied Data Field: the tally exponent",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Tally: for every Contest: for every (Option or Additional) homomorphically-tallied Data Field: plaintext representation of the tally",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records for every Tally: for every Contest: for every (Option or Additional) homomorphically-tallied Data Field: proof of correct decryption of the tally",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records information uniquely identifying each device used for encryption of voter selections to produce any Ballot",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records an ordered list of the Ballots encrypted by each device.",nyi,,4,"Not yet implemented"
+S3.7,"The Election Record records the encrypted contest data, when available.",nyi,,4,"Not yet implemented"
+S3.7,"EGRS enables the Election Record to be produced in a format suitable for digitally signing.",nyi,,4,"Not yet implemented"
+S3.7,"EGRS enables the Election Record to be published in a format suitable to the needs of Verifier applications. For example, a directory of files accessible via HTTPS supporting efficient random access.",nyi,,4,"Not yet implemented"
+S3.7,"EGRS enables the Election Record to be published in a format suitable for archiving or bulk downloading by any interested individuals. For example, the compressed .zip and/or .tar.gz formats.",nyi,,4,"Not yet implemented"
+S4,"EGRI Preencrypted Ballots enable the vote-by-mail scenario.",na,,1,"Not directly applicable to implementation code"
+S4,"EGRI Preencrypted Ballots enable the ""precincts with central count or minimal in-precinct equipment"" scenario.",na,,1,"Not directly applicable to implementation code"
+S4,"EGRI Preencrypted Ballots enable back-ups for precincts which ordinarily perform encryption on demand.",na,,1,"Not directly applicable to implementation code"
+S4,"EGRI enables ordinary and Preencrypted Ballots to be tallied together.",nyi,,4,"Not yet implemented"
+S4,"When ordinary and Preencrypted Ballots are tallied together, it does not reveal which votes came from which mode.",nyi,,4,"Not yet implemented"
+S4,"The Election Manifest contains a configuration setting indicating whether Preencrypted Ballots are enabled for that election.",nyi,,4,"Not yet implemented"
+S4,"If the Election Manifest indicates Preencrypted Ballots are enabled, EGRI allows to produce data necessary to print Preencrypted Ballots. Note: Referred to in the EGRS as the ""Ballot Encryption Tool"".",nyi,,4,"Not yet implemented"
+S4,"EGRI refuses to generate any Preencrypted Ballots unless the Election Manifest indicates Preencrypted Ballots are enabled.",nyi,,4,"Not yet implemented"
+S4,"EGRI allows to record Voter Selections made on Preencrypted Ballots, if the Election Manifest indicates Preencrypted Ballots are enabled.",nyi,,4,"Not yet implemented"
+S4,"If the Election Manifest indicates Preencrypted Ballots are not enabled, EGRI refuses to record any Voter Selections made on Preencrypted Ballots.",nyi,,4,"Not yet implemented"
+S4,"For each Preencrypted Ballot generated, EGRI computes the Selection Encryption Identifier `id_B` as described in (Ref: S3.3.2.a).",nyi,,4,"Not yet implemented"
+S4,"For each Preencrypted Ballot generated, EGRI computes `H_I` from `H_E` and the Selection Encryption Identifier `id_B` as specified in EG DS v2.1.0 eq. 32 (Ref: S3.3.2.a).",nyi,,4,"Not yet implemented"
+S4.1,"pg. 57 EGRI `Preencrypted Ballot`, for every Contest in the BallotStyle, for every Contest Option plus an additional null selection, computes a vector `Psi_{i,m}` of length `m`, where `m` is equal to the number of Contest Options and `i` is the Contest Option index. Note1: This is captial `Psi`. Note2: Although `m` is denoted here as a subscript, it is not an index into a second dimension.",nyi,,4,"Not yet implemented"
+S4.1,"pg. 57 EGRI `PreencryptedBallot` computes `Psi_{i,m}` for `0 <= i <= m`, where `m` is equal to the number of Contest Options, `i = 0` corresponds to the null vote, and for `1 <= i` `i` is the corresponding Option Index.",nyi,,4,"Not yet implemented"
+S4.1,"pg. 57 EGRI `PreencryptedBallot` computes `Psi_{i,m}` when `1 <= i` as a length `m` vector having an encryption of `1` at (1-based) position `i`, and encryptions of `0` at all other options. Note: This corresponds to non-null vote cases.",nyi,,4,"Not yet implemented"
+S4.1,"pg. 57 EGRI `PreencryptedBallot` computes `Psi_{i,m}` when `i = 0` as a length `m` vector of encryptions of `0`. Note: This corresponds to the null vote case.",nyi,,4,"Not yet implemented"
+S4.1,"pg. 57 Note: EGRI `PreencryptedBallot`, when encrypting ContestOption vectors `Psi_{j,m}`, the encryption nonce `xi_{i,j}` is derived from `H_I` and `xi_B` as specified in eq. 121 (Ref: S4.2.1).",nyi,,4,"Not yet implemented"
+S4.1,"pg. 57 For each Preencrypted Ballot generated, EGRI computes `H_I` from `H_E` and the Selection Encryption Identifier `id_B` as specified in [eq. 121 pg. 61].",nyi,,4,"Not yet implemented"
+S4.1.1,"pg. 58 EGRI computes the Selection Hash `psi_i` for a single Option `i` according to [eq. 115 pg. 58]",nyi,,4,"Not yet implemented"
+S4.1.1,"pg. 58 ""In a contest with a selection limit of L, an additional L null vectors are hashed"" ""where all $E_i = (\alpha_i, \beta_i)$ are encyptions of zero and `1 <= l <= L`.""",nyi,,4,"Not yet implemented"
+S4.1.1,"pg. 58 EGRI computes the Selection Hash `psi_{m+l}` for an additional L null vector according to [eq. 114 pg. 58]",nyi,,4,"Not yet implemented"
+S4.1.2,"pg. 58 EGRI sorts all Selection Hashes in a contest prior to their use in the computation of the Contest Hash.",nyi,,4,"Not yet implemented"
+S4.1.2,"pg. 58 EGRI computes the Contest Hash `chi_l` according to [eq. 115 pg. 58]",nyi,,4,"Not yet implemented"
+S4.1.3,"pg. 58 EGRI computes the Confirmation Code `H_C` according to [eq. 116 pg. 58]",nyi,,4,"Not yet implemented"
+S4.1.4,"pg. 59 EGRI computes Ballot Chaining values for Preencrypted Ballots according to eq. 117-120 pg. 59.",nyi,,4,"Not yet implemented"
+S4.1.5.a,"pg. 59 If the Election Manifest indicates Preencrypted Ballots are enabled, EGRI requires that the Election Manifest specify unambiguously the Hash Trimming Function `Omega` to be used for all Preencrypted Ballots generated for the election.",nyi,,4,"Not yet implemented"
+S4.1.5.a,"pg. 59 EGRI provides one or more Hash Trimming Functions.",nyi,,4,"Not yet implemented"
+S4.1.5.b,"If the Election Manifest indicates Preencrypted Ballots are enabled, EGRI provides short codes to indicate undervotes",nyi,,4,"Not yet implemented"
+S4.2,"If the Election Manifest indicates Preencrypted Ballots are enabled, EGRI provides a ""Ballot Encrypting Tool"" which operates as describedin S4.2",nyi,,4,"Not yet implemented"
+S4.2.1,"If the Election Manifest indicates Preencrypted Ballots are enabled, EGRI produces nonces deterministically as described in eq. 121",nyi,,4,"Not yet implemented"
+S4.2.2,"[TODO: Pre-Encrypted Ballots]","",,,
+S4.3,"[TODO: Pre-Encrypted Ballots]",nyi,,4,"Not yet implemented"
+S4.3.1,"[TODO: Pre-Encrypted Ballots]",nyi,,4,"Not yet implemented"
+S4.4,"[TODO: Pre-Encrypted Ballots]",nyi,,4,"Not yet implemented"
+S4.4.1,"[TODO: Pre-Encrypted Ballots]",nyi,,4,"Not yet implemented"
+S4.5.a,"[TODO: Pre-Encrypted Ballots]",nyi,,4,"Not yet implemented"
+S4.5.b.verif15,"TODO: Verification 15",nyi,,4,"Not yet implemented"
+S4.5.c.verif16,"TODO: Verification 16","",,,
+S4.5.d.verif17,"TODO: Verification 17","",,,
+S4.5.e.verif18,"TODO: Verification 18","",,,
+S4.5.f.verif19,"TODO: Verification 19","",,,
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Two Hex Characters` hash-trimming function `Ω_1`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Four Hex Characters` hash-trimming function `Ω_2`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Letter-Digit` hash-trimming function `Ω_3`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Digit-Letter` hash-trimming function `Ω_4`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Number: 0-255` hash-trimming function `Ω_5`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Number: 1-256` hash-trimming function `Ω_6`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Number: 100-355` hash-trimming function `Ω_7`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature allows the ElectionManifest to specify the use of the `Number: 101-356` hash-trimming function `Ω_8`.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS ElectionManifest PreencryptedBallots feature allows to specify the use of and the complete configuration for an API-user-supplied hash-trimming function.",ics,,50,"Implementation code exists covering a portion of code paths considered substantial"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Two Hex Characters` hash-trimming function `Ω_1`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Four Hex Characters` hash-trimming function `Ω_2`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Letter-Digit` hash-trimming function `Ω_3`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Digit-Letter` hash-trimming function `Ω_4`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Number: 0-255` hash-trimming function `Ω_5`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Number: 1-256` hash-trimming function `Ω_6`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Number: 100-355` hash-trimming function `Ω_7`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can produce short codes using the `Number: 101-356` hash-trimming function `Ω_8`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature allows an API user to provide a custom hash-trimming function for producing short codes.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Two Hex Characters` hash-trimming function `Ω_1`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Four Hex Characters` hash-trimming function `Ω_2`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Letter-Digit` hash-trimming function `Ω_3`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Digit-Letter` hash-trimming function `Ω_4`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Number: 0-255` hash-trimming function `Ω_5`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Number: 1-256` hash-trimming function `Ω_6`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Number: 100-355` hash-trimming function `Ω_7`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature can consume short codes using the `Number: 101-356` hash-trimming function `Ω_8`.",nyi,,4,"Not yet implemented"
+S4.6,"EGRS PreencryptedBallots feature allows an API user to provide a custom hash-trimming function for consuming short codes.",nyi,,4,"Not yet implemented"
+S5,"EGRI uses `HMAC` as the basis for the function `H`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1,"EGRI converts between nonegative integers and fixed-size byte arrays using the big endian convention as specified in EG DS v2.1.0 eq. 122 - 123.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.1,"EGRI converts between nonegative integers mod `p` and fixed-size byte arrays using the big endian convention as specified in EG DS v2.1.0 eq. 124 - 126.b.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.2,"EGRI converts between nonegative integers mod `q` and fixed-size byte arrays using the big endian convention as specified in EG DS v2.1.0 eq. 127 - 129.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.3,"EGRI converts between nonnegative integers less than 2^31 and 4-byte fixed-size arrays using the big endian convention.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.4,"EGRI hashes fixed-length strings as their minimal UTF-8 encoding.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.4,"EGRI hashes varible-length strings as their minimal UTF-8 encoding prefixed by their length in bytes as a sequence of 4 bytes using big endian convention.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.5,"EGRI can read and write files as contiguous sequences of bytes.",nfd,"",2,"Needs further discussion"
+S5.1.5,"EGRI encodes byte lengths as 4-byte big-endian values.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.5,"EGRI accepts byte lengths less than `2^31`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.1.5,"EGRI does not produce byte lengths greater than `2^31 - 1`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.2,"EGRI implements the function `H` using HMAC and SHA-2-256 as specified in EG DS v2.1.0 eq. 130.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.3,"EGRI hashes multiple inputs using an unambiguous separation as specified in the relevant section in EG DS v2.1.0",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.4,"EGRI implements the function `H_q` as specified in EG DS v2.1.0 eq. 131 - 132.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.4,"Iff Fixed Parameter `q` begins with 248 or more consecutive leading `1` valued bits, such as is the case with `q` from the standard parameter set, the function `H_q` can be simplified to `H`.",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.5,"This is expected to be a fully-redundant section, but we could double-check it",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S5.5.1,"This is expected to be a fully-redundant section, but we could double-check it",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S5.5.2,"This is expected to be a fully-redundant section, but we could double-check it",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S5.5.3,"This is expected to be a fully-redundant section, but we could double-check it",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S5.5.4,"This is expected to be a fully-redundant section, but we could double-check it",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S5.5.5,"This is expected to be a fully-redundant section, but we could double-check it",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.1.b,TODO,utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S6.1.c,"EGRI should compute moduluar multiplication on large integers without generating unnecessarily large intermediate values",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S6.1.d,"EGRI should compute moduluar exponentiation on large integers without generating intermediate values having more digits than there are particles in the universe",utsp,,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+S6.2.1.verif1,"TODO: Verification 1",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.2.a.verif2,"TODO: Verification 2",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.2.b.verif3,"TODO: Verification 3",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.3.verif4,"TODO: Verification 4",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.4.a.verif5,"TODO: Verification 5",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.4.b.verif6,"TODO: Verification 6",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.4.c.verif7,"TODO: Verification 7",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.4.d.verif8,"TODO: Verification 8",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.5.a.verif9,"TODO: Verification 9",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.5.b.verif10,"TODO: Verification 10",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.5.c.verif11,"TODO: Verification 11",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.6.a.verif12,"Verification of Correct Contest Data Decryption",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.7.a.verif13,"TODO: Verification 13",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.7.b.verif14,"TODO: Verification 14",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.8.a.verif15,"TODO: Verification 15",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.8.b.verif16,"TODO: Verification 16",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.8.c.verif17,"TODO: Verification 17",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.8.d.verif18,"TODO: Verification 18",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"
+S6.2.8.e.verif19,"TODO: Verification 19",ace,,3,"Applicable to implementation code, but more directly covered elsewhere"

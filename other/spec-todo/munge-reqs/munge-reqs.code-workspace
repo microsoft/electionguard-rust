@@ -1,0 +1,60 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../html"
+		}
+	],
+	"settings": {
+		"workbench.colorTheme": "Default Dark+",
+		"rust-analyzer.check.overrideCommand": [
+			"cargo",
+			"clippy",
+			"--profile=release",
+			"--workspace",
+			"--all-targets",
+			"--keep-going",
+			"--message-format=json-diagnostic-rendered-ansi",
+		],
+		"workbench.editor.showIcons": false,
+		"rust-analyzer.runnables.extraEnv": {
+			"RUN_SLOW_TESTS": "0" // this is an example from https://rust-analyzer.github.io/manual.html#configuration
+		},
+		"todo-tree.tree.scanMode": "workspace only",
+		"rust-analyzer.cargo.buildScripts.overrideCommand": null,
+		"vscode-edge-devtools.webRoot": "${workspaceFolder}../html",
+		"vscode-edge-devtools.defaultUrl": "file:///home/maray/w/snc/eg/wt-other/spec-todo/html/index.html",
+		//"rust-analyzer.cargo.noDefaultFeatures": true,
+		//"rust-analyzer.cargo.features": [
+		//],
+	},
+	"launch": {
+		"configurations": [
+			{
+				"type": "vscode-edge-devtools.debug",
+				"name": "Open Edge DevTools",
+				"request": "attach",
+				"url": "file:///home/maray/w/snc/eg/wt-other/spec-todo/html/index.html",
+				"presentation": {
+					"hidden": true
+				}
+			}
+		],
+		"compounds": [
+			{
+				"name": "Launch Edge Headless and attach DevTools",
+				"configurations": [
+					"Open Edge DevTools"
+				]
+			},
+			{
+				"name": "Launch Edge and attach DevTools",
+				"configurations": [
+					"Open Edge DevTools"
+				]
+			}
+		]
+	}
+}

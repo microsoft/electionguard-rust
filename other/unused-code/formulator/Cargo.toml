@@ -1,0 +1,45 @@
+[package]
+name = "formulator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+#--- Defined in this workspace
+util.workspace = true
+
+#--- From crates.io
+#allocator-api2.workspace = true
+anyhow.workspace = true
+arbitrary.workspace = true
+#bumpalo.workspace = true
+derive_arbitrary.workspace = true
+equivalent.workspace = true
+hashbrown.workspace = true
+indexmap.workspace = true
+indoc.workspace = true
+itertools.workspace = true
+pathfinding.workspace = true
+proptest.workspace = true
+proptest-arbitrary-interop.workspace = true
+rustc-stable-hash.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+smallbitvec.workspace = true
+static_assertions.workspace = true
+thiserror.workspace = true
+
+tinyset = "0.5.1"
+
+#--- Rand
+rand_core.workspace = true
+rand_distr.workspace = true
+
+#--- Tracing
+tracing.workspace = true
+#valuable.workspace = true
+
+[dev-dependencies]
+insta = { version = "1.42.2", features = ["json"] }
+rand.workspace = true
+rand_xorshift.workspace = true

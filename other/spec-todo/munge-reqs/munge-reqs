@@ -1,0 +1,489 @@
+#!/usr/bin/sh
+
+umask 077
+
+set -o errexit
+this_script_fullpath=$(readlink -f -- "$0")
+this_script=$(basename -- "$this_script_fullpath")
+this_script_dir=$(dirname -- "$this_script_fullpath")
+this_script_rel_dir=$(realpath --relative-to="$PWD" "$this_script_dir")
+set +o errexit
+
+do_help() {
+    cat <<-EOD
+Usage: $this_script [OPTIONS] [FILE]
+    Runs munge-reqs on a file and extracts some tables from the resulting db.
+
+    FILE is used as both the src and dest.
+
+    --db-file=DB_FILE         (default "FILE.db")
+    --sql-dump-file=SQL_FILE  (default "DB_FILE.sql")
+    --html-dir=HTML_DIR       (default "html")
+
+    --watch       Loop and watch for changes.
+
+    -v --verbose  Verbose.
+    -n --no-act   Don't actually run anything. Implies -v  .
+
+    --help        Just display this help and exit.
+EOD
+}
+
+verbose=0
+
+do_exit() {
+    exit_status=$( printf '%d' "${1:-fail}" 2>>/dev/null )
+    if [ $? != 0 ]; then exit_status=127; fi
+
+    if [ $exit_status != 0 ]; then
+        printf '%s: Exiting with status: %d\n' "$this_script" "$exit_status" | cat -t >&2
+    elif [ 0 -lt "$verbose" ]; then
+        printf '%s: Exiting with status: %d\n' "$this_script" "$exit_status" | cat -t
+    fi
+    exit $exit_status
+}
+
+act=1
+srcdst_file=''
+db_file=''
+sql_dump_file=''
+html_dir=''
+watch=0
+while [ 0 -lt $# ]; do
+    arg="${1:-}"
+    case "$arg" in
+        -v | --verbose)
+            verbose=$(( verbose + 1 ))
+            ;;
+        -n | --no-act)
+            act=0
+            ;;
+        --watch)
+            watch=1
+            ;;
+        --db-file=*)
+            db_file=${arg#*=}
+            ;;
+        --sql-dump-file=*)
+            sql_dump_file=${arg#*=}
+            ;;
+        --html-dir=*)
+            html_dir=${arg#*=}
+            ;;
+        --)
+            shift
+            break
+            ;;
+        --help)
+            do_help >&1 2>&2
+            do_exit 0
+            ;;
+        -?*)
+            printf '%s: Unknown option: %s\n' "$this_script" "$arg" >&2
+            do_exit 3
+            ;;
+        *)
+            if [ -n "${srcdst_file:-}" ]; then
+                printf '%s: Error: Ony one non-option arg allowed (the src-dest file)\n' "$this_script" "$arg" >&2
+                do_exit 4
+            fi
+            srcdst_file=$arg
+            ;;
+    esac
+    shift
+done
+
+if [ "$act" = 0 ] && [ "$verbose" = 0 ] ; then verbose=1; fi
+
+printf '===================================== %s ======================================================\n' $this_script | cat -t >&2
+
+if [ 0 -lt "$verbose" ]; then
+    (
+        printf '%s: started: %s\n\n' "$this_script" "$this_script_fullpath"
+        printf 'pwd: %s' "$PWD"
+        printf 'this_script_fullpath: %s\n' "$this_script_fullpath"
+        printf 'this_script:          %s\n' "$this_script"
+        printf 'this_script_dir:      %s\n' "$this_script_dir"
+        printf 'this_script_rel_dir:  %s\n' "$this_script_rel_dir"
+
+    ) | cat -t
+fi
+
+export TIME='do_exit status: %x\nelapsed real: %e s\nmax resident: %M KiB\npage faults:  %R'
+#time_exe=$(which time)
+time_exe=
+
+echo #-------------- munge-reqs crate dir
+
+crate_dir=$this_script_rel_dir
+
+if ! [ -d "$crate_dir" ]; then
+    printf '%s: Error: munge-reqs crate dir doesn'"'"'t exist: %s\n' "$this_script" "$crate_dir" | cat -t >&2
+    do_exit 71
+fi
+
+crate_dir=$(realpath --relative-to="$PWD" "$crate_dir")
+
+echo #-------------- srcdst_file
+
+if [ -z "$srcdst_file" ]; then
+    printf '%s: Error: Please specify [srcdst_file] as the non-option arg\n' "$this_script" | cat -t >&2
+    do_exit 72
+fi
+
+srcdst_file=$(realpath --relative-to="$PWD" "$srcdst_file")
+
+if [ 0 -lt "$verbose" ]; then
+    printf 'srcdst_file (rel to %s): %s\n' "$PWD" "$srcdst_file" | cat -t
+fi
+
+if ! [ -f "$srcdst_file" ]; then
+    printf '%s: Error: [srcdst_file] doesn'"'"'t exist: %s\n' "$this_script" "$srcdst_file" | cat -t >&2
+    do_exit 73
+fi
+
+if [ 0 -lt "$verbose" ]; then
+    printf 'srcdst_file: %s\n' "$srcdst_file" | cat -t
+    (set -x; ls -al "$srcdst_file") | cat -t
+fi
+
+echo #-------------- db_file
+
+if [ -z "$db_file" ]; then
+    db_file="${srcdst_file}.db"
+fi
+
+if [ 0 -lt "$verbose" ]; then
+    printf 'db_file (rel to %s): %s\n' "$PWD" "$db_file" | cat -t
+    (set -x; ls -al "$db_file") 2>&1 | cat -t
+fi
+
+echo #-------------- sql_dump_file
+
+if [ -z "$sql_dump_file" ]; then
+    sql_dump_file="${db_file}.sql"
+fi
+
+if [ 0 -lt "$verbose" ]; then
+    printf 'sql_dump_file (rel to %s): %s\n' "$PWD" "$sql_dump_file" | cat -t
+    (set -x; ls -al "$sql_dump_file") 2>&1 | cat -t
+fi
+
+echo #-------------- html_dir
+
+if [ -z "$html_dir" ]; then
+    html_dir=$(dirname -- "$db_file")/html
+fi
+
+html_dir=$(realpath --relative-to="$PWD" "$html_dir")
+
+if [ 0 -lt "$verbose" ]; then
+    printf 'html_dir (rel to %s): %s\n' "$PWD" "$html_dir" | cat -t
+    (set -x; ls -ald "$html_dir") 2>&1 | cat -t
+fi
+
+if [ -d "$html_dir" ]; then
+    printf 'html_dir exists: %s\n' "$html_dir"
+    (set -x; ls -ald "$html_dir") 2>&1 | cat -t
+    if [ 0 -lt "$act" ]; then
+        (set -x; rm -rf "$html_dir")
+    fi
+fi
+
+if ! [ -d "$html_dir" ]; then
+    if [ 0 -lt "$act" ]; then
+        printf 'html_dir does not exist, creating: %s\n' "$html_dir" | cat -t
+        (set -x; umask 077; mkdir "$html_dir")
+        (set -x; ls -ald "$html_dir") 2>&1 | cat -t
+    else
+        printf 'html_dir does not exist (not creating due to -n): %s\n' "$html_dir" | cat -t
+    fi
+fi
+
+echo #--------------
+
+if [ 0 -lt "$verbose" ]; then
+    (
+        printf 'pwd:           %s\n' "$PWD"
+        printf 'crate_dir:     %s\n' "$crate_dir"
+        printf 'srcdst_file:   %s\n' "$srcdst_file"
+        printf 'db_file:       %s\n' "$db_file"
+        printf 'sql_dump_file: %s\n' "$sql_dump_file"
+        printf 'html_dir:      %s\n' "$html_dir"
+    ) | cat -t
+fi
+echo
+
+(
+    this_script_file2=./$(realpath --relative-to="$crate_dir" "$this_script_fullpath")
+    srcdst_file2=$(realpath --relative-to="$crate_dir" "$srcdst_file")
+    db_file2=$(realpath --relative-to="$crate_dir" "$db_file")
+    sql_dump_file2=$(realpath --relative-to="$crate_dir" "$sql_dump_file")
+    db_file2=$(realpath --relative-to="$crate_dir" "$db_file")
+    html_dir2=$(realpath --relative-to="$crate_dir" "$html_dir")
+
+    prev_pwd="$PWD"
+
+    printf '+ cd %s\n' "$crate_dir"
+    cd "$crate_dir"
+    if ! [ $? = 0 ]; then
+        printf '%s: Error: could not cd to crate dir: %s\n' "$this_script" "$crate_dir" | cat -t >&2
+        do_exit 74
+    fi
+
+    if [ 0 -lt "$verbose" ]; then
+        (
+            printf 'pwd:              %s\n' "$PWD"
+            printf 'this_script_file: %s\n' "$this_script_file2"
+            printf 'db_file:          %s\n' "$db_file2"
+            printf 'sql_dump_file:    %s\n' "$sql_dump_file2"
+            printf 'html_dir:         %s\n' "$html_dir2"
+            printf 'srcdst_file:      %s\n' "$srcdst_file2"
+        ) | cat -t
+    fi
+    echo
+
+    if [ 0 -lt "$watch" ]; then
+
+        cargo_toml=Cargo.toml
+
+        clear='-c'
+        clear=''
+
+        poll=''
+        poll='--poll'
+
+        restart='--no-restart'
+
+        # cargo watch --why -w ../TODO-2.1.txt -w Cargo.toml -w ./munge-reqs -w src/ -- ./munge-reqs ../TODO-2.1.txt ../TODO-2.1.txt.db
+
+        v=''
+        no_act='-n'
+        if [ 0 -lt "$act" ]; then
+            no_act=''
+            if [ 0 -lt "$verbose" ]; then
+                v='-v'
+            fi
+        fi
+
+        echo
+        echo
+        (   set +x
+            cargo watch \
+                $clear $restart \
+                --why \
+                $poll \
+                -w "$this_script_file2" \
+                -w "$srcdst_file2" \
+                -w Cargo.toml \
+                -w src/ \
+                -- "$this_script_file2" $v $no_act \
+                "--db-file=$db_file2" \
+                "--sql-dump-file=$sql_dump_file2" \
+                "--html-dir=$html_dir2" \
+                "$srcdst_file2"
+        )
+
+    else # not watch
+
+        #(set -x; "$time_exe" cargo run --release -- --db "$db_file" --html-dir "$html_dir" "$srcdst_file")
+        (set -x; time cargo run --release -- --db "$db_file2" --html-dir "$html_dir2" "$srcdst_file2")
+
+    fi
+)
+
+if ! [ 0 -lt "$act" ]; then
+
+    printf '[no-act mode]\n'
+
+else
+    # src_dst_dir=$(dirname -- "$srcdst_file")
+    # echo sha256sum "$srcdst_file" "${src_dst_dir}/*.bak.txt"
+    # sha256sum "$srcdst_file" "${src_dst_dir}"/*.bak.txt
+
+    sqlite3 "$db_file" .dump >"$sql_dump_file"
+
+    if false; then
+        sqlite3 "$db_file" .dump \
+            | grep -v "INSERT INTO lines VALUES" \
+            | grep -v "INSERT INTO xreqs VALUES" \
+            | grep -v "INSERT INTO xdones VALUES" \
+            | grep -v "INSERT INTO sections VALUES" \
+            | grep -v "INSERT INTO xtodos VALUES"
+    fi
+
+    printf 'qty lines:     '
+    sqlite3 "$db_file" <<'EOSQL'
+select count(*) from lines
+EOSQL
+
+    printf 'qty xreqs:     '
+    sqlite3 "$db_file" <<'EOSQL'
+select count(*) from xreqs
+EOSQL
+
+    printf 'qty xdones:    '
+    sqlite3 "$db_file" <<'EOSQL'
+select count(*) from xdones
+EOSQL
+
+    printf 'qty sections:  '
+    sqlite3 "$db_file" <<'EOSQL'
+select count(*) from sections
+EOSQL
+
+    printf 'qty xtodos:    '
+    sqlite3 "$db_file" <<'EOSQL'
+select count(*) from xtodos
+EOSQL
+
+    csv_out_file="${db_file}.lines.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select * from lines;
+EOSQLITE3
+
+    csv_out_file="${db_file}.sections.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select * from sections;
+EOSQLITE3
+
+    csv_out_file="${db_file}.pages.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select * from pages;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xdones.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select section,xtext from xdones;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xnotes.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select section,xtext from xnotes;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xreq_statuses.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select * from xreq_statuses;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xreqs.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select section,xtext,status_code,status_note from xreqs;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xtodos.csv"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select * from xtodos;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xtodos.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+select * from xtodos;
+EOSQLITE3
+
+    csv_out_file="${db_file}.other_items.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+SELECT section, status, xtext
+FROM (
+    SELECT line_n,
+        section, 'done' as status, xtext FROM xdones
+    UNION ALL
+    SELECT line_n,
+        section, 'todo' as status, xtext FROM xtodos
+    ORDER BY line_n ASC
+);
+EOSQLITE3
+
+    csv_out_file="${db_file}.xreqs_statuses.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+SELECT -- xr.line_n,
+    xr.section, xr.xtext, xr.status_code, xr.status_note, st.ordinal, st.xtext
+FROM xreqs xr
+LEFT OUTER JOIN xreq_statuses st ON xr.status_code = st.status_code
+ORDER BY xr.line_n ASC;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xreqs_statuses.status-lte-ics.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+SELECT xr.status_code, st.ordinal, -- xr.line_n,
+    xr.section, xr.xtext, xr.status_note
+FROM xreqs xr
+LEFT OUTER JOIN xreq_statuses st ON xr.status_code = st.status_code
+WHERE st.ordinal <= (select ordinal from xreq_statuses where status_code='ics')
+ORDER BY xr.line_n ASC;
+EOSQLITE3
+
+    csv_out_file="${db_file}.xreqs_statuses.status-nyi.csv"
+    [ -f "$csv_out_file" ] && rm "$csv_out_file"
+    printf 'Writing: %s\n' "$csv_out_file" | cat -t
+    sqlite3 "$db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+SELECT xr.status_code, st.ordinal, -- xr.line_n,
+    xr.section, xr.xtext, xr.status_note
+FROM xreqs xr
+LEFT OUTER JOIN xreq_statuses st ON xr.status_code = st.status_code
+WHERE st.status_code = 'nyi'
+ORDER BY xr.line_n ASC;
+EOSQLITE3
+
+jj_query_xreqs_stats=$this_script_rel_dir/../jj-query-xreqs-stats
+if [ ! -x "$jj_query_xreqs_stats" ]; then
+    printf 'Skipping jj-query-xreqs-stats, file not existing or executable: %s\n' "$jj_query_xreqs_stats"
+else
+    (set +x; "$jj_query_xreqs_stats" "$db_file")
+fi
+
+fi
+
+printf '\n[done] %s\n' "$this_script"
+do_exit 0

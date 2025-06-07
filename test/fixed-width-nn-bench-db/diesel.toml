@@ -1,0 +1,4 @@
+
+[print_schema]
+
+file = "src/db_schema.rs"

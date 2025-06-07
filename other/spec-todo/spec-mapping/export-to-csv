@@ -1,0 +1,77 @@
+#!/usr/bin/bash
+
+do_help() {
+    cat <<EOHELP
+Usage: export-to-csv SQLITE3_DB_FILENAME
+    Exports 'mappings' table to .csv file.
+    --help   Display this help and exit.
+EOHELP
+}
+
+sqlite3_db_file=
+while :; do
+    if [[ ! ${1+x} ]]; then
+        break
+    elif [[ -z "$1" ]]; then
+        echo "export-to-csv: Arg is null" >&2
+        exit 1
+    fi
+
+    case "$1" in
+        --help)
+            do_help
+            exit 0
+            ;;
+        -?*)
+            printf 'export-to-csv: Unknown option: %s' "$1" | cat -A >&2
+            echo >&2
+            exit 1
+            ;;
+        *)
+            if [[ ! -z "$sqlite3_db_file" ]]; then
+                echo "export-to-csv: Exactly one positional arg is allowed: SQLITE3_DB_FILENAME" >&2
+                do_help >&1 2>&2
+                return 1
+            else
+                sqlite3_db_file="$1"
+            fi
+            ;;
+    esac
+    shift
+done
+
+if [ -z "$sqlite3_db_file" ]; then
+    echo "export-to-csv: Positional arg SQLITE3_DB_FILENAME is required" >&2
+    exit 1
+elif [ ! -f "$sqlite3_db_file" ]; then
+    printf 'export-to-csv: File does not exist: %s' "$sqlite3_db_file" | cat -A >&2
+    echo >&2
+    exit 1
+fi
+
+printf 'export-to-csv: Reading from: %s' "$sqlite3_db_file" | cat -A >&2; echo >&2
+
+sqlite3_db_file_basename=$(printf '%s' "$sqlite3_db_file")
+printf -v csv_out_file '%s.mapping.csv' "$sqlite3_db_file_basename"
+sqlite3_db_file_basename=
+
+printf 'export-to-csv: Writing to: %s' "$csv_out_file" | cat -A >&2; echo >&2
+
+sqlite3 "$sqlite3_db_file" >"$csv_out_file" <<EOSQLITE3
+.mode csv
+.headers on
+-- select * from mapping;
+select
+    v210_eq, v210_var, v210_var_description, v210_pg, v210_sec, v210_sec_title,
+    v200_eq
+from mapping
+where
+       v210_eq is not null
+    or v210_var is not null
+    or v210_var_description is not null
+    or v210_pg is not null
+    or v210_sec is not null
+    or v210_sec_title is not null
+order by v210_eq, v210_pg
+;
+EOSQLITE3

@@ -1,0 +1,79 @@
+[package]
+name = "test-eg"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = [
+  "basic-array",
+  "crypto-bigint",
+  # required: "num-bigint",
+  "bits-256",
+  "bits-4096",
+  "zeroize"
+]
+
+basic-array      = [ "fixed-width-nonnegative/basic-array" ]
+basic-array-u8   = [ "fixed-width-nonnegative/basic-array-u8" ]
+basic-array-u16  = [ "fixed-width-nonnegative/basic-array-u16" ]
+basic-array-u32  = [ "fixed-width-nonnegative/basic-array-u32" ]
+basic-array-u64  = [ "fixed-width-nonnegative/basic-array-u64" ]
+# basic-array-u128 = [ "fixed-width-nonnegative/basic-array-u128" ]  TODO temp commented out due to limitations of crate::significant_first::ops::add_returning_carry
+crypto-bigint    = [ "fixed-width-nonnegative/crypto-bigint" ]
+hacl-rs          = [ "fixed-width-nonnegative/hacl-rs" ]
+hacl-rs-u32      = [ "fixed-width-nonnegative/hacl-rs-u32" ]
+hacl-rs-u64      = [ "fixed-width-nonnegative/hacl-rs-u64" ]
+# required: num-bigint       = [ "fixed-width-nonnegative/num-bigint" ]
+num-integer      = [ "fixed-width-nonnegative/num-integer" ]
+# bits-8           = [ "fixed-width-nonnegative/bits-8" ] TODO temp commented out due to limitations of crate::significant_first::ops::add_returning_carry
+# bits-16          = [ "fixed-width-nonnegative/bits-16" ]
+# bits-32          = [ "fixed-width-nonnegative/bits-32" ]
+# bits-64          = [ "fixed-width-nonnegative/bits-64" ]
+bits-128         = [ "fixed-width-nonnegative/bits-128" ]
+bits-256         = [ "fixed-width-nonnegative/bits-256" ]
+bits-512         = [ "fixed-width-nonnegative/bits-512" ]
+bits-1024        = [ "fixed-width-nonnegative/bits-1024" ]
+bits-2048        = [ "fixed-width-nonnegative/bits-2048" ]
+bits-4096        = [ "fixed-width-nonnegative/bits-4096" ]
+zeroize          = [ "fixed-width-nonnegative/zeroize" ]
+
+[dependencies]
+
+[dependencies.fixed-width-nonnegative]
+workspace = true
+features = [
+    "bits-256",
+    "bits-4096",
+    "basic-array",
+	"basic-array-u64",
+    "crypto-bigint",
+    "hacl-rs",
+    "montgomery",
+    "num-bigint",
+    "zeroize"
+]
+
+[dev-dependencies]
+anyhow.workspace = true
+criterion.workspace = true
+lazy_static.workspace = true
+crypto-bigint = { workspace = true, features = ["serde", "zeroize"] }
+num-bigint = { workspace = true, features = [] }
+# num-derive = { workspace = true, optional = true, features = [] }
+# num-integer = { workspace = true, optional = true, features = ["std"] }
+# num-traits = { workspace = true, optional = true, features = ["std", "i128"] }
+rand.workspace = true
+rand_core.workspace = true
+rand_pcg.workspace = true
+rayon.workspace = true
+static_assertions.workspace = true
+
+bench-util.workspace = true
+eg.workspace = true
+eg.features = ["bench"]
+eg-artifacts-dir.workspace = true
+util.workspace = true
+
+[[bench]]
+name = "bench"
+harness = false

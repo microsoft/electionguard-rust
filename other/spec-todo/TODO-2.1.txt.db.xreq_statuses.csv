@@ -1,0 +1,12 @@
+status_code,ordinal,xtext
+na,1,"Not directly applicable to implementation code"
+nfd,2,"Needs further discussion"
+ace,3,"Applicable to implementation code, but more directly covered elsewhere"
+nyi,4,"Not yet implemented"
+ics,50,"Implementation code exists covering a portion of code paths considered substantial"
+ute,55,"At least one unit test exercising a relevant code path exists"
+utep,60,"At least one unit test exercising a relevant code path is passing"
+uts,65,"Unit tests exercising a portion of code paths considered sufficient exist"
+utsp,75,"Unit tests exercising a portion of code paths considered sufficient are passing"
+its,80,"An integration test exercising a portion of code paths considered sufficient exists"
+itsp,100,"An integration test exercising a portion of code paths considered sufficient is passing"

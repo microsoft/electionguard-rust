@@ -1,0 +1,61 @@
+[package]
+name = "fixed-width-nn-bench"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+#static_assertions.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+diesel.workspace = true
+dotenvy.workspace = true
+crypto-bigint.workspace = true
+#cfg-if.workspace = true
+eg.workspace = true
+log.workspace = true
+logging.workspace = true
+num-bigint.workspace = true
+sha2 = { workspace = true, features = ["std"] }
+#rand.workspace = true
+#util.workspace = true
+
+#bench-util.workspace = true
+fixed-width-nonnegative.workspace = true
+fixed-width-nn-bench-db.workspace = true
+
+
+[features]
+default = [
+  "basic-array",
+  "crypto-bigint",
+  "num-bigint",
+  "bits-256",
+  "bits-4096",
+  "zeroize"
+]
+
+basic-array      = [ "fixed-width-nonnegative/basic-array" ]
+basic-array-u8   = [ "fixed-width-nonnegative/basic-array-u8" ]
+basic-array-u16  = [ "fixed-width-nonnegative/basic-array-u16" ]
+basic-array-u32  = [ "fixed-width-nonnegative/basic-array-u32" ]
+basic-array-u64  = [ "fixed-width-nonnegative/basic-array-u64" ]
+# basic-array-u128 = [ "fixed-width-nonnegative/basic-array-u128" ]  TODO temp commented out due to limitations of crate::significant_first::ops::add_returning_carry
+crypto-bigint    = [ "fixed-width-nonnegative/crypto-bigint" ]
+hacl-rs          = [ "fixed-width-nonnegative/hacl-rs" ]
+hacl-rs-u32      = [ "fixed-width-nonnegative/hacl-rs-u32" ]
+hacl-rs-u64      = [ "fixed-width-nonnegative/hacl-rs-u64" ]
+num-bigint       = [ "fixed-width-nonnegative/num-bigint" ]
+montgomery       = [ "fixed-width-nonnegative/montgomery" ]
+# bits-8           = [ "fixed-width-nonnegative/bits-8" ] TODO temp commented out due to limitations of crate::significant_first::ops::add_returning_carry
+# bits-16          = [ "fixed-width-nonnegative/bits-16" ]
+# bits-32          = [ "fixed-width-nonnegative/bits-32" ]
+# bits-64          = [ "fixed-width-nonnegative/bits-64" ]
+bits-128         = [ "fixed-width-nonnegative/bits-128" ]
+bits-256         = [ "fixed-width-nonnegative/bits-256" ]
+bits-512         = [ "fixed-width-nonnegative/bits-512" ]
+bits-1024        = [ "fixed-width-nonnegative/bits-1024" ]
+bits-2048        = [ "fixed-width-nonnegative/bits-2048" ]
+bits-4096        = [ "fixed-width-nonnegative/bits-4096", "fixed-width-nonnegative/bits-8192" ]
+bits-8192        = [ "fixed-width-nonnegative/bits-8192" ]
+zeroize          = [ "fixed-width-nonnegative/zeroize" ]
