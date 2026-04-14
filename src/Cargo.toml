@@ -169,7 +169,7 @@ ractor = { version = "0.15.6", default-features = false, features = [
 #--------------- Rand
 
 getrandom = { version = "0.3.3", default-features = false }
-rand = { version = "0.9.1", default-features = false, features = [
+rand = { version = "0.9.3", default-features = false, features = [
     "alloc",
 ] }
 rand_core = { version = "0.9.3", default-features = false, features = ["std"] }
